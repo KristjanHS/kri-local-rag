@@ -4,16 +4,13 @@
 # External libraries
 from __future__ import annotations
 import sys
-import httpx  # For catching connection errors
-import requests
-import json
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any
 
 # Local .py imports
-from config import OLLAMA_MODEL, OLLAMA_URL
+from config import OLLAMA_MODEL
 from retriever import get_top_k
-from windows_ip_in_wsl import get_windows_host_ip
+from ollama_client import test_ollama_connection, generate_response, set_debug_level
 
 
 # ---------- cross-encoder helpers --------------------------------------------------
@@ -38,38 +35,6 @@ _cross_encoder: "CrossEncoder | None" = None  # type: ignore
 _ollama_context: list[int] | None = None
 
 # ✅ Re-ranking of retrieved chunks implemented below using a cross-encoder (sentence-transformers).
-
-
-# ---------- Ollama helpers --------------------------------------------------
-def _get_ollama_base_url() -> str:
-    """Return the Ollama base URL accessible from WSL.
-
-    Prefers the Windows host IP if available, otherwise falls back to the
-    default URL from config.
-    """
-    ip = get_windows_host_ip()
-    if ip:
-        return f"http://{ip}:11434"
-    return OLLAMA_URL
-
-
-'''
-def _detect_ollama_model() -> str | None:
-    """Return the first available model reported by the Ollama server or None."""
-    try:
-        # /api/tags lists all pulled models
-        base_url = _get_ollama_base_url()
-        resp = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=2)
-        resp.raise_for_status()
-        models = resp.json().get("models", [])
-        if models:
-            # The endpoint returns a list of objects; each has a `name` field.
-            return models[0].get("name")
-    except Exception:
-        # Any issue (network, JSON, etc.) – silently ignore and let caller fall back.
-        pass
-    return None
-'''
 
 
 # ---------- Cross-encoder helpers --------------------------------------------------
@@ -167,67 +132,13 @@ def answer(
     # ---------- 3) Prepare the prompt and payload -------------------------------------------------
     prompt_text = build_prompt(question, context_chunks)
 
-    model_name = OLLAMA_MODEL
-    # alternative: use the first available model from the server
-    # model_name = _detect_ollama_model() or OLLAMA_MODEL
-    base_url = _get_ollama_base_url()
-    # Use the native Ollama generate endpoint which streams newline-delimited JSON
-    url = f"{base_url.rstrip('/')}/api/generate"
-
-    payload: dict[str, object] = {
-        "model": model_name,
-        "prompt": prompt_text,
-        "stream": True,
-        # You can tweak generation params here as desired.
-    }
-    if _ollama_context is not None:
-        payload["context"] = _ollama_context
-
     # ---------- 4) Query the LLM -------------------------------------------------
-    answer_text = ""
-    try:
-        resp = requests.post(url, json=payload, timeout=None, stream=True)
-        for raw_chunk in resp.iter_lines():
-            if not raw_chunk:
-                continue
+    answer_text, updated_context = generate_response(prompt_text, OLLAMA_MODEL, _ollama_context)
 
-            # Ollama sends newline-separated JSON objects. Some builds prefix each
-            # line with "data: " (SSE style) – strip it if present.
-            line = raw_chunk.decode().strip()
-            if line.startswith("data:"):
-                line = line[len("data:") :].strip()
+    # Update context for next interaction
+    _ollama_context = updated_context
 
-            # End-of-stream marker used by OpenAI-compatible endpoints.
-            if line == "[DONE]":
-                break
-
-            try:
-                data = json.loads(line)
-            except json.JSONDecodeError:
-                # Skip malformed lines instead of crashing the whole loop.
-                continue
-
-            # The token field differs across Ollama endpoints / versions → handle all known keys.
-            token_str: str = (
-                data.get("response")
-                or data.get("token")
-                or (data.get("choices", [{}])[0].get("text") if "choices" in data else "")
-            )
-
-            answer_text += token_str
-            sys.stdout.write(token_str)
-            sys.stdout.flush()
-
-            # Capture the conversation context if provided with the final chunk.
-            if data.get("done"):
-                _ollama_context = data.get("context", _ollama_context)
-                break
-
-        return answer_text or "(no response)"
-    except (requests.exceptions.RequestException, httpx.HTTPError, httpx.ConnectError, ConnectionError):
-        return "[Ollama server not reachable – please ensure it is running on the configured URL]"
-    except Exception as exc:
-        return f"[Unexpected error while querying Ollama: {exc}]"
+    return answer_text
 
 
 # ---------- CLI --------------------------------------------------
@@ -238,7 +149,17 @@ if __name__ == "__main__":
     parser.add_argument("--source", help="Filter chunks by source field (e.g. 'pdf')")
     parser.add_argument("--language", help="Filter chunks by detected language code (e.g. 'en', 'et')")
     parser.add_argument("--k", type=int, default=3, help="Number of top chunks to keep after re-ranking")
+    parser.add_argument(
+        "--debug-level",
+        type=int,
+        default=1,
+        choices=[0, 1, 2, 3],
+        help="Debug level: 0=off, 1=basic, 2=detailed, 3=verbose (default: 1)",
+    )
     args = parser.parse_args()
+
+    # Set debug level
+    set_debug_level(args.debug_level)
 
     # Build metadata filter dict (AND-combination of provided fields)
     meta_filter: Optional[Dict[str, Any]] = None
@@ -255,6 +176,13 @@ if __name__ == "__main__":
             meta_filter = {"operator": "And", "operands": clauses}
 
     print("RAG console – type a question, Ctrl-D/Ctrl-C to quit")
+
+    # Run Ollama connection test before starting
+    if not test_ollama_connection():
+        print("Failed to establish Ollama connection. Please check your setup.")
+        sys.exit(1)
+
+    print("\nReady for questions!")
     try:
         for line in sys.stdin:
             q = line.strip()
