@@ -1,8 +1,0 @@
-weaviate:
-  class_name: "Document"
-  vectorizer: "text2vec-nomic"
-  model: "nomic-embed-text-v1.5"
-data:
-  directory: "data" # Relative to the script location
-query:
-  default_query: "What did the fox jump over?"

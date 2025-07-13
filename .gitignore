@@ -52,10 +52,6 @@ cuda-keyring_*.deb
 # google cloud
 google-cloud-sdk/
 
-#####################
-# Phase 2
-#####################
-
 # Large data files, assets, or logs
 data/
 assets/
