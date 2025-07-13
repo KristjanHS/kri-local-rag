@@ -1,10 +1,11 @@
 # External libraries actually imported by the Python source files
 langchain
-weaviate-client
+weaviate-client>=4.0.0
 httpx
 requests
 sentence-transformers
 langdetect
+unstructured[pdf]
 
 # --- Core ML / GPU stack (optional, install manually as noted above) ---
 # torch==2.5.1+cu121

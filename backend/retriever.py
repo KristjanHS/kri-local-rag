@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import List, Optional, Dict, Any
 
 import weaviate
-import os
 
 from config import COLLECTION_NAME, DEFAULT_HYBRID_ALPHA
 
@@ -41,12 +40,12 @@ def get_top_k(
        (e.g. older Weaviate versions without the hybrid module).
     """
 
-    url = os.getenv("WEAVIATE_URL")
-    client = weaviate.Client(url=url) if url else weaviate.connect_to_local()  # type: ignore[attr-defined]
+    # For now, use the local connection which should work with v4
+    client = weaviate.connect_to_local()
     try:
-        docs = client.collections.get(COLLECTION_NAME)  # type: ignore[attr-defined]
+        collection = client.collections.get(COLLECTION_NAME)
 
-        q = docs.query
+        q = collection.query
         q = _apply_metadata_filter(q, metadata_filter)
 
         try:

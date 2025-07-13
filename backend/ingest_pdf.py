@@ -70,9 +70,7 @@ def list_pdfs(directory: str) -> List[str]:
 
 
 def connect() -> weaviate.WeaviateClient:
-    url = os.getenv("WEAVIATE_URL")
-    if url:
-        return weaviate.Client(url=url)  # type: ignore[attr-defined]
+    # Use local connection for v4 compatibility
     return weaviate.connect_to_local()
 
 
