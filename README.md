@@ -1,19 +1,83 @@
-# Phase 2 — Local RAG Experimentation
+# kri-local-rag
 
-This phase focuses on building and experimenting with a local Retrieval-Augmented Generation (RAG) pipeline. The goal is to use the `nomic-embed-text` model for creating text embeddings and FAISS for efficient similarity search.
+Local RAG system using Weaviate, Ollama, and Python.
 
-## Directory Layout
+## Quick Start
 
-```text
-/
-├── data/                     # Sample data for the RAG pipeline
-├── notebooks/                # Jupyter notebooks for experimentation
-├── python_code/              # Python scripts for the RAG pipeline
-└── tests/                    # Tests for the RAG pipeline
+```bash
+git clone <your-repo-url>
+cd kri-local-rag
+./run-docker.sh
 ```
 
-## Key Components
+## Features
 
-- **Embedding Model**: `nomic-embed-text` for creating high-quality text embeddings.
-- **Vector Store**: FAISS for efficient storage and retrieval of text embeddings.
-- **RAG Pipeline**: A Python script that demonstrates how to load data, create embeddings, and perform similarity search.
+- **Vector Database** (Weaviate) - Store document embeddings
+- **Local LLM** (Ollama) - Run models locally
+- **Interactive Console** - Ask questions about documents
+- **PDF Processing** - Ingest and embed PDFs
+- **GPU Support** - Optional acceleration
+
+## System Requirements
+
+- Docker & Docker Compose
+- 8GB+ RAM
+- NVIDIA GPU (optional)
+- Linux/WSL2
+
+## Usage
+
+### 1. Start System
+```bash
+./run-docker.sh
+```
+
+### 2. Ingest Documents
+```bash
+docker compose run --rm rag-backend python ingest_pdf.py
+```
+
+### 3. Ask Questions
+```
+> What is this document about?
+```
+
+## Development
+
+### Code Changes
+```bash
+# Make changes to backend/ files
+# Restart to pick up changes
+docker compose restart rag-backend
+```
+
+### Debug Levels
+```bash
+docker compose run --rm rag-backend --debug-level 1
+```
+
+## Troubleshooting
+
+### Common Issues
+- **No results** - Check if documents were ingested
+- **Model not found** - Wait for download or pull manually
+- **GPU issues** - Check NVIDIA Container Toolkit
+- **Port conflicts** - Check ports 8080, 8081, 11434
+
+### Quick Commands
+```bash
+docker ps                    # Check status
+docker compose logs rag-backend  # View logs
+docker compose down -v && ./run-docker.sh  # Reset
+```
+
+## Documentation
+
+- [Getting Started](docs/setup/getting-started.md)
+- [Basic Usage](docs/usage/basic-usage.md)
+- [Document Processing](docs/usage/document-processing.md)
+- [Docker Management](docs/setup/docker-management.md)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file.
