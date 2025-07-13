@@ -1,4 +1,4 @@
-name: kri_local_RAG
+name: kri-local-rag
 services:
   # ---------- Local Weaviate database ------------------------------------------------
   weaviate:
