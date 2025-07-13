@@ -1,14 +1,14 @@
 # Automating Project Startup with Virtual Environment Activation & VS Code Workspace
 
-This short guide shows how to jump straight into your **hands‑on‑llm** project from any WSL shell with a single command.  After following the steps, typing `llm` will:
+This short guide shows how to jump straight into your **kri-local-rag** project from any WSL shell with a single command.  After following the steps, typing `llm` will:
 
-1. **cd** into `~/projects/hands-on-llm`
+1. **cd** into `~/projects/kri-local-rag`
 2. **Activate** the .venv Python virtual environment (if it exists)
-3. **Launch** VS Code, opening *hands‑on‑llm.code-workspace* in a fresh window
+3. **Launch** VS Code, opening *kri-local-rag.code-workspace* in a fresh window
 4. Leave you inside the project directory with the venv active:
 
 ```bash
-(.venv) kristjan@pcname:~/projects/hands-on-llm$
+(.venv) kristjan@pcname:~/projects/kri-local-rag$
 ```
 
 ---
@@ -20,8 +20,8 @@ Add the following function to the bottom of your `~/.bashrc` (or `~/.zshrc`):
 ```bash
 # ——— quick project launcher ———
 llm () {
-    local project=~/projects/hands-on-llm
-    local ws="$project/hands-on-llm.code-workspace"
+    local project=~/projects/kri-local-rag
+    local ws="$project/kri-local-rag.code-workspace"
 
     cd "$project" || return 1                           # jump into the project
     [ -f .venv/bin/activate ] && source .venv/bin/activate # activate venv if present

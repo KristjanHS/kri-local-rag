@@ -1,4 +1,4 @@
 #!/bin/bash
-export COMPOSE_FILE=phase2/docker-compose.yml
-export COMPOSE_PROJECT_NAME=weaviate
+export COMPOSE_FILE=docker/docker-compose.yml
+export COMPOSE_PROJECT_NAME=kri-local-rag
 docker-compose up

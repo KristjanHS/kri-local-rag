@@ -5,7 +5,7 @@ This phase focuses on building and experimenting with a local Retrieval-Augmente
 ## Directory Layout
 
 ```text
-phase2/
+/
 ├── data/                     # Sample data for the RAG pipeline
 ├── notebooks/                # Jupyter notebooks for experimentation
 ├── python_code/              # Python scripts for the RAG pipeline
