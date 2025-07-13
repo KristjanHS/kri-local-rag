@@ -52,7 +52,7 @@ services:
   rag-backend:
     build:
       context: ..  # project root
-      dockerfile: docker/Dockerfile.backend
+      dockerfile: docker/backend.Dockerfile
     depends_on:
       - weaviate
       - ollama
