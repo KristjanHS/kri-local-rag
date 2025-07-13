@@ -1,4 +1,4 @@
-name: text2vec-weaviate
+name: kri_local_RAG
 services:
   # ---------- Local Weaviate database ------------------------------------------------
   weaviate:

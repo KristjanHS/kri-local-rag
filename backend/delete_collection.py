@@ -1,5 +1,6 @@
 import weaviate
 import os
+
 from config import COLLECTION_NAME
 
 url = os.getenv("WEAVIATE_URL")

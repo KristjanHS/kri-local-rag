@@ -8,7 +8,7 @@ ENV PIP_ROOT_USER_ACTION=ignore
 # Suppress update-alternatives warnings - they are normal in python slim images
 ENV DEBIAN_FRONTEND=noninteractive
 
-WORKDIR /app
+WORKDIR /app/backend
 
 # System deps required by PDF parsing & other libs.
 RUN apt-get update && \
@@ -19,9 +19,9 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements separately to leverage Docker layer cache
-COPY requirements.txt ./
+COPY requirements.txt /app/
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r /app/requirements.txt && \
     # If you do not need GPU inside this container, ALSO remove the runtime line in docker-compose.yml!
     # Enable GPU support via NVIDIA runtime (CUDA libraries are provided by the host runtime)
     # Optional: install GPU-enabled PyTorch (comment out if you prefer CPU)
@@ -31,4 +31,4 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY backend/ /app/backend/
 
 # Default command – override in docker-compose if you need another entrypoint.
-CMD ["python", "-m", "backend.qa_loop"] 
+CMD ["python", "qa_loop.py"] 
