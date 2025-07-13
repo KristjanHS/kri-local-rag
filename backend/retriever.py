@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import List, Optional, Dict, Any
 
 import weaviate
+import os
 
 from config import COLLECTION_NAME, DEFAULT_HYBRID_ALPHA
 
@@ -40,9 +41,10 @@ def get_top_k(
        (e.g. older Weaviate versions without the hybrid module).
     """
 
-    client = weaviate.connect_to_local()
+    url = os.getenv("WEAVIATE_URL")
+    client = weaviate.Client(url=url) if url else weaviate.connect_to_local()  # type: ignore[attr-defined]
     try:
-        docs = client.collections.get(COLLECTION_NAME)
+        docs = client.collections.get(COLLECTION_NAME)  # type: ignore[attr-defined]
 
         q = docs.query
         q = _apply_metadata_filter(q, metadata_filter)
@@ -66,4 +68,4 @@ def get_top_k(
 
         return [str(o.properties.get("content", "")) for o in objects]
     finally:
-        client.close()
+        client.close()  # type: ignore[attr-defined]

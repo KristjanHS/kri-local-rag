@@ -1,5 +1,6 @@
 name: text2vec-weaviate
 services:
+  # ---------- Local Weaviate database ------------------------------------------------
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.25.1
     ports:
@@ -15,6 +16,7 @@ services:
       TRANSFORMERS_INFERENCE_API: 'http://t2v-transformers:8080'
       CLUSTER_HOSTNAME: 'node1'
 
+  # ---------- Local Transformers server for Weaviate ingestion ------------------------------------------------
   t2v-transformers:
     build:
       context: ./
@@ -32,7 +34,48 @@ services:
     secrets:
       - hf_hub_token
 
+  # ---------- Local LLM server for generating RAG answers ---------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    runtime: nvidia
+    ports:
+      - "11434:11434"  # expose locally
+    volumes:
+      - ollama_models:/root/.ollama  # mount models volume to persist pulled models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+
+  # ---------- Local RAG Q&A loop - Python backend -----------------------------------------
+  rag-backend:
+    build:
+      context: ..  # project root
+      dockerfile: docker/Dockerfile.backend
+    depends_on:
+      - weaviate
+      - ollama
+    environment:
+      # Point the Python code to the other services inside the compose network
+      - OLLAMA_URL=http://ollama:11434
+      - WEAVIATE_URL=http://weaviate:8080
+    ports:
+      - "8000:8000"  # change if you expose an API on another port
+    volumes:
+      - ..:/app  # live-mount project for rapid iteration – remove for prod
+    # Comment out the next two lines (and their children) if you CPU only is enough for the python code
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+
 # Root-level secrets definition
 secrets:
   hf_hub_token:
     file: ./secrets/hf_hub_token
+
+volumes:
+  ollama_models:

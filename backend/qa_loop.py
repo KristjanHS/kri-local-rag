@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """Interactive console for Retrieval-Augmented Generation."""
-from __future__ import annotations
-from windows_ip_in_wsl import get_windows_host_ip
 
+# External libraries
+from __future__ import annotations
 import sys
 import httpx  # For catching connection errors
 import requests
 import json
+from dataclasses import dataclass
+from typing import List, Tuple, Optional, Dict, Any
 
+# Local .py imports
 from config import OLLAMA_MODEL, OLLAMA_URL
 from retriever import get_top_k
-from typing import List, Tuple, Optional, Dict, Any
-from dataclasses import dataclass
+from windows_ip_in_wsl import get_windows_host_ip
 
 
 # ---------- cross-encoder helpers --------------------------------------------------
-
-
 @dataclass
 class ScoredChunk:
     """A context *chunk* paired with its relevance *score*."""
@@ -37,9 +37,10 @@ _cross_encoder: "CrossEncoder | None" = None  # type: ignore
 # Keep Ollama context tokens between calls so the model retains conversation state
 _ollama_context: list[int] | None = None
 
-# ✅ Re-ranking implemented below using a cross-encoder (sentence-transformers).
+# ✅ Re-ranking of retrieved chunks implemented below using a cross-encoder (sentence-transformers).
 
 
+# ---------- Ollama helpers --------------------------------------------------
 def _get_ollama_base_url() -> str:
     """Return the Ollama base URL accessible from WSL.
 
@@ -52,6 +53,7 @@ def _get_ollama_base_url() -> str:
     return OLLAMA_URL
 
 
+'''
 def _detect_ollama_model() -> str | None:
     """Return the first available model reported by the Ollama server or None."""
     try:
@@ -67,8 +69,10 @@ def _detect_ollama_model() -> str | None:
         # Any issue (network, JSON, etc.) – silently ignore and let caller fall back.
         pass
     return None
+'''
 
 
+# ---------- Cross-encoder helpers --------------------------------------------------
 def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
     """Return a (cached) CrossEncoder instance or ``None`` if the library is unavailable.
 
@@ -87,6 +91,7 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
     return _cross_encoder
 
 
+# ---------- Scoring of retrieved chunks --------------------------------------------------
 def _score_chunks(question: str, chunks: List[str], debug: bool = False) -> List[ScoredChunk]:
     """Return *chunks* each paired with a relevance score for *question*."""
 
@@ -109,6 +114,7 @@ def _score_chunks(question: str, chunks: List[str], debug: bool = False) -> List
     return [ScoredChunk(text=c, score=float(s)) for c, s in zip(chunks, scores)]
 
 
+# ---------- Reranking of retrieved chunks --------------------------------------------------
 def _rerank(question: str, chunks: List[str], k_keep: int, debug: bool = False) -> List[ScoredChunk]:
     """Return the *k_keep* most relevant chunks for *question*, sorted by score."""
 
@@ -117,6 +123,7 @@ def _rerank(question: str, chunks: List[str], k_keep: int, debug: bool = False) 
     return scored[:k_keep]
 
 
+# ---------- Prompt building --------------------------------------------------
 def build_prompt(question: str, context_chunks: list[str]) -> str:
     context = "\n\n".join(context_chunks)
     prompt = (
@@ -127,6 +134,7 @@ def build_prompt(question: str, context_chunks: list[str]) -> str:
     return prompt
 
 
+# ---------- Answer generation --------------------------------------------------
 def answer(
     question: str,
     k: int = 3,
@@ -222,6 +230,7 @@ def answer(
         return f"[Unexpected error while querying Ollama: {exc}]"
 
 
+# ---------- CLI --------------------------------------------------
 if __name__ == "__main__":
     import argparse
 
