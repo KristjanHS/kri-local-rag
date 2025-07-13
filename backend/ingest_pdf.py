@@ -164,7 +164,7 @@ def ingest(directory: str):
 # ---------- CLI ---------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Ingest PDFs into Weaviate and print statistics.")
-    parser.add_argument("--data-dir", default="data", help="Directory with PDF files.")
+    parser.add_argument("--data-dir", default="../data", help="Directory with PDF files.")
     args = parser.parse_args()
 
     ingest(args.data_dir)

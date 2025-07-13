@@ -6,9 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "hands-on-llm"
 authors = [{ name="Kristjan Sillmann"}]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
-    "torch==2.5.1+cu121",
+    "torch==2.7.1+cu128",
     "ipykernel",
     "numpy",
     "rich"
@@ -17,4 +17,4 @@ dependencies = [
 [tool.black]
 line-length = 120
 skip-string-normalization = false
-target-version = ["py311"]
+target-version = ["py312"]
