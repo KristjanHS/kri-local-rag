@@ -1,0 +1,73 @@
+# Compiled outputs
+bin/
+*.out
+
+# Virtualenv
+.venv/
+venv/
+.cu121/
+.tox/
+.nox/
+.mypy_cache/
+
+
+# Python cache and build files
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+build/
+_build/
+dist/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment variables
+.env
+
+# Logs
+logs/
+
+# Ignore distribution and packaging files
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+cuda-keyring_*.deb
+
+# google cloud
+google-cloud-sdk/
+
+#####################
+# Phase 2
+#####################
+
+# Large data files, assets, or logs
+data/
+assets/
+*.csv
+# If they are large datasets
+*.json
+*.log
+faiss_index/
+
+# Third-party libraries you've vendored/included
+vendor/
+third_party/
+
+# Docker secrets
+secrets/

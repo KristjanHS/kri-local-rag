@@ -1,0 +1,12 @@
+# .flake8
+[flake8]
+max-line-length = 120
+exclude = .git,__pycache__,.venv,venv,build,dist
+
+extend-ignore = E203, W503, E401, E302, E305
+#    E203,  # Ignore whitespace before ':'
+#    W503  # Ignore line break before binary operator
+#    'E501',  # Ignore line length errors
+#    'F401',  # Ignore unused imports
+#    'F403',  # Ignore wildcard imports
+#    'F405',  # Ignore undefined names in wildcard imports

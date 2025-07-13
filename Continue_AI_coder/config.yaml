@@ -1,0 +1,202 @@
+name: Local Assistant
+version: 1.0.0
+schema: v1
+models:
+# Prompt style – plain chat or code prefix; infill not native, but you can emulate 
+# by sending the incomplete function plus # TODO:
+# 3.8 GB
+  - name: "deepseek-coder instruct-Q4_K_M"
+    provider: ollama
+    model: "hf.co/Savyasaachin/deepseek-coder-6.7b-instruct-Q4_K_M-GGUF:Q4_K_M"
+    roles:
+      - autocomplete
+      - chat
+      - edit
+    defaultCompletionOptions:
+      contextLength: 4096         
+      maxTokens:     1024         
+      temperature:   0.1          
+      topK:          40           # smaller candidate set → faster sampling
+      topP:          0.9          # nucleus cap
+#      stop: ["\n"]                # stop at first newline
+#      presencePenalty: 0            # discourage repetition of certain tokens
+#      frequencyPenalty: 0.1
+    
+
+  - name: Qwen 2.5 Coder 3B Instruct Q8
+    provider: ollama
+    model: qwen2.5-coder:3b-instruct-q8_0
+    roles:
+#      - autocomplete
+      - edit
+      - chat
+    defaultCompletionOptions:
+      contextLength: 8192
+      maxTokens: 4096
+
+
+
+# Autocomplete tip – prepend natural-language intent 
+# (e.g. “### Python function to …”) to steer completions.
+# 4 GB
+  - name: "StarCoder2:7b 16k context"
+    provider: ollama
+    model: "starcoder2:7b"
+    roles:
+#      - autocomplete
+      - chat
+      - edit
+
+
+# Pedigree – Meta’s research release; beats even Llama 2 70 B on coding tasks at a tenth the size
+# Designed for IDE-like infill – uses <PRE> … <SUF> … <MID> tokens for true hole-filling
+# 3.8GB
+# TODO: 
+# Switch from legacy Q4_0 to Q4_K_M or Q5_K_M; 
+# they are ~25–40 % faster and need ≤ 4 GB VRAM for a 7 B model.
+  - name: "codellama:7b 16k context"
+    provider: ollama
+    model: "codellama:7b"
+    roles:
+#      - autocomplete
+      - chat
+      - edit
+
+  - name: "Qwen Coder"
+    provider: ollama
+    model: "qwen2.5-coder:latest"
+#    model: "qwen2.5-coder:7b"
+#    apiBase: "http://localhost:11434"
+    roles:
+#      - autocomplete
+      - chat
+      - edit
+
+  - name: Llama3.1:8b
+    provider: ollama
+    model: "llama3.1:8b"
+    roles:
+#      - autocomplete
+      - chat
+      - edit
+
+  #- name: Autodetect ollama
+  #  provider: ollama
+  #  model: AUTODETECT
+  #  roles:
+  #    - chat
+  #    - edit
+  #    - autocomplete
+
+# Prompt style – plain chat or code prefix; infill not native, but you can emulate 
+# by sending the incomplete function plus # TODO:
+# 8.9GB
+  - name: "deepseek-coder-v2 16B 160k context"
+    provider: ollama
+    model: "deepseek-coder-v2:16b"
+    roles:
+#      - autocomplete
+      - chat
+      - edit
+
+# Prompt style – plain chat or code prefix; infill not native, but you can emulate 
+# by sending the incomplete function plus # TODO:
+# 8.9GB
+  - name: "deepseek-coder-v2-lite-instruct 16B 4k context"
+    provider: ollama
+    model: "mannix/deepseek-coder-v2-lite-instruct:latest"
+    roles:
+#      - autocomplete
+      - chat
+      - edit
+
+# Autocomplete tip – prepend natural-language intent 
+# (e.g. “### Python function to …”) to steer completions.
+# 9.1GB
+  - name: "starcoder2:15b 16k context"
+    provider: ollama
+    model: "starcoder2:15b"
+    roles:
+#      - autocomplete
+      - chat
+      - edit
+
+# Pedigree – Meta’s research release; beats even Llama 2 70 B on coding tasks at a tenth the size
+# Designed for IDE-like infill – uses <PRE> … <SUF> … <MID> tokens for true hole-filling
+# 7.4GB
+  - name: "codellama:13b 16k context"
+    provider: ollama
+    model: "codellama:13b"
+    roles:
+#      - autocomplete
+      - chat
+      - edit
+
+ ##############################################################################
+ # 3B models were generally the best choice for local autocompletion
+ ##############################################################################
+ # A local 3B model dedicated to lightning-fast autocompletion:
+  # Start with an instruct-tuned model - They return usable answers without custom system prompts. 
+       # Replit-Code v1.5 and Phi-3 Mini qualify.
+
+  ### Final Recommendation for You
+  # 2. Once you are comfortable, I highly recommend you try **`phi3:3.8b-mini-instruct-q6_K`**. 
+  # Its ability to generate explanations can significantly speed up your learning process for new AI topics.
+  # Microsoft "phi3:mini", 4k context
+  # Newer data. Surprisingly "smart" for its size. Great at generating code and explaining it with comments. 
+  # Understands instructions well (e.g., "complete this function and add a docstring explaining it").
+  # strong reasoning but a hair larger (3.8 B)
+  # 
+  - name: "Phi-3:mini"
+    provider: ollama
+    model: "mannix/phi3-mini-4k:q6_k"
+    roles:
+      - chat
+      - edit
+
+  ### Final Recommendation for You
+  # 1. Start with `StarCoder2:3b-q8_0`**.
+  # It is the most straightforward and reliable choice for pure code completion. 
+  # As a beginner, having a tool that consistently provides clean, correct boilerplate for Python
+  # and its AI libraries is the most valuable asset.
+  # Context: 4 K; trained on 80+ languages from GitHub.
+  # Excellent at generating clean, standard Python boilerplate.
+  # Very good at completing lines and functions. Trained specifically on code, so it has low "noise."
+  - name: "StarCoder2"
+    provider: ollama
+    model: "starcoder2:3b-q8_0"
+    roles:
+      - chat
+      - edit
+
+  # IBM "granite-code:3b"
+  # Context: 128 K, both base and instruct checkpoints.
+  # Strengths: broad language mix (116 langs); enterprise-grade model card & safety filters.
+  # Q4_0 ≈ 4.6 GB (a bit heavier).
+ 
+  # "replit-code-v1_5-3b"
+  # Dead-simple chat/IDE completions, 4 K context, permissive licence, rock-solid Python coverage.
+
+context:
+  # @code - Search for specific functions or classes in your codebase
+  - provider: code
+  # @docs - Search external documentation that you have indexed
+  # This provider requires you to list the documentation sites you want to use.
+  - provider: docs
+    sites:
+      - title: "Continue Docs"
+        url: "https://continue.dev/docs"
+      - title: "Python Docs"
+        url: "https://docs.python.org/3/"
+  # @diff - Reference your current staged or unstaged git changes
+  - provider: diff
+  # @terminal - Reference the output of the last command run in the terminal
+  - provider: terminal
+  # @problems - Reference all errors and warnings in the current file
+  - provider: problems
+  # @folder - Search for context within a specific folder
+  - provider: folder
+  # @codebase - Perform a semantic search across your entire codebase
+  - provider: codebase
+    params:
+      nFinal: 8       # only last 8 edited files
