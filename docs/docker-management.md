@@ -23,42 +23,36 @@ docker compose run --rm rag-backend
 | **t2v-transformers** | Embedding generation | 8081 |
 | **rag-backend** | RAG application | - |
 
-## Code Changes
+## Service Details
 
-Live volume mounting means changes are immediate:
+### Weaviate (Vector Database)
+- **Purpose**: Stores document embeddings
+- **Data**: Persisted in `./.data` volume
+
+### Ollama (LLM Server)
+- **Purpose**: Local LLM inference
+- **Models**: Stored in `ollama_models` volume
+
+### t2v-transformers (Embedding Service)
+- **Purpose**: Generates text embeddings
+- **GPU**: CUDA support
+
+### rag-backend (Application)
+- **Purpose**: Main RAG application
+- **Dependencies**: weaviate, ollama
+- **Volume**: Live-mounted project directory
+
+## Service Operations
+
 ```bash
-# Make changes to backend/ files
-# Restart to pick up changes
+# Code changes (live volume mounting)
 docker compose restart rag-backend
-```
 
-## Service Management
-
-```bash
-# Start services
-docker compose up -d
-
-# Stop services
-docker compose down
-
-# View logs
+# Service management
 docker compose logs -f
 
-# Restart specific service
-docker compose restart rag-backend
-```
-
-## Rebuilding
-
-```bash
-# Rebuild specific service
-docker compose build rag-backend
-
-# Rebuild all services
+# Rebuilding
 docker compose build
-
-# Force rebuild
-docker compose build --no-cache
 ```
 
 ## Troubleshooting
@@ -74,12 +68,25 @@ sudo netstat -tulpn | grep :11434
 # Check GPU availability
 docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
 
+# Test GPU in containers
+docker compose exec ollama nvidia-smi
+
 # Install NVIDIA Container Toolkit
 distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
 curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
 curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
 sudo apt-get update && sudo apt-get install -y nvidia-docker2
 sudo systemctl restart docker
+```
+
+## Debug & Monitoring
+
+### Service Health
+```bash
+# Check service health
+curl http://localhost:8080/v1/meta  # Weaviate
+curl http://localhost:11434/api/tags  # Ollama
+curl http://localhost:8081/health  # Transformers
 ```
 
 ### Service Issues
@@ -93,31 +100,87 @@ docker compose logs rag-backend
 docker ps -a
 ```
 
-## Debug Commands
-
+### Access Service Shells
 ```bash
-# Access service shells
 docker compose exec weaviate sh
 docker compose exec ollama sh
 docker compose exec rag-backend bash
-
-# Check service health
-curl http://localhost:8080/v1/meta  # Weaviate
-curl http://localhost:11434/api/tags  # Ollama
-curl http://localhost:8081/health  # Transformers
 ```
 
-## Volumes
+## Volumes & Data Management
+
+This project uses two types of volumes:
+- **Named volumes** (`ollama_models`): Managed by Docker, stored outside the project.
+- **Bind mounts** (`docker/.data`): Stored inside the project directory.
+
+### Common Commands (Work in WSL2 & Linux)
 
 ```bash
-# List volumes
+# List all project-related volumes
 docker volume ls | grep kri-local-rag
 
-# Backup data
-docker run --rm -v kri-local-rag_weaviate_data:/data -v $(pwd):/backup alpine tar czf /backup/weaviate_backup.tar.gz -C /data .
+# Remove old/unused volumes from previous project names
+docker volume rm <old-volume-name>
 ```
+
+### Universal Backup/Restore Method (via Docker Container)
+
+```bash
+# Backup Weaviate data:
+docker run --rm -v kri-local-rag_weaviate_data:/data -v $(pwd):/backup alpine tar czf /backup/weaviate_backup.tar.gz -C /data .
+# Restore Weaviate data:
+docker run --rm -v kri-local-rag_weaviate_data:/data -v $(pwd):/backup alpine tar xzf /backup/weaviate_backup.tar.gz -C /data .
+```
+
+### Environment-Specific Differences
+
+On native Linux, you can directly access the filesystem path of a named volume. This is NOT the standard or recommended way on WSL2, where Docker Desktop manages data within its own virtual disk, making direct filesystem access complex.
+
+```bash
+# Example (Linux Only): Direct filesystem access
+sudo ls -la /var/lib/docker/volumes/kri-local-rag_weaviate_data/_data
+
+# Example (Linux Only): Direct filesystem backup
+sudo tar czf /backup/weaviate_backup.tar.gz -C /var/lib/docker/volumes/kri-local-rag_weaviate_data/_data .
+```
+
+## Cleaning Up Containers & Images (Keep All Data)
+
+This process removes all containers and images associated with the project but preserves your persistent data volumes.
+
+### Step 1: Stop Services and Preserve Data
+
+First, stop the running services. It is critical to use the correct `down` command to ensure your data volumes are not deleted.
+
+```bash
+# This command stops containers but PRESERVES all persistent data volumes.
+docker compose down
+```
+
+> **⚠️ Important:**
+> -   `docker compose down` **preserves** data volumes.
+> -   `docker compose down -v` **deletes** data volumes.
+> -   Always consider creating a backup first (see backup commands in the section above).
+
+### Step 2: (Optional) Prune Unused System Resources
+
+If you want to free up more disk space, you can remove any remaining stopped containers and all associated Docker images.
+
+```bash
+# Force-remove any remaining stopped containers
+docker rm -f $(docker ps -aq)
+
+# Remove all Docker images (this requires re-downloading/rebuilding them later)
+docker rmi -f $(docker images -q)
+```
+
+### Step 3: Verify Data Preservation
+
+After running the cleanup, your persistent data remains safe. The following volumes are preserved:
+-   **`ollama_models`**: A named volume stored outside the project, containing downloaded LLMs.
+-   **`docker/.data`**: A bind mount inside the `docker` directory, containing the Weaviate database.
 
 ## Next Steps
 
-- [Getting Started Guide](docs/setup/getting-started.md)
-- [Basic Usage](docs/usage/basic-usage.md) 
+- [Getting Started Guide](GETTING_STARTED.md)
+- [Document Processing Guide](document-processing.md) 

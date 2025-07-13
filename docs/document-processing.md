@@ -3,25 +3,17 @@
 ## Supported Formats
 
 - **PDF files** (`.pdf`) - Primary format
-- **Text files** (`.txt`) - Basic support
-- **Markdown files** (`.md`) - Documentation files
 
 ## Quick Ingestion
 
-### 1. Prepare Documents
 ```bash
-# Copy PDFs to data directory
+# 1. Prepare documents
 cp your-document.pdf data/
-```
 
-### 2. Run Ingestion
-```bash
+# 2. Run ingestion
 docker compose run --rm rag-backend python ingest_pdf.py
-```
 
-### 3. Verify
-```bash
-# Check collections
+# 3. Verify
 docker compose run --rm rag-backend python -c "
 import weaviate
 client = weaviate.Client('http://weaviate:8080')
@@ -37,9 +29,8 @@ print('Collections:', [c['class'] for c in client.schema.get()['classes']])
 
 ## Managing Data
 
-### View Documents
 ```bash
-# List collections and counts
+# View documents (list collections and counts)
 docker compose run --rm rag-backend python -c "
 import weaviate
 client = weaviate.Client('http://weaviate:8080')
@@ -48,25 +39,23 @@ for collection in client.schema.get()['classes']:
     result = client.query.aggregate(collection['class']).with_meta_count().do()
     print(f'Documents: {result[\"data\"][\"Aggregate\"][collection[\"class\"]][0][\"meta\"][\"count\"]}')
 "
-```
 
-### Delete All Data
-```bash
+# Delete all data
 docker compose run --rm rag-backend python delete_collection.py
 ```
 
 ## Advanced Options
 
-### Custom Chunking
-Edit `ingest_pdf.py`:
+### Custom Configuration
 ```python
+# Edit ingest_pdf.py
 CHUNK_SIZE = 1000  # Characters per chunk
 CHUNK_OVERLAP = 200  # Overlap between chunks
 ```
 
 ### Batch Processing
 ```bash
-# Process files in batches (script processes all PDFs in data/ directory)
+# Process all PDFs in data/ directory
 docker compose run --rm rag-backend python ingest_pdf.py
 ```
 
@@ -105,7 +94,7 @@ docker compose logs t2v-transformers
 
 ## Data Persistence
 
-### Docker Volumes
+### Docker Volumes & Backup
 ```bash
 # List volumes
 docker volume ls | grep kri-local-rag
@@ -114,12 +103,12 @@ docker volume ls | grep kri-local-rag
 docker run --rm -v kri-local-rag_weaviate_data:/data -v $(pwd):/backup alpine tar czf /backup/weaviate_backup.tar.gz -C /data .
 ```
 
-### Data Location
+### Data Locations
 - **Weaviate data**: `kri-local-rag_weaviate_data` volume
-- **Ollama models**: `ollama_models` volume
+- **Ollama models**: `ollama_models` volume  
 - **Source documents**: Local `data/` directory
 
 ## Next Steps
 
-- [Basic Usage Guide](docs/usage/basic-usage.md)
-- [Docker Management](docs/setup/docker-management.md) 
+- [Getting Started Guide](GETTING_STARTED.md)
+- [Docker Management Guide](docker-management.md) 
