@@ -21,8 +21,8 @@
 			"name": "data"
 		},
 		{
-			"path": "docs",
-			"name": "docs"
+			"path": "docker",
+			"name": "docker"
 		}
 	],
 

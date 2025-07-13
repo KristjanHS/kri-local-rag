@@ -1,3 +1,9 @@
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from the project root .env (if present)
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 COLLECTION_NAME = "Document"
 
 # Text splitting parameters

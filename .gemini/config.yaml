@@ -1,0 +1,12 @@
+version: 1
+enabled_features:
+  auto_review: true
+  post_review_summary: true
+  inline_suggestions: true
+review_comment_severity:
+  critical: true
+  high: true
+  medium: true
+  low: false
+comment_severity_threshold: MEDIUM
+max_review_comments: 10

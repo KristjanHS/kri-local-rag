@@ -1,31 +1,24 @@
-# --- Core ML / GPU stack ---
-# torch==2.5.1+cu121 # (ensure this matches the version in the Makefile)
+# External libraries actually imported by the Python source files
+langchain
+weaviate-client
+httpx
+requests
+sentence-transformers
+langdetect
+
+# --- Core ML / GPU stack (optional, install manually as noted above) ---
+# torch==2.5.1+cu121
 # this will not work as part of requirements.txt, since they are not available on PyPI
 # instead, use the Makefile to install the correct version of torch or install manually:
-# pip install torch==2.7.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+# pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128
 # OR for older versions:
-# pip install torch==2.5.1+cu121 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# pip install torch==2.5.1+cu121 --index-url https://download.pytorch.org/whl/cu121
 
-# External libraries actually imported by the Python source files
-faiss-cpu
-nomic
-langchain
-langchain-community
-langchain-nomic
-langchain-core
-weaviate-client
-pypdf
-pyyaml
-tqdm
-
-# --- Environment & Configuration ---
+# --- Environment & Configuration (optional) ---
 python-dotenv
 
-# --- Development & Testing Utilities ---
+# --- Development & Testing Utilities (optional) ---
 black
 flake8
 pytest
 pre-commit
-httpx
-requests
-sentence-transformers
