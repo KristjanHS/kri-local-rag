@@ -1,8 +1,8 @@
-# Migrating **hands-on-llm/phase2/RAG_app** to a new repository: `kri_local_RAG`
+# Migrating **hands-on-llm/phase2/RAG_app** to a new repository: `kri-local-rag`
 
 This guide shows a **safe, repeatable** way to extract the RAG_app portion of your
 `hands‑on‑llm` monorepo into its own GitHub repository named
-`kri_local_RAG`.  The process keeps your original project intact while giving
+`kri-local-rag`.  The process keeps your original project intact while giving
 you a clean, history‑free copy of the selected files.
 
 > **Why not use `git filter‑repo` / `git subtree`?**
@@ -26,7 +26,7 @@ you a clean, history‑free copy of the selected files.
 
 1. Open [https://github.com/new](https://github.com/new) in your browser.
 2. Fill in:
-   * **Repository name** → `kri_local_RAG`
+   * **Repository name** → `kri-local-rag`
    * Visibility as you prefer (Public / Private)
    * **DO NOT** add a README, `.gitignore`, or license here – we’ll copy them.
 3. Click **Create repository** and leave the page open; the *Quick Setup*
@@ -56,15 +56,15 @@ folder first.)*
 cd ..
 
 # Make a workspace for the new repo
-mkdir kri_local_RAG && cd kri_local_RAG
+mkdir kri-local-rag && cd kri-local-rag
 
 # Initialise the empty repository and set the default branch to **main**
 git init -b main
 
 # Add the GitHub remote: for HTTPS auth:
-git remote add origin https://github.com/KristjanHS/kri_local_RAG.git
+git remote add origin https://github.com/KristjanHS/kri-local-rag.git
 # OR replace URL if you use SSH:
-# git remote add origin git@github.com:KristjanHS/kri_local_RAG.git
+# git remote add origin git@github.com:KristjanHS/kri-local-rag.git
 ```
 
 > **Tip**  If your Git defaults to `master`, force `main` with `git symbolic-ref`
@@ -106,7 +106,7 @@ cp ../hands-on-llm/pyproject.toml             .
 cp ../hands-on-llm/LICENSE                    .
 
 # Workspace & docs – rename to match new repo
-cp ../hands-on-llm/hands-on-llm.code-workspace kri_local_RAG.code-workspace
+cp ../hands-on-llm/hands-on-llm.code-workspace kri-local-rag.code-workspace
 cp ../hands-on-llm/README.md                   README.md
 
 # Runtime helpers
@@ -188,5 +188,5 @@ when the codebases evolve independently.
 
 ---
 
-🚀 **You now have a clean, standalone `kri_local_RAG` repository.** Happy
+🚀 **You now have a clean, standalone `kri-local-rag` repository.** Happy
 hacking!
