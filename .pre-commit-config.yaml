@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/psf/black
-    rev: 24.4.2 # Using a specific version is best practice
+    rev: 25.1.0 # Using a specific version is best practice
     hooks:
       - id: black
-        args: [--line-length=120]
+        args: [--line-length=120, --version]
