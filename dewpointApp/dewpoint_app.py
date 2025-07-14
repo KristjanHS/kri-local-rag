@@ -22,9 +22,13 @@ from datetime import datetime
 load_dotenv()
 
 # Try Streamlit secrets first, then environment variable (for local .env)
-OPENWEATHER_API_KEY = st.secrets.get("OPENWEATHER_API_KEY") or os.getenv("OPENWEATHER_API_KEY")
+OPENWEATHER_API_KEY = st.secrets.get("OPENWEATHER_API_KEY") or os.getenv(
+    "OPENWEATHER_API_KEY"
+)
 if not OPENWEATHER_API_KEY:
-    st.warning("OpenWeatherMap API key not found. Please add OPENWEATHER_API_KEY to your .streamlit/secrets.toml file.")
+    st.warning(
+        "OpenWeatherMap API key not found. Please add OPENWEATHER_API_KEY to your .streamlit/secrets.toml file."
+    )
 
 
 def get_weather(city, api_key):
@@ -32,7 +36,9 @@ def get_weather(city, api_key):
     # Try as entered
     url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&units=metric&appid={api_key}"
     resp = requests.get(url)
-    debug_info += f"URL tried: {url}\nStatus code: {resp.status_code}\nResponse: {resp.text}\n"
+    debug_info += (
+        f"URL tried: {url}\nStatus code: {resp.status_code}\nResponse: {resp.text}\n"
+    )
     if resp.status_code == 200:
         data = resp.json()
         temp = data["main"]["temp"]
@@ -42,7 +48,8 @@ def get_weather(city, api_key):
         lon = data["coord"]["lon"]
         # Fetch forecast for +6h and +12h
         forecast_url = (
-            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}" f"&units=metric&appid={api_key}"
+            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}"
+            f"&units=metric&appid={api_key}"
         )
         forecast_resp = requests.get(forecast_url)
         debug_info += (
@@ -81,7 +88,9 @@ def get_weather(city, api_key):
     if "," in city:
         city_parts = city.split(",")
         if len(city_parts) == 2:
-            city_country = f"{city_parts[0].strip()},{city_parts[1].strip()[:2].upper()}"
+            city_country = (
+                f"{city_parts[0].strip()},{city_parts[1].strip()[:2].upper()}"
+            )
             url = f"https://api.openweathermap.org/data/2.5/weather?q={city_country}&units=metric&appid={api_key}"
             resp = requests.get(url)
             debug_info += f"URL tried: {url}\nStatus code: {resp.status_code}\nResponse: {resp.text}\n"
@@ -247,7 +256,9 @@ elif use_gps:
 
 # Set city input default to empty if location is detected, otherwise use a default city
 city_default = "" if use_gps else "Viimsi"
-city = st.text_input("City name for outdoor weather (override GPS location)", value=city_default)
+city = st.text_input(
+    "City name for outdoor weather (override GPS location)", value=city_default
+)
 
 # Add at the top, after imports:
 FORECAST_HOUR_1 = 3
@@ -281,14 +292,17 @@ if "debug_info" not in st.session_state:
 def fetch_weather_by_gps(lat, lon, api_key):
     url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&units=metric&appid={api_key}"
     resp = requests.get(url)
-    debug_info = f"URL tried: {url}\nStatus code: {resp.status_code}\nResponse: {resp.text}\n"
+    debug_info = (
+        f"URL tried: {url}\nStatus code: {resp.status_code}\nResponse: {resp.text}\n"
+    )
     if resp.status_code == 200:
         data = resp.json()
         temp = data["main"]["temp"]
         humidity = data["main"]["humidity"]
         # Fetch forecast for +6h and +12h
         forecast_url = (
-            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}" f"&units=metric&appid={api_key}"
+            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}"
+            f"&units=metric&appid={api_key}"
         )
         forecast_resp = requests.get(forecast_url)
         debug_info += (
@@ -329,7 +343,9 @@ def fetch_weather_by_gps(lat, lon, api_key):
 if city:
     # If city is entered, override GPS and use city for weather
     if city != st.session_state["last_city"]:
-        temp, humidity, forecast_6h, forecast_12h, debug_info = get_weather(city, OPENWEATHER_API_KEY)
+        temp, humidity, forecast_6h, forecast_12h, debug_info = get_weather(
+            city, OPENWEATHER_API_KEY
+        )
         st.session_state["last_city"] = city
         st.session_state["debug_info"] = debug_info
         if temp is not None:
@@ -344,7 +360,9 @@ if city:
             st.session_state["forecast_12h"] = None
 elif use_gps:
     # Only use GPS if city is empty
-    temp, humidity, forecast_6h, forecast_12h, debug_info = fetch_weather_by_gps(lat, lon, OPENWEATHER_API_KEY)
+    temp, humidity, forecast_6h, forecast_12h, debug_info = fetch_weather_by_gps(
+        lat, lon, OPENWEATHER_API_KEY
+    )
     st.session_state["last_city"] = f"GPS:{lat},{lon}"
     st.session_state["debug_info"] = debug_info
     if temp is not None:
@@ -367,7 +385,9 @@ debug_info = st.session_state["debug_info"]
 # Always define the input fields, dew point calculations, and plot before the weather fetch result check
 col1, col2 = st.columns(2)
 with col1:
-    indoor_temp = st.number_input("Indoor temperature (°C)", min_value=0.0, max_value=40.0, value=25.0, step=0.5)
+    indoor_temp = st.number_input(
+        "Indoor temperature (°C)", min_value=0.0, max_value=40.0, value=25.0, step=0.5
+    )
     indoor_rh = st.number_input(
         "Indoor relative humidity (%)",
         min_value=0.0,
@@ -427,7 +447,11 @@ fig = go.Figure(
         z=dew_points,
         colorscale=blue_red_scale,
         colorbar=dict(title="Dew Point (°C)"),
-        hovertemplate=("Temperature: %{x:.1f}°C<br>" "Humidity: %{y:.0f}%<br>" "Dew Point: %{z:.2f}°C<extra></extra>"),
+        hovertemplate=(
+            "Temperature: %{x:.1f}°C<br>"
+            "Humidity: %{y:.0f}%<br>"
+            "Dew Point: %{z:.2f}°C<extra></extra>"
+        ),
         text=text_labels,
         texttemplate="%{text}",
         textfont={"size": 8, "color": "black"},
@@ -483,7 +507,8 @@ fig.add_trace(
         textposition="top center",
         textfont=dict(size=12, color="white", weight="bold"),
         hovertemplate=(
-            f"<b>Indoor</b><br>Temp: %{{x:.1f}}°C<br>RH: %{{y:.0f}}%<br>" f"Dew Point: {indoor_dp:.2f}°C<extra></extra>"
+            f"<b>Indoor</b><br>Temp: %{{x:.1f}}°C<br>RH: %{{y:.0f}}%<br>"
+            f"Dew Point: {indoor_dp:.2f}°C<extra></extra>"
         ),
     )
 )
@@ -528,12 +553,22 @@ def to_local_time(dt_str):
 if outdoor_temp_fetched is not None and outdoor_rh_fetched is not None:
     # Ultra-compact single-row table for mobile
     label_6h = to_local_time(forecast_6h[2]) if forecast_6h else f"+{forecast_hour_1}h"
-    label_12h = to_local_time(forecast_12h[2]) if forecast_12h else f"+{forecast_hour_2}h"
+    label_12h = (
+        to_local_time(forecast_12h[2]) if forecast_12h else f"+{forecast_hour_2}h"
+    )
     all_table = [
         [
-            (f"{outdoor_temp_fetched:.1f}°C, {outdoor_rh_fetched:.0f}%" if outdoor_temp_fetched is not None else ""),
+            (
+                f"{outdoor_temp_fetched:.1f}°C, {outdoor_rh_fetched:.0f}%"
+                if outdoor_temp_fetched is not None
+                else ""
+            ),
             (f"{forecast_6h[0]:.1f}°C, {forecast_6h[1]:.0f}%" if forecast_6h else ""),
-            (f"{forecast_12h[0]:.1f}°C, {forecast_12h[1]:.0f}%" if forecast_12h else ""),
+            (
+                f"{forecast_12h[0]:.1f}°C, {forecast_12h[1]:.0f}%"
+                if forecast_12h
+                else ""
+            ),
             f"{indoor_dp:.1f}°C",
             f"{outdoor_dp:.1f}°C",
             "✅" if outdoor_dp <= indoor_dp - 2 else "❌",
@@ -570,10 +605,9 @@ else:
 
 # After the plot, title, and description, but before the detected location:
 st.markdown("---")
-st.subheader("Configure Future Forecast Times")
 
 # After the plot and results, add the title and description at the end
-st.title("Dew Point Ventilation Advisor")
+st.subheader("Dew Point Ventilation Advisor")
 st.markdown(
     """
 This app is a simple tool to help you decide whether to ventilate your home based on the indoor and outdoor conditions.\
