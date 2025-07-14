@@ -230,7 +230,7 @@ elif loc and loc.get("error"):
 #    )
 
 # Set city input default to empty if location is detected, otherwise use a default city
-city_default = "" if use_gps else "Viimsi, Estonia"
+city_default = "" if use_gps else "Viimsi"
 city = st.text_input("City name for outdoor weather", value=city_default)
 
 # Use session_state to store last fetched city and weather
