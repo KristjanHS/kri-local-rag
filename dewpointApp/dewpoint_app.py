@@ -231,9 +231,23 @@ elif loc and loc.get("error"):
 #        "Allow location access to auto-detect your weather, or enter a city name below."
 #    )
 
+# Show detected location
+if location_name:
+    st.markdown(
+        f"<div style='text-align:center; color:gray; font-size:0.95em; margin-top:2em;'>Detected location: "
+        f"{location_name}</div>",
+        unsafe_allow_html=True,
+    )
+elif use_gps:
+    st.markdown(
+        f"<div style='text-align:center; color:gray; font-size:0.95em; margin-top:2em;'>Detected location: "
+        f"{lat:.4f}, {lon:.4f}</div>",
+        unsafe_allow_html=True,
+    )
+
 # Set city input default to empty if location is detected, otherwise use a default city
 city_default = "" if use_gps else "Viimsi"
-city = st.text_input("City name for outdoor weather", value=city_default)
+city = st.text_input("City name for outdoor weather (override GPS location)", value=city_default)
 
 # Add at the top, after imports:
 FORECAST_HOUR_1 = 3
@@ -538,7 +552,7 @@ if outdoor_temp_fetched is not None and outdoor_rh_fetched is not None:
     table_header = "".join(f"<th>{label}</th>" for label in labels)
     table_row = "".join(f"<td>{cell}</td>" for cell in row)
     table_html = f"""
-    <table style='width:100%; font-size:1.1em; text-align:center;'>
+    <table style='width:100%; font-size:0.9em; text-align:center;'>
       <tr>
         {table_header}
       </tr>
@@ -567,17 +581,3 @@ It calculates the dew point for both indoor and outdoor and displays them in a h
 It also provides a suggestion for HRV homeowners, based on the difference between the indoor and outdoor dew points.
 """
 )
-
-# Show detected location at the very bottom
-if location_name:
-    st.markdown(
-        f"<div style='text-align:center; color:gray; font-size:0.95em; margin-top:2em;'>Detected location: "
-        f"{location_name}</div>",
-        unsafe_allow_html=True,
-    )
-elif use_gps:
-    st.markdown(
-        f"<div style='text-align:center; color:gray; font-size:0.95em; margin-top:2em;'>Detected location: "
-        f"{lat:.4f}, {lon:.4f}</div>",
-        unsafe_allow_html=True,
-    )

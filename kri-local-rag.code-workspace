@@ -5,7 +5,7 @@
 		{
 			// The main project files, like your readme and .gitignore
 			"path": ".",
-			"name": "ROOT: Project Files"
+			"name": "ROOT"
 		},
 		{
 			// Give each sub-project a descriptive name for clarity in the UI.
