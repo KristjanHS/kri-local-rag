@@ -453,3 +453,14 @@ if "lat" in locals() and "lon" in locals() and lat is not None and lon is not No
                 st.markdown(
                     f"**Wind direction:** {wind_dir_int}° ({deg_to_compass(wind_dir)})"
                 )
+            # Show measurement time/date if available
+            measurement_time = nearest.get("Time")
+            if measurement_time:
+                # Try to parse ISO format and display as 'DD.MM.YYYY HH:MM'
+                try:
+                    dt = datetime.fromisoformat(measurement_time.replace("Z", "+00:00"))
+                    st.markdown(
+                        f"**Measurement time:** {dt.strftime('%d.%m.%Y %H:%M')}"
+                    )
+                except Exception:
+                    st.markdown(f"**Measurement time:** {measurement_time}")
