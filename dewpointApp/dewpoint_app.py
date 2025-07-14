@@ -13,6 +13,8 @@ import requests
 import os
 from dotenv import load_dotenv
 from streamlit_js_eval import streamlit_js_eval
+import pytz  # Add this import at the top if not already present
+from datetime import datetime
 
 # ---------------------------------------------------------------------------
 # Load API key from .env file
@@ -168,7 +170,7 @@ st.markdown(
         .block-container {
             padding-top: 0.2rem !important;
         }
-    </style>    
+    </style>
     """,
     unsafe_allow_html=True,
 )
@@ -485,11 +487,20 @@ fig.update_layout(
     )
 )
 
+
+def to_local_time(dt_str):
+    # dt_str is in format 'YYYY-MM-DD HH:MM:SS' and UTC
+    utc_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+    local_tz = pytz.timezone("Europe/Tallinn")
+    local_dt = utc_dt.replace(tzinfo=pytz.utc).astimezone(local_tz)
+    return local_dt.strftime("%H:%M")
+
+
 # Only show plot and results if the weather fetch was successful
 if outdoor_temp_fetched is not None and outdoor_rh_fetched is not None:
     # Ultra-compact single-row table for mobile
-    label_6h = forecast_6h[2][11:16] if forecast_6h else "+6h"
-    label_12h = forecast_12h[2][11:16] if forecast_12h else "+12h"
+    label_6h = to_local_time(forecast_6h[2]) if forecast_6h else "+6h"
+    label_12h = to_local_time(forecast_12h[2]) if forecast_12h else "+12h"
     all_table = [
         [
             (f"{outdoor_temp_fetched:.1f}°C, {outdoor_rh_fetched:.0f}%" if outdoor_temp_fetched is not None else ""),
@@ -501,7 +512,14 @@ if outdoor_temp_fetched is not None and outdoor_rh_fetched is not None:
         ],
     ]
     # Custom HTML table for mobile
-    labels = ["Now", label_6h, label_12h, "Indoor DP", "Outdoor DP", "HRV?"]
+    labels = [
+        "Now",
+        f"{label_6h} (slot)",
+        f"{label_12h} (slot)",
+        "Indoor DP",
+        "Outdoor DP",
+        "HRV?",
+    ]
     row = all_table[0]
     table_header = "".join(f"<th>{label}</th>" for label in labels)
     table_row = "".join(f"<td>{cell}</td>" for cell in row)
@@ -515,6 +533,12 @@ if outdoor_temp_fetched is not None and outdoor_rh_fetched is not None:
       </tr>
     </table>
     """
+    # Debug output for verification
+    st.write(f"Current UTC: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}")
+    if forecast_6h:
+        st.write(f"Forecast +6h slot (UTC): {forecast_6h[2]}")
+    if forecast_12h:
+        st.write(f"Forecast +12h slot (UTC): {forecast_12h[2]}")
     st.markdown(table_html, unsafe_allow_html=True)
     st.plotly_chart(fig, use_container_width=True)
 else:
@@ -535,11 +559,13 @@ It also provides a suggestion for HRV homeowners, based on the difference betwee
 # Show detected location at the very bottom
 if location_name:
     st.markdown(
-        f"<div style='text-align:center; color:gray; font-size:0.95em; margin-top:2em;'>Detected location: {location_name}</div>",
+        f"<div style='text-align:center; color:gray; font-size:0.95em; margin-top:2em;'>Detected location: "
+        f"{location_name}</div>",
         unsafe_allow_html=True,
     )
 elif use_gps:
     st.markdown(
-        f"<div style='text-align:center; color:gray; font-size:0.95em; margin-top:2em;'>Detected location: {lat:.4f}, {lon:.4f}</div>",
+        f"<div style='text-align:center; color:gray; font-size:0.95em; margin-top:2em;'>Detected location: "
+        f"{lat:.4f}, {lon:.4f}</div>",
         unsafe_allow_html=True,
     )

@@ -205,9 +205,10 @@ def generate_response(
     on_token=None,
     on_debug=None,
     stop_event=None,
-    context_tokens: int = None,
+    context_tokens: int = 8192,
 ) -> tuple[str, Optional[list]]:
-    """Generate a response from Ollama for the given prompt, optionally streaming tokens and debug info via callbacks. Can be interrupted with stop_event."""
+    """Generate a response from Ollama for the given prompt, optionally streaming tokens and debug info via callbacks.
+    Can be interrupted with stop_event."""
     import sys
 
     if context_tokens is None:
@@ -233,14 +234,16 @@ def generate_response(
     approx_tokens = len(prompt) // 4
     if approx_tokens > context_tokens:
         debug_print(
-            f"WARNING: Prompt is estimated at {approx_tokens} tokens, which exceeds the context window ({context_tokens}). "
+            f"WARNING: Prompt is estimated at {approx_tokens} tokens, "
+            f"which exceeds the context window ({context_tokens}). "
             "Ollama will truncate the prompt and you may lose context.",
             1,
             on_debug,
         )
     elif approx_tokens > context_tokens * 0.9:
         debug_print(
-            f"NOTE: Prompt is estimated at {approx_tokens} tokens, which is close to the context window ({context_tokens}).",
+            f"NOTE: Prompt is estimated at {approx_tokens} tokens, "
+            f"      which is close to the context window ({context_tokens}).",
             1,
             on_debug,
         )
