@@ -17,6 +17,11 @@
 			"name": "frontend"
 		},
 		{
+			"path": "dewpointApp",
+			"name": "dewpointApp"
+		},
+
+		{
 			"path": "data",
 			"name": "data"
 		},

@@ -73,10 +73,10 @@ docker compose down -v && ./run-docker.sh  # Reset
 
 ## Documentation
 
-- [Getting Started](docs/setup/getting-started.md)
-- [Basic Usage](docs/usage/basic-usage.md)
-- [Document Processing](docs/usage/document-processing.md)
-- [Docker Management](docs/setup/docker-management.md)
+- [Getting Started](docs/GETTING_STARTED.md)
+- [Document Processing](docs/document-processing.md)
+- [Docker Management](docs/docker-management.md)
+- [Development Guide](docs/DEVELOPMENT.md)
 
 ## License
 

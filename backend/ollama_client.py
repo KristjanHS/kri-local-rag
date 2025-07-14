@@ -5,17 +5,21 @@ import httpx
 import json
 from typing import Optional
 
-from config import OLLAMA_MODEL, OLLAMA_URL
+from config import OLLAMA_MODEL, OLLAMA_URL, OLLAMA_CONTEXT_TOKENS
 from windows_ip_in_wsl import get_windows_host_ip
 
 # Debug levels: 0=off, 1=basic, 2=detailed, 3=verbose
 DEBUG_LEVEL = 1
 
 
-def debug_print(message: str, level: int = 1):
-    """Print debug message only if current debug level is sufficient."""
+def debug_print(message: str, level: int = 1, on_debug=None):
+    """Print debug message only if current debug level is sufficient. Optionally call on_debug callback."""
     if DEBUG_LEVEL >= level:
-        print(f"[DEBUG-{level}] {message}")
+        msg = f"[DEBUG-{level}] {message}"
+        if on_debug:
+            on_debug(msg)
+        else:
+            print(msg)
 
 
 def set_debug_level(level: int):
@@ -195,14 +199,19 @@ def test_ollama_connection() -> bool:
 
 
 def generate_response(
-    prompt: str, model_name: str = OLLAMA_MODEL, context: Optional[list] = None
+    prompt: str,
+    model_name: str = OLLAMA_MODEL,
+    context: Optional[list] = None,
+    on_token=None,
+    on_debug=None,
+    stop_event=None,
+    context_tokens: int = None,
 ) -> tuple[str, Optional[list]]:
-    """Generate a response from Ollama for the given prompt.
-
-    Returns:
-        tuple: (response_text, updated_context)
-    """
+    """Generate a response from Ollama for the given prompt, optionally streaming tokens and debug info via callbacks. Can be interrupted with stop_event."""
     import sys
+
+    if context_tokens is None:
+        context_tokens = OLLAMA_CONTEXT_TOKENS
 
     base_url = _get_ollama_base_url()
     url = f"{base_url.rstrip('/')}/api/generate"
@@ -211,26 +220,46 @@ def generate_response(
         "model": model_name,
         "prompt": prompt,
         "stream": True,
+        "options": {"num_ctx": context_tokens},
     }
     if context is not None:
         payload["context"] = context
 
-    debug_print(f"Calling Ollama at: {url}", 2)
-    debug_print(f"Model: {model_name}", 2)
-    debug_print(f"Prompt length: {len(prompt)} characters", 2)
-    debug_print(f"Context provided: {context is not None}", 2)
+    debug_print(f"Calling Ollama at: {url}", 1, on_debug)
+    debug_print(f"Model: {model_name}", 1, on_debug)
+    debug_print(f"Ollama context window: {context_tokens} tokens", 1, on_debug)
+    debug_print(f"Prompt length: {len(prompt)} characters", 2, on_debug)
+    debug_print(f"Context provided: {context is not None}", 2, on_debug)
+    approx_tokens = len(prompt) // 4
+    if approx_tokens > context_tokens:
+        debug_print(
+            f"WARNING: Prompt is estimated at {approx_tokens} tokens, which exceeds the context window ({context_tokens}). "
+            "Ollama will truncate the prompt and you may lose context.",
+            1,
+            on_debug,
+        )
+    elif approx_tokens > context_tokens * 0.9:
+        debug_print(
+            f"NOTE: Prompt is estimated at {approx_tokens} tokens, which is close to the context window ({context_tokens}).",
+            1,
+            on_debug,
+        )
 
     try:
-        debug_print("Making HTTP request to Ollama...", 2)
+        debug_print("Making HTTP request to Ollama...", 1, on_debug)
         with httpx.stream("POST", url, json=payload, timeout=None) as resp:
-            debug_print(f"Response status: {resp.status_code}", 2)
+            debug_print(f"Response status: {resp.status_code}", 1, on_debug)
 
             response_text = ""
             updated_context = context
             line_count = 0
+            first_token = True
 
-            debug_print("Starting to read response stream...", 2)
+            debug_print("Waiting for Ollama to start streaming response...", 1, on_debug)
             for line in resp.iter_lines():
+                if stop_event is not None and stop_event.is_set():
+                    debug_print("Stop event set, aborting stream.", 1, on_debug)
+                    break
                 line_count += 1
                 if not line:
                     continue
@@ -241,13 +270,13 @@ def generate_response(
                     line_str = line_str[len("data:") :].strip()
 
                 if line_str == "[DONE]":
-                    debug_print("Received [DONE] marker", 2)
+                    debug_print("Received [DONE] marker", 1, on_debug)
                     break
 
                 try:
                     data = json.loads(line_str)
                 except json.JSONDecodeError:
-                    debug_print(f"Failed to parse JSON: {line_str[:50]}...", 2)
+                    debug_print(f"Failed to parse JSON: {line_str[:50]}...", 2, on_debug)
                     continue
 
                 # Extract token from response
@@ -257,19 +286,25 @@ def generate_response(
                     or (data.get("choices", [{}])[0].get("text") if "choices" in data else "")
                 )
 
+                if first_token and token_str:
+                    debug_print("Ollama started streaming tokens...", 1, on_debug)
+                    first_token = False
+
                 response_text += token_str
-                # Stream token to stdout like original code
-                sys.stdout.write(token_str)
-                sys.stdout.flush()
+                if on_token:
+                    on_token(token_str)
+                else:
+                    sys.stdout.write(token_str)
+                    sys.stdout.flush()
 
                 # Capture the conversation context if provided with the final chunk.
                 if data.get("done"):
-                    debug_print("Received 'done' flag", 2)
+                    debug_print("Received 'done' flag", 1, on_debug)
                     updated_context = data.get("context", context)
                     break
 
-            debug_print(f"Processed {line_count} lines from response", 2)
+            debug_print(f"Processed {line_count} lines from response", 1, on_debug)
             return response_text or "(no response)", updated_context
     except Exception as e:
-        debug_print(f"Exception in generate_response: {e}", 2)
+        debug_print(f"Exception in generate_response: {e}", 1, on_debug)
         return f"[Error generating response: {e}]", context
