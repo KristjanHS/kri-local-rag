@@ -528,10 +528,10 @@ if outdoor_temp_fetched is not None and outdoor_rh_fetched is not None:
     # Custom HTML table for mobile
     labels = [
         "Now",
-        f"{label_6h} (slot)",
-        f"{label_12h} (slot)",
-        "Indoor DP",
-        "Outdoor DP",
+        f"{label_6h}",
+        f"{label_12h}",
+        "In DP",
+        "Out DP",
         "HRV?",
     ]
     row = all_table[0]
