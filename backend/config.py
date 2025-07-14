@@ -25,6 +25,7 @@ DEBUG_LEVEL = int(os.getenv("DEBUG_LEVEL", 2))  # 0=off, 1=basic, 2=detailed, 3=
 # Default context window (max tokens) for Ollama LLM requests
 OLLAMA_CONTEXT_TOKENS = int(os.getenv("OLLAMA_CONTEXT_TOKENS", 8192))  # e.g. 4096, 8192, etc.
 
+
 # (base) PS %USERPROFILE%> ollama show cas/mistral-7b-instruct-v0.3
 #  Model
 #    architecture        llama3
