@@ -488,32 +488,30 @@ fig.update_layout(
 # Only show plot and results if the weather fetch was successful
 if outdoor_temp_fetched is not None and outdoor_rh_fetched is not None:
     # Ultra-compact single-row table for mobile
-    label_6h = forecast_6h[2][11:16] if forecast_6h else ""
-    label_12h = forecast_12h[2][11:16] if forecast_12h else ""
+    label_6h = forecast_6h[2][11:16] if forecast_6h else "+6h"
+    label_12h = forecast_12h[2][11:16] if forecast_12h else "+12h"
     all_table = [
         [
-            (
-                f"Now: {outdoor_temp_fetched:.1f}°C, {outdoor_rh_fetched:.0f}%"
-                if outdoor_temp_fetched is not None
-                else ""
-            ),
-            (f"+6h: {forecast_6h[0]:.1f}°C, {forecast_6h[1]:.0f}%" if forecast_6h else ""),
-            (f"+12h: {forecast_12h[0]:.1f}°C, {forecast_12h[1]:.0f}%" if forecast_12h else ""),
-            f"Indoor DP: {indoor_dp:.1f}°C",
-            f"Outdoor DP: {outdoor_dp:.1f}°C",
+            (f"{outdoor_temp_fetched:.1f}°C, {outdoor_rh_fetched:.0f}%" if outdoor_temp_fetched is not None else ""),
+            (f"{forecast_6h[0]:.1f}°C, {forecast_6h[1]:.0f}%" if forecast_6h else ""),
+            (f"{forecast_12h[0]:.1f}°C, {forecast_12h[1]:.0f}%" if forecast_12h else ""),
+            f"{indoor_dp:.1f}°C",
+            f"{outdoor_dp:.1f}°C",
             "✅" if outdoor_dp <= indoor_dp - 2 else "❌",
         ],
     ]
     # Custom HTML table for mobile
-    labels = ["Now", "+6h", "+12h", "Indoor DP", "Outdoor DP", "HRV?"]
+    labels = ["Now", label_6h, label_12h, "Indoor DP", "Outdoor DP", "HRV?"]
     row = all_table[0]
+    table_header = "".join(f"<th>{label}</th>" for label in labels)
+    table_row = "".join(f"<td>{cell}</td>" for cell in row)
     table_html = f"""
     <table style='width:100%; font-size:1.1em; text-align:center;'>
       <tr>
-        {''.join(f'<th>{label}</th>' for label in labels)}
+        {table_header}
       </tr>
       <tr>
-        {''.join(f'<td>{cell}</td>' for cell in row)}
+        {table_row}
       </tr>
     </table>
     """
