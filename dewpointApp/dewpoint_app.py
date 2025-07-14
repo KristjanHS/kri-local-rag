@@ -56,8 +56,8 @@ def get_weather(city, api_key):
             from datetime import datetime, timedelta
 
             now = datetime.utcnow()
-            target_6h = now + timedelta(hours=6)
-            target_12h = now + timedelta(hours=12)
+            target_6h = now + timedelta(hours=FORECAST_HOUR_1)
+            target_12h = now + timedelta(hours=FORECAST_HOUR_2)
             closest_6h = min(
                 forecast_data["list"],
                 key=lambda x: abs(datetime.fromtimestamp(x["dt"]) - target_6h),
@@ -106,8 +106,8 @@ def get_weather(city, api_key):
                     from datetime import datetime, timedelta
 
                     now = datetime.utcnow()
-                    target_6h = now + timedelta(hours=6)
-                    target_12h = now + timedelta(hours=12)
+                    target_6h = now + timedelta(hours=FORECAST_HOUR_1)
+                    target_12h = now + timedelta(hours=FORECAST_HOUR_2)
                     closest_6h = min(
                         forecast_data["list"],
                         key=lambda x: abs(datetime.fromtimestamp(x["dt"]) - target_6h),
@@ -235,6 +235,20 @@ elif loc and loc.get("error"):
 city_default = "" if use_gps else "Viimsi"
 city = st.text_input("City name for outdoor weather", value=city_default)
 
+# Add at the top, after imports:
+FORECAST_HOUR_1 = 3
+FORECAST_HOUR_2 = 7
+
+# Replace the session_state initialization block with:
+if "forecast_hour_1" not in st.session_state:
+    st.session_state["forecast_hour_1"] = FORECAST_HOUR_1
+if "forecast_hour_2" not in st.session_state:
+    st.session_state["forecast_hour_2"] = FORECAST_HOUR_2
+
+# Use these throughout the app
+forecast_hour_1 = st.session_state["forecast_hour_1"]
+forecast_hour_2 = st.session_state["forecast_hour_2"]
+
 # Use session_state to store last fetched city and weather
 if "last_city" not in st.session_state:
     st.session_state["last_city"] = ""
@@ -273,8 +287,8 @@ def fetch_weather_by_gps(lat, lon, api_key):
             from datetime import datetime, timedelta
 
             now = datetime.utcnow()
-            target_6h = now + timedelta(hours=6)
-            target_12h = now + timedelta(hours=12)
+            target_6h = now + timedelta(hours=FORECAST_HOUR_1)
+            target_12h = now + timedelta(hours=FORECAST_HOUR_2)
             closest_6h = min(
                 forecast_data["list"],
                 key=lambda x: abs(datetime.fromtimestamp(x["dt"]) - target_6h),
@@ -499,8 +513,8 @@ def to_local_time(dt_str):
 # Only show plot and results if the weather fetch was successful
 if outdoor_temp_fetched is not None and outdoor_rh_fetched is not None:
     # Ultra-compact single-row table for mobile
-    label_6h = to_local_time(forecast_6h[2]) if forecast_6h else "+6h"
-    label_12h = to_local_time(forecast_12h[2]) if forecast_12h else "+12h"
+    label_6h = to_local_time(forecast_6h[2]) if forecast_6h else f"+{forecast_hour_1}h"
+    label_12h = to_local_time(forecast_12h[2]) if forecast_12h else f"+{forecast_hour_2}h"
     all_table = [
         [
             (f"{outdoor_temp_fetched:.1f}°C, {outdoor_rh_fetched:.0f}%" if outdoor_temp_fetched is not None else ""),
@@ -533,18 +547,16 @@ if outdoor_temp_fetched is not None and outdoor_rh_fetched is not None:
       </tr>
     </table>
     """
-    # Debug output for verification
-    st.write(f"Current UTC: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}")
-    if forecast_6h:
-        st.write(f"Forecast +6h slot (UTC): {forecast_6h[2]}")
-    if forecast_12h:
-        st.write(f"Forecast +12h slot (UTC): {forecast_12h[2]}")
     st.markdown(table_html, unsafe_allow_html=True)
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.error("City not found or API error.")
     if debug_info:
         st.code(debug_info, language="text")
+
+# After the plot, title, and description, but before the detected location:
+st.markdown("---")
+st.subheader("Configure Future Forecast Times")
 
 # After the plot and results, add the title and description at the end
 st.title("Dew Point Ventilation Advisor")
