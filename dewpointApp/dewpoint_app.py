@@ -14,7 +14,8 @@ import os
 from dotenv import load_dotenv
 from streamlit_js_eval import streamlit_js_eval
 import pytz  # Add this import at the top if not already present
-from datetime import datetime
+from datetime import datetime, UTC
+from datetime import timezone
 
 # ---------------------------------------------------------------------------
 # Load API key from .env file
@@ -62,16 +63,20 @@ def get_weather(city, api_key):
             # Find the closest times to +6h and +12h
             from datetime import datetime, timedelta
 
-            now = datetime.utcnow()
+            now = datetime.now(UTC)
             target_6h = now + timedelta(hours=FORECAST_HOUR_1)
             target_12h = now + timedelta(hours=FORECAST_HOUR_2)
             closest_6h = min(
                 forecast_data["list"],
-                key=lambda x: abs(datetime.fromtimestamp(x["dt"]) - target_6h),
+                key=lambda x: abs(
+                    datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_6h
+                ),
             )
             closest_12h = min(
                 forecast_data["list"],
-                key=lambda x: abs(datetime.fromtimestamp(x["dt"]) - target_12h),
+                key=lambda x: abs(
+                    datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_12h
+                ),
             )
             forecast_6h = (
                 closest_6h["main"]["temp"],
@@ -114,16 +119,21 @@ def get_weather(city, api_key):
                     forecast_data = forecast_resp.json()
                     from datetime import datetime, timedelta
 
-                    now = datetime.utcnow()
+                    now = datetime.now(UTC)
                     target_6h = now + timedelta(hours=FORECAST_HOUR_1)
                     target_12h = now + timedelta(hours=FORECAST_HOUR_2)
                     closest_6h = min(
                         forecast_data["list"],
-                        key=lambda x: abs(datetime.fromtimestamp(x["dt"]) - target_6h),
+                        key=lambda x: abs(
+                            datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_6h
+                        ),
                     )
                     closest_12h = min(
                         forecast_data["list"],
-                        key=lambda x: abs(datetime.fromtimestamp(x["dt"]) - target_12h),
+                        key=lambda x: abs(
+                            datetime.fromtimestamp(x["dt"], tz=timezone.utc)
+                            - target_12h
+                        ),
                     )
                     forecast_6h = (
                         closest_6h["main"]["temp"],
@@ -314,16 +324,20 @@ def fetch_weather_by_gps(lat, lon, api_key):
             forecast_data = forecast_resp.json()
             from datetime import datetime, timedelta
 
-            now = datetime.utcnow()
+            now = datetime.now(UTC)
             target_6h = now + timedelta(hours=FORECAST_HOUR_1)
             target_12h = now + timedelta(hours=FORECAST_HOUR_2)
             closest_6h = min(
                 forecast_data["list"],
-                key=lambda x: abs(datetime.fromtimestamp(x["dt"]) - target_6h),
+                key=lambda x: abs(
+                    datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_6h
+                ),
             )
             closest_12h = min(
                 forecast_data["list"],
-                key=lambda x: abs(datetime.fromtimestamp(x["dt"]) - target_12h),
+                key=lambda x: abs(
+                    datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_12h
+                ),
             )
             forecast_6h = (
                 closest_6h["main"]["temp"],
