@@ -16,6 +16,7 @@ from streamlit_js_eval import streamlit_js_eval
 import pytz  # Add this import at the top if not already present
 from datetime import datetime, UTC
 from datetime import timezone
+import xml.etree.ElementTree as ET
 
 # ---------------------------------------------------------------------------
 # Load API key from .env file
@@ -629,3 +630,99 @@ It calculates the dew point for both indoor and outdoor and displays them in a h
 It also provides a suggestion for HRV homeowners, based on the difference between the indoor and outdoor dew points.
 """
 )
+
+# --- Beach water temperature integration (using new Estonian Environment Agency API) ---
+# import requests  # REMOVE this duplicate import if already imported at the top
+from math import radians, cos, sin, asin, sqrt
+
+
+def haversine(lat1, lon1, lat2, lon2):
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    c = 2 * asin(sqrt(a))
+    r = 6371  # Radius of earth in kilometers
+    return c * r
+
+
+def fetch_estonian_beach_temps():
+    url = "https://publicapi.envir.ee/v1/combinedWeatherData/coastalSeaStationsWeatherToday"
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=10)
+        # st.write(f"DEBUG: status={response.status_code}")  # Remove debug
+        # st.write(f"DEBUG: content={response.text[:500]}")  # Remove debug
+        response.raise_for_status()
+        stations = []
+        root = ET.fromstring(response.content)
+        ns = {"ns0": "http://ws.wso2.org/dataservice/coastalSeaStationsWeatherToday"}
+
+        def dms_to_decimal(deg, min, sec):
+            return float(deg) + float(min) / 60 + float(sec) / 3600
+
+        for entry in root.findall(".//ns0:entry", ns):
+            name = entry.findtext("ns0:ametliknimi", namespaces=ns) or entry.findtext(
+                "ns0:Jaam", namespaces=ns
+            )
+            lat_deg = entry.findtext("ns0:LaiusKraad", namespaces=ns)
+            lat_min = entry.findtext("ns0:LaiusMinut", namespaces=ns)
+            lat_sec = entry.findtext("ns0:LaiusSekund", namespaces=ns)
+            lon_deg = entry.findtext("ns0:PikkusKraad", namespaces=ns)
+            lon_min = entry.findtext("ns0:PikkusMinut", namespaces=ns)
+            lon_sec = entry.findtext("ns0:PikkusSekund", namespaces=ns)
+            temp = entry.findtext("ns0:wt1ha", namespaces=ns)
+            if (
+                name
+                and lat_deg
+                and lat_min
+                and lat_sec
+                and lon_deg
+                and lon_min
+                and lon_sec
+                and temp
+                and temp.replace(",", ".").replace("-", "").strip()
+            ):
+                try:
+                    lat = dms_to_decimal(lat_deg, lat_min, lat_sec)
+                    lon = dms_to_decimal(lon_deg, lon_min, lon_sec)
+                    stations.append(
+                        {
+                            "name": name,
+                            "lat": lat,
+                            "lon": lon,
+                            "temp": float(temp.replace(",", ".")),
+                        }
+                    )
+                except Exception as e:
+                    st.write(f"DEBUG: Station parse error: {e}")
+        return stations
+    except Exception as e:
+        st.write(f"DEBUG: Exception fetching stations: {e}")
+        return []
+
+
+def find_nearest_station(user_lat, user_lon, stations):
+    min_dist = float("inf")
+    nearest = None
+    for station in stations:
+        dist = haversine(user_lat, user_lon, station["lat"], station["lon"])
+        if dist < min_dist:
+            min_dist = dist
+            nearest = station
+    return nearest
+
+
+# Only try to show if GPS is available
+if "lat" in locals() and "lon" in locals() and lat is not None and lon is not None:
+    stations = fetch_estonian_beach_temps()
+    if stations:
+        nearest = find_nearest_station(lat, lon, stations)
+        if nearest:
+            st.markdown(
+                f"**Nearest beach water temperature:** {nearest['name']}: {nearest['temp']:.1f}°C"
+            )
+        else:
+            st.markdown("**Nearest beach water temperature:** Data not available.")
+    else:
+        st.markdown("**Nearest beach water temperature:** Data not available.")
