@@ -166,7 +166,7 @@ st.markdown(
     """
     <style>
         .block-container {
-            padding-top: 1rem !important;
+            padding-top: 0.2rem !important;
         }
     </style>    
     """,
@@ -224,10 +224,14 @@ if loc and loc.get("latitude") and loc.get("longitude"):
     use_gps = True
 elif loc and loc.get("error"):
     st.warning(f"Geolocation error: {loc['error']}")
-else:
-    st.info("Allow location access to auto-detect your weather, or enter a city name below.")
+# else:
+#    st.info(
+#        "Allow location access to auto-detect your weather, or enter a city name below."
+#    )
 
-city = st.text_input("City name for outdoor weather", value="Viimsi, Estonia")
+# Set city input default to empty if location is detected, otherwise use a default city
+city_default = "" if use_gps else "Viimsi, Estonia"
+city = st.text_input("City name for outdoor weather", value=city_default)
 
 # Use session_state to store last fetched city and weather
 if "last_city" not in st.session_state:
@@ -292,23 +296,26 @@ def fetch_weather_by_gps(lat, lon, api_key):
 
 
 # Only fetch if city changed or GPS is used
-if use_gps:
+if city:
+    # If city is entered, override GPS and use city for weather
+    if city != st.session_state["last_city"]:
+        temp, humidity, forecast_6h, forecast_12h, debug_info = get_weather(city, OPENWEATHER_API_KEY)
+        st.session_state["last_city"] = city
+        st.session_state["debug_info"] = debug_info
+        if temp is not None:
+            st.session_state["outdoor_temp_fetched"] = temp
+            st.session_state["outdoor_rh_fetched"] = humidity
+            st.session_state["forecast_6h"] = forecast_6h
+            st.session_state["forecast_12h"] = forecast_12h
+        else:
+            st.session_state["outdoor_temp_fetched"] = None
+            st.session_state["outdoor_rh_fetched"] = None
+            st.session_state["forecast_6h"] = None
+            st.session_state["forecast_12h"] = None
+elif use_gps:
+    # Only use GPS if city is empty
     temp, humidity, forecast_6h, forecast_12h, debug_info = fetch_weather_by_gps(lat, lon, OPENWEATHER_API_KEY)
     st.session_state["last_city"] = f"GPS:{lat},{lon}"
-    st.session_state["debug_info"] = debug_info
-    if temp is not None:
-        st.session_state["outdoor_temp_fetched"] = temp
-        st.session_state["outdoor_rh_fetched"] = humidity
-        st.session_state["forecast_6h"] = forecast_6h
-        st.session_state["forecast_12h"] = forecast_12h
-    else:
-        st.session_state["outdoor_temp_fetched"] = None
-        st.session_state["outdoor_rh_fetched"] = None
-        st.session_state["forecast_6h"] = None
-        st.session_state["forecast_12h"] = None
-elif city and city != st.session_state["last_city"]:
-    temp, humidity, forecast_6h, forecast_12h, debug_info = get_weather(city, OPENWEATHER_API_KEY)
-    st.session_state["last_city"] = city
     st.session_state["debug_info"] = debug_info
     if temp is not None:
         st.session_state["outdoor_temp_fetched"] = temp
