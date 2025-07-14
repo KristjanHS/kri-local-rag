@@ -9,14 +9,22 @@
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
-import requests
 import os
 from dotenv import load_dotenv
-from streamlit_js_eval import streamlit_js_eval
-import pytz  # Add this import at the top if not already present
-from datetime import datetime, UTC
-from datetime import timezone
-import xml.etree.ElementTree as ET
+import pytz
+from datetime import datetime
+from dewpoint_weather import (
+    get_weather,
+    calculate_dew_point,
+    fetch_weather_by_gps,
+    reverse_geocode,
+    get_js_geolocation,
+    temperatures,
+    humidities,
+    dew_points,
+    text_labels,
+)
+from beach_weather import fetch_estonian_beach_temps, find_nearest_station
 
 # ---------------------------------------------------------------------------
 # Load API key from .env file
@@ -33,154 +41,6 @@ if not OPENWEATHER_API_KEY:
     )
 
 
-def get_weather(city, api_key):
-    debug_info = ""
-    # Try as entered
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&units=metric&appid={api_key}"
-    resp = requests.get(url)
-    debug_info += (
-        f"URL tried: {url}\nStatus code: {resp.status_code}\nResponse: {resp.text}\n"
-    )
-    if resp.status_code == 200:
-        data = resp.json()
-        temp = data["main"]["temp"]
-        humidity = data["main"]["humidity"]
-        # Get lat/lon for forecast
-        lat = data["coord"]["lat"]
-        lon = data["coord"]["lon"]
-        # Fetch forecast for +6h and +12h
-        forecast_url = (
-            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}"
-            f"&units=metric&appid={api_key}"
-        )
-        forecast_resp = requests.get(forecast_url)
-        debug_info += (
-            f"Forecast URL tried: {forecast_url}\nStatus code: {forecast_resp.status_code}\n"
-            f"Response: {forecast_resp.text[:300]}...\n"
-        )
-        forecast_6h = forecast_12h = None
-        if forecast_resp.status_code == 200:
-            forecast_data = forecast_resp.json()
-            # Find the closest times to +6h and +12h
-            from datetime import datetime, timedelta
-
-            now = datetime.now(UTC)
-            target_6h = now + timedelta(hours=FORECAST_HOUR_1)
-            target_12h = now + timedelta(hours=FORECAST_HOUR_2)
-            closest_6h = min(
-                forecast_data["list"],
-                key=lambda x: abs(
-                    datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_6h
-                ),
-            )
-            closest_12h = min(
-                forecast_data["list"],
-                key=lambda x: abs(
-                    datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_12h
-                ),
-            )
-            forecast_6h = (
-                closest_6h["main"]["temp"],
-                closest_6h["main"]["humidity"],
-                closest_6h["dt_txt"],
-            )
-            forecast_12h = (
-                closest_12h["main"]["temp"],
-                closest_12h["main"]["humidity"],
-                closest_12h["dt_txt"],
-            )
-        return temp, humidity, forecast_6h, forecast_12h, debug_info
-    # Try replacing ', ' with ',' and with country code if not found
-    if "," in city:
-        city_parts = city.split(",")
-        if len(city_parts) == 2:
-            city_country = (
-                f"{city_parts[0].strip()},{city_parts[1].strip()[:2].upper()}"
-            )
-            url = f"https://api.openweathermap.org/data/2.5/weather?q={city_country}&units=metric&appid={api_key}"
-            resp = requests.get(url)
-            debug_info += f"URL tried: {url}\nStatus code: {resp.status_code}\nResponse: {resp.text}\n"
-            if resp.status_code == 200:
-                data = resp.json()
-                temp = data["main"]["temp"]
-                humidity = data["main"]["humidity"]
-                lat = data["coord"]["lat"]
-                lon = data["coord"]["lon"]
-                forecast_url = (
-                    f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}"
-                    f"&units=metric&appid={api_key}"
-                )
-                forecast_resp = requests.get(forecast_url)
-                debug_info += (
-                    f"Forecast URL tried: {forecast_url}\nStatus code: {forecast_resp.status_code}\n"
-                    f"Response: {forecast_resp.text[:300]}...\n"
-                )
-                forecast_6h = forecast_12h = None
-                if forecast_resp.status_code == 200:
-                    forecast_data = forecast_resp.json()
-                    from datetime import datetime, timedelta
-
-                    now = datetime.now(UTC)
-                    target_6h = now + timedelta(hours=FORECAST_HOUR_1)
-                    target_12h = now + timedelta(hours=FORECAST_HOUR_2)
-                    closest_6h = min(
-                        forecast_data["list"],
-                        key=lambda x: abs(
-                            datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_6h
-                        ),
-                    )
-                    closest_12h = min(
-                        forecast_data["list"],
-                        key=lambda x: abs(
-                            datetime.fromtimestamp(x["dt"], tz=timezone.utc)
-                            - target_12h
-                        ),
-                    )
-                    forecast_6h = (
-                        closest_6h["main"]["temp"],
-                        closest_6h["main"]["humidity"],
-                        closest_6h["dt_txt"],
-                    )
-                    forecast_12h = (
-                        closest_12h["main"]["temp"],
-                        closest_12h["main"]["humidity"],
-                        closest_12h["dt_txt"],
-                    )
-                return temp, humidity, forecast_6h, forecast_12h, debug_info
-    return None, None, None, None, debug_info
-
-
-# ---------------------------------------------------------------------------
-# Dew‑point calculation using Magnus‑Tetens approximation
-# ---------------------------------------------------------------------------
-a_const: float = 17.625
-b_const: float = 243.04
-
-
-def calculate_dew_point(temp_c: float, rh: float) -> float:
-    """Return dew‑point (°C) for given temperature (°C) and RH (0‑100 %)."""
-    alpha = np.log(rh / 100.0) + (a_const * temp_c) / (b_const + temp_c)
-    return (b_const * alpha) / (a_const - alpha)
-
-
-# ---------------------------------------------------------------------------
-# Grid definition — higher resolution for "middle" values
-# ---------------------------------------------------------------------------
-temperatures = np.arange(13.0, 28.5, 2.0)  # 1 °C steps for finer precision
-humidities = np.arange(50.0, 100.0, 8)  # 4 % RH steps
-
-# Compute dew‑point matrix
-dew_points = np.empty((len(humidities), len(temperatures)))
-for i, rh in enumerate(humidities):
-    for j, t in enumerate(temperatures):
-        dew_points[i, j] = calculate_dew_point(float(t), float(rh))
-
-# Create a text matrix for data labels (dew point values)
-text_labels = np.empty_like(dew_points, dtype=object)
-for i in range(len(humidities)):
-    for j in range(len(temperatures)):
-        text_labels[i, j] = f"{dew_points[i, j]:.0f}"
-
 # ---------------------------------------------------------------------------
 # Streamlit UI
 # ---------------------------------------------------------------------------
@@ -194,37 +54,6 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
-
-def reverse_geocode(lat, lon):
-    try:
-        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-        resp = requests.get(url, headers={"User-Agent": "dewpoint-app/1.0"})
-        if resp.status_code == 200:
-            data = resp.json()
-            return data.get("display_name")
-    except Exception:
-        pass
-    return None
-
-
-def get_js_geolocation():
-    js_code = """
-    new Promise((resolve, reject) => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => resolve({
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude
-                }),
-                (err) => resolve({latitude: null, longitude: null, error: err.message})
-            );
-        } else {
-            resolve({latitude: null, longitude: null, error: 'Geolocation not supported'});
-        }
-    })
-    """
-    return streamlit_js_eval(js_expressions=js_code, key="js_geo")
 
 
 # --- Outdoor weather fetch ---
@@ -298,60 +127,6 @@ if "forecast_12h" not in st.session_state:
     st.session_state["forecast_12h"] = None
 if "debug_info" not in st.session_state:
     st.session_state["debug_info"] = ""
-
-
-def fetch_weather_by_gps(lat, lon, api_key):
-    url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&units=metric&appid={api_key}"
-    resp = requests.get(url)
-    debug_info = (
-        f"URL tried: {url}\nStatus code: {resp.status_code}\nResponse: {resp.text}\n"
-    )
-    if resp.status_code == 200:
-        data = resp.json()
-        temp = data["main"]["temp"]
-        humidity = data["main"]["humidity"]
-        # Fetch forecast for +6h and +12h
-        forecast_url = (
-            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}"
-            f"&units=metric&appid={api_key}"
-        )
-        forecast_resp = requests.get(forecast_url)
-        debug_info += (
-            f"Forecast URL tried: {forecast_url}\nStatus code: {forecast_resp.status_code}\n"
-            f"Response: {forecast_resp.text[:300]}...\n"
-        )
-        forecast_6h = forecast_12h = None
-        if forecast_resp.status_code == 200:
-            forecast_data = forecast_resp.json()
-            from datetime import datetime, timedelta
-
-            now = datetime.now(UTC)
-            target_6h = now + timedelta(hours=FORECAST_HOUR_1)
-            target_12h = now + timedelta(hours=FORECAST_HOUR_2)
-            closest_6h = min(
-                forecast_data["list"],
-                key=lambda x: abs(
-                    datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_6h
-                ),
-            )
-            closest_12h = min(
-                forecast_data["list"],
-                key=lambda x: abs(
-                    datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_12h
-                ),
-            )
-            forecast_6h = (
-                closest_6h["main"]["temp"],
-                closest_6h["main"]["humidity"],
-                closest_6h["dt_txt"],
-            )
-            forecast_12h = (
-                closest_12h["main"]["temp"],
-                closest_12h["main"]["humidity"],
-                closest_12h["dt_txt"],
-            )
-        return temp, humidity, forecast_6h, forecast_12h, debug_info
-    return None, None, None, None, debug_info
 
 
 # Only fetch if city changed or GPS is used
@@ -633,84 +408,17 @@ It also provides a suggestion for HRV homeowners, based on the difference betwee
 
 # --- Beach water temperature integration (using new Estonian Environment Agency API) ---
 # import requests  # REMOVE this duplicate import if already imported at the top
-from math import radians, cos, sin, asin, sqrt
 
 
-def haversine(lat1, lon1, lat2, lon2):
-    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
-    c = 2 * asin(sqrt(a))
-    r = 6371  # Radius of earth in kilometers
-    return c * r
-
-
-def fetch_estonian_beach_temps():
-    url = "https://publicapi.envir.ee/v1/combinedWeatherData/coastalSeaStationsWeatherToday"
+# Replace deg_to_compass with 8-direction version
+def deg_to_compass(deg):
+    dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=10)
-        # st.write(f"DEBUG: status={response.status_code}")  # Remove debug
-        # st.write(f"DEBUG: content={response.text[:500]}")  # Remove debug
-        response.raise_for_status()
-        stations = []
-        root = ET.fromstring(response.content)
-        ns = {"ns0": "http://ws.wso2.org/dataservice/coastalSeaStationsWeatherToday"}
-
-        def dms_to_decimal(deg, min, sec):
-            return float(deg) + float(min) / 60 + float(sec) / 3600
-
-        for entry in root.findall(".//ns0:entry", ns):
-            name = entry.findtext("ns0:ametliknimi", namespaces=ns) or entry.findtext(
-                "ns0:Jaam", namespaces=ns
-            )
-            lat_deg = entry.findtext("ns0:LaiusKraad", namespaces=ns)
-            lat_min = entry.findtext("ns0:LaiusMinut", namespaces=ns)
-            lat_sec = entry.findtext("ns0:LaiusSekund", namespaces=ns)
-            lon_deg = entry.findtext("ns0:PikkusKraad", namespaces=ns)
-            lon_min = entry.findtext("ns0:PikkusMinut", namespaces=ns)
-            lon_sec = entry.findtext("ns0:PikkusSekund", namespaces=ns)
-            temp = entry.findtext("ns0:wt1ha", namespaces=ns)
-            if (
-                name
-                and lat_deg
-                and lat_min
-                and lat_sec
-                and lon_deg
-                and lon_min
-                and lon_sec
-                and temp
-                and temp.replace(",", ".").replace("-", "").strip()
-            ):
-                try:
-                    lat = dms_to_decimal(lat_deg, lat_min, lat_sec)
-                    lon = dms_to_decimal(lon_deg, lon_min, lon_sec)
-                    stations.append(
-                        {
-                            "name": name,
-                            "lat": lat,
-                            "lon": lon,
-                            "temp": float(temp.replace(",", ".")),
-                        }
-                    )
-                except Exception as e:
-                    st.write(f"DEBUG: Station parse error: {e}")
-        return stations
-    except Exception as e:
-        st.write(f"DEBUG: Exception fetching stations: {e}")
-        return []
-
-
-def find_nearest_station(user_lat, user_lon, stations):
-    min_dist = float("inf")
-    nearest = None
-    for station in stations:
-        dist = haversine(user_lat, user_lon, station["lat"], station["lon"])
-        if dist < min_dist:
-            min_dist = dist
-            nearest = station
-    return nearest
+        deg = float(deg)
+        ix = int((deg / 45) + 0.5) % 8
+        return dirs[ix]
+    except Exception:
+        return str(deg)
 
 
 # Only try to show if GPS is available
@@ -719,10 +427,29 @@ if "lat" in locals() and "lon" in locals() and lat is not None and lon is not No
     if stations:
         nearest = find_nearest_station(lat, lon, stations)
         if nearest:
-            st.markdown(
-                f"**Nearest beach water temperature:** {nearest['name']}: {nearest['temp']:.1f}°C"
-            )
-        else:
-            st.markdown("**Nearest beach water temperature:** Data not available.")
-    else:
-        st.markdown("**Nearest beach water temperature:** Data not available.")
+            st.subheader("Nearest beach:")
+            st.markdown(f"{nearest['name']}")
+            st.markdown(f"**Water temperature:** {nearest['temp']:.1f}°C")
+            # Highlight air temperature, wind speed, and wind direction if available
+            air_temp = nearest.get("ta1ha")
+            wind_speed = nearest.get("ws1hx")
+            wind_dir = nearest.get("wd10ma")
+            if air_temp:
+                st.markdown(f"**Air temperature:** {air_temp} °C")
+            if wind_speed:
+                try:
+                    wind_speed_float = float(str(wind_speed).replace(",", "."))
+                    wind_speed_kmh = wind_speed_float * 3.6
+                    st.markdown(
+                        f"**Wind speed:** {wind_speed_float:.1f} m/s ({wind_speed_kmh:.1f} km/h)"
+                    )
+                except Exception:
+                    st.markdown(f"**Wind speed:** {wind_speed} m/s")
+            if wind_dir:
+                try:
+                    wind_dir_int = int(round(float(wind_dir)))
+                except Exception:
+                    wind_dir_int = wind_dir
+                st.markdown(
+                    f"**Wind direction:** {wind_dir_int}° ({deg_to_compass(wind_dir)})"
+                )
