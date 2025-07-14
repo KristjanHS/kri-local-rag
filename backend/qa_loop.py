@@ -106,8 +106,14 @@ def answer(
     *,
     debug: bool = False,
     metadata_filter: Optional[Dict[str, Any]] = None,
+    on_token=None,
+    on_debug=None,
+    stop_event=None,
+    context_tokens: int = 8192,
 ) -> str:
-    """Return an answer from the LLM using RAG with optional debug output."""
+    """Return an answer from the LLM using RAG with optional debug output and streaming callbacks.
+    Can be interrupted with stop_event.
+    """
 
     global _ollama_context
 
@@ -121,10 +127,18 @@ def answer(
     scored_chunks = _rerank(question, candidates, k_keep=k, debug=debug)
 
     if debug:
-        print("\n[Debug] Reranked context chunks:")
+        msg = "\n[Debug] Reranked context chunks:"
+        if on_debug:
+            on_debug(msg)
+        else:
+            print(msg)
         for idx, sc in enumerate(scored_chunks, 1):
             preview = sc.text.replace("\n", " ")[:120]
-            print(f" {idx:02d}. score={sc.score:.4f} | {preview}…")
+            msg = f" {idx:02d}. score={sc.score:.4f} | {preview}…"
+            if on_debug:
+                on_debug(msg)
+            else:
+                print(msg)
 
     # Extract plain texts for prompt construction.
     context_chunks = [sc.text for sc in scored_chunks]
@@ -133,7 +147,15 @@ def answer(
     prompt_text = build_prompt(question, context_chunks)
 
     # ---------- 4) Query the LLM -------------------------------------------------
-    answer_text, updated_context = generate_response(prompt_text, OLLAMA_MODEL, _ollama_context)
+    answer_text, updated_context = generate_response(
+        prompt_text,
+        OLLAMA_MODEL,
+        _ollama_context,
+        on_token=on_token,
+        on_debug=on_debug,
+        stop_event=stop_event,
+        context_tokens=context_tokens,
+    )
 
     # Update context for next interaction
     _ollama_context = updated_context
@@ -152,7 +174,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--debug-level",
         type=int,
-        default=1,
+        default=2,
         choices=[0, 1, 2, 3],
         help="Debug level: 0=off, 1=basic, 2=detailed, 3=verbose (default: 1)",
     )
