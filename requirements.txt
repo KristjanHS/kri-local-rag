@@ -1,4 +1,3 @@
-# External libraries actually imported by the Python source files
 langchain
 weaviate-client>=4.0.0
 httpx
@@ -6,6 +5,9 @@ requests
 sentence-transformers
 langdetect
 unstructured[pdf]
+# for Windows (but doesn't hurt on Linux)
+# https://github.com/Unstructured-IO/unstructured/issues/2237
+# python-magic-bin==0.4.14
 
 # --- Core ML / GPU stack (optional, install manually as noted above) ---
 # torch==2.5.1+cu121
@@ -15,10 +17,11 @@ unstructured[pdf]
 # OR for older versions:
 # pip install torch==2.5.1+cu121 --index-url https://download.pytorch.org/whl/cu121
 
-# --- Environment & Configuration (optional) ---
+# Dev dependencies below
 python-dotenv
+streamlit
 
-# --- Development & Testing Utilities (optional) ---
+# Linting, formatting, testing
 black
 flake8
 pytest

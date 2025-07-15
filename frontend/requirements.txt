@@ -1,5 +1,21 @@
-streamlit
-python-dotenv
-weaviate-client
-sentence-transformers
 langchain
+weaviate-client>=4.0.0
+httpx
+requests
+sentence-transformers
+langdetect
+unstructured[pdf]
+# for Windows (but doesn't hurt on Linux)
+# https://github.com/Unstructured-IO/unstructured/issues/2237
+# python-magic-bin==0.4.14
+
+
+# Dev dependencies below
+python-dotenv
+streamlit
+
+# Linting, formatting, testing
+black
+flake8
+pytest
+pre-commit

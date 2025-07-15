@@ -1,74 +1,5 @@
 name: kri-local-rag
 services:
-  # ---------- Local Weaviate database ------------------------------------------------
-  weaviate:
-    image: cr.weaviate.io/semitechnologies/weaviate:1.25.1
-    depends_on:
-      t2v-transformers:
-        condition: service_healthy
-    ports:
-      - "8080:8080"
-      - "50051:50051"
-    volumes:
-      - ../.weaviate_db:/var/lib/weaviate    # .weaviate_db/ will be in the project root directory
-    environment:
-      QUERY_DEFAULTS_LIMIT: 25
-      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
-      DEFAULT_VECTORIZER_MODULE: 'text2vec-transformers'
-      ENABLE_MODULES: 'text2vec-transformers'
-      TRANSFORMERS_INFERENCE_API: 'http://t2v-transformers:8080'
-      CLUSTER_HOSTNAME: 'node1'
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  # ---------- Local Transformers server for Weaviate ingestion ------------------------------------------------
-  t2v-transformers:
-    build:
-      context: ./
-      dockerfile: t2v-transformers.Dockerfile
-    runtime: nvidia
-    environment:
-      ENABLE_CUDA: 1
-    ports:
-      - "8081:8080"  # expose if you want to hit the inference container directly
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/.well-known/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    secrets:
-      - hf_hub_token
-
-  # ---------- Local LLM server for generating RAG answers ---------------------------------------------------
-  ollama:
-    image: ollama/ollama:latest
-    runtime: nvidia
-    ports:
-      - "11434:11434"  # expose locally
-    volumes:
-      - ../.ollama_models:/root/.ollama  # .ollama_models/ will be in the project root directory
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
-    healthcheck:
-      test: ["CMD-SHELL", "ollama list"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
   # ---------- Python Backend & RAG CLI -----------------------------------------
   backend:
     build:
@@ -83,17 +14,63 @@ services:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
       - WEAVIATE_URL=http://weaviate:8080
-    ports:
-      - "8000:8000"  # change if you expose an API on another port
     volumes:
-      - ..:/app  # live-mount project for rapid iteration – remove for prod
-    # Comment out the next two lines (and their children) if you CPU only is enough for the python code
-    runtime: nvidia
+      - ../:/app
+      - ../data:/app/data
+    working_dir: /app
+    # command: sleep infinity  # Keep container running for exec
+    entrypoint: /app/docker/docker-entrypoint.sh
+    command: ["sleep", "infinity"] # Keep container running for interactive use
     deploy:
       resources:
         reservations:
           devices:
-            - capabilities: [gpu]
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    secrets: [] # No secrets needed for the backend at the moment
+
+  # ---------- Local Weaviate database ------------------------------------------------
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.25.1
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    volumes:
+      - weaviate_db:/var/lib/weaviate
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      DEFAULT_VECTORIZER_MODULE: 'none' # We are providing vectors manually
+      ENABLE_MODULES: 'text2vec-huggingface,reranker-huggingface' # Still needed for reranker
+      CLUSTER_HOSTNAME: 'node1'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ---------- Local LLM server for generating RAG answers ---------------------------------------------------
+  ollama:
+    image: ollama/ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   # ---------- Streamlit RAG Frontend -----------------------------------------
   frontend:
@@ -113,10 +90,7 @@ services:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
       - WEAVIATE_URL=http://weaviate:8080
-    volumes:
-      - ..:/app # live-mount project for rapid iteration
 
-# Root-level secrets definition
-secrets:
-  hf_hub_token:
-    file: ./secrets/hf_hub_token
+volumes:
+  weaviate_db:
+  ollama_models:
