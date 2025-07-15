@@ -69,6 +69,9 @@ def get_top_k(
                     "[Debug][Retriever] hybrid not available – falling back to near_text"
                 )
 
+        if debug:
+            print(f"[Debug][Retriever] Found {len(res.objects)} candidates.")
+
         # Weaviate returns objects already ordered by relevance. If a distance
         # attribute is present we sort on it just in case.
         objects = res.objects

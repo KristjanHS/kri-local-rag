@@ -34,16 +34,16 @@ docker compose build --progress=plain 2>&1 | tee build.log
 docker compose up weaviate t2v-transformers ollama
 # Wait until you see in the foreground that Weaviate and Ollama are ready. Use Ctrl+C to stop when services started up successfully.
 
-# Part 4: Start the services in background, and start backend automatically after services are responding:
-./run-docker.sh 
+# Part 4: This script will start services in the background and wait for them to be healthy before launching the CLI/backend:
+./run-rag-cli.sh 
 ```
 
 ### Subsequent Launches
 
 After the initial build, you can use the helper script to start services and the backend. 
-This script will start services in the background and wait for them to be healthy before launching the backend:
+This script will start services in the background and wait for them to be healthy before launching the CLI/backend:
 ```bash
-./run-docker.sh
+./run-rag-cli.sh
 ```
 
 For all other Docker usage, troubleshooting, and advanced commands, see [Docker Management Guide](docs/docker-management.md).

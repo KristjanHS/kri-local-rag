@@ -127,32 +127,38 @@ def answer(
         question, k=initial_k, debug=debug, metadata_filter=metadata_filter
     )
     if not candidates:
-        return "I found no relevant context to answer that question."
+        return "I found no relevant context to answer that question. The database may be empty. Please ingest a PDF first."
 
     # ---------- 2) Re-rank ------------------------------------------------------
+    if debug:
+        print(f"\n[Debug] Re-ranking the top {len(candidates)} candidates...")
     scored_chunks = _rerank(question, candidates, k_keep=k, debug=debug)
 
     if debug:
         msg = "\n[Debug] Reranked context chunks:"
-        if on_debug:
-            on_debug(msg)
-        else:
-            print(msg)
+        print(msg)
         for idx, sc in enumerate(scored_chunks, 1):
             preview = sc.text.replace("\n", " ")[:120]
             msg = f" {idx:02d}. score={sc.score:.4f} | {preview}…"
-            if on_debug:
-                on_debug(msg)
-            else:
-                print(msg)
+            print(msg)
 
     # Extract plain texts for prompt construction.
     context_chunks = [sc.text for sc in scored_chunks]
 
     # ---------- 3) Prepare the prompt and payload -------------------------------------------------
     prompt_text = build_prompt(question, context_chunks)
+    if debug:
+        print("\n[Debug] Prompt being sent to Ollama:")
+        print(prompt_text)
 
     # ---------- 4) Query the LLM -------------------------------------------------
+    if debug:
+        # Use a simple print callback for CLI debug mode
+        def cli_on_debug(msg):
+            print(f"[Ollama Debug] {msg}")
+
+        on_debug = cli_on_debug
+
     answer_text, updated_context = generate_response(
         prompt_text,
         OLLAMA_MODEL,
