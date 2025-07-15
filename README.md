@@ -12,92 +12,73 @@ Local RAG system using Weaviate, Ollama, and Python.
 
 ---
 
+## Automated Scripts
+
+This project includes simple shell scripts to manage the entire Docker environment:
+
+-   `docker-setup.sh`: Builds all images and starts all services for the first time.
+-   `docker-run.sh`: Executes commands inside the running backend container (e.g., for ingestion).
+-   `docker-reset.sh`: Stops and completely removes all containers, volumes, and images for this project.
+
+---
+
 ## Installation & Startup
 
-### First-Time Setup: run these parts one by one:
+### First-Time Setup
 
-```bash
-# Part 1: Clone the repo and cd in:
-git clone https://github.com/KristjanHS/kri-local-rag
-cd kri-local-rag
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/KristjanHS/kri-local-rag
+    cd kri-local-rag
+    ```
 
-# Part 2: Set environment variables and build images:
-export COMPOSE_FILE=docker/docker-compose.yml  # Tells Docker Compose exactly which file to use.
-export COMPOSE_PROJECT_NAME=kri-local-rag  # Sets a custom name for your project.
-export BUILDKIT_PROGRESS=plain  # Ensures the Docker build output is shown as a continuous, plain-text log instead of the default progress bars.
-docker compose build --progress=plain 2>&1 | tee build.log
-# Wait until you see in the foreground that all builds completed successfully
-  # The "2>&1 | tee build.log" pipes all output (both standard output and errors) to the tee command,
-  # which simultaneously displays it on your screen and saves it to a file named build.log.
+2.  Make the scripts executable:
+    ```bash
+    chmod +x docker-setup.sh docker-run.sh docker-reset.sh
+    ```
 
-# Part 3: Start core services in the foreground (watch logs for errors or readiness):
-docker compose up weaviate t2v-transformers ollama
-# Wait until you see in the foreground that Weaviate and Ollama are ready. Use Ctrl+C to stop when services started up successfully.
+3.  Run the automated setup script. This will build the Docker images and start all services.
+    ```bash
+    ./docker-setup.sh
+    ```
+    **Note:** The first run can be very slow (10-20 minutes or more) as it downloads several gigabytes of models. Subsequent launches are much faster.
 
-# Part 4: This script will start services in the background and wait for them to be healthy before launching the CLI/backend:
-./run-rag-cli.sh 
-```
+Once the setup is complete, the Streamlit frontend will be available at **[http://localhost:8501](http://localhost:8501)**.
 
 ### Subsequent Launches
 
-After the initial build, you can use the helper script to start services and the backend. 
-This script will start services in the background and wait for them to be healthy before launching the CLI/backend:
+If you have stopped the containers (e.g., with `docker compose down`), you can restart them with:
 ```bash
-./run-rag-cli.sh
+docker compose -f docker/docker-compose.yml up --detach
 ```
-
-For all other Docker usage, troubleshooting, and advanced commands, see [Docker Management Guide](docs/docker-management.md).
 
 ---
 
+## Usage
+
 ### Ingest Documents
+
+To ingest documents into the Weaviate database, use the `docker-run.sh` script to execute the ingestion command inside the backend container.
+
+For example, to ingest all PDFs from the `example_data` directory:
 ```bash
-docker compose run --rm rag-backend python ingest_pdf.py
+./docker-run.sh python backend/ingest_pdf.py example_data/
 ```
 
 ### Ask Questions
-```
-> What is this document about?
-> How does the system work?
-> Can you summarize the key points?
-```
 
-For detailed document processing, see [Document Processing Guide](docs/document-processing.md).
+Once documents are ingested, you can ask questions via the Streamlit frontend at **[http://localhost:8501](http://localhost:8501)**.
 
 ---
 
-## Usage Options
+## Environment Reset
+
+To completely reset the project, which will stop and delete all Docker containers, volumes (including the Weaviate database and Ollama models), and custom images, run the reset script:
 
 ```bash
-# Debug levels
-docker compose run --rm rag-backend --debug-level 1   # Basic debug
-docker compose run --rm rag-backend --debug-level 2   # Detailed debug
-
-# Filtering options
-docker compose run --rm rag-backend --source pdf      # Filter by source
-docker compose run --rm rag-backend --language en     # Filter by language
-docker compose run --rm rag-backend --k 5             # Set number of chunks to use after re-ranking
+./docker-reset.sh
 ```
-
----
-
-## Troubleshooting & Service Management
-
-For all Docker/service management and troubleshooting, see [Docker Management Guide](docs/docker-management.md).
-
----
-
-## Resetting the Database
-
-To delete all persistent data (including the Weaviate database), run:
-
-```bash
-docker compose down -v
-```
-
-This will remove all Docker volumes, including the Weaviate database volume, and delete all data.
-
-Other documentation files refer to this section for database reset instructions.
+The script will ask for confirmation before deleting anything.
 
 ---
 

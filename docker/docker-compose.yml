@@ -3,6 +3,9 @@ services:
   # ---------- Local Weaviate database ------------------------------------------------
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.25.1
+    depends_on:
+      t2v-transformers:
+        condition: service_healthy
     ports:
       - "8080:8080"
       - "50051:50051"
@@ -37,6 +40,12 @@ services:
         reservations:
           devices:
             - capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/.well-known/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     secrets:
       - hf_hub_token
 
@@ -60,14 +69,16 @@ services:
       retries: 5
       start_period: 10s
 
-  # ---------- Local RAG Q&A loop - Python backend -----------------------------------------
+  # ---------- Python Backend & RAG CLI -----------------------------------------
   backend:
     build:
       context: ..  # project root
       dockerfile: docker/backend.Dockerfile
     depends_on:
-      - weaviate
-      - ollama
+      weaviate:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
     environment:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
@@ -83,6 +94,27 @@ services:
         reservations:
           devices:
             - capabilities: [gpu]
+
+  # ---------- Streamlit RAG Frontend -----------------------------------------
+  frontend:
+    build:
+      context: ..  # project root
+      dockerfile: docker/frontend.Dockerfile
+    depends_on:
+      weaviate:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    ports:
+      - "8501:8501"
+    environment:
+      # Point the Python code to the other services inside the compose network
+      - OLLAMA_URL=http://ollama:11434
+      - WEAVIATE_URL=http://weaviate:8080
+    volumes:
+      - ..:/app # live-mount project for rapid iteration
 
 # Root-level secrets definition
 secrets:
