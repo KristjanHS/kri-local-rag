@@ -1,0 +1,5 @@
+streamlit
+python-dotenv
+weaviate-client
+sentence-transformers
+langchain

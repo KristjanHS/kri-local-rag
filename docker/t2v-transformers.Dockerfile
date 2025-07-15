@@ -1,5 +1,8 @@
 FROM semitechnologies/transformers-inference:sentence-transformers-all-MiniLM-L6-v2
 
+# Install curl so the healthcheck command can run
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # The Weaviate registry doesn’t have a pre-built image whose tag matches nomic-ai-nomic-embed-text-v1.5
 # You can verify by listing the tags available:
 # https://cr.weaviate.io/v2/semitechnologies/transformers-inference/tags/list
