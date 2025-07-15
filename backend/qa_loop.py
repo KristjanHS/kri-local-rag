@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactive console for Retrieval-Augmented Generation."""
+"""RAG CLI: Interactive console for Retrieval-Augmented Generation."""
 
 # External libraries
 from __future__ import annotations
@@ -57,7 +57,9 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
 
 
 # ---------- Scoring of retrieved chunks --------------------------------------------------
-def _score_chunks(question: str, chunks: List[str], debug: bool = False) -> List[ScoredChunk]:
+def _score_chunks(
+    question: str, chunks: List[str], debug: bool = False
+) -> List[ScoredChunk]:
     """Return *chunks* each paired with a relevance score for *question*."""
 
     encoder = _get_cross_encoder()
@@ -80,7 +82,9 @@ def _score_chunks(question: str, chunks: List[str], debug: bool = False) -> List
 
 
 # ---------- Reranking of retrieved chunks --------------------------------------------------
-def _rerank(question: str, chunks: List[str], k_keep: int, debug: bool = False) -> List[ScoredChunk]:
+def _rerank(
+    question: str, chunks: List[str], k_keep: int, debug: bool = False
+) -> List[ScoredChunk]:
     """Return the *k_keep* most relevant chunks for *question*, sorted by score."""
 
     scored = _score_chunks(question, chunks, debug)
@@ -119,7 +123,9 @@ def answer(
 
     # ---------- 1) Retrieve -----------------------------------------------------
     initial_k = max(k * 20, 100)  # ask vector DB for more than we eventually keep
-    candidates = get_top_k(question, k=initial_k, debug=debug, metadata_filter=metadata_filter)
+    candidates = get_top_k(
+        question, k=initial_k, debug=debug, metadata_filter=metadata_filter
+    )
     if not candidates:
         return "I found no relevant context to answer that question."
 
@@ -164,13 +170,93 @@ def answer(
 
 
 # ---------- CLI --------------------------------------------------
-if __name__ == "__main__":
-    import argparse
+import weaviate
+from weaviate.exceptions import WeaviateConnectionError
+from weaviate.classes.query import Filter
+from config import COLLECTION_NAME, WEAVIATE_URL
+from ingest_pdf import ingest, create_collection_if_not_exists
+import argparse
+from urllib.parse import urlparse
 
-    parser = argparse.ArgumentParser(description="Interactive RAG console with optional metadata filtering.")
+
+def ensure_weaviate_ready_and_populated():
+    print("--- Checking Weaviate status and collection ---")
+    try:
+        parsed_url = urlparse(WEAVIATE_URL)
+        client = weaviate.connect_to_custom(
+            http_host=parsed_url.hostname,
+            http_port=parsed_url.port or 80,
+            grpc_host=parsed_url.hostname,
+            grpc_port=50051,
+            http_secure=parsed_url.scheme == "https",
+            grpc_secure=parsed_url.scheme == "https",
+        )
+        print(f"1. Attempting to connect to Weaviate at {WEAVIATE_URL}...")
+        client.is_ready()  # Raises if not ready
+        print("   ✓ Connection successful.")
+
+        # Check if collection exists
+        print(f"2. Checking if collection '{COLLECTION_NAME}' exists...")
+        if not client.collections.exists(COLLECTION_NAME):
+            # First-time setup: create the collection, ingest examples, then clean up.
+            print(f"   → Collection does not exist. Running one-time initialization...")
+            create_collection_if_not_exists(client)
+
+            # Ingest example data to ensure all modules are warm, then remove it.
+            ingest("../example_data/")
+
+            # Clean up the example data now that the schema is created.
+            # This check is important in case the example_data folder was empty.
+            collection = client.collections.get(COLLECTION_NAME)
+            # Use the robust iterator method to check for objects
+            try:
+                next(collection.iterator())
+                has_objects = True
+            except StopIteration:
+                has_objects = False
+
+            if has_objects:
+                collection.data.delete_many(
+                    where=Filter.by_property("source_file").equal("test.pdf")
+                )
+                print(
+                    "   ✓ Example data removed, leaving a clean collection for the user."
+                )
+
+            return
+
+        # If the collection already exists, we do nothing. This avoids checking if it's empty
+        # and re-populating, which could be slow on large user databases.
+        print(f"   ✓ Collection '{COLLECTION_NAME}' exists.")
+
+    except WeaviateConnectionError as e:
+        print(
+            f"\n[Error] Failed to connect to Weaviate: {e}.\n"
+            "Please ensure Weaviate is running and accessible before starting the backend."
+        )
+        exit(1)
+    except Exception as e:
+        print(f"\n[Error] An unexpected error occurred during Weaviate check: {e}")
+        exit(1)
+    finally:
+        if "client" in locals() and client.is_connected():
+            client.close()
+    print("--- Weaviate check complete ---\n")
+
+
+if __name__ == "__main__":
+    ensure_weaviate_ready_and_populated()
+
+    parser = argparse.ArgumentParser(
+        description="Interactive RAG console with optional metadata filtering."
+    )
     parser.add_argument("--source", help="Filter chunks by source field (e.g. 'pdf')")
-    parser.add_argument("--language", help="Filter chunks by detected language code (e.g. 'en', 'et')")
-    parser.add_argument("--k", type=int, default=3, help="Number of top chunks to keep after re-ranking")
+    parser.add_argument(
+        "--language", help="Filter chunks by detected language code (e.g. 'en', 'et')"
+    )
+    parser.add_argument(
+        "--k", type=int, default=3, help="Number of top chunks to keep after re-ranking"
+    )
     parser.add_argument(
         "--debug-level",
         type=int,
@@ -188,9 +274,13 @@ if __name__ == "__main__":
     if args.source or args.language:
         clauses = []
         if args.source:
-            clauses.append({"path": ["source"], "operator": "Equal", "valueText": args.source})
+            clauses.append(
+                {"path": ["source"], "operator": "Equal", "valueText": args.source}
+            )
         if args.language:
-            clauses.append({"path": ["language"], "operator": "Equal", "valueText": args.language})
+            clauses.append(
+                {"path": ["language"], "operator": "Equal", "valueText": args.language}
+            )
 
         if len(clauses) == 1:
             meta_filter = clauses[0]

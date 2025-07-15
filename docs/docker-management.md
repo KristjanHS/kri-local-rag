@@ -1,18 +1,8 @@
 # Docker Management Guide
 
-## Quick Start
+> **Note:** Other documentation files refer to this guide for all Docker usage, troubleshooting, and advanced commands.
 
-```bash
-# Start all services
-./run-docker.sh
-
-# Manual start
-export COMPOSE_FILE=docker/docker-compose.yml
-export COMPOSE_PROJECT_NAME=kri-local-rag
-docker compose up --build -d weaviate t2v-transformers ollama
-sleep 10
-docker compose run --rm rag-backend
-```
+> **For basic startup and quick reference commands, see the root [README.md](../README.md).**
 
 ## Services
 
@@ -85,7 +75,7 @@ sudo systemctl restart docker
 ```bash
 # Check service health
 curl http://localhost:8080/v1/meta  # Weaviate
-curl http://localhost:11434/api/tags  # Ollama
+curl http://localhost:11434/api/tags  # Ollama - is service up, what models are available
 curl http://localhost:8081/health  # Transformers
 ```
 
@@ -120,7 +110,7 @@ This project uses two types of volumes:
 docker volume ls | grep kri-local-rag
 
 # Remove old/unused volumes from previous project names
-docker volume rm <old-volume-name>
+# (Refer to README.md for canonical reset instructions)
 ```
 
 ### Universal Backup/Restore Method (via Docker Container)
@@ -143,6 +133,12 @@ sudo ls -la /var/lib/docker/volumes/kri-local-rag_weaviate_data/_data
 # Example (Linux Only): Direct filesystem backup
 sudo tar czf /backup/weaviate_backup.tar.gz -C /var/lib/docker/volumes/kri-local-rag_weaviate_data/_data .
 ```
+
+## Data Locations
+
+- **Weaviate data**: `.weaviate_db` directory at the project root (visible in WSL/Linux as <project-root>/.weaviate_db)
+- **Ollama models**: `.ollama_models` directory at the project root (visible in WSL/Linux as <project-root>/.ollama_models)
+- **Source documents**: Local `data/` directory
 
 ## Cleaning Up Containers & Images (Keep All Data)
 

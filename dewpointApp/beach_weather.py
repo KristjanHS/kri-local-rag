@@ -75,3 +75,66 @@ def find_nearest_station(user_lat, user_lon, stations):
             min_dist = dist
             nearest = station
     return nearest
+
+
+def fetch_estonian_humidity_map(date_str, hour_str):
+    """
+    Fetches the Estonian humidity map for a given date (YYYY-MM-DD) and hour (HH),
+    returns a list of dicts with station name, lat, lon, and humidity (as float or None).
+    """
+    url = f"https://publicapi.envir.ee/v1/misc/observationAirHumidityMap?date={date_str}&hour={hour_str}"
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        stations = []
+        root = ET.fromstring(response.content)
+        for entry in root.findall(
+            ".//{http://ws.wso2.org/dataservice/observationAirHumidityMap}entry"
+        ):
+            station = {}
+            for child in entry:
+                tag = child.tag.split("}", 1)[-1]
+                station[tag] = child.text
+            # Convert coordinates to decimal
+            try:
+                lat = (
+                    float(station.get("LaiusKraad", 0))
+                    + float(station.get("LaiusMinut", 0)) / 60
+                    + float(station.get("LaiusSekund", 0)) / 3600
+                )
+                lon = (
+                    float(station.get("PikkusKraad", 0))
+                    + float(station.get("PikkusMinut", 0)) / 60
+                    + float(station.get("PikkusSekund", 0)) / 3600
+                )
+                station["lat"] = lat
+                station["lon"] = lon
+            except Exception:
+                station["lat"] = None
+                station["lon"] = None
+            # Parse humidity
+            try:
+                rh = station.get("rhins")
+                if rh is not None and rh.lower() != "null":
+                    station["humidity"] = float(rh)
+                else:
+                    station["humidity"] = None
+            except Exception:
+                station["humidity"] = None
+            stations.append(station)
+        return stations
+    except Exception:
+        return []
+
+
+def find_nearest_humidity_station(user_lat, user_lon, stations):
+    min_dist = float("inf")
+    nearest = None
+    for station in stations:
+        if station.get("lat") is not None and station.get("lon") is not None:
+            dist = haversine(user_lat, user_lon, station["lat"], station["lon"])
+            if dist < min_dist:
+                min_dist = dist
+                nearest = station
+    return nearest
