@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from typing import List, Optional, Dict, Any
+from urllib.parse import urlparse
 
 import weaviate
 
-from config import COLLECTION_NAME, DEFAULT_HYBRID_ALPHA
+from config import COLLECTION_NAME, DEFAULT_HYBRID_ALPHA, WEAVIATE_URL
 
 # ---------------------------------------------------------------------------
 # Retriever helpers
@@ -40,8 +41,15 @@ def get_top_k(
        (e.g. older Weaviate versions without the hybrid module).
     """
 
-    # For now, use the local connection which should work with v4
-    client = weaviate.connect_to_local()
+    parsed_url = urlparse(WEAVIATE_URL)
+    client = weaviate.connect_to_custom(
+        http_host=parsed_url.hostname,
+        http_port=parsed_url.port or 80,
+        grpc_host=parsed_url.hostname,
+        grpc_port=50051,
+        http_secure=parsed_url.scheme == "https",
+        grpc_secure=parsed_url.scheme == "https",
+    )
     try:
         collection = client.collections.get(COLLECTION_NAME)
 
@@ -57,7 +65,9 @@ def get_top_k(
             # Fallback for older clients/servers – use near_text.
             res = q.near_text(query=question, limit=k)
             if debug:
-                print("[Debug][Retriever] hybrid not available – falling back to near_text")
+                print(
+                    "[Debug][Retriever] hybrid not available – falling back to near_text"
+                )
 
         # Weaviate returns objects already ordered by relevance. If a distance
         # attribute is present we sort on it just in case.
@@ -67,4 +77,4 @@ def get_top_k(
 
         return [str(o.properties.get("content", "")) for o in objects]
     finally:
-        client.close()  # type: ignore[attr-defined]
+        client.close()

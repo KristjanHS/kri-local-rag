@@ -3,3 +3,4 @@ plotly
 numpy
 python-dotenv
 streamlit_js_eval
+timezonefinder

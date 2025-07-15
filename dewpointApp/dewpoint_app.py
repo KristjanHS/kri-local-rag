@@ -12,7 +12,7 @@ import streamlit as st
 import os
 from dotenv import load_dotenv
 import pytz
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from dewpoint_weather import (
     get_weather,
     calculate_dew_point,
@@ -25,6 +25,7 @@ from dewpoint_weather import (
     text_labels,
 )
 from beach_weather import fetch_estonian_beach_temps, find_nearest_station
+from timezonefinder import TimezoneFinder
 
 # ---------------------------------------------------------------------------
 # Load API key from .env file
@@ -453,14 +454,78 @@ if "lat" in locals() and "lon" in locals() and lat is not None and lon is not No
                 st.markdown(
                     f"**Wind direction:** {wind_dir_int}° ({deg_to_compass(wind_dir)})"
                 )
-            # Show measurement time/date if available
-            measurement_time = nearest.get("Time")
-            if measurement_time:
-                # Try to parse ISO format and display as 'DD.MM.YYYY HH:MM'
-                try:
-                    dt = datetime.fromisoformat(measurement_time.replace("Z", "+00:00"))
-                    st.markdown(
-                        f"**Measurement time:** {dt.strftime('%d.%m.%Y %H:%M')}"
-                    )
-                except Exception:
-                    st.markdown(f"**Measurement time:** {measurement_time}")
+                # Show measurement time/date if available
+                measurement_time = nearest.get("Time")
+                if measurement_time:
+                    # Try to parse ISO format and display as 'DD.MM.YYYY HH:MM'
+                    try:
+                        dt = datetime.fromisoformat(
+                            measurement_time.replace("Z", "+00:00")
+                        )
+                        st.markdown(
+                            f"**Measurement time:** {dt.strftime('%d.%m.%Y %H:%M')}"
+                        )
+                    except Exception:
+                        st.markdown(f"**Measurement time:** {measurement_time}")
+                # Show station distance to user location
+                user_coords = (lat, lon)
+                station_coords = (nearest.get("lat"), nearest.get("lon"))
+                from beach_weather import haversine
+
+                dist_km = haversine(lat, lon, station_coords[0], station_coords[1])
+                st.code(
+                    f"Station distance to user location: {dist_km:.2f} km",
+                    language="text",
+                )
+
+# --- Estonian Environment Agency Humidity Comparison ---
+from beach_weather import fetch_estonian_humidity_map, find_nearest_humidity_station
+
+if "lat" in locals() and "lon" in locals() and lat is not None and lon is not None:
+    # Determine local timezone for user's coordinates
+    tf = TimezoneFinder()
+    user_tz_str = tf.timezone_at(lat=lat, lng=lon) or "Europe/Tallinn"
+    user_tz = pytz.timezone(user_tz_str)
+    now_utc = datetime.now(timezone.utc)
+    now_local = now_utc.astimezone(user_tz)
+    found = False
+    for hour_offset in range(0, 4):
+        dt = now_local - timedelta(hours=hour_offset)
+        date_str = dt.strftime("%Y-%m-%d")
+        hour_str = dt.strftime("%H")
+        stations = fetch_estonian_humidity_map(date_str, hour_str)
+        stations = [s for s in stations if s.get("humidity") is not None]
+        if stations:
+            nearest = find_nearest_humidity_station(lat, lon, stations)
+            if nearest and nearest.get("humidity") is not None:
+                st.markdown("---")
+                st.subheader("Estonian Environment Agency Humidity (nearest station)")
+                st.markdown(f"**Station:** {nearest.get('Jaam','?')}")
+                # Format timestamp for easier reading in local time
+                dt_obj = user_tz.localize(
+                    datetime.strptime(f"{date_str} {hour_str}", "%Y-%m-%d %H")
+                )
+                formatted_time = dt_obj.strftime("%H:00, %d.%m.%Y %Z")
+                st.markdown(
+                    f"**Relative humidity:** {nearest['humidity']:.0f}% (at {formatted_time})"
+                )
+                # Debug info: show user and station coordinates and distance
+                user_coords = (lat, lon)
+                station_coords = (nearest.get("lat"), nearest.get("lon"))
+                from beach_weather import haversine
+
+                dist_km = haversine(lat, lon, station_coords[0], station_coords[1])
+                st.code(
+                    # f"User location: {user_coords}\nStation location: {station_coords}\nDistance: {dist_km:.2f} km",
+                    f"Station distance to user location: {dist_km:.2f} km",
+                    language="text",
+                )
+                found = True
+                break
+    if not found:
+        st.info("No recent Estonian humidity data available for your location.")
+    # Also show OpenWeatherMap humidity for comparison
+    if outdoor_rh_fetched is not None:
+        st.markdown(
+            f"**OpenWeatherMap humidity (your GPS):** {outdoor_rh_fetched:.0f}% (current)"
+        )

@@ -53,7 +53,10 @@ cuda-keyring_*.deb
 google-cloud-sdk/
 
 # Large data files, assets, or logs
+.ollama_models/
 data/
+.data/
+.weaviate_db/
 assets/
 *.csv
 # If they are large datasets

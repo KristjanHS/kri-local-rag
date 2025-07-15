@@ -18,12 +18,15 @@ DEFAULT_HYBRID_ALPHA = 0.5  # 0 → pure BM25, 1 → pure vector
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "cas/mistral-7b-instruct-v0.3")
 # Default to local Ollama endpoint but allow override via env variable.
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
 
 # Default debug level for both CLI and Streamlit frontend
 DEBUG_LEVEL = int(os.getenv("DEBUG_LEVEL", 2))  # 0=off, 1=basic, 2=detailed, 3=verbose
 
 # Default context window (max tokens) for Ollama LLM requests
-OLLAMA_CONTEXT_TOKENS = int(os.getenv("OLLAMA_CONTEXT_TOKENS", 8192))  # e.g. 4096, 8192, etc.
+OLLAMA_CONTEXT_TOKENS = int(
+    os.getenv("OLLAMA_CONTEXT_TOKENS", 8192)
+)  # e.g. 4096, 8192, etc.
 
 
 # (base) PS %USERPROFILE%> ollama show cas/mistral-7b-instruct-v0.3

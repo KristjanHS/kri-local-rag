@@ -30,5 +30,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy source code last (so edits don’t invalidate earlier layers)
 COPY backend/ /app/backend/
 
+# Also copy the example data so it's available for auto-ingestion
+COPY example_data/ /app/example_data/
+
 # Default command – override in docker-compose if you need another entrypoint.
 CMD ["python", "qa_loop.py"] 

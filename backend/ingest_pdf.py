@@ -27,10 +27,13 @@ from typing import List
 
 import weaviate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from weaviate.util import generate_uuid5
 from weaviate.exceptions import UnexpectedStatusCodeError
+from weaviate.classes.config import Configure, Property, DataType
 
-from config import COLLECTION_NAME, CHUNK_SIZE, CHUNK_OVERLAP
+from config import COLLECTION_NAME, CHUNK_SIZE, CHUNK_OVERLAP, WEAVIATE_URL
+from urllib.parse import urlparse
+
+import hashlib
 
 # Lightweight language detection
 try:
@@ -48,7 +51,9 @@ except ImportError:
 PdfReader = None
 
 
-splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP
+)
 
 # ---------- helpers ----------------------------------------------------------------
 
@@ -61,7 +66,9 @@ def extract_text(path: str) -> str:
         els = partition_pdf(filename=path)
         return "\n".join([e.text for e in els if getattr(e, "text", None)])
     except Exception as err:
-        print(f"[Error] Failed to parse {os.path.basename(path)} with unstructured: {err}")
+        print(
+            f"[Error] Failed to parse {os.path.basename(path)} with unstructured: {err}"
+        )
         return ""
 
 
@@ -70,14 +77,43 @@ def list_pdfs(directory: str) -> List[str]:
 
 
 def connect() -> weaviate.WeaviateClient:
-    # Use local connection for v4 compatibility
-    return weaviate.connect_to_local()
+    parsed_url = urlparse(WEAVIATE_URL)
+    return weaviate.connect_to_custom(
+        http_host=parsed_url.hostname,
+        http_port=parsed_url.port or 80,
+        grpc_host=parsed_url.hostname,
+        grpc_port=50051,
+        http_secure=parsed_url.scheme == "https",
+        grpc_secure=parsed_url.scheme == "https",
+    )
 
 
-def ensure_collection(client: weaviate.WeaviateClient):
+def create_collection_if_not_exists(client: weaviate.WeaviateClient):
+    """Create the collection with a predefined schema if it doesn't exist."""
     if not client.collections.exists(COLLECTION_NAME):
-        client.collections.create(name=COLLECTION_NAME)
+        client.collections.create(
+            name=COLLECTION_NAME,
+            properties=[
+                Property(name="content", data_type=DataType.TEXT),
+                Property(name="source_file", data_type=DataType.TEXT),
+                Property(name="page", data_type=DataType.INT),
+                Property(name="source", data_type=DataType.TEXT),
+                Property(name="section", data_type=DataType.TEXT),
+                Property(name="created_at", data_type=DataType.DATE),
+                Property(name="language", data_type=DataType.TEXT),
+            ],
+            vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+        )
+        print(f"→ Collection '{COLLECTION_NAME}' created with the specified schema.")
+
+
+def get_collection(client: weaviate.WeaviateClient):
     return client.collections.get(COLLECTION_NAME)
+
+
+def deterministic_uuid(source_file, chunk_index, chunk_content):
+    base = f"{source_file}:{chunk_index}:{chunk_content}"
+    return hashlib.md5(base.encode("utf-8")).hexdigest()
 
 
 # ---------- ingestion logic ---------------------------------------------------------
@@ -89,7 +125,7 @@ def process_pdf(path: str, docs, stats: dict[str, int]):
     stats["chunks"] += len(chunks)
     # Use a UUID that is independent of *content* so we can detect edits.
     for i, chunk in enumerate(chunks):
-        uuid = generate_uuid5(f"{os.path.basename(path)}:{i}")
+        uuid = deterministic_uuid(os.path.basename(path), i, chunk)
         # Basic metadata enrichment
         created_ts = os.path.getmtime(path)
         created_iso = datetime.fromtimestamp(created_ts).isoformat()
@@ -144,7 +180,8 @@ def ingest(directory: str):
 
     client = connect()
     try:
-        docs = ensure_collection(client)
+        create_collection_if_not_exists(client)
+        docs = get_collection(client)
         for p in pdfs:
             print(f"→ {os.path.basename(p)}")
             process_pdf(p, docs, stats)
@@ -164,8 +201,12 @@ def ingest(directory: str):
 
 # ---------- CLI ---------------------------------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Ingest PDFs into Weaviate and print statistics.")
-    parser.add_argument("--data-dir", default="../data", help="Directory with PDF files.")
+    parser = argparse.ArgumentParser(
+        description="Ingest PDFs into Weaviate and print statistics."
+    )
+    parser.add_argument(
+        "--data-dir", default="../data", help="Directory with PDF files."
+    )
     args = parser.parse_args()
 
     ingest(args.data_dir)
