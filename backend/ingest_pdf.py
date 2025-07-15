@@ -41,6 +41,12 @@ try:
 except ImportError:
     detect = None  # type: ignore
 
+# For manual vectorization
+try:
+    from sentence_transformers import SentenceTransformer  # type: ignore
+except ImportError:
+    SentenceTransformer = None  # type: ignore
+
 # ---------- optional PDF back-ends --------------------------------------------------
 try:
     from unstructured.partition.pdf import partition_pdf  # type: ignore
@@ -102,9 +108,9 @@ def create_collection_if_not_exists(client: weaviate.WeaviateClient):
                 Property(name="created_at", data_type=DataType.DATE),
                 Property(name="language", data_type=DataType.TEXT),
             ],
-            vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+            # No vectorizer_config means we provide vectors manually
         )
-        print(f"→ Collection '{COLLECTION_NAME}' created with the specified schema.")
+        print(f"→ Collection '{COLLECTION_NAME}' created for manual vectorization.")
 
 
 def get_collection(client: weaviate.WeaviateClient):
@@ -119,7 +125,7 @@ def deterministic_uuid(source_file, chunk_index, chunk_content):
 # ---------- ingestion logic ---------------------------------------------------------
 
 
-def process_pdf(path: str, docs, stats: dict[str, int]):
+def process_pdf(path: str, docs, stats: dict[str, int], model: "SentenceTransformer"):
     text = extract_text(path)
     chunks = splitter.split_text(text)
     stats["chunks"] += len(chunks)
@@ -148,9 +154,11 @@ def process_pdf(path: str, docs, stats: dict[str, int]):
             "language": language,
         }
 
+        vector = model.encode(chunk)
+
         try:
             # First try to insert – fast path for new chunks
-            docs.data.insert(uuid=uuid, properties=props)
+            docs.data.insert(uuid=uuid, properties=props, vector=vector)
             stats["inserts"] += 1
         except UnexpectedStatusCodeError as e:
             # 422 "id already exists" → object present; decide if update needed
@@ -163,13 +171,18 @@ def process_pdf(path: str, docs, stats: dict[str, int]):
                 existing = None
 
             if existing and existing.properties.get("content", "") != chunk:
-                docs.data.replace(uuid=uuid, properties=props)
+                docs.data.replace(uuid=uuid, properties=props, vector=vector)
                 stats["updates"] += 1
             else:
                 stats["skipped"] += 1
 
 
 def ingest(directory: str):
+    if SentenceTransformer is None:
+        raise ImportError("Install 'sentence-transformers' to enable vectorization.")
+
+    model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+
     pdfs = list_pdfs(directory)
     if not pdfs:
         print(f"No PDF files in '{directory}'.")
@@ -184,7 +197,7 @@ def ingest(directory: str):
         docs = get_collection(client)
         for p in pdfs:
             print(f"→ {os.path.basename(p)}")
-            process_pdf(p, docs, stats)
+            process_pdf(p, docs, stats, model)
     finally:
         client.close()
 
