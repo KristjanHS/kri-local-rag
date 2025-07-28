@@ -12,7 +12,6 @@ WORKDIR /app/backend
 
 # System deps required by PDF parsing & other libs.
 RUN apt-get update && \
-
 # Apply latest OS security patches, then install required packages
     apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends \
