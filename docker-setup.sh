@@ -69,6 +69,9 @@ echo -e "${BOLD}Services that will be started: ${SERVICES_UP[*]}${NC}"
 # --- Script Start ---
 echo -e "${BOLD}Starting the automatic setup for the RAG project...${NC}"
 
+# Ensure helper scripts are executable
+chmod +x cli.sh ingest.sh docker-reset.sh || true
+
 # Create a logs directory if it doesn't exist
 mkdir -p logs
 
@@ -110,7 +113,7 @@ if [[ " ${SERVICES_UP[*]} " == *" app "* ]]; then
 fi
 
 if [[ " ${SERVICES_UP[*]} " == *" cli "* ]]; then
-  echo "To open an interactive RAG CLI shell, run: docker compose run --rm cli"
+  echo "To open an interactive RAG CLI shell, run: ./cli.sh"
 fi
 echo ""
 echo "To stop all services, run: docker compose --file docker/docker-compose.yml down"

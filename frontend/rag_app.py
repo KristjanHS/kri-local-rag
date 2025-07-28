@@ -3,10 +3,11 @@ import sys
 import os
 import threading
 import streamlit as st
+import io, contextlib
 
 # Add backend directory to sys.path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../backend")))
-from qa_loop import answer, set_debug_level
+from qa_loop import answer, set_debug_level, ensure_weaviate_ready_and_populated
 from config import DEBUG_LEVEL, OLLAMA_CONTEXT_TOKENS
 from ingest_pdf import ingest
 
@@ -69,6 +70,22 @@ if "stop_event" not in st.session_state:
 stop_clicked = st.button("Stop", key="stop_button")
 if stop_clicked:
     st.session_state.stop_event.set()
+
+# ---------------- One-time backend initialization ------------------
+if "init_done" not in st.session_state:
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        try:
+            ensure_weaviate_ready_and_populated()
+        except Exception as e:
+            print(f"[Error] Backend initialization failed: {e}")
+    st.session_state["init_logs"] = buf.getvalue()
+    st.session_state["init_done"] = True
+
+# Show init logs in sidebar
+st.sidebar.expander("Backend init logs", expanded=False).text(
+    st.session_state.get("init_logs", "No init logs.")
+)
 
 if submitted and question.strip():
     st.session_state.stop_event.clear()

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Usage: ./ingest.sh <path-to-pdf-or-directory>
-# Runs the PDF ingestion pipeline inside the running 'app' container.
+# Runs the PDF ingestion pipeline inside the running 'cli' container.
 
 set -e
 if [ $# -lt 1 ]; then
@@ -8,4 +8,4 @@ if [ $# -lt 1 ]; then
   exit 1
 fi
 
-docker compose -f docker/docker-compose.yml exec app python backend/ingest_pdf.py "$@" 
+docker compose -f docker/docker-compose.yml exec cli python backend/ingest_pdf.py "$@" 
