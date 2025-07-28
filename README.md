@@ -76,6 +76,7 @@ Runs `ingest_pdf.py` inside the *cli* container that is already running:
 ```bash
 ./ingest.sh data/
 ```
+The script simply passes the folder to `ingest_pdf.py --data-dir <folder>` inside the container.
 
 **One-off Compose profile**
 Builds a minimal “ingester” container (same image as the app) and executes ingestion once, then exits:

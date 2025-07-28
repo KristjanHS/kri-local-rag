@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 import weaviate
 
 from config import COLLECTION_NAME, DEFAULT_HYBRID_ALPHA, WEAVIATE_URL
+from weaviate.exceptions import WeaviateQueryError
 
 # ---------------------------------------------------------------------------
 # Retriever helpers
@@ -61,13 +62,15 @@ def get_top_k(
             res = q.hybrid(query=question, alpha=alpha, limit=k)
             if debug:
                 print(f"[Debug][Retriever] hybrid search used (alpha={alpha})")
-        except AttributeError:
-            # Fallback for older clients/servers – use near_text.
-            res = q.near_text(query=question, limit=k)
+        except (TypeError, WeaviateQueryError) as e:
+            # Possible causes: old client without hybrid, empty collection error, etc.
             if debug:
-                print(
-                    "[Debug][Retriever] hybrid not available – falling back to near_text"
-                )
+                print(f"[Debug][Retriever] hybrid failed ({e}); falling back to bm25")
+            try:
+                res = q.bm25(query=question, limit=k)
+            except Exception:
+                # If even BM25 fails (e.g., collection truly empty), return empty list
+                return []
 
         if debug:
             print(f"[Debug][Retriever] Found {len(res.objects)} candidates.")

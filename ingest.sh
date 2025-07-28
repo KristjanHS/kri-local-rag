@@ -8,4 +8,4 @@ if [ $# -lt 1 ]; then
   exit 1
 fi
 
-docker compose -f docker/docker-compose.yml exec cli python backend/ingest_pdf.py "$@" 
+docker compose -f docker/docker-compose.yml exec cli python backend/ingest_pdf.py --data-dir "$@" 

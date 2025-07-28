@@ -1,4 +1,5 @@
 langchain
+protobuf==5.29.0
 weaviate-client>=4.0.0
 httpx
 sentence-transformers
