@@ -4,8 +4,8 @@ set -e    # It tells the shell: "Exit immediately if any command in the script r
 export COMPOSE_FILE=docker/docker-compose.yml
 export COMPOSE_PROJECT_NAME=kri-local-rag
 
-echo "Starting Docker services (weaviate, t2v-transformers, ollama) in background..."
-docker compose up -d weaviate t2v-transformers ollama
+echo "Starting Docker services (weaviate, ollama) in background..."
+docker compose up -d weaviate ollama
 
 # Wait for Ollama
 until [ "$(docker inspect -f '{{.State.Health.Status}}' $(docker compose ps -q ollama))" = "healthy" ]; do
@@ -20,7 +20,7 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' $(docker compose ps -q w
 done
 
 echo "Starting interactive RAG CLI shell..."
-docker compose run --rm cli
+docker compose run --rm -it cli python backend/qa_loop.py
 # The --rm flag tells Docker to Automatically remove the container after it exits.
 
 # docker compose up --build -d

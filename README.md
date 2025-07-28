@@ -17,7 +17,7 @@ Local RAG system using Weaviate, Ollama, and Python.
 This project includes simple shell scripts to manage the entire Docker environment:
 
 -   `docker-setup.sh`: Builds all images and starts all services for the first time.
--   `docker-run.sh`: Executes commands inside the running CLI container (e.g., for ingestion).
+-   `cli.sh`: Executes commands inside the running CLI container (e.g., for ingestion).
 -   `docker-reset.sh`: Stops and completely removes all containers, volumes, and images for this project.
 
 ---
@@ -34,7 +34,7 @@ This project includes simple shell scripts to manage the entire Docker environme
 
 2.  Make the scripts executable:
     ```bash
-    chmod +x docker-setup.sh docker-run.sh docker-reset.sh
+    chmod +x docker-setup.sh cli.sh docker-reset.sh ingest.sh
     ```
 
 3.  Run the automated setup script. This will build the Docker images and start all services.
@@ -66,12 +66,12 @@ You can add PDFs to the vector-database in several convenient ways – pick whic
 | **1. Streamlit UI** | Open the app in your browser, expand *Ingest PDFs* in the sidebar, upload one or more PDF files and click **Ingest** | Quick, small uploads, no terminal needed |
 | **2. Helper script** | `./ingest.sh <path>` | Fast one-liner from a terminal when the App container is already running |
 | **3. One-off Docker Compose profile** | `docker compose --profile ingest up ingester` | Fire-and-forget batch ingestion without launching the full UI |
-| **4. Full CLI shell** | `./docker-run.sh python backend/ingest_pdf.py <path>` | Maximum flexibility: run any backend script inside a temporary CLI container |
+| **4. Full CLI shell** | `./cli.sh python backend/ingest_pdf.py <path>` | Maximum flexibility: run any backend script inside a temporary CLI container |
 
 Details:
 
 **Helper script (`ingest.sh`)**
-Runs `ingest_pdf.py` inside the *app* container that is already running:
+Runs `ingest_pdf.py` inside the *cli* container that is already running:
 
 ```bash
 ./ingest.sh data/
@@ -90,7 +90,13 @@ The default command ingests any PDFs found in `data/`. Edit `docker/docker-compo
 For advanced or scripted workflows you can run arbitrary Python inside the CLI image:
 
 ```bash
-./docker-run.sh python backend/ingest_pdf.py docs/my.pdf
+./cli.sh python backend/ingest_pdf.py docs/my.pdf
+```
+
+To open an interactive RAG CLI shell at any time run:
+
+```bash
+./cli.sh   # launches interactive qa_loop.py inside the CLI container
 ```
 
 ### Ask Questions

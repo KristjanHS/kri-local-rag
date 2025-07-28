@@ -18,9 +18,8 @@ services:
       - ../:/app
       - ../data:/app/data
     working_dir: /app
-    # command: sleep infinity  # Keep container running for exec
-    entrypoint: /app/docker/docker-entrypoint.sh
-    command: ["sleep", "infinity"] # Keep container running for interactive use
+    # Keep container running for exec sessions
+    command: ["sleep", "infinity"]
     deploy:
       resources:
         reservations:
