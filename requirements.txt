@@ -1,7 +1,6 @@
 langchain
 weaviate-client>=4.0.0
 httpx
-requests
 sentence-transformers
 langdetect
 unstructured[pdf]
