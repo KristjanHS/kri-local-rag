@@ -1,10 +1,10 @@
 name: kri-local-rag
 services:
-  # ---------- Python Backend & RAG CLI -----------------------------------------
-  backend:
+  # ---------- RAG CLI -----------------------------------------
+  cli:
     build:
       context: ..  # project root
-      dockerfile: docker/backend.Dockerfile
+      dockerfile: docker/CLI.Dockerfile
     depends_on:
       weaviate:
         condition: service_healthy
@@ -72,20 +72,25 @@ services:
       retries: 5
       start_period: 60s
 
-  # ---------- Streamlit RAG Frontend -----------------------------------------
-  frontend:
+  # ---------- Streamlit RAG App (contains backend and frontend) -----------------------------------------
+  app:
     build:
       context: ..  # project root
-      dockerfile: docker/frontend.Dockerfile
+      dockerfile: docker/app.Dockerfile
     depends_on:
       weaviate:
         condition: service_healthy
       ollama:
         condition: service_healthy
-      backend:
-        condition: service_started
     ports:
       - "8501:8501"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     environment:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
