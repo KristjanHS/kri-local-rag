@@ -8,11 +8,14 @@ import streamlit as st
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../backend")))
 from qa_loop import answer, set_debug_level
 from config import DEBUG_LEVEL, OLLAMA_CONTEXT_TOKENS
+from ingest_pdf import ingest
 
 st.set_page_config(page_title="RAG Q&A", layout="centered")
 st.title("RAG Q&A (Streamlit Frontend)")
 
-debug_level = st.sidebar.selectbox("Debug Level", [0, 1, 2, 3], index=[0, 1, 2, 3].index(DEBUG_LEVEL))
+debug_level = st.sidebar.selectbox(
+    "Debug Level", [0, 1, 2, 3], index=[0, 1, 2, 3].index(DEBUG_LEVEL)
+)
 set_debug_level(debug_level)
 k = st.sidebar.slider("Number of top chunks (k)", min_value=1, max_value=10, value=3)
 context_tokens = st.sidebar.number_input(
@@ -32,6 +35,28 @@ nvidia-smi -l 1
 This will update VRAM usage every second.
 """
 )
+
+# ---------------- Ingestion Sidebar ------------------
+with st.sidebar.expander("Ingest PDFs"):
+    uploaded_files = st.file_uploader(
+        "Select PDF files", accept_multiple_files=True, type=["pdf"]
+    )
+    if st.button("Ingest", key="ingest_btn"):
+        if not uploaded_files:
+            st.warning("No files selected.")
+        else:
+            save_dir = "data"
+            os.makedirs(save_dir, exist_ok=True)
+            saved_paths = []
+            for f in uploaded_files:
+                path = os.path.join(save_dir, f.name)
+                with open(path, "wb") as out:
+                    out.write(f.getbuffer())
+                saved_paths.append(path)
+
+            with st.spinner("Ingesting ..."):
+                ingest(saved_paths)
+            st.success(f"Ingested {len(saved_paths)} file(s).")
 
 with st.form("question_form"):
     question = st.text_area("Ask a question:", height=100)

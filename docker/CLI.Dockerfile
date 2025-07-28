@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12.3-slim
 
 ENV PYTHONUNBUFFERED=1
 
@@ -12,6 +12,8 @@ WORKDIR /app/backend
 
 # System deps required by PDF parsing & other libs.
 RUN apt-get update && \
+    # Apply latest OS security patches, then install required packages
+    apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends \
         build-essential \
         poppler-utils \

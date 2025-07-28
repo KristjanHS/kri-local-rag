@@ -96,6 +96,25 @@ services:
       - OLLAMA_URL=http://ollama:11434
       - WEAVIATE_URL=http://weaviate:8080
 
+  # ---------- One-off Ingestion Utility -----------------------------------------
+  ingester:
+    profiles: ["ingest"]
+    build:
+      context: ..
+      dockerfile: docker/app.Dockerfile
+    depends_on:
+      weaviate:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ../:/app
+      - ../data:/app/data
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - WEAVIATE_URL=http://weaviate:8080
+    command: ["python", "backend/ingest_pdf.py", "/app/data"]
+
 volumes:
   weaviate_db:
   ollama_models:
