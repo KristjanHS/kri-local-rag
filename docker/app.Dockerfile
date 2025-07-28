@@ -8,6 +8,7 @@ WORKDIR /app
 # First, pull in latest security patches for the base image
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends libmagic1 libmagic-dev && \
+    apt-get install -y --no-install-recommends poppler-utils && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ---- wheel cache mount (optional) ----
