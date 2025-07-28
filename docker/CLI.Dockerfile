@@ -20,12 +20,14 @@ RUN apt-get update && \
 
 # Copy requirements separately to leverage Docker layer cache
 COPY requirements.txt /app/
+
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /app/requirements.txt && \
+    pip install --no-cache-dir torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128 || true && \
+    pip install --no-cache-dir -r /app/requirements.txt
     # If you do not need GPU inside this container, ALSO remove the runtime line in docker-compose.yml!
     # Enable GPU support via NVIDIA runtime (CUDA libraries are provided by the host runtime)
     # Optional: install GPU-enabled PyTorch (comment out if you prefer CPU)
-    pip install --no-cache-dir torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128 || true
+
 
 # Copy source code last (so edits don’t invalidate earlier layers)
 COPY backend/ /app/backend/

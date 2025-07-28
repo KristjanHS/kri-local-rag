@@ -1,7 +1,6 @@
 langchain
 weaviate-client>=4.0.0
 httpx
-requests
 sentence-transformers
 langdetect
 unstructured[pdf]
@@ -13,9 +12,3 @@ unstructured[pdf]
 # Dev dependencies below
 python-dotenv
 streamlit
-
-# Linting, formatting, testing
-black
-flake8
-pytest
-pre-commit

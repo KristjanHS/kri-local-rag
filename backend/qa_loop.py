@@ -127,7 +127,7 @@ def answer(
         question, k=initial_k, debug=debug, metadata_filter=metadata_filter
     )
     if not candidates:
-        return "I found no relevant context to answer that question. The database may be empty. Please ingest a PDF first."
+        return "I found no relevant context to answer that question. The database may be empty. Ingest a PDF first."
 
     # ---------- 2) Re-rank ------------------------------------------------------
     if debug:
@@ -205,7 +205,7 @@ def ensure_weaviate_ready_and_populated():
         print(f"2. Checking if collection '{COLLECTION_NAME}' exists...")
         if not client.collections.exists(COLLECTION_NAME):
             # First-time setup: create the collection, ingest examples, then clean up.
-            print(f"   → Collection does not exist. Running one-time initialization...")
+            print("   → Collection does not exist. Running one-time initialization...")
             create_collection_if_not_exists(client)
 
             # Ingest example data to ensure all modules are warm, then remove it.
