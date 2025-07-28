@@ -1,10 +1,13 @@
 # Use a slim Python base image
-FROM python:3.12-slim
+FROM python:3.12.3-slim
 
 # Set the working directory inside the container
 WORKDIR /app
 
 # --- Install Dependencies ---
+# First, pull in latest security patches for the base image
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Copy and install the lean, app-specific requirements
 COPY frontend/requirements.txt .
 

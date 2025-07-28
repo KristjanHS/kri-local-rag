@@ -17,7 +17,7 @@ Local RAG system using Weaviate, Ollama, and Python.
 This project includes simple shell scripts to manage the entire Docker environment:
 
 -   `docker-setup.sh`: Builds all images and starts all services for the first time.
--   `docker-run.sh`: Executes commands inside the running backend container (e.g., for ingestion).
+-   `docker-run.sh`: Executes commands inside the running CLI container (e.g., for ingestion).
 -   `docker-reset.sh`: Stops and completely removes all containers, volumes, and images for this project.
 
 ---
@@ -49,7 +49,8 @@ Once the setup is complete, the Streamlit RAG app will be available at **[http:/
 
 If you have stopped the containers (e.g., with `docker compose down`), you can restart them with:
 ```bash
-docker compose -f docker/docker-compose.yml up --detach
+# Re-start only previously-built containers, skip building anything new
+docker compose -f docker/docker-compose.yml up --detach --no-build
 ```
 
 ---
@@ -58,11 +59,38 @@ docker compose -f docker/docker-compose.yml up --detach
 
 ### Ingest Documents
 
-To ingest documents into the Weaviate database, use the `docker-run.sh` script to execute the ingestion command inside the backend container.
+You can add PDFs to the vector-database in several convenient ways – pick whichever fits your workflow:
 
-For example, to ingest all PDFs from the `example_data` directory:
+| Method | Command / UI | When to use |
+|--------|--------------|-------------|
+| **1. Streamlit UI** | Open the app in your browser, expand *Ingest PDFs* in the sidebar, upload one or more PDF files and click **Ingest** | Quick, small uploads, no terminal needed |
+| **2. Helper script** | `./ingest.sh <path>` | Fast one-liner from a terminal when the App container is already running |
+| **3. One-off Docker Compose profile** | `docker compose --profile ingest up ingester` | Fire-and-forget batch ingestion without launching the full UI |
+| **4. Full CLI shell** | `./docker-run.sh python backend/ingest_pdf.py <path>` | Maximum flexibility: run any backend script inside a temporary CLI container |
+
+Details:
+
+**Helper script (`ingest.sh`)**
+Runs `ingest_pdf.py` inside the *app* container that is already running:
+
 ```bash
-./docker-run.sh python backend/ingest_pdf.py example_data/
+./ingest.sh data/
+```
+
+**One-off Compose profile**
+Builds a minimal “ingester” container (same image as the app) and executes ingestion once, then exits:
+
+```bash
+docker compose --profile ingest up ingester
+```
+
+The default command ingests any PDFs found in `data/`. Edit `docker/docker-compose.yml` if you need a different folder or command.
+
+**CLI container**
+For advanced or scripted workflows you can run arbitrary Python inside the CLI image:
+
+```bash
+./docker-run.sh python backend/ingest_pdf.py docs/my.pdf
 ```
 
 ### Ask Questions
