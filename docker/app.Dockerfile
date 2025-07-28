@@ -6,14 +6,17 @@ WORKDIR /app
 
 # --- Install Dependencies ---
 # First, pull in latest security patches for the base image
-RUN apt-get update && apt-get upgrade -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
+    apt-get install -y --no-install-recommends libmagic1 libmagic-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy and install the lean, app-specific requirements
-COPY frontend/requirements.txt .
+# ---- wheel cache mount (optional) ----
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128
 
-# ---- CUDA Torch first -------------------------------------------------
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128 || true && \
+# ---- rest of your deps ----
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements.txt
     # If you do not need GPU inside this container, ALSO remove the runtime line in docker-compose.yml!
     # Enable GPU support via NVIDIA runtime (CUDA libraries are provided by the host runtime)
@@ -25,6 +28,9 @@ COPY backend/ /app/backend/
 
 # Copy the frontend app code
 COPY frontend/ /app/frontend/
+
+# Copy example data for initial Weaviate warm-up
+COPY example_data/ /example_data/
 
 # Expose the default Streamlit port
 EXPOSE 8501
