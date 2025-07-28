@@ -43,7 +43,7 @@ This project includes simple shell scripts to manage the entire Docker environme
     ```
     **Note:** The first run can be very slow (10-20 minutes or more) as it downloads several gigabytes of models. Subsequent launches are much faster.
 
-Once the setup is complete, the Streamlit frontend will be available at **[http://localhost:8501](http://localhost:8501)**.
+Once the setup is complete, the Streamlit RAG app will be available at **[http://localhost:8501](http://localhost:8501)**.
 
 ### Subsequent Launches
 
@@ -67,7 +67,7 @@ For example, to ingest all PDFs from the `example_data` directory:
 
 ### Ask Questions
 
-Once documents are ingested, you can ask questions via the Streamlit frontend at **[http://localhost:8501](http://localhost:8501)**.
+Once documents are ingested, you can ask questions via the Streamlit app at **[http://localhost:8501](http://localhost:8501)**.
 
 ---
 
