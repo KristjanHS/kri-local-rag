@@ -19,8 +19,8 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' $(docker compose ps -q w
   sleep 5
 done
 
-echo "Starting interactive RAG backend..."
-docker compose run --rm backend
+echo "Starting interactive RAG CLI shell..."
+docker compose run --rm cli
 # The --rm flag tells Docker to Automatically remove the container after it exits.
 
 # docker compose up --build -d
