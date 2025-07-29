@@ -17,6 +17,7 @@ services:
     volumes:
       - ../:/app
       - ../data:/app/data
+      - hf_cache:/root/.cache/huggingface
     working_dir: /app
     # Keep container running for exec sessions
     command: ["sleep", "infinity"]
@@ -90,6 +91,8 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    volumes:
+      - hf_cache:/root/.cache/huggingface
     environment:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
@@ -98,22 +101,30 @@ services:
   # ---------- One-off Ingestion Utility -----------------------------------------
   ingester:
     profiles: ["ingest"]
-    build:
-      context: ..
-      dockerfile: docker/app.Dockerfile
+    image: kri-local-rag-cli   # reuse the lightweight CLI image
     depends_on:
       weaviate:
         condition: service_healthy
       ollama:
         condition: service_healthy
     volumes:
+      # Mount the whole project so python files are always up-to-date (no rebuild needed)
       - ../:/app
       - ../data:/app/data
-    environment:
-      - OLLAMA_URL=http://ollama:11434
-      - WEAVIATE_URL=http://weaviate:8080
+      # Persist HuggingFace cache between one-off runs to avoid repeated downloads
+      - hf_cache:/root/.cache/huggingface
     command: ["python", "backend/ingest_pdf.py", "/app/data"]
+
+  # ---------- GraphQL Playground -----------------------------------------
+  graphql-playground:
+    image: quay.io/graphql/graphql-playground   # public & tiny
+    ports:
+      - "8081:80"
+    environment:
+      # Tell the playground which endpoint to use for requests
+      - GRAPHQL_ENDPOINT=http://weaviate:8080/v1/graphql
 
 volumes:
   weaviate_db:
   ollama_models:
+  hf_cache:
