@@ -9,6 +9,8 @@ WORKDIR /app
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends libmagic1 libmagic-dev && \
     apt-get install -y --no-install-recommends poppler-utils && \
+    # Needed by OpenCV (dependency of unstructured)
+    apt-get install -y --no-install-recommends libgl1 libglib2.0-0 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ---- wheel cache mount (optional) ----
@@ -18,7 +20,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # ---- rest of your deps ----
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir -r requirements.txt
+    pip install -r requirements.txt
     # If you do not need GPU inside this container, ALSO remove the runtime line in docker-compose.yml!
     # Enable GPU support via NVIDIA runtime (CUDA libraries are provided by the host runtime)
     # Optional: install GPU-enabled PyTorch (comment out if you prefer CPU)

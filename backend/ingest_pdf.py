@@ -22,7 +22,7 @@ import argparse
 import glob
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 import weaviate
@@ -33,7 +33,9 @@ from weaviate.classes.config import Configure, Property, DataType
 from config import COLLECTION_NAME, CHUNK_SIZE, CHUNK_OVERLAP, WEAVIATE_URL
 from urllib.parse import urlparse
 
+# Debug helpers
 import hashlib
+import traceback
 
 # Lightweight language detection
 try:
@@ -51,6 +53,23 @@ except ImportError:
 try:
     from unstructured.partition.pdf import partition_pdf  # type: ignore
 except ImportError:
+    # Provide detailed diagnostics so we know *why* the import failed.
+    print(
+        "[DEBUG] Failed to import 'unstructured.partition.pdf'. Full traceback follows:"
+    )
+    traceback.print_exc()
+
+    # Check if the base package is present at all and print its version.
+    try:
+        import importlib.metadata as _metadata
+
+        print(
+            "[DEBUG] Detected unstructured version:", _metadata.version("unstructured")
+        )
+    except Exception:
+        print("[DEBUG] Package 'unstructured' is not installed in this environment.")
+
+    # Fallback: disable PDF parsing so the rest of the script can continue.
     partition_pdf = None
 
 # Remove PyPDF fallback – rely solely on `unstructured`.
@@ -69,7 +88,7 @@ def extract_text(path: str) -> str:
         raise ImportError("Install 'unstructured[pdf]' to enable PDF parsing.")
 
     try:
-        els = partition_pdf(filename=path)
+        els = partition_pdf(filename=path, languages=["eng", "est"])
         return "\n".join([e.text for e in els if getattr(e, "text", None)])
     except Exception as err:
         print(
@@ -134,7 +153,8 @@ def process_pdf(path: str, docs, stats: dict[str, int], model: "SentenceTransfor
         uuid = deterministic_uuid(os.path.basename(path), i, chunk)
         # Basic metadata enrichment
         created_ts = os.path.getmtime(path)
-        created_iso = datetime.fromtimestamp(created_ts).isoformat()
+        # RFC3339 requires explicit timezone. Use UTC (Z) to satisfy Weaviate.
+        created_iso = datetime.fromtimestamp(created_ts, tz=timezone.utc).isoformat()
 
         if detect is not None:
             try:

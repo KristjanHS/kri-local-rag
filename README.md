@@ -17,7 +17,8 @@ Local RAG system using Weaviate, Ollama, and Python.
 This project includes simple shell scripts to manage the entire Docker environment:
 
 -   `docker-setup.sh`: Builds all images and starts all services for the first time.
--   `cli.sh`: Executes commands inside the running CLI container (e.g., for ingestion).
+-   `cli.sh`: Starts the CLI container or runs arbitrary backend commands inside it.
+-   `ingest.sh`: Convenience wrapper to ingest PDFs from a host path in a one-off CLI container.
 -   `docker-reset.sh`: Stops and completely removes all containers, volumes, and images for this project.
 
 ---
@@ -64,22 +65,22 @@ You can add PDFs to the vector-database in several convenient ways – pick whic
 | Method | Command / UI | When to use |
 |--------|--------------|-------------|
 | **1. Streamlit UI** | Open the app in your browser, expand *Ingest PDFs* in the sidebar, upload one or more PDF files and click **Ingest** | Quick, small uploads, no terminal needed |
-| **2. Helper script** | `./ingest.sh <path>` | Fast one-liner from a terminal when the App container is already running |
+| **2. Helper script** | `./ingest.sh <path>` | Fast one-liner from a terminal **(spins up a temporary CLI container automatically)** |
 | **3. One-off Docker Compose profile** | `docker compose --profile ingest up ingester` | Fire-and-forget batch ingestion without launching the full UI |
-| **4. Full CLI shell** | `./cli.sh python backend/ingest_pdf.py <path>` | Maximum flexibility: run any backend script inside a temporary CLI container |
+| **4. CLI utility wrapper** | `./cli.sh <command>` | Run any backend command inside the persistent CLI container (e.g. `./cli.sh python backend/ingest_pdf.py ./docs/my.pdf`) |
 
 Details:
 
 **Helper script (`ingest.sh`)**
-Runs `ingest_pdf.py` inside the *cli* container that is already running:
+Runs `ingest_pdf.py` in a temporary *cli* container (it will start one automatically if needed):
 
 ```bash
 ./ingest.sh data/
 ```
-The script simply passes the folder to `ingest_pdf.py --data-dir <folder>` inside the container.
+The script spins up `docker compose run --rm cli ...` and passes the folder to `ingest_pdf.py --data-dir <folder>`, so no prior `cli` container must be running.
 
 **One-off Compose profile**
-Builds a minimal “ingester” container (same image as the app) and executes ingestion once, then exits:
+Builds a minimal “ingester” container (same image as the cli) and executes ingestion once from data/ folder, then exits:
 
 ```bash
 docker compose --profile ingest up ingester
