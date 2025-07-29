@@ -15,11 +15,12 @@ RUN apt-get update && \
 # Apply latest OS security patches, then install required packages
     apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends \
-        build-essential \
+        libmagic1 libmagic-dev \
         poppler-utils \
         tesseract-ocr libtesseract-dev \
-        libmagic1 libmagic-dev \
         ghostscript \
+        libgl1 libglib2.0-0 \
+        build-essential \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -30,7 +31,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # ---- rest of your deps ----
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir -r requirements.txt
+    pip install -r requirements.txt
+    # pip install --no-cache-dir -r requirements.txt
     # If you do not need GPU inside this container, ALSO remove the runtime line in docker-compose.yml!
     # Enable GPU support via NVIDIA runtime (CUDA libraries are provided by the host runtime)
     # Optional: install GPU-enabled PyTorch (comment out if you prefer CPU)

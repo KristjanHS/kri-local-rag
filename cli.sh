@@ -19,8 +19,15 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' $(docker compose ps -q w
   sleep 5
 done
 
-echo "Starting interactive RAG CLI shell..."
-docker compose run --rm -it cli python backend/qa_loop.py
+# If arguments were passed, run them inside the CLI container; otherwise open the interactive QA shell.
+if [ "$#" -gt 0 ]; then
+  echo "Running command inside CLI container: $@"
+  docker compose run --rm -it cli "$@"
+else
+  echo "Starting interactive RAG CLI shell..."
+  docker compose run --rm -it cli python backend/qa_loop.py
+fi
+
 # The --rm flag tells Docker to Automatically remove the container after it exits.
 
 # docker compose up --build -d
