@@ -5,27 +5,11 @@ import httpx
 import json
 from typing import Optional
 
-from config import OLLAMA_MODEL, OLLAMA_URL, OLLAMA_CONTEXT_TOKENS
+from config import OLLAMA_MODEL, OLLAMA_URL, OLLAMA_CONTEXT_TOKENS, get_logger
 from windows_ip_in_wsl import get_windows_host_ip
 
-# Debug levels: 0=off, 1=basic, 2=detailed, 3=verbose
-DEBUG_LEVEL = 1
-
-
-def debug_print(message: str, level: int = 1, on_debug=None):
-    """Print debug message only if current debug level is sufficient. Optionally call on_debug callback."""
-    if DEBUG_LEVEL >= level:
-        msg = f"[DEBUG-{level}] {message}"
-        if on_debug:
-            on_debug(msg)
-        else:
-            print(msg)
-
-
-def set_debug_level(level: int):
-    """Set the debug level (0=off, 1=basic, 2=detailed, 3=verbose)."""
-    global DEBUG_LEVEL
-    DEBUG_LEVEL = max(0, min(3, level))
+# Set up logging for this module
+logger = get_logger(__name__)
 
 
 def _get_ollama_base_url() -> str:
@@ -63,15 +47,17 @@ def _check_model_exists(model_name: str, models: list) -> bool:
         model_name_from_list = model.get("name", "")
         # Check exact match or if our model is a prefix
         # (e.g., "cas/mistral-7b-instruct-v0.3" matches "cas/mistral-7b-instruct-v0.3:latest")
-        if model_name_from_list == model_name or model_name_from_list.startswith(model_name + ":"):
+        if model_name_from_list == model_name or model_name_from_list.startswith(
+            model_name + ":"
+        ):
             return True
     return False
 
 
 def _download_model_with_progress(model_name: str, base_url: str) -> bool:
     """Download a model with progress tracking."""
-    print(f"Model '{model_name}' not found. Downloading...")
-    print("This may take several minutes depending on your internet speed.")
+    logger.info("Model '%s' not found. Downloading...", model_name)
+    logger.info("This may take several minutes depending on your internet speed.")
 
     try:
         with httpx.stream(
@@ -91,19 +77,21 @@ def _download_model_with_progress(model_name: str, base_url: str) -> bool:
                             status = data["status"]
                             if status == "downloading":
                                 if "digest" in data:
-                                    print(f"Downloading layer: {data['digest'][:12]}...")
+                                    logger.info(
+                                        "Downloading layer: %s...", data["digest"][:12]
+                                    )
                             elif status == "verifying":
-                                print("Verifying model integrity...")
+                                logger.info("Verifying model integrity...")
                             elif status == "writing":
-                                print("Writing model to disk...")
+                                logger.info("Writing model to disk...")
                             elif status == "complete":
-                                print("✓ Model download completed!")
+                                logger.info("✓ Model download completed!")
                                 break
                     except json.JSONDecodeError:
                         continue
         return True
     except Exception as e:
-        print(f"Download failed: {e}")
+        logger.error("Download failed: %s", e)
         return False
 
 
@@ -121,9 +109,11 @@ def _verify_model_download(model_name: str, base_url: str) -> bool:
     model_verified = _check_model_exists(model_name, verify_models)
 
     if model_verified:
-        print(f"Model '{model_name}' downloaded and verified successfully!")
+        logger.info("Model '%s' downloaded and verified successfully!", model_name)
     else:
-        print(f"Model '{model_name}' download completed but verification failed.")
+        logger.warning(
+            "Model '%s' download completed but verification failed.", model_name
+        )
 
     return model_verified
 
@@ -149,11 +139,11 @@ def ensure_model_available(model_name: str) -> bool:
             # Verify the download was successful
             return _verify_model_download(model_name, base_url)
         else:
-            print(f"Model '{model_name}' is already available.")
+            logger.info("Model '%s' is already available.", model_name)
             return True
 
     except Exception as e:
-        print(f"Error ensuring model availability: {e}")
+        logger.error("Error ensuring model availability: %s", e)
         return False
 
 
@@ -163,15 +153,15 @@ def test_ollama_connection() -> bool:
         base_url = _get_ollama_base_url()
         model_name = OLLAMA_MODEL
 
-        debug_print("Testing Ollama connection...", 1)
+        logger.info("Testing Ollama connection...")
 
         # Test 1: Check if Ollama is reachable
         try:
             resp = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=5)
             resp.raise_for_status()
-            debug_print("✓ Ollama server is reachable", 1)
+            logger.info("✓ Ollama server is reachable")
         except Exception as e:
-            debug_print(f"✗ Ollama server not reachable: {e}", 1)
+            logger.error("✗ Ollama server not reachable: %s", e)
             return False
 
         # Test 2: Ensure model is available
@@ -179,7 +169,7 @@ def test_ollama_connection() -> bool:
             return False
 
         # Test 3: Quick inference test
-        debug_print("Running quick inference test...", 1)
+        logger.info("Running quick inference test...")
         test_payload = {
             "model": model_name,
             "prompt": "Hello",
@@ -187,14 +177,16 @@ def test_ollama_connection() -> bool:
             "options": {"num_predict": 5},  # Limit to 5 tokens for speed
         }
 
-        test_resp = httpx.post(f"{base_url.rstrip('/')}/api/generate", json=test_payload, timeout=30)
+        test_resp = httpx.post(
+            f"{base_url.rstrip('/')}/api/generate", json=test_payload, timeout=30
+        )
         test_resp.raise_for_status()
 
-        debug_print("✓ Ollama inference test successful", 1)
+        logger.info("✓ Ollama inference test successful")
         return True
 
     except Exception as e:
-        debug_print(f"✗ Ollama test failed: {e}", 1)
+        logger.error("✗ Ollama test failed: %s", e)
         return False
 
 
@@ -226,42 +218,62 @@ def generate_response(
     if context is not None:
         payload["context"] = context
 
-    debug_print(f"Calling Ollama at: {url}", 1, on_debug)
-    debug_print(f"Model: {model_name}", 1, on_debug)
-    debug_print(f"Ollama context window: {context_tokens} tokens", 1, on_debug)
-    debug_print(f"Prompt length: {len(prompt)} characters", 2, on_debug)
-    debug_print(f"Context provided: {context is not None}", 2, on_debug)
+    logger.info("Calling Ollama at: %s", url)
+    if on_debug:
+        on_debug(f"Calling Ollama at: {url}")
+    logger.info("Model: %s", model_name)
+    if on_debug:
+        on_debug(f"Model: {model_name}")
+    logger.info("Ollama context window: %d tokens", context_tokens)
+    if on_debug:
+        on_debug(f"Ollama context window: {context_tokens} tokens")
+    logger.debug("Prompt length: %d characters", len(prompt))
+    if on_debug:
+        on_debug(f"Prompt length: {len(prompt)} characters")
+    logger.debug("Context provided: %s", context is not None)
+    if on_debug:
+        on_debug(f"Context provided: {context is not None}")
     approx_tokens = len(prompt) // 4
     if approx_tokens > context_tokens:
-        debug_print(
+        warning_msg = (
             f"WARNING: Prompt is estimated at {approx_tokens} tokens, "
             f"which exceeds the context window ({context_tokens}). "
-            "Ollama will truncate the prompt and you may lose context.",
-            1,
-            on_debug,
+            "Ollama will truncate the prompt and you may lose context."
         )
+        logger.warning(warning_msg)
+        if on_debug:
+            on_debug(warning_msg)
     elif approx_tokens > context_tokens * 0.9:
-        debug_print(
+        note_msg = (
             f"NOTE: Prompt is estimated at {approx_tokens} tokens, "
-            f"      which is close to the context window ({context_tokens}).",
-            1,
-            on_debug,
+            f"      which is close to the context window ({context_tokens})."
         )
+        logger.info(note_msg)
+        if on_debug:
+            on_debug(note_msg)
 
     try:
-        debug_print("Making HTTP request to Ollama...", 1, on_debug)
+        logger.info("Making HTTP request to Ollama...")
+        if on_debug:
+            on_debug("Making HTTP request to Ollama...")
         with httpx.stream("POST", url, json=payload, timeout=None) as resp:
-            debug_print(f"Response status: {resp.status_code}", 1, on_debug)
+            logger.info("Response status: %d", resp.status_code)
+            if on_debug:
+                on_debug(f"Response status: {resp.status_code}")
 
             response_text = ""
             updated_context = context
             line_count = 0
             first_token = True
 
-            debug_print("Waiting for Ollama to start streaming response...", 1, on_debug)
+            logger.info("Waiting for Ollama to start streaming response...")
+            if on_debug:
+                on_debug("Waiting for Ollama to start streaming response...")
             for line in resp.iter_lines():
                 if stop_event is not None and stop_event.is_set():
-                    debug_print("Stop event set, aborting stream.", 1, on_debug)
+                    logger.info("Stop event set, aborting stream.")
+                    if on_debug:
+                        on_debug("Stop event set, aborting stream.")
                     break
                 line_count += 1
                 if not line:
@@ -273,24 +285,34 @@ def generate_response(
                     line_str = line_str[len("data:") :].strip()
 
                 if line_str == "[DONE]":
-                    debug_print("Received [DONE] marker", 1, on_debug)
+                    logger.debug("Received [DONE] marker")
+                    if on_debug:
+                        on_debug("Received [DONE] marker")
                     break
 
                 try:
                     data = json.loads(line_str)
                 except json.JSONDecodeError:
-                    debug_print(f"Failed to parse JSON: {line_str[:50]}...", 2, on_debug)
+                    logger.debug("Failed to parse JSON: %s...", line_str[:50])
+                    if on_debug:
+                        on_debug(f"Failed to parse JSON: {line_str[:50]}...")
                     continue
 
                 # Extract token from response
                 token_str = (
                     data.get("response")
                     or data.get("token")
-                    or (data.get("choices", [{}])[0].get("text") if "choices" in data else "")
+                    or (
+                        data.get("choices", [{}])[0].get("text")
+                        if "choices" in data
+                        else ""
+                    )
                 )
 
                 if first_token and token_str:
-                    debug_print("Ollama started streaming tokens...", 1, on_debug)
+                    logger.info("Ollama started streaming tokens...")
+                    if on_debug:
+                        on_debug("Ollama started streaming tokens...")
                     first_token = False
 
                 response_text += token_str
@@ -302,12 +324,18 @@ def generate_response(
 
                 # Capture the conversation context if provided with the final chunk.
                 if data.get("done"):
-                    debug_print("Received 'done' flag", 1, on_debug)
+                    logger.debug("Received 'done' flag")
+                    if on_debug:
+                        on_debug("Received 'done' flag")
                     updated_context = data.get("context", context)
                     break
 
-            debug_print(f"Processed {line_count} lines from response", 1, on_debug)
+            logger.debug("Processed %d lines from response", line_count)
+            if on_debug:
+                on_debug(f"Processed {line_count} lines from response")
             return response_text or "(no response)", updated_context
     except Exception as e:
-        debug_print(f"Exception in generate_response: {e}", 1, on_debug)
+        logger.error("Exception in generate_response: %s", e)
+        if on_debug:
+            on_debug(f"Exception in generate_response: {e}")
         return f"[Error generating response: {e}]", context

@@ -62,6 +62,7 @@ assets/
 # If they are large datasets
 *.json
 *.log
+wget-log
 faiss_index/
 
 # Third-party libraries you've vendored/included

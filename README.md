@@ -17,8 +17,8 @@ Local RAG system using Weaviate, Ollama, and Python.
 This project includes simple shell scripts to manage the entire Docker environment:
 
 -   `docker-setup.sh`: Builds all images and starts all services for the first time.
--   `cli.sh`: Starts the CLI container or runs arbitrary backend commands inside it.
--   `ingest.sh`: Convenience wrapper to ingest PDFs from a host path in a one-off CLI container.
+-   `cli.sh`: Provides CLI access to the APP container for running backend commands.
+-   `ingest.sh`: Convenience wrapper to ingest PDFs from a host path using the APP container.
 -   `docker-reset.sh`: Stops and completely removes all containers, volumes, and images for this project.
 
 ---
@@ -65,22 +65,22 @@ You can add PDFs to the vector-database in several convenient ways – pick whic
 | Method | Command / UI | When to use |
 |--------|--------------|-------------|
 | **1. Streamlit UI** | Open the app in your browser, expand *Ingest PDFs* in the sidebar, upload one or more PDF files and click **Ingest** | Quick, small uploads, no terminal needed |
-| **2. Helper script** | `./ingest.sh <path>` | Fast one-liner from a terminal **(spins up a temporary CLI container automatically)** |
+| **2. Helper script** | `./ingest.sh <path>` | Fast one-liner from a terminal **(spins up a temporary APP container automatically)** |
 | **3. One-off Docker Compose profile** | `docker compose --profile ingest up ingester` | Fire-and-forget batch ingestion without launching the full UI |
-| **4. CLI utility wrapper** | `./cli.sh <command>` | Run any backend command inside the persistent CLI container (e.g. `./cli.sh python backend/ingest_pdf.py ./docs/my.pdf`) |
+| **4. CLI utility wrapper** | `./cli.sh <command>` | Run any backend command inside the persistent APP container (e.g. `./cli.sh python backend/ingest_pdf.py ./docs/my.pdf`) |
 
 Details:
 
 **Helper script (`ingest.sh`)**
-Runs `ingest_pdf.py` in a temporary *cli* container (it will start one automatically if needed):
+Runs `ingest_pdf.py` in a temporary *app* container (it will start one automatically if needed):
 
 ```bash
 ./ingest.sh data/
 ```
-The script spins up `docker compose run --rm cli ...` and passes the folder to `ingest_pdf.py --data-dir <folder>`, so no prior `cli` container must be running.
+The script spins up `docker compose run --rm app ...` and passes the folder to `ingest_pdf.py --data-dir <folder>`, so no prior `app` container must be running.
 
 **One-off Compose profile**
-Builds a minimal “ingester” container (same image as the cli) and executes ingestion once from data/ folder, then exits:
+Builds a minimal “ingester” container (same image as the app) and executes ingestion once from data/ folder, then exits:
 
 ```bash
 docker compose --profile ingest up ingester
@@ -88,8 +88,8 @@ docker compose --profile ingest up ingester
 
 The default command ingests any PDFs found in `data/`. Edit `docker/docker-compose.yml` if you need a different folder or command.
 
-**CLI container**
-For advanced or scripted workflows you can run arbitrary Python inside the CLI image:
+**APP container**
+For advanced or scripted workflows you can run arbitrary Python inside the APP container:
 
 ```bash
 ./cli.sh python backend/ingest_pdf.py docs/my.pdf
@@ -98,7 +98,7 @@ For advanced or scripted workflows you can run arbitrary Python inside the CLI i
 To open an interactive RAG CLI shell at any time run:
 
 ```bash
-./cli.sh   # launches interactive qa_loop.py inside the CLI container
+./cli.sh   # launches interactive qa_loop.py inside the APP container
 ```
 
 ### Ask Questions
@@ -123,6 +123,37 @@ The script will ask for confirmation before deleting anything.
 - **Weaviate data**: `.weaviate_db` directory at the project root (visible in WSL/Linux as <project-root>/.weaviate_db)
 - **Ollama models**: `.ollama_models` directory at the project root (visible in WSL/Linux as <project-root>/.ollama_models)
 - **Source documents**: Local `data/` directory
+
+## GPU Monitoring
+
+This project includes a GPU monitoring script optimized for WSL + Docker setups:
+
+### Quick Monitoring
+```bash
+./monitor_gpu.sh
+```
+Shows:
+- Overall GPU memory usage and utilization
+- Container resource usage (CPU, RAM, network)
+- Clean, WSL-friendly output
+
+### Continuous Monitoring
+```bash
+# Updates every 2 seconds
+gpustat -i 2
+
+# Or use watch for the monitoring script
+watch -n 5 ./monitor_gpu.sh
+```
+
+### Why This Monitoring Script?
+
+The included `monitor_gpu.sh` script is specifically designed for WSL + Docker environments where:
+- Standard `nvidia-smi` process-level reporting is unreliable
+- Container GPU usage isn't properly isolated
+- You need to correlate GPU usage with container activity
+
+The script provides reliable GPU monitoring without the noise of unreliable process-level details.
 
 ---
 

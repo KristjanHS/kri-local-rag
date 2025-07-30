@@ -8,9 +8,12 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any
 
 # Local .py imports
-from config import OLLAMA_MODEL
+from config import OLLAMA_MODEL, get_logger
 from retriever import get_top_k
 from ollama_client import test_ollama_connection, generate_response, set_debug_level
+
+# Set up logging for this module
+logger = get_logger(__name__)
 
 
 # ---------- cross-encoder helpers --------------------------------------------------
@@ -57,15 +60,13 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
 
 
 # ---------- Scoring of retrieved chunks --------------------------------------------------
-def _score_chunks(
-    question: str, chunks: List[str], debug: bool = False
-) -> List[ScoredChunk]:
+def _score_chunks(question: str, chunks: List[str]) -> List[ScoredChunk]:
     """Return *chunks* each paired with a relevance score for *question*."""
 
     encoder = _get_cross_encoder()
 
-    if encoder is None and debug:
-        print("[Debug] Cross-encoder unavailable – falling back to neutral scores.")
+    if encoder is None:
+        logger.warning("Cross-encoder unavailable – falling back to neutral scores.")
 
     if encoder is None:
         # No re-ranker available – every chunk gets a neutral score of 0.
@@ -82,14 +83,18 @@ def _score_chunks(
 
 
 # ---------- Reranking of retrieved chunks --------------------------------------------------
-def _rerank(
-    question: str, chunks: List[str], k_keep: int, debug: bool = False
-) -> List[ScoredChunk]:
-    """Return the *k_keep* most relevant chunks for *question*, sorted by score."""
+def _rerank(question: str, chunks: List[str], k_keep: int) -> List[ScoredChunk]:
+    """Return the top *k_keep* chunks from *chunks* after re-ranking by relevance to *question*."""
 
-    scored = _score_chunks(question, chunks, debug)
-    scored.sort(key=lambda sc: sc.score, reverse=True)
-    return scored[:k_keep]
+    if not chunks:
+        return []
+
+    # Score all chunks
+    scored_chunks = _score_chunks(question, chunks)
+
+    # Sort by score (higher = more relevant) and keep top k
+    scored_chunks.sort(key=lambda sc: sc.score, reverse=True)
+    return scored_chunks[:k_keep]
 
 
 # ---------- Prompt building --------------------------------------------------
@@ -108,7 +113,6 @@ def answer(
     question: str,
     k: int = 3,
     *,
-    debug: bool = False,
     metadata_filter: Optional[Dict[str, Any]] = None,
     on_token=None,
     on_debug=None,
@@ -123,40 +127,33 @@ def answer(
 
     # ---------- 1) Retrieve -----------------------------------------------------
     initial_k = max(k * 20, 100)  # ask vector DB for more than we eventually keep
-    candidates = get_top_k(
-        question, k=initial_k, debug=debug, metadata_filter=metadata_filter
-    )
+    candidates = get_top_k(question, k=initial_k, metadata_filter=metadata_filter)
     if not candidates:
         return "I found no relevant context to answer that question. The database may be empty. Ingest a PDF first."
 
     # ---------- 2) Re-rank ------------------------------------------------------
-    if debug:
-        print(f"\n[Debug] Re-ranking the top {len(candidates)} candidates...")
-    scored_chunks = _rerank(question, candidates, k_keep=k, debug=debug)
+    logger.debug("Re-ranking the top %d candidates...", len(candidates))
+    scored_chunks = _rerank(question, candidates, k_keep=k)
 
-    if debug:
-        msg = "\n[Debug] Reranked context chunks:"
-        print(msg)
-        for idx, sc in enumerate(scored_chunks, 1):
-            preview = sc.text.replace("\n", " ")[:120]
-            msg = f" {idx:02d}. score={sc.score:.4f} | {preview}…"
-            print(msg)
+    logger.debug("Reranked context chunks:")
+    for idx, sc in enumerate(scored_chunks, 1):
+        preview = sc.text.replace("\n", " ")[:120]
+        logger.debug(" %02d. score=%.4f | %s…", idx, sc.score, preview)
 
     # Extract plain texts for prompt construction.
     context_chunks = [sc.text for sc in scored_chunks]
 
     # ---------- 3) Prepare the prompt and payload -------------------------------------------------
     prompt_text = build_prompt(question, context_chunks)
-    if debug:
-        print("\n[Debug] Prompt being sent to Ollama:")
-        print(prompt_text)
+    logger.debug("Prompt being sent to Ollama:")
+    logger.debug(prompt_text)
 
     # ---------- 4) Query the LLM -------------------------------------------------
-    if debug:
-        # Use a simple print callback for CLI debug mode
-        def cli_on_debug(msg):
-            print(f"[Ollama Debug] {msg}")
+    # Use a simple print callback for CLI debug mode
+    def cli_on_debug(msg):
+        logger.debug("[Ollama Debug] %s", msg)
 
+    if on_debug is None:
         on_debug = cli_on_debug
 
     answer_text, updated_context = generate_response(
@@ -186,7 +183,7 @@ from urllib.parse import urlparse
 
 
 def ensure_weaviate_ready_and_populated():
-    print("--- Checking Weaviate status and collection ---")
+    logger.info("--- Checking Weaviate status and collection ---")
     try:
         parsed_url = urlparse(WEAVIATE_URL)
         client = weaviate.connect_to_custom(
@@ -197,15 +194,17 @@ def ensure_weaviate_ready_and_populated():
             http_secure=parsed_url.scheme == "https",
             grpc_secure=parsed_url.scheme == "https",
         )
-        print(f"1. Attempting to connect to Weaviate at {WEAVIATE_URL}...")
+        logger.info("1. Attempting to connect to Weaviate at %s...", WEAVIATE_URL)
         client.is_ready()  # Raises if not ready
-        print("   ✓ Connection successful.")
+        logger.info("   ✓ Connection successful.")
 
         # Check if collection exists
-        print(f"2. Checking if collection '{COLLECTION_NAME}' exists...")
+        logger.info("2. Checking if collection '%s' exists...", COLLECTION_NAME)
         if not client.collections.exists(COLLECTION_NAME):
             # First-time setup: create the collection, ingest examples, then clean up.
-            print("   → Collection does not exist. Running one-time initialization...")
+            logger.info(
+                "   → Collection does not exist. Running one-time initialization..."
+            )
             create_collection_if_not_exists(client)
 
             # Ingest example data to ensure all modules are warm, then remove it.
@@ -225,7 +224,7 @@ def ensure_weaviate_ready_and_populated():
                 collection.data.delete_many(
                     where=Filter.by_property("source_file").equal("test.pdf")
                 )
-                print(
+                logger.info(
                     "   ✓ Example data removed, leaving a clean collection for the user."
                 )
 
@@ -233,21 +232,22 @@ def ensure_weaviate_ready_and_populated():
 
         # If the collection already exists, we do nothing. This avoids checking if it's empty
         # and re-populating, which could be slow on large user databases.
-        print(f"   ✓ Collection '{COLLECTION_NAME}' exists.")
+        logger.info("   ✓ Collection '%s' exists.", COLLECTION_NAME)
 
     except WeaviateConnectionError as e:
-        print(
-            f"\n[Error] Failed to connect to Weaviate: {e}.\n"
-            "Please ensure Weaviate is running and accessible before starting the backend."
+        logger.error(
+            "Failed to connect to Weaviate: %s. "
+            "Please ensure Weaviate is running and accessible before starting the backend.",
+            e,
         )
         exit(1)
     except Exception as e:
-        print(f"\n[Error] An unexpected error occurred during Weaviate check: {e}")
+        logger.error("An unexpected error occurred during Weaviate check: %s", e)
         exit(1)
     finally:
         if "client" in locals() and client.is_connected():
             client.close()
-    print("--- Weaviate check complete ---\n")
+    logger.info("--- Weaviate check complete ---")
 
 
 if __name__ == "__main__":
@@ -293,14 +293,14 @@ if __name__ == "__main__":
         else:
             meta_filter = {"operator": "And", "operands": clauses}
 
-    print("RAG console – type a question, Ctrl-D/Ctrl-C to quit")
+    logger.info("RAG console – type a question, Ctrl-D/Ctrl-C to quit")
 
     # Run Ollama connection test before starting
     if not test_ollama_connection():
-        print("Failed to establish Ollama connection. Please check your setup.")
+        logger.error("Failed to establish Ollama connection. Please check your setup.")
         sys.exit(1)
 
-    print("\nReady for questions!")
+    logger.info("Ready for questions!")
     try:
         for line in sys.stdin:
             q = line.strip()
@@ -310,7 +310,7 @@ if __name__ == "__main__":
             sys.stdout.write("→ ")
             sys.stdout.flush()
 
-            answer(q, k=args.k, debug=True, metadata_filter=meta_filter)
+            answer(q, k=args.k, metadata_filter=meta_filter)
 
             print("\n")
     except (EOFError, KeyboardInterrupt):

@@ -1,41 +1,34 @@
 #!/bin/bash
-set -e    # It tells the shell: "Exit immediately if any command in the script returns a non-zero (error) status."
+#!/bin/bash
+# CLI wrapper for the RAG backend - uses APP container
 
-export COMPOSE_FILE=docker/docker-compose.yml
-export COMPOSE_PROJECT_NAME=kri-local-rag
+set -e
 
-echo "Starting Docker services (weaviate, ollama) in background..."
-docker compose up -d weaviate ollama
-
-# Wait for Ollama
-until [ "$(docker inspect -f '{{.State.Health.Status}}' $(docker compose ps -q ollama))" = "healthy" ]; do
-  echo "Waiting for ollama to be healthy..."
-  sleep 5
-done
-
-# Wait for Weaviate
-until [ "$(docker inspect -f '{{.State.Health.Status}}' $(docker compose ps -q weaviate))" = "healthy" ]; do
-  echo "Waiting for weaviate to be healthy..."
-  sleep 5
-done
-
-# If arguments were passed, run them inside the CLI container; otherwise open the interactive QA shell.
-if [ "$#" -gt 0 ]; then
-  echo "Running command inside CLI container: $@"
-  docker compose run --rm -it cli "$@"
-else
-  echo "Starting interactive RAG CLI shell..."
-  docker compose run --rm -it cli python backend/qa_loop.py
+# Check if we're in the project root
+if [ ! -f "docker/docker-compose.yml" ]; then
+    echo "Error: Please run this script from the project root directory."
+    exit 1
 fi
 
-# The --rm flag tells Docker to Automatically remove the container after it exits.
+# Start the app container if not running
+echo "Starting APP container..."
+docker compose -f docker/docker-compose.yml up -d app
 
-# docker compose up --build -d
-# -d: run the containers in the background
-# --force-recreate: force the recreation of the containers
-# --remove-orphans: remove orphaned containers
-# --no-deps: do not start dependent containers
-# --no-build: do not build the images
-# --no-start: do not start the containers
-# --no-recreate: do not recreate the containers
-# --no-restart: do not restart the containers
+# Wait for the app container to be ready
+echo "Waiting for APP container to be ready..."
+sleep 3
+
+# If no arguments provided, start an interactive shell
+if [ $# -eq 0 ]; then
+    echo "Starting interactive CLI session in APP container..."
+    echo "Available commands:"
+    echo "  python backend/qa_loop.py          # Interactive RAG CLI"
+    echo "  python backend/ingest_pdf.py       # Ingest PDFs"
+    echo "  python backend/delete_collection.py # Delete all data"
+    echo ""
+    docker compose -f docker/docker-compose.yml exec app bash
+else
+    # Run the provided command in the APP container
+    echo "Running command in APP container: $*"
+    docker compose -f docker/docker-compose.yml exec app "$@"
+fi

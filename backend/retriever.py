@@ -5,8 +5,11 @@ from urllib.parse import urlparse
 
 import weaviate
 
-from config import COLLECTION_NAME, DEFAULT_HYBRID_ALPHA, WEAVIATE_URL
+from config import COLLECTION_NAME, DEFAULT_HYBRID_ALPHA, WEAVIATE_URL, get_logger
 from weaviate.exceptions import WeaviateQueryError
+
+# Set up logging for this module
+logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Retriever helpers
@@ -31,7 +34,6 @@ def get_top_k(
     *,
     metadata_filter: Optional[Dict[str, Any]] = None,
     alpha: float = DEFAULT_HYBRID_ALPHA,  # 0 → pure BM25 search, 1 → pure vector search
-    debug: bool = False,
 ) -> List[str]:
     """Return the *content* strings of the **k** chunks most relevant to *question*.
 
@@ -60,20 +62,17 @@ def get_top_k(
         try:
             # Preferred: hybrid lexical + semantic search in a single call.
             res = q.hybrid(query=question, alpha=alpha, limit=k)
-            if debug:
-                print(f"[Debug][Retriever] hybrid search used (alpha={alpha})")
+            logger.debug("hybrid search used (alpha=%s)", alpha)
         except (TypeError, WeaviateQueryError) as e:
             # Possible causes: old client without hybrid, empty collection error, etc.
-            if debug:
-                print(f"[Debug][Retriever] hybrid failed ({e}); falling back to bm25")
+            logger.debug("hybrid failed (%s); falling back to bm25", e)
             try:
                 res = q.bm25(query=question, limit=k)
             except Exception:
                 # If even BM25 fails (e.g., collection truly empty), return empty list
                 return []
 
-        if debug:
-            print(f"[Debug][Retriever] Found {len(res.objects)} candidates.")
+        logger.debug("Found %d candidates.", len(res.objects))
 
         # Weaviate returns objects already ordered by relevance. If a distance
         # attribute is present we sort on it just in case.
@@ -81,6 +80,24 @@ def get_top_k(
         if objects and hasattr(objects[0], "distance"):
             objects.sort(key=lambda o: getattr(o, "distance", 0.0))
 
-        return [str(o.properties.get("content", "")) for o in objects]
+        # Extract content and add detailed debug logging
+        chunks = []
+        for i, obj in enumerate(objects):
+            content = str(obj.properties.get("content", ""))
+            chunks.append(content)
+
+            # Log detailed chunk information
+            distance = getattr(obj, "distance", "N/A")
+            score = getattr(obj, "score", "N/A")
+            logger.debug("Chunk %d:", i + 1)
+            logger.debug("  Distance: %s", distance)
+            logger.debug("  Score: %s", score)
+            logger.debug(
+                "  Content: %s",
+                content[:200] + "..." if len(content) > 200 else content,
+            )
+            logger.debug("  Content length: %d characters", len(content))
+
+        return chunks
     finally:
         client.close()

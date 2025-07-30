@@ -28,10 +28,13 @@ from typing import List
 import weaviate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from weaviate.exceptions import UnexpectedStatusCodeError
-from weaviate.classes.config import Configure, Property, DataType
+from weaviate.classes.config import Property, DataType
 
-from config import COLLECTION_NAME, CHUNK_SIZE, CHUNK_OVERLAP, WEAVIATE_URL
+from config import COLLECTION_NAME, CHUNK_SIZE, CHUNK_OVERLAP, WEAVIATE_URL, get_logger
 from urllib.parse import urlparse
+
+# Set up logging for this module
+logger = get_logger(__name__)
 
 # Debug helpers
 import hashlib
@@ -54,8 +57,8 @@ try:
     from unstructured.partition.pdf import partition_pdf  # type: ignore
 except ImportError:
     # Provide detailed diagnostics so we know *why* the import failed.
-    print(
-        "[DEBUG] Failed to import 'unstructured.partition.pdf'. Full traceback follows:"
+    logger.debug(
+        "Failed to import 'unstructured.partition.pdf'. Full traceback follows:"
     )
     traceback.print_exc()
 
@@ -63,11 +66,11 @@ except ImportError:
     try:
         import importlib.metadata as _metadata
 
-        print(
-            "[DEBUG] Detected unstructured version:", _metadata.version("unstructured")
+        logger.debug(
+            "Detected unstructured version: %s", _metadata.version("unstructured")
         )
     except Exception:
-        print("[DEBUG] Package 'unstructured' is not installed in this environment.")
+        logger.warning("Package 'unstructured' is not installed in this environment.")
 
     # Fallback: disable PDF parsing so the rest of the script can continue.
     partition_pdf = None
@@ -88,11 +91,11 @@ def extract_text(path: str) -> str:
         raise ImportError("Install 'unstructured[pdf]' to enable PDF parsing.")
 
     try:
-        els = partition_pdf(filename=path, languages=["eng", "est"])
+        els = partition_pdf(filename=path, languages=["eng"])
         return "\n".join([e.text for e in els if getattr(e, "text", None)])
     except Exception as err:
-        print(
-            f"[Error] Failed to parse {os.path.basename(path)} with unstructured: {err}"
+        logger.error(
+            "Failed to parse %s with unstructured: %s", os.path.basename(path), err
         )
         return ""
 
@@ -129,7 +132,9 @@ def create_collection_if_not_exists(client: weaviate.WeaviateClient):
             ],
             # No vectorizer_config means we provide vectors manually
         )
-        print(f"→ Collection '{COLLECTION_NAME}' created for manual vectorization.")
+        logger.info(
+            "→ Collection '%s' created for manual vectorization.", COLLECTION_NAME
+        )
 
 
 def get_collection(client: weaviate.WeaviateClient):
@@ -205,7 +210,7 @@ def ingest(directory: str):
 
     pdfs = list_pdfs(directory)
     if not pdfs:
-        print(f"No PDF files in '{directory}'.")
+        logger.warning("No PDF files in '%s'.", directory)
         return
 
     stats = {"pdfs": len(pdfs), "chunks": 0, "inserts": 0, "updates": 0, "skipped": 0}
@@ -216,20 +221,23 @@ def ingest(directory: str):
         create_collection_if_not_exists(client)
         docs = get_collection(client)
         for p in pdfs:
-            print(f"→ {os.path.basename(p)}")
+            logger.info("→ %s", os.path.basename(p))
             process_pdf(p, docs, stats, model)
     finally:
         client.close()
 
     elapsed = time.time() - start
     # ---------- summary ---------------------------------------------------------
-    print("\n── Summary ─────────────────────────────")
-    print(f"✓ {stats['pdfs']} PDF(s) processed")
-    print(
-        f"✓ {stats['chunks']} chunks  ("
-        f"{stats['inserts']} inserts, {stats['updates']} updates, {stats['skipped']} skipped)"
+    logger.info("── Summary ─────────────────────────────")
+    logger.info("✓ %d PDF(s) processed", stats["pdfs"])
+    logger.info(
+        "✓ %d chunks  (%d inserts, %d updates, %d skipped)",
+        stats["chunks"],
+        stats["inserts"],
+        stats["updates"],
+        stats["skipped"],
     )
-    print(f"Elapsed: {elapsed:.1f} s")
+    logger.info("Elapsed: %.1f s", elapsed)
 
 
 # ---------- CLI ---------------------------------------------------------------------

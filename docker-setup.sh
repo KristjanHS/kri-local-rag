@@ -39,30 +39,16 @@ echo -e "${GREEN}--- Confirmation received. Starting setup... ---${NC}"
 
 # --- Build Mode Selection ---
 echo ""
-echo -e "${BOLD}Select which part of the stack you want to build and start:${NC}"
-echo "  1) CLI only   – interactive shell with all RAG utilities (service: cli)"
-echo "  2) App only   – Streamlit UI (service: app)"
-echo "  3) Both       – build & start both cli and app (default)"
-read -p "Enter 1, 2 or 3 [3]: " mode_choice
+echo -e "${BOLD}The APP container now supports both web app and CLI functionality.${NC}"
+echo "This will build and start the unified APP service that provides:"
+echo "  • Streamlit web interface at http://localhost:8501"
+echo "  • CLI access via ./cli.sh"
+echo "  • Live code changes (no rebuilds needed)"
 
-# Determine services based on user choice
-case "$mode_choice" in
-  1)
-    SERVICES_BUILD=(cli)
-    SERVICES_UP=(weaviate ollama cli)
-    ;;
-  2)
-    SERVICES_BUILD=(app)
-    SERVICES_UP=(weaviate ollama app)
-    ;;
-  *)
-    SERVICES_BUILD=(cli app)
-    SERVICES_UP=(weaviate ollama cli app)
-    ;;
-esac
+SERVICES_BUILD=(app)
+SERVICES_UP=(weaviate ollama app)
 
 echo ""
-echo -e "${BOLD}You chose to build: ${SERVICES_BUILD[*]}${NC}"
 echo -e "${BOLD}Services that will be started: ${SERVICES_UP[*]}${NC}"
 
 
@@ -107,14 +93,9 @@ echo -e "${GREEN}${BOLD}========================================${NC}"
 echo ""
 echo "The selected services are now running in the background."
 
-# Tailored post-setup hints
-if [[ " ${SERVICES_UP[*]} " == *" app "* ]]; then
-  echo -e "You can access the Streamlit app at: ${BOLD}http://localhost:8501${NC}"
-fi
-
-if [[ " ${SERVICES_UP[*]} " == *" cli "* ]]; then
-  echo "To open an interactive RAG CLI shell, run: ./cli.sh"
-fi
+# Post-setup hints
+echo -e "You can access the Streamlit app at: ${BOLD}http://localhost:8501${NC}"
+echo "To open an interactive RAG CLI shell, run: ./cli.sh"
 echo ""
 echo "To stop all services, run: docker compose --file docker/docker-compose.yml down"
 echo "To completely reset the environment, run: ./docker-reset.sh"

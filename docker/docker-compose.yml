@@ -1,35 +1,5 @@
 name: kri-local-rag
 services:
-  # ---------- RAG CLI -----------------------------------------
-  cli:
-    build:
-      context: ..  # project root
-      dockerfile: docker/CLI.Dockerfile
-    depends_on:
-      weaviate:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-    environment:
-      # Point the Python code to the other services inside the compose network
-      - OLLAMA_URL=http://ollama:11434
-      - WEAVIATE_URL=http://weaviate:8080
-    volumes:
-      - ../:/app
-      - ../data:/app/data
-      - hf_cache:/root/.cache/huggingface
-    working_dir: /app
-    # Keep container running for exec sessions
-    command: ["sleep", "infinity"]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    secrets: [] # No secrets needed for the backend at the moment
-
   # ---------- Local Weaviate database ------------------------------------------------
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.25.1
@@ -72,7 +42,7 @@ services:
       retries: 5
       start_period: 60s
 
-  # ---------- Streamlit RAG App (contains backend and frontend) -----------------------------------------
+  # ---------- RAG App Container (supports both web app and CLI) -----------------------------------------
   app:
     build:
       context: ..  # project root
@@ -84,6 +54,15 @@ services:
         condition: service_healthy
     ports:
       - "8501:8501"
+    volumes:
+      - ../backend:/app/backend  # Live backend code
+      - ../frontend:/app/frontend  # Live frontend code
+      - ../data:/app/data  # Live data access
+      - ../logs:/app/logs  # Live log access
+      - hf_cache:/root/.cache/huggingface
+    working_dir: /app
+    # Auto-start Streamlit when container starts
+    command: ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
     deploy:
       resources:
         reservations:
@@ -91,8 +70,6 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    volumes:
-      - hf_cache:/root/.cache/huggingface
     environment:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
@@ -101,28 +78,18 @@ services:
   # ---------- One-off Ingestion Utility -----------------------------------------
   ingester:
     profiles: ["ingest"]
-    image: kri-local-rag-cli   # reuse the lightweight CLI image
+    image: kri-local-rag-app   # reuse the APP image
     depends_on:
       weaviate:
         condition: service_healthy
       ollama:
         condition: service_healthy
     volumes:
-      # Mount the whole project so python files are always up-to-date (no rebuild needed)
-      - ../:/app
-      - ../data:/app/data
-      # Persist HuggingFace cache between one-off runs to avoid repeated downloads
+      - ../backend:/app/backend  # Live backend code
+      - ../data:/app/data  # Live data access
+      - ../logs:/app/logs  # Live log access
       - hf_cache:/root/.cache/huggingface
     command: ["python", "backend/ingest_pdf.py", "/app/data"]
-
-  # ---------- GraphQL Playground -----------------------------------------
-  graphql-playground:
-    image: quay.io/graphql/graphql-playground   # public & tiny
-    ports:
-      - "8081:80"
-    environment:
-      # Tell the playground which endpoint to use for requests
-      - GRAPHQL_ENDPOINT=http://weaviate:8080/v1/graphql
 
 volumes:
   weaviate_db:
