@@ -62,17 +62,17 @@ def get_top_k(
         try:
             # Preferred: hybrid lexical + semantic search in a single call.
             res = q.hybrid(query=question, alpha=alpha, limit=k)
-            logger.debug("hybrid search used (alpha=%s)", alpha)
+            logger.info("hybrid search used (alpha=%s)", alpha)
         except (TypeError, WeaviateQueryError) as e:
             # Possible causes: old client without hybrid, empty collection error, etc.
-            logger.debug("hybrid failed (%s); falling back to bm25", e)
+            logger.info("hybrid failed (%s); falling back to bm25", e)
             try:
                 res = q.bm25(query=question, limit=k)
             except Exception:
                 # If even BM25 fails (e.g., collection truly empty), return empty list
                 return []
 
-        logger.debug("Found %d candidates.", len(res.objects))
+        logger.info("Found %d candidates.", len(res.objects))
 
         # Weaviate returns objects already ordered by relevance. If a distance
         # attribute is present we sort on it just in case.

@@ -10,7 +10,7 @@ from typing import List, Tuple, Optional, Dict, Any
 # Local .py imports
 from config import OLLAMA_MODEL, get_logger
 from retriever import get_top_k
-from ollama_client import generate_response
+from ollama_client import generate_response, ensure_model_available
 
 # Set up logging for this module
 logger = get_logger(__name__)
@@ -158,7 +158,9 @@ def answer(
 
     def cli_on_token(token):
         collected_tokens.append(token)
-        # Don't print tokens immediately in CLI mode
+        # Print tokens immediately for better UX
+        sys.stdout.write(token)
+        sys.stdout.flush()
 
     if on_debug is None:
         on_debug = cli_on_debug
@@ -261,6 +263,13 @@ def ensure_weaviate_ready_and_populated():
 
 if __name__ == "__main__":
     ensure_weaviate_ready_and_populated()
+
+    # Ensure the required Ollama model is available locally before accepting questions
+    if not ensure_model_available(OLLAMA_MODEL):
+        logger.error(
+            "Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL
+        )
+        sys.exit(1)
 
     parser = argparse.ArgumentParser(
         description="Interactive RAG console with optional metadata filtering."

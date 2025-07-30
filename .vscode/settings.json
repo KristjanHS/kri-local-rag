@@ -1,6 +1,6 @@
 {
     // Tell the Python extension which interpreter to load first
-    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    // "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     // Make the integrated terminal auto-activate that env
     "python.terminal.activateEnvironment": true,
     "python.terminal.activateEnvInCurrentTerminal": true,
