@@ -73,5 +73,44 @@ resolve_path() {
     fi
 }
 
+# Global logging function
+log_message() {
+    local level="$1"
+    shift
+    local message="$*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] [$level] $message"
+}
+
+# Function to get log file path for a script
+get_log_file() {
+    local script_name="$1"
+    local log_file="$LOGS_DIR/${script_name}.log"
+    
+    # Ensure logs directory exists
+    mkdir -p "$LOGS_DIR"
+    
+    # Return the log file path
+    echo "$log_file"
+}
+
+# Function to setup logging for shell scripts
+setup_logging() {
+    local script_name="$1"
+    local log_file="$LOGS_DIR/${script_name}.log"
+    
+    # Ensure logs directory exists
+    mkdir -p "$LOGS_DIR"
+    
+    # Log script start
+    log_message "INFO" "Starting $script_name" | tee -a "$log_file"
+}
+
+# Function to get script name without extension
+get_script_name() {
+    local script_path="$1"
+    basename "$script_path" .sh
+}
+
 # Validate directories on source
 validate_directories 
