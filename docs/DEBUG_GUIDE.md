@@ -109,7 +109,7 @@ curl -s "http://localhost:8080/v1/objects?class=Document&limit=1" | jq .
 **To ingest test data:**
 Use the Streamlit interface or run:
 ```bash
-./scripts/shell/ingest.sh data/
+./scripts/ingest.sh data/
 ```
 
 ### Summary

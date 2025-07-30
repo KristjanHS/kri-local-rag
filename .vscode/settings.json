@@ -31,10 +31,15 @@
     "geminicodeassist.chat.defaultDiffLayout": "Side by side diff",
     "geminicodeassist.chat.defaultCodeBlockDisplay": "Expanded",
     "cursorpyright.analysis.diagnosticSeverityOverrides": {
-        "reportMissingImports": "none"
+        // Remove "reportMissingImports": "none" to see import issues
     },
     "cursorpyright.analysis.extraPaths": [
         "backend"
+    ],
+    "cursorpyright.analysis.exclude": [
+        "**/.venv/**",
+        "**/node_modules/**",
+        "**/__pycache__/**"
     ],
     "files.exclude": { "**/.venv": true },
     "python.analysis.exclude": [ "**/.venv/**" ],

@@ -25,6 +25,18 @@ logging.basicConfig(
     ],
 )
 
+# Suppress detailed HTTP request logging from httpx while keeping important info
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
+# Also suppress other HTTP-related verbose logging
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("requests").setLevel(logging.WARNING)
+
+# Suppress verbose logging from other libraries during ingestion
+logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+logging.getLogger("transformers").setLevel(logging.WARNING)
+logging.getLogger("torch").setLevel(logging.WARNING)
+
 
 # Create module-specific loggers
 def get_logger(name: str) -> logging.Logger:

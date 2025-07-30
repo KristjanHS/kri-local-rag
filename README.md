@@ -38,10 +38,10 @@ kri-local-rag/
 
 This project includes organized scripts to manage the entire Docker environment:
 
--   `scripts/shell/docker-setup.sh`: Builds all images and starts all services for the first time.
--   `scripts/shell/cli.sh`: Provides CLI access to the APP container. Starts interactive RAG CLI by default.
--   `scripts/shell/ingest.sh`: Convenience wrapper to ingest PDFs from a host path using the APP container.
--   `scripts/shell/docker-reset.sh`: Stops and completely removes all containers, volumes, and images for this project.
+-   `scripts/docker-setup.sh`: Builds all images and starts all services for the first time.
+-   `scripts/cli.sh`: Provides CLI access to the APP container. Starts interactive RAG CLI by default.
+-   `scripts/ingest.sh`: Convenience wrapper to ingest PDFs from a host path using the APP container.
+-   `scripts/docker-reset.sh`: Stops and completely removes all containers, volumes, and images for this project.
 -   `cli.py`: Python-based CLI entry point (recommended for development).
 
 ---
@@ -58,12 +58,12 @@ This project includes organized scripts to manage the entire Docker environment:
 
 2.  Make the scripts executable:
     ```bash
-    chmod +x scripts/shell/*.sh
+    chmod +x scripts/*.sh
     ```
 
 3.  Run the automated setup script. This will build the Docker images and start all services.
     ```bash
-    ./scripts/shell/docker-setup.sh
+    ./scripts/docker-setup.sh
     ```
     **Note:** The first run can be very slow (10-20 minutes or more) as it downloads several gigabytes of models. Subsequent launches are much faster.
 
@@ -98,7 +98,7 @@ Details:
 Runs `ingest_pdf.py` in a temporary *app* container (it will start one automatically if needed):
 
 ```bash
-./scripts/shell/ingest.sh data/
+./scripts/ingest.sh data/
 ```
 The script spins up `docker compose run --rm app ...` and passes the folder to `ingest_pdf.py --data-dir <folder>`, so no prior `app` container must be running.
 
@@ -115,19 +115,19 @@ The default command ingests any PDFs found in `data/`. Edit `docker/docker-compo
 For advanced or scripted workflows you can run arbitrary Python inside the APP container:
 
 ```bash
-./scripts/shell/cli.sh python backend/ingest_pdf.py docs/my.pdf
+./scripts/cli.sh python backend/ingest_pdf.py docs/my.pdf
 ```
 
 To open an interactive RAG CLI shell at any time run:
 
 ```bash
-./scripts/shell/cli.sh   # starts interactive qa_loop.py by default
+./scripts/cli.sh   # starts interactive qa_loop.py by default
 ```
 
 Or run specific commands:
 ```bash
-./scripts/shell/cli.sh python backend/ingest_pdf.py docs/my.pdf  # Ingest specific files
-./scripts/shell/cli.sh bash                                       # Start bash shell
+./scripts/cli.sh python backend/ingest_pdf.py docs/my.pdf  # Ingest specific files
+./scripts/cli.sh bash                                       # Start bash shell
 ```
 
 **Python CLI (Recommended)**
@@ -150,7 +150,7 @@ Once documents are ingested, you can ask questions via the Streamlit app at **[h
 To completely reset the project, which will stop and delete all Docker containers, volumes (including the Weaviate database and Ollama models), and custom images, run the reset script:
 
 ```bash
-./scripts/shell/docker-reset.sh
+./scripts/docker-reset.sh
 ```
 The script will ask for confirmation before deleting anything.
 
@@ -168,7 +168,7 @@ This project includes a GPU monitoring script optimized for WSL + Docker setups:
 
 ### Quick Monitoring
 ```bash
-./scripts/shell/monitor_gpu.sh
+./scripts/monitor_gpu.sh
 ```
 Shows:
 - Overall GPU memory usage and utilization
@@ -181,12 +181,11 @@ Shows:
 gpustat -i 2
 
 # Or use watch for the monitoring script
-watch -n 5 ./scripts/shell/monitor_gpu.sh
-```
+watch -n 5 ./scripts/monitor_gpu.sh
 
 ### Why This Monitoring Script?
 
-The included `scripts/shell/monitor_gpu.sh` script is specifically designed for WSL + Docker environments where:
+The included `scripts/monitor_gpu.sh` script is specifically designed for WSL + Docker environments where:
 - Standard `nvidia-smi` process-level reporting is unreliable
 - Container GPU usage isn't properly isolated
 - You need to correlate GPU usage with container activity
