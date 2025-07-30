@@ -13,17 +13,26 @@ LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 # Create logs directory if it doesn't exist
 log_dir = Path(__file__).resolve().parent.parent / "logs"
-log_dir.mkdir(exist_ok=True)
-
-# Configure root logger
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL),
-    format=LOG_FORMAT,
-    handlers=[
-        logging.FileHandler(log_dir / "rag_system.log"),
-        logging.StreamHandler(sys.stdout),
-    ],
-)
+try:
+    log_dir.mkdir(exist_ok=True)
+    # Configure root logger with file handler
+    logging.basicConfig(
+        level=getattr(logging, LOG_LEVEL),
+        format=LOG_FORMAT,
+        handlers=[
+            logging.FileHandler(log_dir / "rag_system.log"),
+            logging.StreamHandler(sys.stdout),
+        ],
+    )
+except (PermissionError, OSError):
+    # Fallback to console-only logging if file logging fails
+    logging.basicConfig(
+        level=getattr(logging, LOG_LEVEL),
+        format=LOG_FORMAT,
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+        ],
+    )
 
 # Suppress detailed HTTP request logging from httpx while keeping important info
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -58,6 +67,11 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "cas/mistral-7b-instruct-v0.3")
 # Default to local Ollama endpoint but allow override via env variable.
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
+
+# If running in a Docker container, use the service name
+if os.getenv("DOCKER_ENV"):
+    OLLAMA_URL = "http://ollama:11434"
+    WEAVIATE_URL = "http://weaviate:8080"
 
 # Default context window (max tokens) for Ollama LLM requests
 OLLAMA_CONTEXT_TOKENS = int(

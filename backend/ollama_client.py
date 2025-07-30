@@ -3,6 +3,7 @@
 
 import httpx
 import json
+import os
 from typing import Optional
 
 from config import OLLAMA_MODEL, OLLAMA_URL, OLLAMA_CONTEXT_TOKENS, get_logger
@@ -18,6 +19,11 @@ def _get_ollama_base_url() -> str:
     Prefers the Windows host IP if available, otherwise falls back to the
     default URL from config.
     """
+    # When running outside Docker, use localhost directly
+    if not os.getenv("DOCKER_ENV"):
+        return OLLAMA_URL
+
+    # When running inside Docker, try to get Windows host IP
     ip = get_windows_host_ip()
     if ip:
         return f"http://{ip}:11434"
@@ -69,26 +75,40 @@ def _download_model_with_progress(model_name: str, base_url: str) -> bool:
             response.raise_for_status()
 
             # Track progress from streaming response
+            last_logged_percent = -5  # force first update
             for line in response.iter_lines():
-                if line:
-                    try:
-                        data = json.loads(line)
-                        if "status" in data:
-                            status = data["status"]
-                            if status == "downloading":
-                                if "digest" in data:
-                                    logger.info(
-                                        "Downloading layer: %s...", data["digest"][:12]
-                                    )
-                            elif status == "verifying":
-                                logger.info("Verifying model integrity...")
-                            elif status == "writing":
-                                logger.info("Writing model to disk...")
-                            elif status == "complete":
-                                logger.info("✓ Model download completed!")
-                                break
-                    except json.JSONDecodeError:
-                        continue
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                status = data.get("status", "")
+
+                # 1. Show percentage progress if total / completed present
+                total = data.get("total")
+                completed = data.get("completed")
+                if (
+                    total
+                    and completed
+                    and isinstance(total, (int, float))
+                    and isinstance(completed, (int, float))
+                    and total > 0
+                ):
+                    percent = int(completed / total * 100)
+                    if percent - last_logged_percent >= 5:  # log every 5%
+                        last_logged_percent = percent
+                        logger.info("Downloading… %d%%", percent)
+
+                # 2. Fallback status messages
+                if status == "verifying":
+                    logger.info("Verifying model integrity…")
+                elif status == "writing":
+                    logger.info("Writing model to disk…")
+                elif status == "complete":
+                    logger.info("✓ Model download completed!")
+                    break
         return True
     except Exception as e:
         logger.error("Download failed: %s", e)
@@ -264,7 +284,9 @@ def generate_response(
         logger.info("Making HTTP request to Ollama...")
         if on_debug:
             on_debug("Making HTTP request to Ollama...")
-        with httpx.stream("POST", url, json=payload, timeout=None) as resp:
+        with httpx.stream(
+            "POST", url, json=payload, timeout=300
+        ) as resp:  # 5 minute timeout
             logger.info("Response status: %d", resp.status_code)
             if on_debug:
                 on_debug(f"Response status: {resp.status_code}")
@@ -285,10 +307,14 @@ def generate_response(
                     break
                 line_count += 1
                 if not line:
+                    logger.debug("Empty line received, continuing...")
                     continue
 
                 # Ollama sends newline-separated JSON objects
                 line_str = line.strip()
+                logger.debug(
+                    "Processing line: %s", line_str[:100]
+                )  # Log first 100 chars
                 if line_str.startswith("data:"):
                     line_str = line_str[len("data:") :].strip()
 
@@ -300,10 +326,12 @@ def generate_response(
 
                 try:
                     data = json.loads(line_str)
-                except json.JSONDecodeError:
-                    logger.debug("Failed to parse JSON: %s...", line_str[:50])
+                except json.JSONDecodeError as e:
+                    logger.debug(
+                        "Failed to parse JSON: %s... Error: %s", line_str[:50], e
+                    )
                     if on_debug:
-                        on_debug(f"Failed to parse JSON: {line_str[:50]}...")
+                        on_debug(f"Failed to parse JSON: {line_str[:50]}... Error: {e}")
                     continue
 
                 # Extract token from response
@@ -341,7 +369,15 @@ def generate_response(
             logger.debug("Processed %d lines from response", line_count)
             if on_debug:
                 on_debug(f"Processed {line_count} lines from response")
-            return response_text or "(no response)", updated_context
+
+            # Validate response
+            if not response_text.strip():
+                logger.warning("Received empty response from Ollama")
+                if on_debug:
+                    on_debug("Received empty response from Ollama")
+                return "(No response generated)", updated_context
+
+            return response_text, updated_context
     except Exception as e:
         logger.error("Exception in generate_response: %s", e)
         if on_debug:
