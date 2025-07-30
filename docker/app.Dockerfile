@@ -9,6 +9,8 @@ WORKDIR /app
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends libmagic1 libmagic-dev && \
     apt-get install -y --no-install-recommends poppler-utils && \
+    # Install tesseract for OCR (required by unstructured[pdf])
+    apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng && \
     # Needed by OpenCV (dependency of unstructured)
     apt-get install -y --no-install-recommends libgl1 libglib2.0-0 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
