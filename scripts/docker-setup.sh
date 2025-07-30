@@ -39,83 +39,73 @@ echo -e "${GREEN}--- Confirmation received. Starting setup... ---${NC}"
 
 # --- Build Mode Selection ---
 echo ""
-echo -e "${BOLD}Select which part of the stack you want to build and start:${NC}"
-echo "  1) CLI only   – interactive shell with all RAG utilities (service: cli)"
-echo "  2) App only   – Streamlit UI (service: app)"
-echo "  3) Both       – build & start both cli and app (default)"
-read -p "Enter 1, 2 or 3 [3]: " mode_choice
+echo -e "${BOLD}The APP container now supports both web app and CLI functionality.${NC}"
+echo "This will build and start the unified APP service that provides:"
+echo "  • Streamlit web interface at http://localhost:8501"
+echo "  • CLI access via ./cli.sh"
+echo "  • Live code changes (no rebuilds needed)"
 
-# Determine services based on user choice
-case "$mode_choice" in
-  1)
-    SERVICES_BUILD=(cli)
-    SERVICES_UP=(weaviate ollama cli)
-    ;;
-  2)
-    SERVICES_BUILD=(app)
-    SERVICES_UP=(weaviate ollama app)
-    ;;
-  *)
-    SERVICES_BUILD=(cli app)
-    SERVICES_UP=(weaviate ollama cli app)
-    ;;
-esac
+SERVICES_BUILD=(app)
+SERVICES_UP=(weaviate ollama app)
 
 echo ""
-echo -e "${BOLD}You chose to build: ${SERVICES_BUILD[*]}${NC}"
 echo -e "${BOLD}Services that will be started: ${SERVICES_UP[*]}${NC}"
 
 
 # --- Script Start ---
 echo -e "${BOLD}Starting the automatic setup for the RAG project...${NC}"
 
-# Ensure helper scripts are executable
-chmod +x cli.sh ingest.sh docker-reset.sh || true
+# Source centralized configuration
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
-# Create a logs directory if it doesn't exist
-mkdir -p logs
+# Setup logging
+SCRIPT_NAME=$(get_script_name "${BASH_SOURCE[0]}")
+LOG_FILE=$(get_log_file "$SCRIPT_NAME")
+setup_logging "$SCRIPT_NAME"
+
+# Ensure helper scripts are executable
+chmod +x scripts/cli.sh scripts/ingest.sh scripts/docker-reset.sh || true
 
 # --- Step 1: Build Docker Images ---
 echo ""
+log_message "INFO" "Starting Docker image build process"
 echo -e "${BOLD}--- Step 1: Building custom Docker images... ---${NC}"
-echo "This may take a few minutes. Detailed output is being saved to 'logs/build.log'."
-docker compose --file docker/docker-compose.yml build --progress=plain "${SERVICES_BUILD[@]}" 2>&1 | tee logs/build.log
+echo "This may take a few minutes. Detailed output is being saved to '$LOG_FILE'."
+docker compose --file "$DOCKER_COMPOSE_FILE" build --progress=plain "${SERVICES_BUILD[@]}" 2>&1 | tee -a "$LOG_FILE"
 echo -e "${GREEN}✓ Build complete.${NC}"
 
 
 # --- Step 2: Start Services ---
 echo ""
+log_message "INFO" "Starting Docker services"
 echo -e "${BOLD}--- Step 2: Starting all Docker services... ---${NC}"
 echo "This can take a long time on the first run as models are downloaded."
 echo "The script will wait for all services to report a 'healthy' status."
-echo "Detailed output is being saved to 'logs/startup.log'."
-docker compose --file docker/docker-compose.yml up --detach --wait "${SERVICES_UP[@]}" 2>&1 | tee logs/startup.log
+echo "Detailed output is being saved to '$LOG_FILE'."
+docker compose --file "$DOCKER_COMPOSE_FILE" up --detach --wait "${SERVICES_UP[@]}" 2>&1 | tee -a "$LOG_FILE"
 echo -e "${GREEN}✓ All services are up and healthy.${NC}"
 
 
 # --- Step 3: Verify Final Status ---
 echo ""
+log_message "INFO" "Verifying final service status"
 echo -e "${BOLD}--- Step 3: Verifying final service status... ---${NC}"
-docker compose --file docker/docker-compose.yml ps
+docker compose --file "$DOCKER_COMPOSE_FILE" ps 2>&1 | tee -a "$LOG_FILE"
 
 
 # --- Success ---
 echo ""
+log_message "INFO" "Docker setup completed successfully"
 echo -e "${GREEN}${BOLD}========================================${NC}"
 echo -e "${GREEN}${BOLD}✅ Setup Complete!${NC}"
 echo -e "${GREEN}${BOLD}========================================${NC}"
 echo ""
 echo "The selected services are now running in the background."
 
-# Tailored post-setup hints
-if [[ " ${SERVICES_UP[*]} " == *" app "* ]]; then
-  echo -e "You can access the Streamlit app at: ${BOLD}http://localhost:8501${NC}"
-fi
-
-if [[ " ${SERVICES_UP[*]} " == *" cli "* ]]; then
-  echo "To open an interactive RAG CLI shell, run: ./cli.sh"
-fi
+# Post-setup hints
+echo -e "You can access the Streamlit app at: ${BOLD}http://localhost:8501${NC}"
+echo "To open an interactive RAG CLI shell, run: ./scripts/cli.sh (starts qa_loop.py by default)"
 echo ""
-echo "To stop all services, run: docker compose --file docker/docker-compose.yml down"
-echo "To completely reset the environment, run: ./docker-reset.sh"
+echo "To stop all services, run: docker compose --file $DOCKER_COMPOSE_FILE down"
+echo "To completely reset the environment, run: ./scripts/docker-reset.sh"
 echo "" 

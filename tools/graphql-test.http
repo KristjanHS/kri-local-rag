@@ -1,0 +1,23 @@
+### Test Weaviate GraphQL endpoint
+POST http://localhost:8080/v1/graphql
+Content-Type: application/json
+
+{
+  "query": "query { __schema { types { name } } }"
+}
+
+### Get all documents
+POST http://localhost:8080/v1/graphql
+Content-Type: application/json
+
+{
+  "query": "query { Get { Document { _additional { id } content source_file } } }"
+}
+
+### Search documents (limit 5)
+POST http://localhost:8080/v1/graphql
+Content-Type: application/json
+
+{
+  "query": "query { Get { Document(limit: 5) { _additional { id } content source_file } } }"
+} 

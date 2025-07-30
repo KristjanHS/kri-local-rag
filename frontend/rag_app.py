@@ -7,17 +7,16 @@ import io, contextlib
 
 # Add backend directory to sys.path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../backend")))
-from qa_loop import answer, set_debug_level, ensure_weaviate_ready_and_populated
-from config import DEBUG_LEVEL, OLLAMA_CONTEXT_TOKENS
+from qa_loop import answer, ensure_weaviate_ready_and_populated
+from config import OLLAMA_CONTEXT_TOKENS, get_logger
 from ingest_pdf import ingest
+
+# Set up logging for this module
+logger = get_logger(__name__)
 
 st.set_page_config(page_title="RAG Q&A", layout="centered")
 st.title("RAG Q&A (Streamlit Frontend)")
 
-debug_level = st.sidebar.selectbox(
-    "Debug Level", [0, 1, 2, 3], index=[0, 1, 2, 3].index(DEBUG_LEVEL)
-)
-set_debug_level(debug_level)
 k = st.sidebar.slider("Number of top chunks (k)", min_value=1, max_value=10, value=3)
 context_tokens = st.sidebar.number_input(
     "Ollama context window (tokens)",
@@ -28,12 +27,17 @@ context_tokens = st.sidebar.number_input(
 )
 st.sidebar.markdown(
     """
-**VRAM usage:**
+**GPU Monitoring:**
 To monitor your GPU VRAM usage while running large context windows, open a terminal and run:
 ```
-nvidia-smi -l 1
+./monitor_gpu.sh
 ```
-This will update VRAM usage every second.
+This shows GPU memory, utilization, and container resource usage.
+
+For continuous monitoring:
+```
+gpustat -i 2
+```
 """
 )
 
@@ -78,7 +82,7 @@ if "init_done" not in st.session_state:
         try:
             ensure_weaviate_ready_and_populated()
         except Exception as e:
-            print(f"[Error] Backend initialization failed: {e}")
+            logger.error("Backend initialization failed: %s", e)
     st.session_state["init_logs"] = buf.getvalue()
     st.session_state["init_done"] = True
 
@@ -106,7 +110,6 @@ if submitted and question.strip():
         answer(
             question,
             k=k,
-            debug=debug_level > 0,
             on_token=on_token,
             on_debug=on_debug,
             stop_event=st.session_state.stop_event,
