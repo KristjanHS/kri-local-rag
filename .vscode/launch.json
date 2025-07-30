@@ -1,0 +1,12 @@
+// .vscode/launch.json
+{
+    "configurations": [
+        {
+            "name": "Python: my-app",
+            "type": "python",
+            "request": "launch",
+            "program": "app.py",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}

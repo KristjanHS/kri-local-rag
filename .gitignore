@@ -60,7 +60,6 @@ data/
 assets/
 *.csv
 # If they are large datasets
-*.json
 *.log
 wget-log
 faiss_index/

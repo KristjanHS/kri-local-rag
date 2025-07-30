@@ -175,7 +175,7 @@ def answer(
 # ---------- CLI --------------------------------------------------
 import weaviate
 from weaviate.exceptions import WeaviateConnectionError
-from weaviate.classes.filters import Filter
+from weaviate.classes.query import Filter
 from config import COLLECTION_NAME, WEAVIATE_URL
 from ingest_pdf import ingest, create_collection_if_not_exists
 import argparse
@@ -300,7 +300,8 @@ if __name__ == "__main__":
             sys.stdout.write("→ ")
             sys.stdout.flush()
 
-            answer(q, k=args.k, metadata_filter=meta_filter)
+            result = answer(q, k=args.k, metadata_filter=meta_filter)
+            print(result)
 
             print("\n")
     except (EOFError, KeyboardInterrupt):

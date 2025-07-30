@@ -56,7 +56,7 @@ echo -e "${BOLD}Services that will be started: ${SERVICES_UP[*]}${NC}"
 echo -e "${BOLD}Starting the automatic setup for the RAG project...${NC}"
 
 # Ensure helper scripts are executable
-chmod +x cli.sh ingest.sh docker-reset.sh || true
+chmod +x scripts/shell/cli.sh scripts/shell/ingest.sh scripts/shell/docker-reset.sh || true
 
 # Create a logs directory if it doesn't exist
 mkdir -p logs
@@ -95,8 +95,8 @@ echo "The selected services are now running in the background."
 
 # Post-setup hints
 echo -e "You can access the Streamlit app at: ${BOLD}http://localhost:8501${NC}"
-echo "To open an interactive RAG CLI shell, run: ./cli.sh (starts qa_loop.py by default)"
+echo "To open an interactive RAG CLI shell, run: ./scripts/shell/cli.sh (starts qa_loop.py by default)"
 echo ""
 echo "To stop all services, run: docker compose --file docker/docker-compose.yml down"
-echo "To completely reset the environment, run: ./docker-reset.sh"
+echo "To completely reset the environment, run: ./scripts/shell/docker-reset.sh"
 echo "" 

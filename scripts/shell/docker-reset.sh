@@ -26,6 +26,13 @@ echo "--- Confirmation received. Proceeding with cleanup... ---"
 
 echo ""
 echo "--- Shutting down project containers and removing volumes... ---"
+# Get the project root directory (one level up from scripts/shell/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+
+# Change to project root for docker commands
+cd "$PROJECT_ROOT"
+
 # The --file flag allows this script to be run from the project root.
 # --volumes removes the named volumes (weaviate_db, ollama_models).
 # --remove-orphans cleans up any containers that are not defined in the compose file.

@@ -206,6 +206,19 @@ def ingest(directory: str):
     if SentenceTransformer is None:
         raise ImportError("Install 'sentence-transformers' to enable vectorization.")
 
+    # Suppress FutureWarning from PyTorch about deprecated encoder_attention_mask
+    # Can be disabled by setting SUPPRESS_TORCH_WARNINGS=false
+    if os.getenv("SUPPRESS_TORCH_WARNINGS", "true").lower() != "false":
+        import warnings
+
+        warnings.filterwarnings(
+            "ignore", category=FutureWarning, module="torch.nn.modules.module"
+        )
+
+    # Alternative models that may have fewer warnings:
+    # - "sentence-transformers/all-mpnet-base-v2" (768d, better quality)
+    # - "sentence-transformers/multi-qa-MiniLM-L6-cos-v1" (384d, similar to current)
+    # - "sentence-transformers/paraphrase-MiniLM-L6-v2" (384d, alternative)
     model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
     pdfs = list_pdfs(directory)

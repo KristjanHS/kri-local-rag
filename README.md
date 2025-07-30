@@ -12,14 +12,37 @@ Local RAG system using Weaviate, Ollama, and Python.
 
 ---
 
+## Project Structure
+
+This project follows Python best practices with organized directories:
+
+```
+kri-local-rag/
+├── backend/           # Core RAG backend code
+├── frontend/          # Streamlit web interface
+├── scripts/           # Utility scripts
+│   ├── shell/        # Shell scripts (setup, CLI, etc.)
+│   └── debug/        # Debug and test scripts
+├── tools/            # Development tools and utilities
+├── docs/             # Documentation
+│   ├── guides/       # User guides and tutorials
+│   └── api/          # API documentation
+├── tests/            # Test suite
+├── logs/             # Log files
+├── data/             # User data directory
+├── example_data/     # Sample data for testing
+└── docker/           # Docker configuration
+```
+
 ## Automated Scripts
 
-This project includes simple shell scripts to manage the entire Docker environment:
+This project includes organized scripts to manage the entire Docker environment:
 
--   `docker-setup.sh`: Builds all images and starts all services for the first time.
--   `cli.sh`: Provides CLI access to the APP container. Starts interactive RAG CLI by default, or run specific commands.
--   `ingest.sh`: Convenience wrapper to ingest PDFs from a host path using the APP container.
--   `docker-reset.sh`: Stops and completely removes all containers, volumes, and images for this project.
+-   `scripts/shell/docker-setup.sh`: Builds all images and starts all services for the first time.
+-   `scripts/shell/cli.sh`: Provides CLI access to the APP container. Starts interactive RAG CLI by default.
+-   `scripts/shell/ingest.sh`: Convenience wrapper to ingest PDFs from a host path using the APP container.
+-   `scripts/shell/docker-reset.sh`: Stops and completely removes all containers, volumes, and images for this project.
+-   `cli.py`: Python-based CLI entry point (recommended for development).
 
 ---
 
@@ -35,12 +58,12 @@ This project includes simple shell scripts to manage the entire Docker environme
 
 2.  Make the scripts executable:
     ```bash
-    chmod +x docker-setup.sh cli.sh docker-reset.sh ingest.sh
+    chmod +x scripts/shell/*.sh
     ```
 
 3.  Run the automated setup script. This will build the Docker images and start all services.
     ```bash
-    ./docker-setup.sh
+    ./scripts/shell/docker-setup.sh
     ```
     **Note:** The first run can be very slow (10-20 minutes or more) as it downloads several gigabytes of models. Subsequent launches are much faster.
 
@@ -75,7 +98,7 @@ Details:
 Runs `ingest_pdf.py` in a temporary *app* container (it will start one automatically if needed):
 
 ```bash
-./ingest.sh data/
+./scripts/shell/ingest.sh data/
 ```
 The script spins up `docker compose run --rm app ...` and passes the folder to `ingest_pdf.py --data-dir <folder>`, so no prior `app` container must be running.
 
@@ -92,19 +115,28 @@ The default command ingests any PDFs found in `data/`. Edit `docker/docker-compo
 For advanced or scripted workflows you can run arbitrary Python inside the APP container:
 
 ```bash
-./cli.sh python backend/ingest_pdf.py docs/my.pdf
+./scripts/shell/cli.sh python backend/ingest_pdf.py docs/my.pdf
 ```
 
 To open an interactive RAG CLI shell at any time run:
 
 ```bash
-./cli.sh   # starts interactive qa_loop.py by default
+./scripts/shell/cli.sh   # starts interactive qa_loop.py by default
 ```
 
 Or run specific commands:
 ```bash
-./cli.sh python backend/ingest_pdf.py docs/my.pdf  # Ingest specific files
-./cli.sh bash                                       # Start bash shell
+./scripts/shell/cli.sh python backend/ingest_pdf.py docs/my.pdf  # Ingest specific files
+./scripts/shell/cli.sh bash                                       # Start bash shell
+```
+
+**Python CLI (Recommended)**
+For development, use the Python-based CLI:
+
+```bash
+python cli.py                    # Interactive mode
+python cli.py --question "What is AI?"  # Single question
+python cli.py --debug            # Enable debug logging
 ```
 
 ### Ask Questions
@@ -118,7 +150,7 @@ Once documents are ingested, you can ask questions via the Streamlit app at **[h
 To completely reset the project, which will stop and delete all Docker containers, volumes (including the Weaviate database and Ollama models), and custom images, run the reset script:
 
 ```bash
-./docker-reset.sh
+./scripts/shell/docker-reset.sh
 ```
 The script will ask for confirmation before deleting anything.
 
@@ -136,7 +168,7 @@ This project includes a GPU monitoring script optimized for WSL + Docker setups:
 
 ### Quick Monitoring
 ```bash
-./monitor_gpu.sh
+./scripts/shell/monitor_gpu.sh
 ```
 Shows:
 - Overall GPU memory usage and utilization
@@ -149,12 +181,12 @@ Shows:
 gpustat -i 2
 
 # Or use watch for the monitoring script
-watch -n 5 ./monitor_gpu.sh
+watch -n 5 ./scripts/shell/monitor_gpu.sh
 ```
 
 ### Why This Monitoring Script?
 
-The included `monitor_gpu.sh` script is specifically designed for WSL + Docker environments where:
+The included `scripts/shell/monitor_gpu.sh` script is specifically designed for WSL + Docker environments where:
 - Standard `nvidia-smi` process-level reporting is unreliable
 - Container GPU usage isn't properly isolated
 - You need to correlate GPU usage with container activity

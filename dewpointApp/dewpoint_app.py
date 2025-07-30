@@ -500,7 +500,7 @@ if "lat" in locals() and "lon" in locals() and lat is not None and lon is not No
             if nearest and nearest.get("humidity") is not None:
                 st.markdown("---")
                 st.subheader("Estonian Environment Agency Humidity (nearest station)")
-                st.markdown(f"**Station:** {nearest.get('Jaam','?')}")
+                st.markdown(f"**Station:** {nearest.get('Jaam', '?')}")
                 # Format timestamp for easier reading in local time
                 dt_obj = user_tz.localize(
                     datetime.strptime(f"{date_str} {hour_str}", "%Y-%m-%d %H")

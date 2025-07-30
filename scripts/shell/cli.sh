@@ -4,11 +4,18 @@
 
 set -e
 
+# Get the project root directory (one level up from scripts/shell/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+
 # Check if we're in the project root
-if [ ! -f "docker/docker-compose.yml" ]; then
+if [ ! -f "$PROJECT_ROOT/docker/docker-compose.yml" ]; then
     echo "Error: Please run this script from the project root directory."
     exit 1
 fi
+
+# Change to project root for docker commands
+cd "$PROJECT_ROOT"
 
 # Start the app container if not running
 echo "Starting APP container..."

@@ -1,0 +1,42 @@
+{
+    // Tell the Python extension which interpreter to load first
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    // Make the integrated terminal auto-activate that env
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+
+    "python.envFile": "${workspaceFolder}/.env",
+    "[python]": {
+        // "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.defaultFormatter": "ms-python.black-formatter", // use black as the default formatter
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file",
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
+            "source.fixAll": "explicit"
+        },
+    },
+    "black-formatter.args": ["--line-length", "120"],
+    // flake8 linting config.
+    // using full path because ${workspaceFolder} is not resolved by cornflakes correctly. tested with Cornflakes 0.11.0. as of 2023-10-20. reported to the author.
+    "cornflakes.linter.executablePath": "/home/kristjans/projects/kri-local-rag/.venv/bin/flake8",
+    "cornflakes.linter.run": "onSave",
+    // "python.analysis.diagnosticSeverityOverrides": {
+    //     "reportMissingImports": "none" // optional: hides some Pylance noise
+    // },
+    "githubPullRequests.ignoredPullRequestBranches": [
+        "main"
+    ],
+    "geminicodeassist.inlineSuggestions.enableAuto": false,
+    "geminicodeassist.chat.defaultDiffLayout": "Side by side diff",
+    "geminicodeassist.chat.defaultCodeBlockDisplay": "Expanded",
+    "cursorpyright.analysis.diagnosticSeverityOverrides": {
+        "reportMissingImports": "none"
+    },
+    "cursorpyright.analysis.extraPaths": [
+        "backend"
+    ],
+    "files.exclude": { "**/.venv": true },
+    "python.analysis.exclude": [ "**/.venv/**" ],
+    "search.exclude": { "**/.venv": true }
+}
