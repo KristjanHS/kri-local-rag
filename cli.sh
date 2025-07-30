@@ -18,15 +18,16 @@ docker compose -f docker/docker-compose.yml up -d app
 echo "Waiting for APP container to be ready..."
 sleep 3
 
-# If no arguments provided, start an interactive shell
+# If no arguments provided, start qa_loop.py by default
 if [ $# -eq 0 ]; then
     echo "Starting interactive CLI session in APP container..."
     echo "Available commands:"
-    echo "  python backend/qa_loop.py          # Interactive RAG CLI"
-    echo "  python backend/ingest_pdf.py       # Ingest PDFs"
+    echo "  python backend/qa_loop.py          # Interactive RAG CLI (default)"
+    echo "  python backend/ingest_pdf.py       # Ingest PDFs. By default, from docs/ directory."
     echo "  python backend/delete_collection.py # Delete all data"
+    echo "  bash                               # Start bash shell"
     echo ""
-    docker compose -f docker/docker-compose.yml exec app bash
+    docker compose -f docker/docker-compose.yml exec app python backend/qa_loop.py
 else
     # Run the provided command in the APP container
     echo "Running command in APP container: $*"

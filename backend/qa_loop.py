@@ -10,7 +10,7 @@ from typing import List, Tuple, Optional, Dict, Any
 # Local .py imports
 from config import OLLAMA_MODEL, get_logger
 from retriever import get_top_k
-from ollama_client import test_ollama_connection, generate_response, set_debug_level
+from ollama_client import test_ollama_connection, generate_response
 
 # Set up logging for this module
 logger = get_logger(__name__)
@@ -175,7 +175,7 @@ def answer(
 # ---------- CLI --------------------------------------------------
 import weaviate
 from weaviate.exceptions import WeaviateConnectionError
-from weaviate.classes.query import Filter
+from weaviate.classes.filters import Filter
 from config import COLLECTION_NAME, WEAVIATE_URL
 from ingest_pdf import ingest, create_collection_if_not_exists
 import argparse
@@ -263,17 +263,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--k", type=int, default=3, help="Number of top chunks to keep after re-ranking"
     )
-    parser.add_argument(
-        "--debug-level",
-        type=int,
-        default=2,
-        choices=[0, 1, 2, 3],
-        help="Debug level: 0=off, 1=basic, 2=detailed, 3=verbose (default: 1)",
-    )
     args = parser.parse_args()
-
-    # Set debug level
-    set_debug_level(args.debug_level)
 
     # Build metadata filter dict (AND-combination of provided fields)
     meta_filter: Optional[Dict[str, Any]] = None

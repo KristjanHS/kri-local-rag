@@ -17,7 +17,7 @@ Local RAG system using Weaviate, Ollama, and Python.
 This project includes simple shell scripts to manage the entire Docker environment:
 
 -   `docker-setup.sh`: Builds all images and starts all services for the first time.
--   `cli.sh`: Provides CLI access to the APP container for running backend commands.
+-   `cli.sh`: Provides CLI access to the APP container. Starts interactive RAG CLI by default, or run specific commands.
 -   `ingest.sh`: Convenience wrapper to ingest PDFs from a host path using the APP container.
 -   `docker-reset.sh`: Stops and completely removes all containers, volumes, and images for this project.
 
@@ -67,7 +67,7 @@ You can add PDFs to the vector-database in several convenient ways – pick whic
 | **1. Streamlit UI** | Open the app in your browser, expand *Ingest PDFs* in the sidebar, upload one or more PDF files and click **Ingest** | Quick, small uploads, no terminal needed |
 | **2. Helper script** | `./ingest.sh <path>` | Fast one-liner from a terminal **(spins up a temporary APP container automatically)** |
 | **3. One-off Docker Compose profile** | `docker compose --profile ingest up ingester` | Fire-and-forget batch ingestion without launching the full UI |
-| **4. CLI utility wrapper** | `./cli.sh <command>` | Run any backend command inside the persistent APP container (e.g. `./cli.sh python backend/ingest_pdf.py ./docs/my.pdf`) |
+| **4. CLI utility wrapper** | `./cli.sh` or `./cli.sh <command>` | Start interactive RAG CLI by default, or run any backend command inside the persistent APP container (e.g. `./cli.sh python backend/ingest_pdf.py ./docs/my.pdf`) |
 
 Details:
 
@@ -98,7 +98,13 @@ For advanced or scripted workflows you can run arbitrary Python inside the APP c
 To open an interactive RAG CLI shell at any time run:
 
 ```bash
-./cli.sh   # launches interactive qa_loop.py inside the APP container
+./cli.sh   # starts interactive qa_loop.py by default
+```
+
+Or run specific commands:
+```bash
+./cli.sh python backend/ingest_pdf.py docs/my.pdf  # Ingest specific files
+./cli.sh bash                                       # Start bash shell
 ```
 
 ### Ask Questions

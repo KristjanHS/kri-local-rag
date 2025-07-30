@@ -13,6 +13,10 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends libgl1 libglib2.0-0 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# ---- upgrade pip ----
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip
+
 # ---- wheel cache mount (optional) ----
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128

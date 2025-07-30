@@ -2,9 +2,6 @@
 # Set to DEBUG to see detailed chunk information from Weaviate
 LOG_LEVEL=DEBUG
 
-# Debug level for backward compatibility (0=off, 1=basic, 2=detailed, 3=verbose)
-DEBUG_LEVEL=3
-
 # Ollama configuration
 OLLAMA_MODEL=cas/mistral-7b-instruct-v0.3
 OLLAMA_URL=http://localhost:11434
@@ -13,4 +10,7 @@ OLLAMA_URL=http://localhost:11434
 WEAVIATE_URL=http://localhost:8080
 
 # Context window size for Ollama
-OLLAMA_CONTEXT_TOKENS=8192 
+OLLAMA_CONTEXT_TOKENS=8192
+
+# Optional: OpenWeatherMap API key for weather functionality in dewpointApp
+# OPENWEATHER_API_KEY=your_api_key_here 
