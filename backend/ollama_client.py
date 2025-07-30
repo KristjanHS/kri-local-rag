@@ -173,14 +173,22 @@ def test_ollama_connection() -> bool:
         test_payload = {
             "model": model_name,
             "prompt": "Hello",
-            "stream": False,
+            "stream": True,
             "options": {"num_predict": 5},  # Limit to 5 tokens for speed
         }
 
-        test_resp = httpx.post(
-            f"{base_url.rstrip('/')}/api/generate", json=test_payload, timeout=30
+        test_resp = httpx.stream(
+            "POST",
+            f"{base_url.rstrip('/')}/api/generate",
+            json=test_payload,
+            timeout=10,
         )
-        test_resp.raise_for_status()
+        with test_resp as resp:
+            resp.raise_for_status()
+            # Just read a few lines to confirm it's working
+            for i, line in enumerate(resp.iter_lines()):
+                if i >= 3:  # Only read first 3 lines
+                    break
 
         logger.info("✓ Ollama inference test successful")
         return True

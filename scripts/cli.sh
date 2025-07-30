@@ -16,7 +16,17 @@ log_message "INFO" "Starting APP container"
 echo "Starting APP container..."
 docker compose -f "$DOCKER_COMPOSE_FILE" up -d "$APP_SERVICE" 2>&1 | tee -a "$LOG_FILE"
 
-# Wait for the app container to be ready
+# Clear Python cache inside the container to ensure latest code is used
+log_message "INFO" "Clearing Python bytecode cache (.pyc files) inside APP container"
+echo "Clearing Python bytecode cache (.pyc files) inside APP container..."
+docker compose -f "$DOCKER_COMPOSE_FILE" exec "$APP_SERVICE" find /app -name '*.pyc' -delete 2>&1 | tee -a "$LOG_FILE"
+
+# Restart the APP container to pick up any code changes
+log_message "INFO" "Restarting APP container to apply code changes"
+echo "Restarting APP container to apply code changes..."
+docker compose -f "$DOCKER_COMPOSE_FILE" restart "$APP_SERVICE" 2>&1 | tee -a "$LOG_FILE"
+
+# Wait for the app container to be ready again
 log_message "INFO" "Waiting for APP container to be ready"
 echo "Waiting for APP container to be ready..."
 sleep 3
