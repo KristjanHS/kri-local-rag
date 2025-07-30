@@ -1,0 +1,10 @@
+{
+  "codeStyle": "pep8",
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y","@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_PAT": "KristjanHS/hands-on-llm" }
+    }
+  }
+}
