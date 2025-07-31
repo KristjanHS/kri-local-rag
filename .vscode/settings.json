@@ -16,6 +16,8 @@
     "search.exclude": {
         "**/.venv": true
     },
+    "python.languageServer": "None",
+    "python.formatting.provider": "none"
     "python.venvPath": "${workspaceFolder}",
     "python.envFile": "${workspaceFolder}/.env",
     "[python]": {
