@@ -1,0 +1,13 @@
+// .vscode/tasks.json
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "clean-pycache",
+        "type":  "shell",
+        "command": "find . -type d -name '__pycache__' -exec rm -rf {} +",
+        "problemMatcher": []
+      }
+    ]
+  }
+  

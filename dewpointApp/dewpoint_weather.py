@@ -10,9 +10,7 @@ def get_weather(city, api_key):
     debug_info = ""
     url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&units=metric&appid={api_key}"
     resp = requests.get(url)
-    debug_info += (
-        f"URL tried: {url}\nStatus code: {resp.status_code}\nResponse: {resp.text}\n"
-    )
+    debug_info += f"URL tried: {url}\nStatus code: {resp.status_code}\nResponse: {resp.text}\n"
     if resp.status_code == 200:
         data = resp.json()
         temp = data["main"]["temp"]
@@ -20,8 +18,7 @@ def get_weather(city, api_key):
         lat = data["coord"]["lat"]
         lon = data["coord"]["lon"]
         forecast_url = (
-            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}"
-            f"&units=metric&appid={api_key}"
+            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}" f"&units=metric&appid={api_key}"
         )
         forecast_resp = requests.get(forecast_url)
         debug_info += (
@@ -38,15 +35,11 @@ def get_weather(city, api_key):
             target_12h = now + timedelta(hours=12)
             closest_6h = min(
                 forecast_data["list"],
-                key=lambda x: abs(
-                    datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_6h
-                ),
+                key=lambda x: abs(datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_6h),
             )
             closest_12h = min(
                 forecast_data["list"],
-                key=lambda x: abs(
-                    datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_12h
-                ),
+                key=lambda x: abs(datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_12h),
             )
             forecast_6h = (
                 closest_6h["main"]["temp"],
@@ -62,9 +55,7 @@ def get_weather(city, api_key):
     if "," in city:
         city_parts = city.split(",")
         if len(city_parts) == 2:
-            city_country = (
-                f"{city_parts[0].strip()},{city_parts[1].strip()[:2].upper()}"
-            )
+            city_country = f"{city_parts[0].strip()},{city_parts[1].strip()[:2].upper()}"
             url = f"https://api.openweathermap.org/data/2.5/weather?q={city_country}&units=metric&appid={api_key}"
             resp = requests.get(url)
             debug_info += f"URL tried: {url}\nStatus code: {resp.status_code}\nResponse: {resp.text}\n"
@@ -93,16 +84,11 @@ def get_weather(city, api_key):
                     target_12h = now + timedelta(hours=12)
                     closest_6h = min(
                         forecast_data["list"],
-                        key=lambda x: abs(
-                            datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_6h
-                        ),
+                        key=lambda x: abs(datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_6h),
                     )
                     closest_12h = min(
                         forecast_data["list"],
-                        key=lambda x: abs(
-                            datetime.fromtimestamp(x["dt"], tz=timezone.utc)
-                            - target_12h
-                        ),
+                        key=lambda x: abs(datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_12h),
                     )
                     forecast_6h = (
                         closest_6h["main"]["temp"],
@@ -126,16 +112,13 @@ def calculate_dew_point(temp_c: float, rh: float) -> float:
 def fetch_weather_by_gps(lat, lon, api_key):
     url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&units=metric&appid={api_key}"
     resp = requests.get(url)
-    debug_info = (
-        f"URL tried: {url}\nStatus code: {resp.status_code}\nResponse: {resp.text}\n"
-    )
+    debug_info = f"URL tried: {url}\nStatus code: {resp.status_code}\nResponse: {resp.text}\n"
     if resp.status_code == 200:
         data = resp.json()
         temp = data["main"]["temp"]
         humidity = data["main"]["humidity"]
         forecast_url = (
-            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}"
-            f"&units=metric&appid={api_key}"
+            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}" f"&units=metric&appid={api_key}"
         )
         forecast_resp = requests.get(forecast_url)
         debug_info += (
@@ -152,15 +135,11 @@ def fetch_weather_by_gps(lat, lon, api_key):
             target_12h = now + timedelta(hours=12)
             closest_6h = min(
                 forecast_data["list"],
-                key=lambda x: abs(
-                    datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_6h
-                ),
+                key=lambda x: abs(datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_6h),
             )
             closest_12h = min(
                 forecast_data["list"],
-                key=lambda x: abs(
-                    datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_12h
-                ),
+                key=lambda x: abs(datetime.fromtimestamp(x["dt"], tz=timezone.utc) - target_12h),
             )
             forecast_6h = (
                 closest_6h["main"]["temp"],

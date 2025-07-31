@@ -33,13 +33,9 @@ from timezonefinder import TimezoneFinder
 load_dotenv()
 
 # Try Streamlit secrets first, then environment variable (for local .env)
-OPENWEATHER_API_KEY = st.secrets.get("OPENWEATHER_API_KEY") or os.getenv(
-    "OPENWEATHER_API_KEY"
-)
+OPENWEATHER_API_KEY = st.secrets.get("OPENWEATHER_API_KEY") or os.getenv("OPENWEATHER_API_KEY")
 if not OPENWEATHER_API_KEY:
-    st.warning(
-        "OpenWeatherMap API key not found. Please add OPENWEATHER_API_KEY to your .streamlit/secrets.toml file."
-    )
+    st.warning("OpenWeatherMap API key not found. Please add OPENWEATHER_API_KEY to your .streamlit/secrets.toml file.")
 
 
 # ---------------------------------------------------------------------------
@@ -97,9 +93,7 @@ elif use_gps:
 
 # Set city input default to empty if location is detected, otherwise use a default city
 city_default = "" if use_gps else "Viimsi"
-city = st.text_input(
-    "City name for outdoor weather (override GPS location)", value=city_default
-)
+city = st.text_input("City name for outdoor weather (override GPS location)", value=city_default)
 
 # Add at the top, after imports:
 FORECAST_HOUR_1 = 3
@@ -134,9 +128,7 @@ if "debug_info" not in st.session_state:
 if city:
     # If city is entered, override GPS and use city for weather
     if city != st.session_state["last_city"]:
-        temp, humidity, forecast_6h, forecast_12h, debug_info = get_weather(
-            city, OPENWEATHER_API_KEY
-        )
+        temp, humidity, forecast_6h, forecast_12h, debug_info = get_weather(city, OPENWEATHER_API_KEY)
         st.session_state["last_city"] = city
         st.session_state["debug_info"] = debug_info
         if temp is not None:
@@ -151,9 +143,7 @@ if city:
             st.session_state["forecast_12h"] = None
 elif use_gps:
     # Only use GPS if city is empty
-    temp, humidity, forecast_6h, forecast_12h, debug_info = fetch_weather_by_gps(
-        lat, lon, OPENWEATHER_API_KEY
-    )
+    temp, humidity, forecast_6h, forecast_12h, debug_info = fetch_weather_by_gps(lat, lon, OPENWEATHER_API_KEY)
     st.session_state["last_city"] = f"GPS:{lat},{lon}"
     st.session_state["debug_info"] = debug_info
     if temp is not None:
@@ -208,9 +198,7 @@ with col2:
             step=1.0,
         )
 with col1:
-    indoor_temp = st.number_input(
-        "Indoor temperature (°C)", min_value=0.0, max_value=40.0, value=25.0, step=0.5
-    )
+    indoor_temp = st.number_input("Indoor temperature (°C)", min_value=0.0, max_value=40.0, value=25.0, step=0.5)
     indoor_rh = st.number_input(
         "Indoor relative humidity (%)",
         min_value=0.0,
@@ -238,11 +226,7 @@ fig = go.Figure(
         z=dew_points,
         colorscale=blue_red_scale,
         colorbar=dict(title="Dew Point (°C)"),
-        hovertemplate=(
-            "Temperature: %{x:.1f}°C<br>"
-            "Humidity: %{y:.0f}%<br>"
-            "Dew Point: %{z:.2f}°C<extra></extra>"
-        ),
+        hovertemplate=("Temperature: %{x:.1f}°C<br>" "Humidity: %{y:.0f}%<br>" "Dew Point: %{z:.2f}°C<extra></extra>"),
         text=text_labels,
         texttemplate="%{text}",
         textfont={"size": 8, "color": "black"},
@@ -298,8 +282,7 @@ fig.add_trace(
         textposition="top center",
         textfont=dict(size=12, color="white", weight="bold"),
         hovertemplate=(
-            f"<b>Indoor</b><br>Temp: %{{x:.1f}}°C<br>RH: %{{y:.0f}}%<br>"
-            f"Dew Point: {indoor_dp:.2f}°C<extra></extra>"
+            f"<b>Indoor</b><br>Temp: %{{x:.1f}}°C<br>RH: %{{y:.0f}}%<br>" f"Dew Point: {indoor_dp:.2f}°C<extra></extra>"
         ),
     )
 )
@@ -344,22 +327,12 @@ def to_local_time(dt_str):
 if outdoor_temp_fetched is not None and outdoor_rh_fetched is not None:
     # Ultra-compact single-row table for mobile
     label_6h = to_local_time(forecast_6h[2]) if forecast_6h else f"+{forecast_hour_1}h"
-    label_12h = (
-        to_local_time(forecast_12h[2]) if forecast_12h else f"+{forecast_hour_2}h"
-    )
+    label_12h = to_local_time(forecast_12h[2]) if forecast_12h else f"+{forecast_hour_2}h"
     all_table = [
         [
-            (
-                f"{outdoor_temp_fetched:.1f}°C, {outdoor_rh_fetched:.0f}%"
-                if outdoor_temp_fetched is not None
-                else ""
-            ),
+            (f"{outdoor_temp_fetched:.1f}°C, {outdoor_rh_fetched:.0f}%" if outdoor_temp_fetched is not None else ""),
             (f"{forecast_6h[0]:.1f}°C, {forecast_6h[1]:.0f}%" if forecast_6h else ""),
-            (
-                f"{forecast_12h[0]:.1f}°C, {forecast_12h[1]:.0f}%"
-                if forecast_12h
-                else ""
-            ),
+            (f"{forecast_12h[0]:.1f}°C, {forecast_12h[1]:.0f}%" if forecast_12h else ""),
             f"{indoor_dp:.1f}°C",
             f"{outdoor_dp:.1f}°C",
             "✅" if outdoor_dp <= indoor_dp - 2 else "❌",
@@ -441,9 +414,7 @@ if "lat" in locals() and "lon" in locals() and lat is not None and lon is not No
                 try:
                     wind_speed_float = float(str(wind_speed).replace(",", "."))
                     wind_speed_kmh = wind_speed_float * 3.6
-                    st.markdown(
-                        f"**Wind speed:** {wind_speed_float:.1f} m/s ({wind_speed_kmh:.1f} km/h)"
-                    )
+                    st.markdown(f"**Wind speed:** {wind_speed_float:.1f} m/s ({wind_speed_kmh:.1f} km/h)")
                 except Exception:
                     st.markdown(f"**Wind speed:** {wind_speed} m/s")
             if wind_dir:
@@ -451,20 +422,14 @@ if "lat" in locals() and "lon" in locals() and lat is not None and lon is not No
                     wind_dir_int = int(round(float(wind_dir)))
                 except Exception:
                     wind_dir_int = wind_dir
-                st.markdown(
-                    f"**Wind direction:** {wind_dir_int}° ({deg_to_compass(wind_dir)})"
-                )
+                st.markdown(f"**Wind direction:** {wind_dir_int}° ({deg_to_compass(wind_dir)})")
                 # Show measurement time/date if available
                 measurement_time = nearest.get("Time")
                 if measurement_time:
                     # Try to parse ISO format and display as 'DD.MM.YYYY HH:MM'
                     try:
-                        dt = datetime.fromisoformat(
-                            measurement_time.replace("Z", "+00:00")
-                        )
-                        st.markdown(
-                            f"**Measurement time:** {dt.strftime('%d.%m.%Y %H:%M')}"
-                        )
+                        dt = datetime.fromisoformat(measurement_time.replace("Z", "+00:00"))
+                        st.markdown(f"**Measurement time:** {dt.strftime('%d.%m.%Y %H:%M')}")
                     except Exception:
                         st.markdown(f"**Measurement time:** {measurement_time}")
                 # Show station distance to user location
@@ -502,13 +467,9 @@ if "lat" in locals() and "lon" in locals() and lat is not None and lon is not No
                 st.subheader("Estonian Environment Agency Humidity (nearest station)")
                 st.markdown(f"**Station:** {nearest.get('Jaam', '?')}")
                 # Format timestamp for easier reading in local time
-                dt_obj = user_tz.localize(
-                    datetime.strptime(f"{date_str} {hour_str}", "%Y-%m-%d %H")
-                )
+                dt_obj = user_tz.localize(datetime.strptime(f"{date_str} {hour_str}", "%Y-%m-%d %H"))
                 formatted_time = dt_obj.strftime("%H:00, %d.%m.%Y %Z")
-                st.markdown(
-                    f"**Relative humidity:** {nearest['humidity']:.0f}% (at {formatted_time})"
-                )
+                st.markdown(f"**Relative humidity:** {nearest['humidity']:.0f}% (at {formatted_time})")
                 # Debug info: show user and station coordinates and distance
                 user_coords = (lat, lon)
                 station_coords = (nearest.get("lat"), nearest.get("lon"))
@@ -526,6 +487,4 @@ if "lat" in locals() and "lon" in locals() and lat is not None and lon is not No
         st.info("No recent Estonian humidity data available for your location.")
     # Also show OpenWeatherMap humidity for comparison
     if outdoor_rh_fetched is not None:
-        st.markdown(
-            f"**OpenWeatherMap humidity (your GPS):** {outdoor_rh_fetched:.0f}% (current)"
-        )
+        st.markdown(f"**OpenWeatherMap humidity (your GPS):** {outdoor_rh_fetched:.0f}% (current)")
