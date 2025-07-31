@@ -6,7 +6,8 @@
             "type": "python",
             "request": "launch",
             "program": "app.py",
-            "envFile": "${workspaceFolder}/.env"
+            "envFile": "${workspaceFolder}/.env",
+            "python": "${config:python.defaultInterpreterPath}"
         }
     ]
 }
