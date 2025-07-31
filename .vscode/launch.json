@@ -1,13 +1,7 @@
-// .vscode/launch.json
 {
-    "configurations": [
-        {
-            "name": "Python: my-app",
-            "type": "python",
-            "request": "launch",
-            "program": "app.py",
-            "envFile": "${workspaceFolder}/.env",
-            "python": "${config:python.defaultInterpreterPath}"
-        }
-    ]
-}
+    "name": "Python: Current file",
+    "type": "python",
+    "request": "launch",
+    "program": "${file}",
+    "preLaunchTask": "clean-pycache"
+  }
