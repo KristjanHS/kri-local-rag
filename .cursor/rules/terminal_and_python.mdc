@@ -1,0 +1,38 @@
+---
+description: "Instructions for running terminal commands in this project, especially for Python and pytest, to avoid environment and path issues."
+globs: 
+alwaysApply: false
+---
+
+# Rules for Terminal Command Execution
+
+## Environment Context
+- **Project Root**: The absolute path to the project root is `/home/kristjans/projects/kri-local-rag`.
+- **Terminal Environment**: The Cursor terminal is isolated. It does not reliably inherit shell configurations or `PYTHONPATH`. Do not assume the environment is pre-configured.
+
+## Critical Rules for All Commands
+1.  **Always run commands from the project root.** Before executing any command, ensure the working directory is `/home/kristjans/projects/kri-local-rag`.
+    <example>
+    cd /home/kristjans/projects/kri-local-rag && some_command
+    </example>
+
+## Critical Rules for Python Commands
+1.  **Use the explicit venv Python interpreter.** Do not use `python` or `python3`. Always use the full path.
+    - **Path**: `/home/kristjans/projects/kri-local-rag/.venv/bin/python`
+
+2.  **Running Python Scripts**: Combine the project root and the explicit interpreter path.
+    <example>
+    cd /home/kristjans/projects/kri-local-rag && /home/kristjans/projects/kri-local-rag/.venv/bin/python backend/some_script.py
+    </example>
+
+3.  **Running Pytest**: To ensure imports work correctly, you must set the `PYTHONPATH` environment variable to the project root.
+    <example>
+    cd /home/kristjans/projects/kri-local-rag && PYTHONPATH=. /home/kristjans/projects/kri-local-rag/.venv/bin/python -m pytest tests/
+    </example>
+    <example type="invalid">
+    # This will fail due to import errors.
+    pytest tests/
+    </example>
+
+## Project Structure Rules
+- **Avoid Module Shadowing**: When creating test files in the `tests/` directory, do not use the same filenames as modules inside the `backend/` directory (e.g., `config.py`). This causes import conflicts.

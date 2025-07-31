@@ -4,6 +4,7 @@
 # External libraries
 from __future__ import annotations
 import sys
+import re
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any
 
@@ -63,23 +64,45 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
 def _score_chunks(question: str, chunks: List[str]) -> List[ScoredChunk]:
     """Return *chunks* each paired with a relevance score for *question*."""
 
-    encoder = _get_cross_encoder()
-
-    if encoder is None:
-        logger.warning("Cross-encoder unavailable – falling back to neutral scores.")
-
-    if encoder is None:
-        # No re-ranker available – every chunk gets a neutral score of 0.
-        return [ScoredChunk(text=c, score=0.0) for c in chunks]
-
+    # Strategy 1: Try cross-encoder (best quality)
     try:
-        pairs: List[Tuple[str, str]] = [(question, c) for c in chunks]
-        scores = encoder.predict(pairs)  # logits, pos > relevant
-    except Exception:
-        # If inference fails we fall back to neutral scores as well.
-        return [ScoredChunk(text=c, score=0.0) for c in chunks]
+        encoder = _get_cross_encoder()
+        if encoder is not None:
+            logger.debug("Attempting cross-encoder scoring.")
+            pairs: List[Tuple[str, str]] = [(question, c) for c in chunks]
+            scores = encoder.predict(pairs)  # logits, pos > relevant
+            return [ScoredChunk(text=c, score=float(s)) for c, s in zip(chunks, scores)]
+        else:
+            # This is a controlled fallback, not an exception.
+            logger.warning("Cross-encoder model not available, falling back.")
+            raise RuntimeError("Encoder not available")
+    except Exception as e:
+        logger.warning(
+            f"Cross-encoder scoring failed: {e}, falling back to keyword overlap."
+        )
 
-    return [ScoredChunk(text=c, score=float(s)) for c, s in zip(chunks, scores)]
+    # Strategy 2: Fallback to keyword overlap
+    try:
+        logger.debug("Attempting keyword overlap scoring.")
+
+        def preprocess(text: str) -> set:
+            words = re.findall(r"\b\w+\b", text.lower())
+            return set(words)
+
+        question_words = preprocess(question)
+        scored_chunks = []
+        for chunk in chunks:
+            chunk_words = preprocess(chunk)
+            intersection = len(question_words.intersection(chunk_words))
+            union = len(question_words.union(chunk_words))
+            score = max(0.0, intersection / union if union > 0 else 0.0)
+            scored_chunks.append(ScoredChunk(text=chunk, score=score))
+        return scored_chunks
+    except Exception as e:
+        logger.error(f"Keyword overlap scoring failed: {e}. Returning neutral scores.")
+
+    # Final fallback: neutral scores
+    return [ScoredChunk(text=c, score=0.0) for c in chunks]
 
 
 # ---------- Reranking of retrieved chunks --------------------------------------------------
