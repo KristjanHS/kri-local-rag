@@ -1,6 +1,8 @@
-# This script is a simple tool to help you decide whether to ventilate your home based on the current indoor and outdoor conditions.
+# This script helps you decide whether to ventilate your home based on the
+# current indoor and outdoor conditions.
 # It calculates the dew point for both indoor and outdoor and displays them in a heatmap.
-# It also provides a suggestion for HRV homeowners, based on the difference between the indoor and outdoor dew points.
+# It also provides a suggestion for HRV homeowners, based on the difference
+# between the indoor and outdoor dew points.
 
 import numpy as np
 import plotly.graph_objects as go
@@ -113,8 +115,7 @@ if __name__ == "__main__":
             textposition="top right",  # Improved alignment
             textfont=dict(size=12, color="black"),
             hovertemplate=(
-                f"<b>Indoor</b><br>Temp: %{{x:.1f}}°C<br>RH: %{{y:.0f}}%<br>"
-                f"Dew Point: {indoor_dp:.2f}°C<extra></extra>"
+                f"<b>Indoor</b><br>Temp: %{{x:.1f}}°C<br>RH: %{{y:.0f}}%<br>Dew Point: {indoor_dp:.2f}°C<extra></extra>"
             ),
         )
     )

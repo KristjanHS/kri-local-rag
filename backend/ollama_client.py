@@ -53,9 +53,7 @@ def _check_model_exists(model_name: str, models: list) -> bool:
         model_name_from_list = model.get("name", "")
         # Check exact match or if our model is a prefix
         # (e.g., "cas/mistral-7b-instruct-v0.3" matches "cas/mistral-7b-instruct-v0.3:latest")
-        if model_name_from_list == model_name or model_name_from_list.startswith(
-            model_name + ":"
-        ):
+        if model_name_from_list == model_name or model_name_from_list.startswith(model_name + ":"):
             return True
     return False
 
@@ -131,9 +129,7 @@ def _verify_model_download(model_name: str, base_url: str) -> bool:
     if model_verified:
         logger.info("Model '%s' downloaded and verified successfully!", model_name)
     else:
-        logger.warning(
-            "Model '%s' download completed but verification failed.", model_name
-        )
+        logger.warning("Model '%s' download completed but verification failed.", model_name)
 
     return model_verified
 
@@ -284,9 +280,7 @@ def generate_response(
         logger.info("Making HTTP request to Ollama...")
         if on_debug:
             on_debug("Making HTTP request to Ollama...")
-        with httpx.stream(
-            "POST", url, json=payload, timeout=300
-        ) as resp:  # 5 minute timeout
+        with httpx.stream("POST", url, json=payload, timeout=300) as resp:  # 5 minute timeout
             logger.info("Response status: %d", resp.status_code)
             if on_debug:
                 on_debug(f"Response status: {resp.status_code}")
@@ -312,9 +306,7 @@ def generate_response(
 
                 # Ollama sends newline-separated JSON objects
                 line_str = line.strip()
-                logger.debug(
-                    "Processing line: %s", line_str[:100]
-                )  # Log first 100 chars
+                logger.debug("Processing line: %s", line_str[:100])  # Log first 100 chars
                 if line_str.startswith("data:"):
                     line_str = line_str[len("data:") :].strip()
 
@@ -327,9 +319,7 @@ def generate_response(
                 try:
                     data = json.loads(line_str)
                 except json.JSONDecodeError as e:
-                    logger.debug(
-                        "Failed to parse JSON: %s... Error: %s", line_str[:50], e
-                    )
+                    logger.debug("Failed to parse JSON: %s... Error: %s", line_str[:50], e)
                     if on_debug:
                         on_debug(f"Failed to parse JSON: {line_str[:50]}... Error: {e}")
                     continue
@@ -338,11 +328,7 @@ def generate_response(
                 token_str = (
                     data.get("response")
                     or data.get("token")
-                    or (
-                        data.get("choices", [{}])[0].get("text")
-                        if "choices" in data
-                        else ""
-                    )
+                    or (data.get("choices", [{}])[0].get("text") if "choices" in data else "")
                 )
 
                 if first_token and token_str:

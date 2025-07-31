@@ -1,0 +1,34 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+name: Python AI Application Standards
+description: Rules that ensure this repo follows modern Python & AI best practices.
+type: Always            # auto-attaches to every new chat
+path: "**"              # whole repository
+---
+
+# Coding Style
+1. Follow PEP 8 strictly; run `ruff --fix` before every commit.
+
+# Typing & Contracts
+2. CI runs `mypy --strict` with no errors.
+
+# Testing
+1. Write pytest unit tests for every module; target ≥90 % branch coverage.
+2. Use `pytest-asyncio` for async code and `hypothesis` for property tests.
+
+# Dependency Management
+1. Manage packages with Poetry (or Hatch); pin versions in `pyproject.toml`.
+2. Run `pip-audit` on CI to flag vulnerable deps.
+
+# Documentation
+1. Use Google-style docstrings; build docs with MkDocs-Material in the `docs/` folder.
+
+# Logging & Observability
+1. Replace `print` with `structlog` JSON logs.
+2. Expose OpenTelemetry traces; default sample rate 1 %.
+
+# AI Model Handling
+1. Store model weights with DVC; never commit binaries to Git.

@@ -49,15 +49,11 @@ def fetch_estonian_beach_temps():
             except Exception:
                 pass
             # Use "ametliknimi" or "Jaam" as name
-            station_data["name"] = station_data.get("ametliknimi") or station_data.get(
-                "Jaam"
-            )
+            station_data["name"] = station_data.get("ametliknimi") or station_data.get("Jaam")
             # Add float water temp if possible
             if station_data.get("wt1ha"):
                 try:
-                    station_data["temp"] = float(
-                        station_data["wt1ha"].replace(",", ".")
-                    )
+                    station_data["temp"] = float(station_data["wt1ha"].replace(",", "."))
                 except Exception:
                     pass
             stations.append(station_data)
@@ -89,9 +85,7 @@ def fetch_estonian_humidity_map(date_str, hour_str):
         response.raise_for_status()
         stations = []
         root = ET.fromstring(response.content)
-        for entry in root.findall(
-            ".//{http://ws.wso2.org/dataservice/observationAirHumidityMap}entry"
-        ):
+        for entry in root.findall(".//{http://ws.wso2.org/dataservice/observationAirHumidityMap}entry"):
             station = {}
             for child in entry:
                 tag = child.tag.split("}", 1)[-1]

@@ -1,0 +1,42 @@
+---
+alwaysApply: true
+---
+1. Code Structure
+Modules: Organize your code into modules such as data_processing, model_training, and api.
+Entry Point: Have a clear entry point like main.py to start your application.
+
+2. Python Coding Standards
+PEP 8: Follow PEP 8 guidelines for Python code style.
+Type Annotations: Use type annotations for better code clarity and maintainability.
+Docstrings: Include docstrings in your functions and classes to explain their purpose.
+
+3. LangChain Integration
+Environment Configuration: Use environment variables to manage API keys and other sensitive information.
+Error Handling: Implement robust error handling, especially around API calls to LangChain.
+Logging: Integrate logging to monitor the interaction between your app and LangChain.
+
+4. Testing
+Unit Tests: Write unit tests for your functions and components.
+Integration Tests: Ensure your app works as expected with LangChain through integration tests.
+
+5. Version Control
+Git: Use Git for version control. Regularly commit changes with concise but meaningful messages.
+Branches: Use feature branches for new features and bug fixes.
+
+6. Performance
+Efficiency: Optimize data processing and model handling for efficiency.
+Monitoring: Implement monitoring to track the performance and usage of your app.
+
+7. Deployment
+Docker: Consider using Docker for environment consistency across development and production.
+
+8. AI Model Handling
+Binaries: Never commit binaries to Git.
+Prompts: Keep prompts in `/prompts/*.yaml`, each with context and safety notes.
+
+9. Commits & CI
+Commits: Use Conventional Commits 
+CI: CI must pass lint and type check
+
+10. Ethics & Licensing
+Data licencing: Verify data licensing; document sources in `/data/README.md`.
