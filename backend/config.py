@@ -74,9 +74,7 @@ if os.getenv("DOCKER_ENV"):
     WEAVIATE_URL = "http://weaviate:8080"
 
 # Default context window (max tokens) for Ollama LLM requests
-OLLAMA_CONTEXT_TOKENS = int(
-    os.getenv("OLLAMA_CONTEXT_TOKENS", 8192)
-)  # e.g. 4096, 8192, etc.
+OLLAMA_CONTEXT_TOKENS = int(os.getenv("OLLAMA_CONTEXT_TOKENS", 8192))  # e.g. 4096, 8192, etc.
 
 
 # (base) PS C:\Users\PC> ollama show cas/mistral-7b-instruct-v0.3

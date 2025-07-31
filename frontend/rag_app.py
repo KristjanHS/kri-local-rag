@@ -43,9 +43,7 @@ gpustat -i 2
 
 # ---------------- Ingestion Sidebar ------------------
 with st.sidebar.expander("Ingest PDFs"):
-    uploaded_files = st.file_uploader(
-        "Select PDF files", accept_multiple_files=True, type=["pdf"]
-    )
+    uploaded_files = st.file_uploader("Select PDF files", accept_multiple_files=True, type=["pdf"])
     if st.button("Ingest", key="ingest_btn"):
         if not uploaded_files:
             st.warning("No files selected.")
@@ -87,9 +85,7 @@ if "init_done" not in st.session_state:
     st.session_state["init_done"] = True
 
 # Show init logs in sidebar
-st.sidebar.expander("Backend init logs", expanded=False).text(
-    st.session_state.get("init_logs", "No init logs.")
-)
+st.sidebar.expander("Backend init logs", expanded=False).text(st.session_state.get("init_logs", "No init logs."))
 
 if submitted and question.strip():
     st.session_state.stop_event.clear()

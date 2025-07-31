@@ -50,9 +50,7 @@ def test_debug_logging():
         logger.debug("Chunk %d:", i + 1)
         logger.debug("  Distance: 0.1234")
         logger.debug("  Score: 0.8765")
-        logger.debug(
-            "  Content: %s", content[:100] + "..." if len(content) > 100 else content
-        )
+        logger.debug("  Content: %s", content[:100] + "..." if len(content) > 100 else content)
         logger.debug("  Content length: %d characters", len(content))
         print()
 

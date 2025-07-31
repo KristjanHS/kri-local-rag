@@ -1,0 +1,16 @@
+[tool.ruff]
+line-length = 120
+exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
+
+[tool.ruff.lint]
+# E203: whitespace-before-punctuation
+# W503: line-break-before-binary-operator
+# E401: multiple-imports-on-one-line
+# E302: expected-2-blank-lines-found-1
+# E305: expected-2-blank-lines-after-function-or-class
+# E402: module-import-not-at-top-of-file
+ignore = ["E203", "E401", "E302", "E305", "E402"]
+select = ["E", "F", "W"]
+
+[tool.ruff.format]
+quote-style = "double"

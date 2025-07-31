@@ -77,9 +77,7 @@ def _score_chunks(question: str, chunks: List[str]) -> List[ScoredChunk]:
             logger.warning("Cross-encoder model not available, falling back.")
             raise RuntimeError("Encoder not available")
     except Exception as e:
-        logger.warning(
-            f"Cross-encoder scoring failed: {e}, falling back to keyword overlap."
-        )
+        logger.warning(f"Cross-encoder scoring failed: {e}, falling back to keyword overlap.")
 
     # Strategy 2: Fallback to keyword overlap
     try:
@@ -236,9 +234,7 @@ def ensure_weaviate_ready_and_populated():
         logger.info("2. Checking if collection '%s' exists...", COLLECTION_NAME)
         if not client.collections.exists(COLLECTION_NAME):
             # First-time setup: create the collection, ingest examples, then clean up.
-            logger.info(
-                "   → Collection does not exist. Running one-time initialization..."
-            )
+            logger.info("   → Collection does not exist. Running one-time initialization...")
             create_collection_if_not_exists(client)
 
             # Ingest example data to ensure all modules are warm, then remove it.
@@ -255,12 +251,8 @@ def ensure_weaviate_ready_and_populated():
                 has_objects = False
 
             if has_objects:
-                collection.data.delete_many(
-                    where=Filter.by_property("source_file").equal("test.pdf")
-                )
-                logger.info(
-                    "   ✓ Example data removed, leaving a clean collection for the user."
-                )
+                collection.data.delete_many(where=Filter.by_property("source_file").equal("test.pdf"))
+                logger.info("   ✓ Example data removed, leaving a clean collection for the user.")
 
             return
 
@@ -289,21 +281,13 @@ if __name__ == "__main__":
 
     # Ensure the required Ollama model is available locally before accepting questions
     if not ensure_model_available(OLLAMA_MODEL):
-        logger.error(
-            "Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL
-        )
+        logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
         sys.exit(1)
 
-    parser = argparse.ArgumentParser(
-        description="Interactive RAG console with optional metadata filtering."
-    )
+    parser = argparse.ArgumentParser(description="Interactive RAG console with optional metadata filtering.")
     parser.add_argument("--source", help="Filter chunks by source field (e.g. 'pdf')")
-    parser.add_argument(
-        "--language", help="Filter chunks by detected language code (e.g. 'en', 'et')"
-    )
-    parser.add_argument(
-        "--k", type=int, default=3, help="Number of top chunks to keep after re-ranking"
-    )
+    parser.add_argument("--language", help="Filter chunks by detected language code (e.g. 'en', 'et')")
+    parser.add_argument("--k", type=int, default=3, help="Number of top chunks to keep after re-ranking")
     args = parser.parse_args()
 
     # Build metadata filter dict (AND-combination of provided fields)
@@ -311,13 +295,9 @@ if __name__ == "__main__":
     if args.source or args.language:
         clauses = []
         if args.source:
-            clauses.append(
-                {"path": ["source"], "operator": "Equal", "valueText": args.source}
-            )
+            clauses.append({"path": ["source"], "operator": "Equal", "valueText": args.source})
         if args.language:
-            clauses.append(
-                {"path": ["language"], "operator": "Equal", "valueText": args.language}
-            )
+            clauses.append({"path": ["language"], "operator": "Equal", "valueText": args.language})
 
         if len(clauses) == 1:
             meta_filter = clauses[0]

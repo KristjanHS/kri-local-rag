@@ -16,6 +16,7 @@ After processing it prints e.g.
 ✓ 142 chunks (90 inserts, 52 updates)
 Elapsed: 4.3 s
 """
+
 from __future__ import annotations
 
 import argparse
@@ -57,18 +58,14 @@ try:
     from unstructured.partition.pdf import partition_pdf  # type: ignore
 except ImportError:
     # Provide detailed diagnostics so we know *why* the import failed.
-    logger.debug(
-        "Failed to import 'unstructured.partition.pdf'. Full traceback follows:"
-    )
+    logger.debug("Failed to import 'unstructured.partition.pdf'. Full traceback follows:")
     traceback.print_exc()
 
     # Check if the base package is present at all and print its version.
     try:
         import importlib.metadata as _metadata
 
-        logger.debug(
-            "Detected unstructured version: %s", _metadata.version("unstructured")
-        )
+        logger.debug("Detected unstructured version: %s", _metadata.version("unstructured"))
     except Exception:
         logger.warning("Package 'unstructured' is not installed in this environment.")
 
@@ -79,9 +76,7 @@ except ImportError:
 PdfReader = None
 
 
-splitter = RecursiveCharacterTextSplitter(
-    chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP
-)
+splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
 
 # ---------- helpers ----------------------------------------------------------------
 
@@ -94,9 +89,7 @@ def extract_text(path: str) -> str:
         els = partition_pdf(filename=path, languages=["eng"])
         return "\n".join([e.text for e in els if getattr(e, "text", None)])
     except Exception as err:
-        logger.error(
-            "Failed to parse %s with unstructured: %s", os.path.basename(path), err
-        )
+        logger.error("Failed to parse %s with unstructured: %s", os.path.basename(path), err)
         return ""
 
 
@@ -132,9 +125,7 @@ def create_collection_if_not_exists(client: weaviate.WeaviateClient):
             ],
             # No vectorizer_config means we provide vectors manually
         )
-        logger.info(
-            "→ Collection '%s' created for manual vectorization.", COLLECTION_NAME
-        )
+        logger.info("→ Collection '%s' created for manual vectorization.", COLLECTION_NAME)
 
 
 def get_collection(client: weaviate.WeaviateClient):
@@ -211,9 +202,7 @@ def ingest(directory: str):
     if os.getenv("SUPPRESS_TORCH_WARNINGS", "true").lower() != "false":
         import warnings
 
-        warnings.filterwarnings(
-            "ignore", category=FutureWarning, module="torch.nn.modules.module"
-        )
+        warnings.filterwarnings("ignore", category=FutureWarning, module="torch.nn.modules.module")
 
     # Alternative models that may have fewer warnings:
     # - "sentence-transformers/all-mpnet-base-v2" (768d, better quality)
@@ -255,12 +244,8 @@ def ingest(directory: str):
 
 # ---------- CLI ---------------------------------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Ingest PDFs into Weaviate and print statistics."
-    )
-    parser.add_argument(
-        "--data-dir", default="../data", help="Directory with PDF files."
-    )
+    parser = argparse.ArgumentParser(description="Ingest PDFs into Weaviate and print statistics.")
+    parser.add_argument("--data-dir", default="../data", help="Directory with PDF files.")
     args = parser.parse_args()
 
     ingest(args.data_dir)
