@@ -8,12 +8,40 @@ import weaviate
 from config import COLLECTION_NAME, DEFAULT_HYBRID_ALPHA, WEAVIATE_URL, get_logger
 from weaviate.exceptions import WeaviateQueryError
 
+# For manual vectorization
+try:
+    from sentence_transformers import SentenceTransformer  # type: ignore
+except ImportError:
+    SentenceTransformer = None  # type: ignore
+
+# Cache the embedding model instance after first load
+_embedding_model: "SentenceTransformer | None" = None
+
 # Set up logging for this module
 logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Retriever helpers
 # ---------------------------------------------------------------------------
+
+
+def _get_embedding_model(model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+    """Return a (cached) SentenceTransformer instance for manual vectorization.
+
+    Uses the same model as specified in ingest_pdf.py to ensure consistency.
+    """
+    global _embedding_model
+    if SentenceTransformer is None:
+        return None
+    if _embedding_model is None:
+        try:
+            # Use the same model as ingestion to ensure vector compatibility
+            _embedding_model = SentenceTransformer(model_name)
+            logger.debug("Loaded embedding model: %s", model_name)
+        except Exception as e:
+            logger.warning("Failed to load embedding model: %s", e)
+            _embedding_model = None
+    return _embedding_model
 
 
 def _apply_metadata_filter(query: Any, metadata_filter: Optional[Dict[str, Any]]):
@@ -60,11 +88,21 @@ def get_top_k(
         q = _apply_metadata_filter(q, metadata_filter)
 
         try:
-            # Preferred: hybrid lexical + semantic search in a single call.
-            res = q.hybrid(query=question, alpha=alpha, limit=k)
-            logger.info("hybrid search used (alpha=%s)", alpha)
+            # For manual vectorization, we need to provide the vector ourselves
+            embedding_model = _get_embedding_model()
+            if embedding_model is not None:
+                # Vectorize the query using the same model as ingestion
+                query_vector = embedding_model.encode(question)
+                # Hybrid search with manually provided vector
+                res = q.hybrid(vector=query_vector, query=question, alpha=alpha, limit=k)
+                logger.info("hybrid search used with manual vectorization (alpha=%s)", alpha)
+            else:
+                # Fallback: try hybrid search without manual vectorization (legacy behavior)
+                # This might fail if no vectorizer is configured
+                res = q.hybrid(query=question, alpha=alpha, limit=k)
+                logger.info("hybrid search used (alpha=%s)", alpha)
         except (TypeError, WeaviateQueryError) as e:
-            # Possible causes: old client without hybrid, empty collection error, etc.
+            # Possible causes: old client without hybrid, empty collection error, vectorizer missing, etc.
             logger.info("hybrid failed (%s); falling back to bm25", e)
             try:
                 res = q.bm25(query=question, limit=k)

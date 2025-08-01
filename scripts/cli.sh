@@ -31,17 +31,35 @@ log_message "INFO" "Waiting for APP container to be ready"
 echo "Waiting for APP container to be ready..."
 sleep 3
 
+# Check for debug flag
+DEBUG_MODE=false
+if [[ "$1" == "--debug" ]]; then
+    DEBUG_MODE=true
+    shift  # Remove --debug from arguments
+fi
+
 # If no arguments provided, start qa_loop.py by default
 if [ $# -eq 0 ]; then
     log_message "INFO" "Starting interactive CLI session in APP container"
-    echo "Starting interactive CLI session in APP container..."
-    echo "Available commands:"
-    echo "  python backend/qa_loop.py          # Interactive RAG CLI (default)"
-    echo "  python backend/ingest_pdf.py       # Ingest PDFs. By default, from docs/ directory."
-    echo "  python backend/delete_collection.py # Delete all data"
-    echo "  bash                               # Start bash shell"
+    
+    if [ "$DEBUG_MODE" = true ]; then
+        echo "DEBUG MODE ENABLED - You will see detailed streaming logs"
+        echo ""
+    fi
+    
+    echo "Launching Interactive RAG CLI..."
     echo ""
-    docker compose -f "$DOCKER_COMPOSE_FILE" exec "$APP_SERVICE" python backend/qa_loop.py 2>&1 | tee -a "$LOG_FILE"
+    echo "💡 Other available commands you can run with this script:"
+    echo "   ./scripts/cli.sh python backend/ingest_pdf.py       # Ingest PDFs"
+    echo "   ./scripts/cli.sh python backend/delete_collection.py # Delete all data"
+    echo "   ./scripts/cli.sh bash                               # Start bash shell"
+    echo ""
+    
+    if [ "$DEBUG_MODE" = true ]; then
+        docker compose -f "$DOCKER_COMPOSE_FILE" exec -e LOG_LEVEL=DEBUG "$APP_SERVICE" python backend/qa_loop.py 2>&1 | tee -a "$LOG_FILE"
+    else
+        docker compose -f "$DOCKER_COMPOSE_FILE" exec "$APP_SERVICE" python backend/qa_loop.py 2>&1 | tee -a "$LOG_FILE"
+    fi
 else
     # Run the provided command in the APP container
     log_message "INFO" "Running command in APP container: $*"

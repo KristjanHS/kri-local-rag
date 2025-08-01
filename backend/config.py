@@ -21,7 +21,7 @@ try:
         format=LOG_FORMAT,
         handlers=[
             logging.FileHandler(log_dir / "rag_system.log"),
-            logging.StreamHandler(sys.stdout),
+            logging.StreamHandler(sys.stderr),  # Use stderr for logs to keep stdout clean for streaming
         ],
     )
 except (PermissionError, OSError):
@@ -30,7 +30,7 @@ except (PermissionError, OSError):
         level=getattr(logging, LOG_LEVEL),
         format=LOG_FORMAT,
         handlers=[
-            logging.StreamHandler(sys.stdout),
+            logging.StreamHandler(sys.stderr),  # Use stderr for logs to keep stdout clean for streaming
         ],
     )
 
