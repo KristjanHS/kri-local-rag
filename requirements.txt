@@ -2,7 +2,7 @@ langchain
 protobuf==5.29.0        # fixes the protobuf-version warning
 weaviate-client>=4.0.0
 httpx
-sentence-transformers
+# sentence-transformers - installed separately in Dockerfile with CPU PyTorch
 langdetect
 unstructured[pdf]
 # for Windows (but doesn't hurt on Linux)

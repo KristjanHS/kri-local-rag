@@ -5,6 +5,7 @@
 from __future__ import annotations
 import sys
 import re
+import torch
 from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any
 
@@ -54,6 +55,18 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
     if _cross_encoder is None:
         try:
             _cross_encoder = CrossEncoder(model_name)
+
+            # Apply PyTorch CPU optimizations
+            # Set optimal threading for current environment
+            torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
+
+            # Apply torch.compile with max-autotune for 5-25% speed-ups on CPU GEMM-heavy models
+            try:
+                _cross_encoder = torch.compile(_cross_encoder, backend="inductor", mode="max-autotune")
+                logger.debug("Applied torch.compile optimization to cross-encoder model")
+            except Exception as compile_e:
+                logger.warning("Failed to apply torch.compile optimization to cross-encoder: %s", compile_e)
+
         except Exception:
             # Any issue loading the model (e.g. no internet) – skip re-ranking.
             _cross_encoder = None
