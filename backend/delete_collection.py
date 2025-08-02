@@ -2,7 +2,7 @@ import weaviate
 from urllib.parse import urlparse
 from weaviate.classes.config import Configure, Property, DataType
 
-from config import COLLECTION_NAME, WEAVIATE_URL
+from backend.config import COLLECTION_NAME, WEAVIATE_URL
 
 parsed_url = urlparse(WEAVIATE_URL)
 client = weaviate.connect_to_custom(

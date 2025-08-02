@@ -50,9 +50,9 @@ if [ $# -eq 0 ]; then
     echo ""
     
     if [ "$DEBUG_MODE" = true ]; then
-        docker compose -f "$DOCKER_COMPOSE_FILE" exec -e LOG_LEVEL=DEBUG "$APP_SERVICE" python backend/qa_loop.py 2>&1 | tee -a "$LOG_FILE"
+        docker compose -f "$DOCKER_COMPOSE_FILE" exec -e LOG_LEVEL=DEBUG "$APP_SERVICE" python -m backend.qa_loop 2>&1 | tee -a "$LOG_FILE"
     else
-        docker compose -f "$DOCKER_COMPOSE_FILE" exec "$APP_SERVICE" python backend/qa_loop.py 2>&1 | tee -a "$LOG_FILE"
+        docker compose -f "$DOCKER_COMPOSE_FILE" exec "$APP_SERVICE" python -m backend.qa_loop 2>&1 | tee -a "$LOG_FILE"
     fi
 else
     # Run the provided command in the APP container
