@@ -62,8 +62,9 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
 
             # Apply torch.compile with max-autotune for 5-25% speed-ups on CPU GEMM-heavy models
             try:
+                logger.info("torch.compile: optimizing cross-encoder – first run may take ~1 min…")
                 _cross_encoder = torch.compile(_cross_encoder, backend="inductor", mode="max-autotune")
-                logger.debug("Applied torch.compile optimization to cross-encoder model")
+                logger.info("torch.compile optimization completed for cross-encoder")
             except Exception as compile_e:
                 logger.warning("Failed to apply torch.compile optimization to cross-encoder: %s", compile_e)
 
