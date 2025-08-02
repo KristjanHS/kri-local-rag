@@ -115,6 +115,21 @@ python -c "from ollama_client import test_ollama_connection; test_ollama_connect
 python -c "import weaviate; client = weaviate.Client('http://localhost:8080'); print('Connected')"
 ```
 
+## Docker Workflow
+
+### Cleanly Rebuilding the `app` Container
+When you make changes to `docker/app.Dockerfile` or want to ensure a fresh build, use this two-step process:
+
+1.  **Build the image without using the cache:**
+    ```bash
+    docker compose -f docker/docker-compose.yml build --no-cache app
+    ```
+
+2.  **Restart the container to use the new image:**
+    ```bash
+    docker compose -f docker/docker-compose.yml up -d --force-recreate app
+    ```
+
 ## Performance
 
 ### Optimization Tips
