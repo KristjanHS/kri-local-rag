@@ -6,6 +6,12 @@ from unittest.mock import MagicMock, patch
 import sys
 import os
 
+# Add a print statement to indicate when this test file starts
+print("\n--- Running tests from: tests/test_hybrid_search_fix.py ---")
+
+# Disable torch.compile during these mocked tests to avoid unnecessary compile overhead
+os.environ["ENABLE_TORCH_COMPILE"] = "false"
+
 # Add backend to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
