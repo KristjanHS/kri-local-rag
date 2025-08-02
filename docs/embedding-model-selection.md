@@ -101,7 +101,7 @@ This is necessary for advanced RAG pipelines, custom research, or when you want 
 
 ### Hybrid Approach Example
 Your project uses both:
-- **Ingestion (`ingest_pdf.py`):** Uses Weaviate's vectorizer for simplicity and throughput.
+- **Ingestion (`ingest.py`):** Uses Weaviate's vectorizer for simplicity and throughput.
 - **Q&A (`qa_loop.py`):** Loads a cross-encoder in Python for advanced re-ranking, which Weaviate cannot do at ingestion time.
 
 **Rule of thumb:**

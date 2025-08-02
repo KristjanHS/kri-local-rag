@@ -44,7 +44,7 @@ if [ $# -eq 0 ]; then
     echo "Launching Interactive RAG CLI..."
     echo ""
     echo "💡 Other available commands you can run with this script:"
-    echo "   ./scripts/cli.sh python backend/ingest_pdf.py       # Ingest PDFs"
+    echo "   ./scripts/cli.sh python backend/ingest.py       # Ingest documents"
     echo "   ./scripts/cli.sh python backend/delete_collection.py # Delete all data"
     echo "   ./scripts/cli.sh bash                               # Start bash shell"
     echo ""

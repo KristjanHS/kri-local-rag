@@ -24,4 +24,4 @@ else
 fi
 
 log_message "INFO" "Starting PDF ingestion with data path: $DATA_PATH"
-docker compose -f "$DOCKER_COMPOSE_FILE" run --rm "$APP_SERVICE" python backend/ingest_pdf.py --data-dir "$DATA_PATH" 2>&1 | tee -a "$LOG_FILE" 
+docker compose -f "$DOCKER_COMPOSE_FILE" run --rm "$APP_SERVICE" python backend/ingest.py --data-dir "$DATA_PATH" 2>&1 | tee -a "$LOG_FILE" 

@@ -72,7 +72,7 @@ git push -u origin main
 - Streaming inference
 - Connection testing
 
-**`ingest_pdf.py`**
+**`ingest.py`**
 - PDF text extraction using `unstructured`
 - Text chunking and embedding generation
 - Weaviate collection management
