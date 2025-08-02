@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from typing import List
 
 import weaviate
+import torch
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from weaviate.exceptions import UnexpectedStatusCodeError
 from weaviate.classes.config import Property, DataType
@@ -209,6 +210,17 @@ def ingest(directory: str):
     # - "sentence-transformers/multi-qa-MiniLM-L6-cos-v1" (384d, similar to current)
     # - "sentence-transformers/paraphrase-MiniLM-L6-v2" (384d, alternative)
     model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+
+    # Apply PyTorch CPU optimizations
+    # Set optimal threading for current environment
+    torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
+
+    # Apply torch.compile with max-autotune for 5-25% speed-ups on CPU GEMM-heavy models
+    try:
+        model = torch.compile(model, backend="inductor", mode="max-autotune")
+        logger.info("Applied torch.compile optimization to embedding model for ingestion")
+    except Exception as compile_e:
+        logger.warning("Failed to apply torch.compile optimization: %s", compile_e)
 
     pdfs = list_pdfs(directory)
     if not pdfs:

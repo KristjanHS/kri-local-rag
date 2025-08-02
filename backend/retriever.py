@@ -4,6 +4,7 @@ from typing import List, Optional, Dict, Any
 from urllib.parse import urlparse
 
 import weaviate
+import torch
 
 from config import COLLECTION_NAME, DEFAULT_HYBRID_ALPHA, WEAVIATE_URL, get_logger
 from weaviate.exceptions import WeaviateQueryError
@@ -37,6 +38,18 @@ def _get_embedding_model(model_name: str = "sentence-transformers/all-MiniLM-L6-
         try:
             # Use the same model as ingestion to ensure vector compatibility
             _embedding_model = SentenceTransformer(model_name)
+
+            # Apply PyTorch CPU optimizations
+            # Set optimal threading for current environment
+            torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
+
+            # Apply torch.compile with max-autotune for 5-25% speed-ups on CPU GEMM-heavy models
+            try:
+                _embedding_model = torch.compile(_embedding_model, backend="inductor", mode="max-autotune")
+                logger.debug("Applied torch.compile optimization to embedding model")
+            except Exception as compile_e:
+                logger.warning("Failed to apply torch.compile optimization: %s", compile_e)
+
             logger.debug("Loaded embedding model: %s", model_name)
         except Exception as e:
             logger.warning("Failed to load embedding model: %s", e)
