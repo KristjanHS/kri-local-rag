@@ -45,14 +45,19 @@ def _get_embedding_model(model_name: str = "sentence-transformers/all-MiniLM-L6-
             torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
 
             # Apply torch.compile for production performance, but allow skipping for tests
-            if os.getenv("ENABLE_TORCH_COMPILE", "true").lower() == "true":
+            from unittest.mock import MagicMock  # type: ignore
+
+            if os.getenv("ENABLE_TORCH_COMPILE", "true").lower() == "true" and not isinstance(
+                _embedding_model, MagicMock
+            ):
                 try:
+                    logger.info("torch.compile: optimizing embedding model – first run may take up to a minute…")
                     _embedding_model = torch.compile(_embedding_model, backend="inductor", mode="max-autotune")
                     logger.debug("Applied torch.compile optimization to embedding model")
                 except Exception as compile_e:
                     logger.warning("Failed to apply torch.compile optimization: %s", compile_e)
             else:
-                logger.debug("Skipping torch.compile optimization for tests.")
+                logger.debug("Skipping torch.compile optimization (tests or MagicMock instance).")
 
             logger.debug("Loaded embedding model: %s", model_name)
         except Exception as e:

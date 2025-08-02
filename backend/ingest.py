@@ -168,8 +168,9 @@ def ingest(directory: str):
     model = SentenceTransformer(EMBEDDING_MODEL)
 
     try:
+        logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
         model = torch.compile(model, backend="inductor", mode="max-autotune")
-        logger.info("Applied torch.compile optimization to embedding model.")
+        logger.info("torch.compile optimization completed.")
     except Exception as e:
         logger.warning(f"Could not apply torch.compile: {e}")
 
