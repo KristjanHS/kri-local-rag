@@ -92,6 +92,18 @@ def connect_to_weaviate() -> weaviate.WeaviateClient:
     return client
 
 
+def _safe_created_at(source_path: str | None) -> str:
+    """Return ISO timestamp from file mtime if path exists, else current UTC time."""
+    try:
+        if source_path and os.path.exists(source_path):
+            ts = os.path.getmtime(source_path)
+        else:
+            raise FileNotFoundError
+    except Exception:
+        ts = time.time()
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+
 def deterministic_uuid(doc: Document) -> str:
     """Generate a deterministic UUID for a document chunk."""
     content_hash = hashlib.md5(doc.page_content.encode("utf-8")).hexdigest()
@@ -133,9 +145,8 @@ def process_and_upload_chunks(
                 "content": doc.page_content,
                 "source_file": os.path.basename(doc.metadata.get("source", "unknown")),
                 "source": os.path.splitext(doc.metadata.get("source", "unknown"))[1],
-                "created_at": datetime.fromtimestamp(
-                    os.path.getmtime(doc.metadata.get("source")), tz=timezone.utc
-                ).isoformat(),
+                # Derive created_at from source file if it exists; fall back to now.
+                "created_at": _safe_created_at(doc.metadata.get("source")),
             }
 
             # This logic remains manual as requested, but uses batching for efficiency
