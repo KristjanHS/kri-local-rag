@@ -176,17 +176,32 @@ def answer(
 
     # Collect tokens for CLI output
     collected_tokens = []
+    first_token_processed = False
 
     def cli_on_token(token):
-        collected_tokens.append(token)
-        # Print tokens immediately for better UX
-        sys.stdout.write(token)
-        sys.stdout.flush()
+        nonlocal first_token_processed
+
+        # Trim leading whitespace from the first token only
+        if not first_token_processed:
+            token = token.lstrip()
+            first_token_processed = True
+
+        # Only output if token has content (avoid empty first tokens)
+        if token:
+            collected_tokens.append(token)
+            # Print tokens immediately for better UX
+            sys.stdout.write(token)
+            sys.stdout.flush()
 
     if on_debug is None:
         on_debug = cli_on_debug
     if on_token is None:
         on_token = cli_on_token
+
+    # Show "Answer: " before streaming starts (for CLI mode)
+    if on_token is not None:
+        sys.stdout.write("Answer: ")
+        sys.stdout.flush()
 
     answer_text, updated_context = generate_response(
         prompt_text,
@@ -198,10 +213,16 @@ def answer(
         context_tokens=context_tokens,
     )
 
+    # Add newline after streaming completes to position cursor properly
+    if on_token is not None:
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+
     # Update context for next interaction
     _ollama_context = updated_context
 
-    return answer_text
+    # Ensure no leading whitespace in the final answer
+    return answer_text.lstrip()
 
 
 # ---------- CLI --------------------------------------------------
@@ -304,29 +325,32 @@ if __name__ == "__main__":
         else:
             meta_filter = {"operator": "And", "operands": clauses}
 
-    logger.info("RAG console – type a question, Ctrl-D/Ctrl-C to quit")
-
     # Run Ollama connection test before starting
     # Temporarily skip Ollama test as it's hanging
     # if not test_ollama_connection():
     #     logger.error("Failed to establish Ollama connection. Please check your setup.")
     #     sys.exit(1)
 
-    logger.info("Ready for questions!")
+    logger.info("💬 RAG console ready – Ask me anything about your documents (Ctrl-D/Ctrl-C to quit)")
+    sys.stdout.write("→ ")
+    sys.stdout.flush()
     try:
         for line in sys.stdin:
             q = line.strip()
             if not q:
+                # For empty input, just show the prompt again on a new line
+                sys.stdout.write("→ ")
+                sys.stdout.flush()
                 continue
 
-            sys.stdout.write("→ ")
-            sys.stdout.flush()
-
             result = answer(q, k=args.k, metadata_filter=meta_filter)
-            print(result)
+            # result is already streamed to stdout, no need to print again
 
-            print("\n" + "─" * 50)
+            print("─" * 50)
             print("💬 Ready for next question... (Ctrl-D/Ctrl-C to quit)")
-            print("─" * 50 + "\n")
+            print("─" * 50)
+            print()  # Extra newline for spacing
+            sys.stdout.write("→ ")
+            sys.stdout.flush()  # Ensure prompt is displayed immediately
     except (EOFError, KeyboardInterrupt):
         pass

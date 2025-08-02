@@ -242,13 +242,13 @@ def generate_response(
     if context is not None:
         payload["context"] = context
 
-    logger.info("Calling Ollama at: %s", url)
+    logger.debug("Calling Ollama at: %s", url)
     if on_debug:
         on_debug(f"Calling Ollama at: {url}")
-    logger.info("Model: %s", model_name)
+    logger.debug("Model: %s", model_name)
     if on_debug:
         on_debug(f"Model: {model_name}")
-    logger.info("Ollama context window: %d tokens", context_tokens)
+    logger.debug("Ollama context window: %d tokens", context_tokens)
     if on_debug:
         on_debug(f"Ollama context window: {context_tokens} tokens")
     logger.debug("Prompt length: %d characters", len(prompt))
@@ -272,16 +272,16 @@ def generate_response(
             f"NOTE: Prompt is estimated at {approx_tokens} tokens, "
             f"      which is close to the context window ({context_tokens})."
         )
-        logger.info(note_msg)
+        logger.debug(note_msg)
         if on_debug:
             on_debug(note_msg)
 
     try:
-        logger.info("Making HTTP request to Ollama...")
+        logger.debug("Making HTTP request to Ollama...")
         if on_debug:
             on_debug("Making HTTP request to Ollama...")
         with httpx.stream("POST", url, json=payload, timeout=300) as resp:  # 5 minute timeout
-            logger.info("Response status: %d", resp.status_code)
+            logger.debug("Response status: %d", resp.status_code)
             if on_debug:
                 on_debug(f"Response status: {resp.status_code}")
 
@@ -290,12 +290,12 @@ def generate_response(
             line_count = 0
             first_token = True
 
-            logger.info("Waiting for Ollama to start streaming response...")
+            logger.debug("Waiting for Ollama to start streaming response...")
             if on_debug:
                 on_debug("Waiting for Ollama to start streaming response...")
             for line in resp.iter_lines():
                 if stop_event is not None and stop_event.is_set():
-                    logger.info("Stop event set, aborting stream.")
+                    logger.debug("Stop event set, aborting stream.")
                     if on_debug:
                         on_debug("Stop event set, aborting stream.")
                     break
@@ -332,7 +332,7 @@ def generate_response(
                 )
 
                 if first_token and token_str:
-                    logger.info("Ollama started streaming tokens...")
+                    logger.debug("Ollama started streaming tokens...")
                     if on_debug:
                         on_debug("Ollama started streaming tokens...")
                     first_token = False
