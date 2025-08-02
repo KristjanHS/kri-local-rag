@@ -80,8 +80,9 @@ class TestHybridSearchFix:
 
         # Setup mocks
         mock_model = MagicMock()
-        mock_vector = [0.1, 0.2, 0.3]  # Mock embedding vector
-        mock_model.encode.return_value = mock_vector
+        mock_array = MagicMock()
+        mock_array.tolist.return_value = [0.1, 0.2, 0.3]
+        mock_model.encode.return_value = mock_array
         mock_get_model.return_value = mock_model
 
         # Mock Weaviate client and collection
@@ -115,7 +116,7 @@ class TestHybridSearchFix:
 
         # Verify hybrid search was called with vector
         mock_query.hybrid.assert_called_once_with(
-            vector=mock_vector,
+            vector=[0.1, 0.2, 0.3],  # The result of tolist()
             query=question,
             alpha=0.5,  # DEFAULT_HYBRID_ALPHA from config
             limit=5,
@@ -231,8 +232,9 @@ class TestHybridSearchFix:
 
         # Setup mocks
         mock_model = MagicMock()
-        mock_vector = [0.1, 0.2, 0.3]
-        mock_model.encode.return_value = mock_vector
+        mock_array = MagicMock()
+        mock_array.tolist.return_value = [0.1, 0.2, 0.3]
+        mock_model.encode.return_value = mock_array
         mock_get_model.return_value = mock_model
 
         # Mock Weaviate response with content
