@@ -143,3 +143,26 @@ When you make changes to `docker/app.Dockerfile` or want to ensure a fresh build
 - **RAM**: 8GB+ for smooth operation
 - **GPU**: Optional but recommended
 - **Storage**: 10GB+ for models and data
+
+---
+
+## Python Module and Import Strategy
+
+To ensure a scalable and maintainable codebase, this project adheres to the following Python import and module conventions:
+
+1.  **Packages over Directories**: Directories containing Python source code (like `backend/`) are treated as official packages. This is enforced by including an `__init__.py` file in them.
+
+2.  **Absolute Imports**: All internal imports must be **absolute** from the project root. This practice, recommended by [PEP 8](https://www.python.org/dev/peps/pep-0008/#imports), makes dependencies explicit and avoids ambiguity.
+    *   **Correct**: `from backend.config import get_logger`
+    *   **Incorrect**: `from config import get_logger`
+
+3.  **Module Execution**: Scripts within a package should be executed as modules using the `-m` flag. This ensures that Python's import system correctly resolves package-level imports.
+    *   **Correct**: `python -m backend.qa_loop`
+    *   **Incorrect**: `python backend/qa_loop.py`
+
+## Docker Dependency Management
+
+To ensure that the Docker containers are always running with the latest dependencies from `requirements.txt`, it's sometimes necessary to force a rebuild of the image, bypassing the cache.
+
+*   **Command**: `docker compose -f docker/docker-compose.yml build --no-cache app`
+*   **When to Use**: Use this command after adding or updating dependencies in `requirements.txt` to ensure they are installed in the Docker image.
