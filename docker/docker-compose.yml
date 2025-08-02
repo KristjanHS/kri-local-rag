@@ -47,11 +47,6 @@ services:
     build:
       context: ..  # project root
       dockerfile: docker/app.Dockerfile
-    depends_on:
-      weaviate:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
     ports:
       - "8501:8501"
     volumes:
@@ -80,10 +75,8 @@ services:
     profiles: ["ingest"]
     image: kri-local-rag-app   # reuse the APP image
     depends_on:
-      weaviate:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
+      - weaviate
+      - ollama
     volumes:
       - ../backend:/app/backend  # Live backend code
       - ../data:/app/data  # Live data access

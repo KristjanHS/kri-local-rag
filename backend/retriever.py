@@ -118,22 +118,23 @@ def get_top_k(
         if objects and hasattr(objects[0], "distance"):
             objects.sort(key=lambda o: getattr(o, "distance", 0.0))
 
-        # Extract content and add detailed debug logging
+        # Extract content and show chunk heads at INFO level
         chunks = []
         for i, obj in enumerate(objects):
             content = str(obj.properties.get("content", ""))
             chunks.append(content)
 
-            # Log detailed chunk information
+            # Show the head of each chunk at INFO level
+            head = content[:100].replace("\n", " ").replace("\r", " ").strip()
+            if len(content) > 100:
+                head += "..."
+            logger.info("Chunk %d: %s", i + 1, head)
+
+            # Keep detailed debug logging for when needed
             distance = getattr(obj, "distance", "N/A")
             score = getattr(obj, "score", "N/A")
-            logger.debug("Chunk %d:", i + 1)
             logger.debug("  Distance: %s", distance)
             logger.debug("  Score: %s", score)
-            logger.debug(
-                "  Content: %s",
-                content[:200] + "..." if len(content) > 200 else content,
-            )
             logger.debug("  Content length: %d characters", len(content))
 
         return chunks

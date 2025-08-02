@@ -325,16 +325,13 @@ if __name__ == "__main__":
         else:
             meta_filter = {"operator": "And", "operands": clauses}
 
-    logger.info("RAG console – type a question, Ctrl-D/Ctrl-C to quit")
-
     # Run Ollama connection test before starting
     # Temporarily skip Ollama test as it's hanging
     # if not test_ollama_connection():
     #     logger.error("Failed to establish Ollama connection. Please check your setup.")
     #     sys.exit(1)
 
-    logger.info("Ready for questions!")
-    print("💬 Ask me anything about your documents:")
+    logger.info("💬 RAG console ready – Ask me anything about your documents (Ctrl-D/Ctrl-C to quit)")
     sys.stdout.write("→ ")
     sys.stdout.flush()
     try:
