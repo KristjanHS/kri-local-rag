@@ -19,14 +19,10 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip
 
-# ---- wheel cache mount (optional) ----
-# Install latest CPU-only PyTorch with optimizations (includes oneDNN 3.x and Inductor improvements)
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# PyTorch (CPU-only) and sentence-transformers are now installed via requirements.txt (which points
+# pip to the CPU wheels using an --extra-index-url directive), so no separate install command is
+# necessary here.
 
-# Install sentence-transformers after PyTorch to ensure compatibility
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install sentence-transformers
 
 # ---- rest of your deps ----
 COPY requirements.txt .

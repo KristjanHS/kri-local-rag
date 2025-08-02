@@ -75,7 +75,7 @@ services:
       - ../data:/app/data  # Live data access
       - ../logs:/app/logs  # Live log access
       - hf_cache:/root/.cache/huggingface
-    command: ["python", "backend/ingest_pdf.py", "/app/data"]
+    command: ["python", "backend/ingest.py", "/app/data"]
 
 volumes:
   weaviate_db:

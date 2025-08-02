@@ -29,7 +29,7 @@ logger = get_logger(__name__)
 def _get_embedding_model(model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
     """Return a (cached) SentenceTransformer instance for manual vectorization.
 
-    Uses the same model as specified in ingest_pdf.py to ensure consistency.
+    Uses the same model as specified in ingest.py to ensure consistency.
     """
     global _embedding_model
     if SentenceTransformer is None:

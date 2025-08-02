@@ -1,28 +1,42 @@
-langchain
-protobuf==5.29.0        # fixes the protobuf-version warning
-weaviate-client>=4.0.0
-httpx
-# sentence-transformers - installed separately in Dockerfile with CPU PyTorch
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Core Machine Learning Frameworks (CPU-only)
+torch==2.7.1          # Installed from the CPU wheel index above
+torchvision==0.22.1   # Matches Torch 2.7.x series
+torchaudio==2.7.1     # Matches Torch 2.7.x series
+
+# Sentence Embeddings
+sentence-transformers==3.0.1
+
+# Core RAG and LangChain Framework
+langchain==0.3.27
+langchain-community==0.3.27
+
+# Vector Database Client
+weaviate-client==4.6.3
+
+# Data Processing and File Parsing
+unstructured[pdf]==0.14.8
 langdetect
-unstructured[pdf]
-# for Windows (but doesn't hurt on Linux)
-# https://github.com/Unstructured-IO/unstructured/issues/2237
-# python-magic-bin==0.4.14
 
-# --- Core ML / GPU stack (optional, install manually as noted above) ---
-# torch==2.5.1+cu121
-# this will not work as part of requirements.txt, since they are not available on PyPI
-# instead, use the Makefile to install the correct version of torch or install manually:
-# pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128
-# OR for older versions:
-# pip install torch==2.5.1+cu121 --index-url https://download.pytorch.org/whl/cu121
+# Image processing
+pillow>=11.1.0
 
-# Dev dependencies below
+# Web and Network
+httpx
+streamlit==1.47.0
+
+# Utilities
+protobuf==5.29.0        # Fixes the protobuf-version warning
+
+# --- Development Dependencies ---
 python-dotenv
-streamlit
 
 # Linting, formatting, testing
 black
 flake8
 pytest
 pre-commit
+
+# --- Notes ---
+# The extra-index-url ensures that CPU-only wheels are selected for torch/torchvision/torchaudio.

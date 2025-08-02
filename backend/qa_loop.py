@@ -243,7 +243,7 @@ import weaviate
 from weaviate.exceptions import WeaviateConnectionError
 from weaviate.classes.query import Filter
 from config import COLLECTION_NAME, WEAVIATE_URL
-from ingest_pdf import ingest, create_collection_if_not_exists
+from backend.ingest import ingest, create_collection_if_not_exists
 import argparse
 from urllib.parse import urlparse
 
