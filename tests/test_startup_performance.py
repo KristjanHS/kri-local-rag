@@ -266,8 +266,9 @@ class TestHybridSearchIntegration:
 
         # Setup embedding model mock
         mock_model = MagicMock()
-        mock_vector = [0.1, 0.2, 0.3]
-        mock_model.encode.return_value = mock_vector
+        mock_array = MagicMock()
+        mock_array.tolist.return_value = [0.1, 0.2, 0.3]
+        mock_model.encode.return_value = mock_array
         mock_get_model.return_value = mock_model
 
         # Setup Weaviate mock
@@ -295,7 +296,7 @@ class TestHybridSearchIntegration:
         # Verify the flow
         mock_get_model.assert_called_once()
         mock_model.encode.assert_called_once_with("test question")
-        mock_query.hybrid.assert_called_once_with(vector=mock_vector, query="test question", alpha=0.5, limit=5)
+        mock_query.hybrid.assert_called_once_with(vector=[0.1, 0.2, 0.3], query="test question", alpha=0.5, limit=5)
 
         assert result == ["Test content 1", "Test content 2"]
 
