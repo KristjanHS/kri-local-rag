@@ -20,16 +20,18 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip
 
 # ---- wheel cache mount (optional) ----
+# Install latest CPU-only PyTorch with optimizations (includes oneDNN 3.x and Inductor improvements)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Install sentence-transformers after PyTorch to ensure compatibility
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install sentence-transformers
 
 # ---- rest of your deps ----
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements.txt
-    # If you do not need GPU inside this container, ALSO remove the runtime line in docker-compose.yml!
-    # Enable GPU support via NVIDIA runtime (CUDA libraries are provided by the host runtime)
-    # Optional: install GPU-enabled PyTorch (comment out if you prefer CPU)
     
 # --- Copy Application Code ---
 # Copy the backend code so the app can import from it
@@ -40,6 +42,14 @@ COPY frontend/ /app/frontend/
 
 # Copy example data for initial Weaviate warm-up
 COPY example_data/ /example_data/
+
+# Set CPU optimization environment variables
+# OMP_NUM_THREADS: one OpenMP thread per core for running many small models
+ENV OMP_NUM_THREADS=6
+# MKL threading for Intel CPU optimizations
+ENV MKL_NUM_THREADS=6
+# Enable oneDNN optimizations
+ENV DNNL_PRIMITIVE_CACHE_CAPACITY=1024
 
 # Expose the default Streamlit port
 EXPOSE 8501
