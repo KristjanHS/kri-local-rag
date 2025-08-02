@@ -107,7 +107,7 @@ def docker_services(request, test_log_file):
                 from urllib.parse import urlparse
                 import weaviate
                 from config import COLLECTION_NAME, WEAVIATE_URL
-                from ingest_pdf import ingest
+                from ingest import ingest
 
                 parsed = urlparse(WEAVIATE_URL)
                 client = weaviate.connect_to_custom(

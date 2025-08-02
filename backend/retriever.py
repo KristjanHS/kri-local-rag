@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import List, Optional, Dict, Any
 from urllib.parse import urlparse
 
@@ -43,12 +44,15 @@ def _get_embedding_model(model_name: str = "sentence-transformers/all-MiniLM-L6-
             # Set optimal threading for current environment
             torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
 
-            # Apply torch.compile with max-autotune for 5-25% speed-ups on CPU GEMM-heavy models
-            try:
-                _embedding_model = torch.compile(_embedding_model, backend="inductor", mode="max-autotune")
-                logger.debug("Applied torch.compile optimization to embedding model")
-            except Exception as compile_e:
-                logger.warning("Failed to apply torch.compile optimization: %s", compile_e)
+            # Apply torch.compile for production performance, but allow skipping for tests
+            if os.getenv("ENABLE_TORCH_COMPILE", "true").lower() == "true":
+                try:
+                    _embedding_model = torch.compile(_embedding_model, backend="inductor", mode="max-autotune")
+                    logger.debug("Applied torch.compile optimization to embedding model")
+                except Exception as compile_e:
+                    logger.warning("Failed to apply torch.compile optimization: %s", compile_e)
+            else:
+                logger.debug("Skipping torch.compile optimization for tests.")
 
             logger.debug("Loaded embedding model: %s", model_name)
         except Exception as e:
@@ -105,7 +109,7 @@ def get_top_k(
             embedding_model = _get_embedding_model()
             if embedding_model is not None:
                 # Vectorize the query using the same model as ingestion
-                query_vector = embedding_model.encode(question)
+                query_vector = embedding_model.encode(question).tolist()
                 # Hybrid search with manually provided vector
                 res = q.hybrid(vector=query_vector, query=question, alpha=alpha, limit=k)
                 logger.info("hybrid search used with manual vectorization (alpha=%s)", alpha)
