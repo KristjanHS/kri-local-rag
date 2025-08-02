@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 import weaviate
 import torch
 
-from config import COLLECTION_NAME, DEFAULT_HYBRID_ALPHA, WEAVIATE_URL, get_logger
+from backend.config import COLLECTION_NAME, DEFAULT_HYBRID_ALPHA, WEAVIATE_URL, get_logger
 from weaviate.exceptions import WeaviateQueryError
 
 # For manual vectorization
