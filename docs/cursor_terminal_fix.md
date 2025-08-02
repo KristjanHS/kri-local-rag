@@ -29,21 +29,23 @@ class TestHybridSearchFix:
         # ...
 ```
 
-### Quick Tips for Debugging `pytest`
+## 2. Debugging a "Hanging" Terminal
 
--   **See `print()` output immediately**: Use `pytest -s` or `pytest --capture=no` to disable output capturing.
--   **Run only fast tests**: Use markers to skip slow or resource-intensive tests.
-    1.  **Define markers** in `pytest.ini`:
-        ```ini
-        [pytest]
-        markers =
-            slow: marks tests as slow
-            docker: tests requiring Docker
-        ```
-    2.  **Apply markers** in tests: `@pytest.mark.slow`
-    3.  **Exclude markers** when running: `pytest -m "not slow and not docker"`
+If a long-running command (like `pytest` or a script) seems to hang or freeze the terminal without any output, it might be due to output buffering. Python often waits to collect a "chunk" of output before displaying it. If the program errors out before a chunk is ready, you will never see the error message.
 
-## 2. Improving Terminal Experience with Shell Integration
+-   **Symptom**: A command runs for a long time with no output, appearing to be frozen.
+-   **Solution**: Force Python to run in "unbuffered" mode using the `-u` flag. This ensures that any `print` statements or errors are displayed in real-time.
+
+-   **Example**:
+    ```bash
+    # Standard (potentially buffered) command
+    python -m pytest
+
+    # Unbuffered command (recommended for debugging)
+    python -u -m pytest -sv
+    ```
+
+## 3. Improving Terminal Experience with Shell Integration
 
 To unlock powerful terminal features in Cursor, enable shell integration.
 
@@ -59,3 +61,10 @@ To unlock powerful terminal features in Cursor, enable shell integration.
     *   **Smarter Links**: Clickable relative file paths that just work.
     *   **Sticky Scroll**: Current command stays visible at the top as you scroll.
     *   **Better History & Autocomplete**: Improved command history and shell-aware Intellisense.
+
+## 4. Manually Update the Python Extension
+
+Cursor manages its VS Code extension updates, but sometimes they can lag behind the official marketplace. An outdated Microsoft Python (`ms-python.python`) extension is a known cause of strange behavior with `pytest`, including issues with test discovery, execution, and debugging.
+
+-   **Symptom**: Tests fail to run or discover, inconsistent test results, or unexpected debugger behavior.
+-   **Solution**: Go to the Extensions tab in Cursor, search for "Python", and manually check for updates for the `ms-python.python` extension. Keeping it on the latest version can resolve many underlying issues.

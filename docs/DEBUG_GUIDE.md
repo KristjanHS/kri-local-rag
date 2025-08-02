@@ -15,17 +15,17 @@ This warning appears when loading the sentence transformer model (`all-MiniLM-L6
 **Solutions:**
 
 1. **Suppressed by Default (Recommended):**
-   The warning is automatically suppressed in `backend/ingest_pdf.py`. This is the safest approach.
+   The warning is automatically suppressed in `backend/ingest.py`. This is the safest approach.
 
 2. **Show Warnings (Debug):**
    ```bash
    # To see the warnings for debugging
-   SUPPRESS_TORCH_WARNINGS=false python backend/ingest_pdf.py
+   SUPPRESS_TORCH_WARNINGS=false python backend/ingest.py
    ```
 
 3. **Use Alternative Model:**
    ```python
-   # In backend/ingest_pdf.py, change the model to:
+   # In backend/ingest.py, change the model to:
    model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")  # 768d, better quality
    # or
    model = SentenceTransformer("sentence-transformers/multi-qa-MiniLM-L6-cos-v1")  # 384d, similar

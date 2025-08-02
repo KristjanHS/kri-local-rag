@@ -11,7 +11,7 @@
 cp your-document.pdf data/
 
 # 2. Run ingestion
-docker compose run --rm rag-backend python ingest_pdf.py
+docker compose run --rm rag-backend python ingest.py
 
 # 3. Verify
 docker compose run --rm rag-backend python -c "
