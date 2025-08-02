@@ -10,9 +10,9 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict, Any
 
 # Local .py imports
-from config import OLLAMA_MODEL, get_logger
-from retriever import get_top_k
-from ollama_client import generate_response, ensure_model_available
+from backend.config import OLLAMA_MODEL, get_logger
+from backend.retriever import get_top_k
+from backend.ollama_client import generate_response, ensure_model_available
 
 # Set up logging for this module
 logger = get_logger(__name__)
@@ -243,7 +243,7 @@ def answer(
 import weaviate
 from weaviate.exceptions import WeaviateConnectionError
 from weaviate.classes.query import Filter
-from config import COLLECTION_NAME, WEAVIATE_URL
+from backend.config import COLLECTION_NAME, WEAVIATE_URL
 from backend.ingest import ingest, create_collection_if_not_exists
 import argparse
 from urllib.parse import urlparse

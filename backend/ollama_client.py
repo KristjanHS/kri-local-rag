@@ -6,8 +6,8 @@ import json
 import os
 from typing import Optional
 
-from config import OLLAMA_MODEL, OLLAMA_URL, OLLAMA_CONTEXT_TOKENS, get_logger
-from windows_ip_in_wsl import get_windows_host_ip
+from backend.config import OLLAMA_MODEL, OLLAMA_URL, OLLAMA_CONTEXT_TOKENS, get_logger
+from backend.windows_ip_in_wsl import get_windows_host_ip
 
 # Set up logging for this module
 logger = get_logger(__name__)

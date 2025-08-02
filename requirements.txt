@@ -13,7 +13,7 @@ langchain==0.3.27
 langchain-community==0.3.27
 
 # Vector Database Client
-weaviate-client==4.6.3
+weaviate-client==4.16.5
 
 # Data Processing and File Parsing
 unstructured[pdf]==0.14.8

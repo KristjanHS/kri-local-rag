@@ -32,7 +32,7 @@ from langchain_community.document_loaders import (
 )
 from sentence_transformers import SentenceTransformer
 
-from config import (
+from backend.config import (
     CHUNK_OVERLAP,
     CHUNK_SIZE,
     COLLECTION_NAME,
