@@ -47,9 +47,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
-      - name: Set Ollama CPU image for CI only
-        if: env.ACT != 'true'
-        run: echo "OLLAMA_IMAGE=ollama/ollama:latest-cpu" >> $GITHUB_ENV
       - name: Build and start container stack
         run: |
           docker compose -f docker/docker-compose.yml up -d --build
@@ -57,9 +54,9 @@ jobs:
         run: |
           timeout=120; until curl -s http://localhost:8080/v1/.well-known/ready >/dev/null 2>&1; do \
             echo "Waiting for Weaviate..."; sleep 5; timeout=$((timeout-5)); if [ $timeout -le 0 ]; then echo "Weaviate not ready"; docker compose -f docker/docker-compose.yml logs weaviate; exit 1; fi; done
-      - name: Run integration tests
+      - name: Run integration tests inside container
         run: |
-          pytest tests/test_cli_script_integration.py -q
+          docker compose -f docker/docker-compose.yml exec -T app pytest -sv tests/test_cli_script_integration.py
       - name: Tear down stack
         if: always()
         run: |
