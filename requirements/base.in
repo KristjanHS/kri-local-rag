@@ -1,0 +1,30 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Core Machine Learning Frameworks (CPU-only)
+torch==2.7.1
+torchvision==0.22.1
+torchaudio==2.7.1
+
+# Sentence Embeddings
+sentence-transformers==3.0.1
+
+# Core RAG and LangChain Framework
+langchain==0.3.27
+langchain-community==0.3.27
+
+# Vector Database Client
+weaviate-client==4.16.5
+
+# Data Processing and File Parsing
+unstructured[pdf]==0.14.8
+langdetect
+
+# Image processing
+pillow>=11.1.0
+
+# Web and Network
+httpx
+streamlit==1.47.0
+
+# Utilities
+protobuf==5.29.0

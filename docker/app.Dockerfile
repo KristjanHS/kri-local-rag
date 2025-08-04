@@ -29,6 +29,9 @@ COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements.txt
     
+COPY pyproject.toml .
+RUN pip install -e .
+
 # --- Copy Application Code ---
 # Copy the backend code so the app can import from it
 COPY backend/ /app/backend/

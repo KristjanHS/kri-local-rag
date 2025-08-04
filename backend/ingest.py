@@ -120,7 +120,7 @@ def create_collection_if_not_exists(client: weaviate.WeaviateClient):
             # Weaviate will not generate vectors for us.
             vectorizer_config=weaviate.classes.config.Configure.Vectorizer.none(),
             # The generative module is set to "none" as we are using a separate LLM.
-            generative_config=weaviate.classes.config.Configure.Generative.none(),
+            # generative_config=weaviate.classes.config.Configure.Generative.none(),
         )
         logger.info(f"→ Collection '{COLLECTION_NAME}' created for manual vectorization.")
     else:

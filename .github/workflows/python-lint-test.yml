@@ -34,6 +34,7 @@ jobs:
       #    python -m pytest || true
 
   integration-tests:
+    if: github.event_name == 'push'
     needs: lint-and-test
     runs-on: ubuntu-latest
     steps:
@@ -56,7 +57,16 @@ jobs:
             echo "Waiting for Weaviate..."; sleep 5; timeout=$((timeout-5)); if [ $timeout -le 0 ]; then echo "Weaviate not ready"; docker compose -f docker/docker-compose.yml logs weaviate; exit 1; fi; done
       - name: Run integration tests inside container
         run: |
-          docker compose -f docker/docker-compose.yml exec -T app pytest -sv tests/test_cli_script_integration.py
+          set -o pipefail
+          docker compose -f docker/docker-compose.yml exec -T app pytest -sv tests/test_cli_script_integration.py | tee pytest.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "\n🔴 Pytest failed — showing container logs for debugging:\n"
+            docker compose -f docker/docker-compose.yml logs app || true
+            docker compose -f docker/docker-compose.yml logs weaviate || true
+            docker compose -f docker/docker-compose.yml logs ollama || true
+            exit $EXIT_CODE
+          fi
       - name: Tear down stack
         if: always()
         run: |

@@ -52,8 +52,10 @@ services:
     volumes:
       - ../backend:/app/backend  # Live backend code
       - ../frontend:/app/frontend  # Live frontend code
+      - ../tests:/app/tests        # Live tests
       - ../data:/app/data  # Live data access
       - ../logs:/app/logs  # Live log access
+      - ../tests:/app/tests      # Mount tests for in-container testing
       - hf_cache:/root/.cache/huggingface
     working_dir: /app
     # Auto-start Streamlit when container starts
@@ -62,6 +64,7 @@ services:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
       - WEAVIATE_URL=http://weaviate:8080
+      - PYTHONPATH=/app
 
   # ---------- One-off Ingestion Utility -----------------------------------------
   ingester:
@@ -74,6 +77,7 @@ services:
       - ../backend:/app/backend  # Live backend code
       - ../data:/app/data  # Live data access
       - ../logs:/app/logs  # Live log access
+      - ../tests:/app/tests      # Mount tests for in-container testing
       - hf_cache:/root/.cache/huggingface
     command: ["python", "backend/ingest.py", "/app/data"]
 
