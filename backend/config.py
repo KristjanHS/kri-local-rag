@@ -2,55 +2,70 @@ from pathlib import Path
 from dotenv import load_dotenv
 import os
 import logging
+import logging.handlers
 import sys
 
 # Load environment variables from the project root .env (if present)
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-# Configure logging
+# --- Logging Configuration ---
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+_logging_configured = False
 
-# Create logs directory if it doesn't exist
-log_dir = Path(__file__).resolve().parent.parent / "logs"
-try:
+
+def _setup_logging():
+    """Configure the root logger. This should only be called once."""
+    global _logging_configured
+    if _logging_configured:
+        return
+
+    log_dir = Path(__file__).resolve().parent.parent / "logs"
     log_dir.mkdir(exist_ok=True)
-    # Configure root logger with file handler
-    logging.basicConfig(
-        level=getattr(logging, LOG_LEVEL),
-        format=LOG_FORMAT,
-        handlers=[
-            logging.FileHandler(log_dir / "rag_system.log"),
-            logging.StreamHandler(sys.stderr),  # Use stderr for logs to keep stdout clean for streaming
-        ],
+    log_file = log_dir / "rag_system.log"
+
+    # Use a rotating file handler to prevent log files from growing indefinitely
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file,
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5,  # 10 MB per file, 5 backups
     )
-except (PermissionError, OSError):
-    # Fallback to console-only logging if file logging fails
-    logging.basicConfig(
-        level=getattr(logging, LOG_LEVEL),
-        format=LOG_FORMAT,
-        handlers=[
-            logging.StreamHandler(sys.stderr),  # Use stderr for logs to keep stdout clean for streaming
-        ],
-    )
+    file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
 
-# Suppress detailed HTTP request logging from httpx while keeping important info
-logging.getLogger("httpx").setLevel(logging.WARNING)
+    # Use stderr for console logging
+    console_handler = logging.StreamHandler(sys.stderr)
+    console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
 
-# Also suppress other HTTP-related verbose logging
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-logging.getLogger("requests").setLevel(logging.WARNING)
+    # Configure the root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, LOG_LEVEL))
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
 
-# Suppress verbose logging from other libraries during ingestion
-logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
-logging.getLogger("transformers").setLevel(logging.WARNING)
-logging.getLogger("torch").setLevel(logging.WARNING)
+    # Suppress detailed HTTP request logging from httpx while keeping important info
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
+
+    # Suppress verbose logging from other libraries
+    logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+    logging.getLogger("transformers").setLevel(logging.WARNING)
+    logging.getLogger("torch").setLevel(logging.WARNING)
+
+    _logging_configured = True
 
 
-# Create module-specific loggers
 def get_logger(name: str) -> logging.Logger:
-    """Get a logger for the specified module name."""
+    """
+    Get a logger for the specified module name.
+    Initializes logging on first call.
+    """
+    if not _logging_configured:
+        _setup_logging()
     return logging.getLogger(name)
+
+
+# --- End Logging Configuration ---
 
 
 COLLECTION_NAME = "Document"
