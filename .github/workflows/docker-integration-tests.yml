@@ -15,11 +15,31 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build and run Docker services
-        run: docker compose -f docker/docker-compose.yml up -d
+        run: docker compose -f docker/docker-compose.ci.yml up -d --build
+
+      - name: Wait for Weaviate to be healthy
+        run: |
+          echo "Waiting for Weaviate to be ready..."
+          until [ "$(docker compose -f docker/docker-compose.ci.yml exec weaviate wget -q --spider -O - http://localhost:8080/v1/.well-known/ready)" == "" ]; do
+            sleep 1
+          done
+          echo "Weaviate is ready."
+
+      - name: Pull small model and wait for Ollama
+        run: |
+          echo "Pulling CI model and waiting for Ollama to be ready..."
+          docker compose -f docker/docker-compose.ci.yml exec ollama ollama pull llama3
+          until [ "$(docker compose -f docker/docker-compose.ci.yml exec ollama ollama list)" ]; do
+            sleep 1
+          done
+          echo "Ollama is ready."
+      
+      - name: Prepare Weaviate for tests
+        run: docker compose -f docker/docker-compose.ci.yml exec app python -c "from tests.conftest import setup_weaviate_for_tests; setup_weaviate_for_tests()"
 
       - name: Run test suite in app container
-        run: docker compose -f docker/docker-compose.yml exec app python -m pytest tests/
+        run: docker compose -f docker/docker-compose.ci.yml exec app python -m pytest -m docker tests/
 
       - name: Shutdown Docker services
         if: always()
-        run: docker compose -f docker/docker-compose.yml down
+        run: docker compose -f docker/docker-compose.ci.yml down

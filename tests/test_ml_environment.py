@@ -36,6 +36,7 @@ def test_pytorch_cpu_optimizations_are_available():
     ), "Test failed: The MKL backend is not available. This indicates the CPU-optimized wheel may not be in use."
 
 
+@pytest.mark.docker
 def test_sentence_transformer_model_loads_on_cpu():
     """
 
@@ -65,6 +66,7 @@ def test_sentence_transformer_model_loads_on_cpu():
         )
 
 
+@pytest.mark.docker
 @pytest.mark.skipif(CrossEncoder is None, reason="sentence_transformers library not installed.")
 def test_torch_compile_on_cross_encoder():
     """
