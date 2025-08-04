@@ -1,6 +1,13 @@
 import pytest
 import torch
 
+# Try to import CrossEncoder and skip the new test if it's not available.
+try:
+    from sentence_transformers import CrossEncoder
+except ImportError:
+    CrossEncoder = None
+
+
 # --- Constants for ML Environment Validation ---
 EXPECTED_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
@@ -24,11 +31,12 @@ def test_pytorch_cpu_optimizations_are_available():
     expected with the CPU-optimized PyTorch wheel for Intel processors.
     """
     # For modern PyTorch CPU wheels, the Math Kernel Library (MKL) is a key indicator.
-    assert torch.backends.mkl.is_available(), (
-        "Test failed: The MKL backend is not available. " "This indicates the CPU-optimized wheel may not be in use."
-    )
+    assert (
+        torch.backends.mkl.is_available()
+    ), "Test failed: The MKL backend is not available. This indicates the CPU-optimized wheel may not be in use."
 
 
+@pytest.mark.docker
 def test_sentence_transformer_model_loads_on_cpu():
     """
 
@@ -56,3 +64,46 @@ def test_sentence_transformer_model_loads_on_cpu():
             f"Failed to load or use SentenceTransformer model '{EXPECTED_MODEL_NAME}' on CPU. "
             f"This is a critical failure for the ML environment. Error: {e}"
         )
+
+
+@pytest.mark.docker
+@pytest.mark.skipif(CrossEncoder is None, reason="sentence_transformers library not installed.")
+def test_torch_compile_on_cross_encoder():
+    """
+    Verifies that torch.compile can successfully compile the production CrossEncoder model.
+    This is a critical integration test to catch environment-specific issues with
+    torch.compile, such as the ones that can occur inside a Docker container.
+    """
+    model_name = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    print(f"--- Loading CrossEncoder model for torch.compile test: {model_name} ---")
+
+    try:
+        # 1. Load the actual CrossEncoder model used in production
+        model = CrossEncoder(model_name)
+
+        # 2. Set thread count to match production environment
+        torch.set_num_threads(12)
+
+        # 3. Compile the model using production settings
+        print("--- Compiling model with backend='inductor' and mode='max-autotune'... ---")
+        compiled_model = torch.compile(model, backend="inductor", mode="max-autotune")
+        print("--- ✓ Model compiled successfully. ---")
+
+        # 4. Create some sample input data
+        sentence_pairs = [
+            ("What is the capital of France?", "Paris is the capital of France."),
+            ("What is the capital of France?", "London is a large city in the UK."),
+        ]
+
+        # 5. Run prediction with the compiled model
+        with torch.no_grad():
+            scores = compiled_model.predict(sentence_pairs)
+
+        # 6. Check that the output is as expected
+        assert len(scores) == 2
+        assert scores[0] > scores[1]  # The first pair should be more relevant.
+
+        print(f"--- ✓ Compiled model successfully produced scores: {scores} ---")
+
+    except Exception as e:
+        pytest.fail(f"torch.compile failed on the CrossEncoder model: {e}")
