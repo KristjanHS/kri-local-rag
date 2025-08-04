@@ -1,0 +1,8 @@
+# Runtime configuration for act-cli to speed up local CI runs
+# Use a lightweight image that already includes common tooling.
+-P ubuntu-latest=-self-hosted
+-P ubuntu-24.04=-self-hosted
+-P ubuntu-22.04=-self-hosted
+-P ubuntu-20.04=-self-hosted
+# Optionally pin the tag to avoid unexpected pulls (add :latest or specific sha)
+# Disable automatic image pulls to stay fully offline (act --pull=false)
