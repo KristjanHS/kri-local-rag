@@ -1,5 +1,8 @@
 name: Python Lint and Test
 
+env:
+  ACT: ""
+
 on:
   push:
     branches: [ main, dev ]
