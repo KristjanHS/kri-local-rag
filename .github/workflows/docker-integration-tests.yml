@@ -34,11 +34,9 @@ jobs:
           done
           echo "Ollama is ready."
       
-      - name: Prepare Weaviate for tests
-        run: docker compose -f docker/docker-compose.ci.yml exec app python -c "from backend.qa_loop import ensure_weaviate_ready_and_populated; ensure_weaviate_ready_and_populated()"
 
       - name: Run test suite in app container
-        run: docker compose -f docker/docker-compose.ci.yml exec app python -m pytest tests/
+        run: docker compose -f docker/docker-compose.ci.yml exec -e PYTHONPATH=/app app pytest -m docker
 
       - name: Shutdown Docker services
         if: always()
