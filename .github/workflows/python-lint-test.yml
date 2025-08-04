@@ -4,8 +4,6 @@ env:
   ACT: ""
 
 on:
-  push:
-    branches: [ main, dev ]
   pull_request:
     branches: [ main, dev ]
 
@@ -34,7 +32,6 @@ jobs:
       #    python -m pytest || true
 
   integration-tests:
-    if: github.event_name == 'push'
     needs: lint-and-test
     runs-on: ubuntu-latest
     steps:
