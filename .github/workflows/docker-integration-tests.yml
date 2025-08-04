@@ -1,0 +1,25 @@
+name: Docker Integration Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-in-docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build and run Docker services
+        run: docker compose -f docker/docker-compose.yml up -d
+
+      - name: Run test suite in app container
+        run: docker compose -f docker/docker-compose.yml exec app python -m pytest tests/
+
+      - name: Shutdown Docker services
+        if: always()
+        run: docker compose -f docker/docker-compose.yml down

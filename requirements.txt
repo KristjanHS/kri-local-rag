@@ -6,7 +6,7 @@ torchvision==0.22.1   # Matches Torch 2.7.x series
 torchaudio==2.7.1     # Matches Torch 2.7.x series
 
 # Sentence Embeddings
-sentence-transformers==3.0.1
+sentence-transformers==5.0.0
 
 # Core RAG and LangChain Framework
 langchain==0.3.27

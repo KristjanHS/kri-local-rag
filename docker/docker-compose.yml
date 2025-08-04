@@ -52,6 +52,7 @@ services:
     volumes:
       - ../backend:/app/backend  # Live backend code
       - ../frontend:/app/frontend  # Live frontend code
+      - ../tests:/app/tests      # Mount tests for in-container execution
       - ../data:/app/data  # Live data access
       - ../logs:/app/logs  # Live log access
       - hf_cache:/root/.cache/huggingface

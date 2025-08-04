@@ -60,7 +60,7 @@
 			"**/__pycache__": true,
 			"**/.pytest_cache": true,
 			"**/.venv": true // Hides the virtual environment folder
-		},
+		}
 	},
 
 	// "extensions" lets you recommend tools for anyone who clones your project.
@@ -70,7 +70,7 @@
 			"ms-python.vscode-pylance", // Language server
 			"ms-python.black-formatter",// The formatter you chose
 			"ms-vscode-remote.remote-wsl", // Essential for your WSL setup
-			"eamodio.gitlens",          // Powerful Git integration
+			"eamodio.gitlens"          // Powerful Git integration
 
 		]
 	}
