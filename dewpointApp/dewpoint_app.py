@@ -226,7 +226,7 @@ fig = go.Figure(
         z=dew_points,
         colorscale=blue_red_scale,
         colorbar=dict(title="Dew Point (°C)"),
-        hovertemplate=("Temperature: %{x:.1f}°C<br>" "Humidity: %{y:.0f}%<br>" "Dew Point: %{z:.2f}°C<extra></extra>"),
+        hovertemplate=("Temperature: %{x:.1f}°C<br>Humidity: %{y:.0f}%<br>Dew Point: %{z:.2f}°C<extra></extra>"),
         text=text_labels,
         texttemplate="%{text}",
         textfont={"size": 8, "color": "black"},
@@ -282,7 +282,7 @@ fig.add_trace(
         textposition="top center",
         textfont=dict(size=12, color="white", weight="bold"),
         hovertemplate=(
-            f"<b>Indoor</b><br>Temp: %{{x:.1f}}°C<br>RH: %{{y:.0f}}%<br>" f"Dew Point: {indoor_dp:.2f}°C<extra></extra>"
+            f"<b>Indoor</b><br>Temp: %{{x:.1f}}°C<br>RH: %{{y:.0f}}%<br>Dew Point: {indoor_dp:.2f}°C<extra></extra>"
         ),
     )
 )
@@ -297,8 +297,7 @@ fig.add_trace(
         textposition="top center",
         textfont=dict(size=12, color="white", weight="bold"),
         hovertemplate=(
-            f"<b>Outdoor</b><br>Temp: %{{x:.1f}}°C<br>RH: %{{y:.0f}}%<br>"
-            f"Dew Point: {outdoor_dp:.2f}°C<extra></extra>"
+            f"<b>Outdoor</b><br>Temp: %{{x:.1f}}°C<br>RH: %{{y:.0f}}%<br>Dew Point: {outdoor_dp:.2f}°C<extra></extra>"
         ),
     )
 )

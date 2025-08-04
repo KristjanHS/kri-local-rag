@@ -18,7 +18,7 @@ def get_weather(city, api_key):
         lat = data["coord"]["lat"]
         lon = data["coord"]["lon"]
         forecast_url = (
-            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}" f"&units=metric&appid={api_key}"
+            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=metric&appid={api_key}"
         )
         forecast_resp = requests.get(forecast_url)
         debug_info += (
@@ -66,8 +66,7 @@ def get_weather(city, api_key):
                 lat = data["coord"]["lat"]
                 lon = data["coord"]["lon"]
                 forecast_url = (
-                    f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}"
-                    f"&units=metric&appid={api_key}"
+                    f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=metric&appid={api_key}"
                 )
                 forecast_resp = requests.get(forecast_url)
                 debug_info += (
@@ -118,7 +117,7 @@ def fetch_weather_by_gps(lat, lon, api_key):
         temp = data["main"]["temp"]
         humidity = data["main"]["humidity"]
         forecast_url = (
-            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}" f"&units=metric&appid={api_key}"
+            f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=metric&appid={api_key}"
         )
         forecast_resp = requests.get(forecast_url)
         debug_info += (
