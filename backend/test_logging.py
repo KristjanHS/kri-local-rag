@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 """Comprehensive test script for logging functionality across the RAG system."""
 
-import os
-import sys
 import logging
+import os
 import tempfile
 
-# Add the backend directory to the path so we can import our modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
-
-from config import get_logger
+from backend.config import get_logger
 
 
 def test_basic_logging():

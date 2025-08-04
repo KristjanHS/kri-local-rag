@@ -3,16 +3,18 @@
 
 # External libraries
 from __future__ import annotations
-import sys
+
 import re
-import torch
+import sys
 from dataclasses import dataclass
-from typing import List, Tuple, Optional, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple
+
+import torch
 
 # Local .py imports
 from backend.config import OLLAMA_MODEL, get_logger
+from backend.ollama_client import ensure_model_available, generate_response
 from backend.retriever import get_top_k
-from backend.ollama_client import generate_response, ensure_model_available
 
 # Set up logging for this module
 logger = get_logger(__name__)
@@ -240,13 +242,15 @@ def answer(
 
 
 # ---------- CLI --------------------------------------------------
-import weaviate
-from weaviate.exceptions import WeaviateConnectionError
-from weaviate.classes.query import Filter
-from backend.config import COLLECTION_NAME, WEAVIATE_URL
-from backend.ingest import ingest, create_collection_if_not_exists
 import argparse
 from urllib.parse import urlparse
+
+import weaviate
+from weaviate.classes.query import Filter
+from weaviate.exceptions import WeaviateConnectionError
+
+from backend.config import COLLECTION_NAME, WEAVIATE_URL
+from backend.ingest import create_collection_if_not_exists, ingest
 
 
 def ensure_weaviate_ready_and_populated():
@@ -295,16 +299,13 @@ def ensure_weaviate_ready_and_populated():
         # and re-populating, which could be slow on large user databases.
         logger.info("   ✓ Collection '%s' exists.", COLLECTION_NAME)
 
-    except WeaviateConnectionError as e:
-        logger.error(
-            "Failed to connect to Weaviate: %s. "
-            "Please ensure Weaviate is running and accessible before starting the backend.",
-            e,
+    except WeaviateConnectionError:
+        raise WeaviateConnectionError(
+            "Failed to connect to Weaviate. "
+            "Please ensure Weaviate is running and accessible before starting the backend."
         )
-        exit(1)
     except Exception as e:
-        logger.error("An unexpected error occurred during Weaviate check: %s", e)
-        exit(1)
+        raise Exception(f"An unexpected error occurred during Weaviate check: {e}")
     finally:
         if "client" in locals() and client.is_connected():
             client.close()

@@ -1,7 +1,14 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [tool.ruff]
 line-length = 120
 exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
-
+[project]
+name = "kri-local-rag"
+version = "0.1.0"
+description = "A local RAG implementation with Weaviate and Ollama."
 [tool.ruff.lint]
 # E203: whitespace-before-punctuation
 # W503: line-break-before-binary-operator
@@ -14,3 +21,5 @@ select = ["E", "F", "W"]
 
 [tool.ruff.format]
 quote-style = "double"
+[tool.setuptools.packages.find]
+include = ["backend*"]
