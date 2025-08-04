@@ -1,6 +1,7 @@
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # --- Constants for Environment Validation ---
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -8,6 +9,7 @@ VENV_PYTHON_PATH = PROJECT_ROOT / ".venv" / "bin" / "python"
 BACKEND_CONFIG_PATH = PROJECT_ROOT / "backend" / "config.py"
 
 
+@pytest.mark.skipif(Path("/.dockerenv").exists(), reason="Test not applicable in Docker container")
 def test_python_executable_is_from_venv():
     """
     Verifies that the Python interpreter running the tests is the one
