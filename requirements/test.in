@@ -1,0 +1,10 @@
+-r base.in
+
+# --- Development Dependencies ---
+python-dotenv
+
+# Linting, formatting, testing
+ruff
+pytest
+pre-commit
+markdown

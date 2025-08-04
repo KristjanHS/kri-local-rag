@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """Test startup performance and initialization behaviors."""
 
-import pytest
-from unittest.mock import patch, MagicMock
-import sys
 import os
+import sys
 import time
+from unittest.mock import MagicMock, patch
 
-# Add backend to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
+import pytest
 
 
 class TestStartupPerformance:
@@ -17,7 +15,6 @@ class TestStartupPerformance:
     def test_backend_files_exist(self):
         """Test that core backend files exist without importing them."""
         print("\n=== TESTING FILE EXISTENCE ===", flush=True)
-        import os
 
         backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
 
@@ -34,7 +31,6 @@ class TestStartupPerformance:
     def test_import_structure_without_execution(self):
         """Test import structure by reading files as text without executing them."""
         print("\n=== TESTING IMPORT STRUCTURE ===", flush=True)
-        import os
 
         backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
 
@@ -62,7 +58,6 @@ class TestStartupPerformance:
 
     def test_python_syntax_is_valid(self):
         """Test that all Python files have valid syntax without importing."""
-        import os
         import ast
 
         backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
@@ -82,30 +77,21 @@ class TestStartupPerformance:
         """Test to detect if imports are waiting for interactive prompts."""
         print("\n=== TESTING FOR INTERACTIVE PROMPTS ===", flush=True)
         import subprocess
-        import os
 
-        # Try to import config.py in a subprocess to see what happens
-        backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
+        project_root = os.path.join(os.path.dirname(__file__), "..")
 
         print("Testing config.py import in subprocess...", flush=True)
         try:
             result = subprocess.run(
-                [
-                    "python",
-                    "-c",
-                    f"import sys; sys.path.insert(0, '{backend_dir}'); import config; print('CONFIG_IMPORT_SUCCESS')",
-                ],
+                ["python", "-m", "backend.config"],
                 capture_output=True,
                 text=True,
                 timeout=10,  # 10-second timeout
-                cwd=backend_dir,
+                cwd=project_root,
             )
 
             if result.returncode == 0:
-                if "CONFIG_IMPORT_SUCCESS" in result.stdout:
-                    print("✓ config.py imports without hanging", flush=True)
-                else:
-                    print(f"⚠ config.py import had unexpected output: {result.stdout}", flush=True)
+                print("✓ config.py imports without hanging", flush=True)
             else:
                 print(f"⚠ config.py import failed: {result.stderr}", flush=True)
 
@@ -119,19 +105,12 @@ class TestStartupPerformance:
     def test_safe_config_import_only(self):
         """Test importing only the config module safely."""
         print("\n=== TESTING SAFE CONFIG IMPORT ===", flush=True)
-        import sys
-        import os
-
-        # Add backend to path
-        backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
-        if backend_dir not in sys.path:
-            sys.path.insert(0, backend_dir)
 
         print("About to import config module...", flush=True)
         sys.stdout.flush()
 
         try:
-            import config
+            from backend import config
 
             print("✓ Config module imported successfully!", flush=True)
 
@@ -147,8 +126,8 @@ class TestStartupPerformance:
 
         print("=== SAFE CONFIG IMPORT COMPLETED ===", flush=True)
 
-    @patch("qa_loop.ensure_weaviate_ready_and_populated")
-    @patch("qa_loop.ensure_model_available")
+    @patch("backend.qa_loop.ensure_weaviate_ready_and_populated")
+    @patch("backend.qa_loop.ensure_model_available")
     def test_qa_loop_initialization_components(self, mock_ensure_model, mock_ensure_weaviate):
         """Test that QA loop initialization components work correctly."""
         # Mock successful initialization
@@ -163,8 +142,6 @@ class TestStartupPerformance:
 
     def test_heavy_imports_eventually_succeed(self):
         """Test that heavy ML library imports eventually succeed."""
-        import sys
-
         print("\n=== STARTING HEAVY IMPORT TEST ===", flush=True)
         start_time = time.time()
 
@@ -192,11 +169,11 @@ class TestStartupPerformance:
             # This should not hang because we're mocking the import
             try:
                 # Clear any cached module
-                if "qa_loop" in sys.modules:
-                    del sys.modules["qa_loop"]
+                if "backend.qa_loop" in sys.modules:
+                    del sys.modules["backend.qa_loop"]
 
                 # Now test the fallback
-                import qa_loop
+                from backend import qa_loop
 
                 result = qa_loop._get_cross_encoder()
                 assert result is None
@@ -210,7 +187,8 @@ class TestStartupPerformance:
         # the retriever module still loads and functions without errors.
         with patch.dict("sys.modules", {"sentence_transformers": None}):
             import importlib
-            import retriever
+
+            from backend import retriever
 
             importlib.reload(retriever)
 
@@ -221,7 +199,7 @@ class TestStartupPerformance:
 class TestInitializationLogging:
     """Test initialization logging and message deduplication."""
 
-    @patch("qa_loop.weaviate.connect_to_custom")
+    @patch("weaviate.connect_to_custom")
     def test_weaviate_check_logging(self, mock_connect):
         """Test that Weaviate check produces appropriate log messages."""
         # Mock successful connection
@@ -230,7 +208,7 @@ class TestInitializationLogging:
         mock_client.collections.exists.return_value = True
         mock_connect.return_value = mock_client
 
-        from qa_loop import ensure_weaviate_ready_and_populated
+        from backend.qa_loop import ensure_weaviate_ready_and_populated
 
         # Should complete without exceptions
         ensure_weaviate_ready_and_populated()
@@ -240,10 +218,10 @@ class TestInitializationLogging:
         mock_client.collections.exists.assert_called_once()
         mock_client.close.assert_called_once()
 
-    @patch("ollama_client.httpx.get")
+    @patch("backend.ollama_client.httpx.get")
     def test_ollama_model_check_logging(self, mock_get):
         """Test Ollama model availability check logging."""
-        from ollama_client import ensure_model_available
+        from backend.ollama_client import ensure_model_available
 
         # Mock successful model check
         mock_response = MagicMock()
@@ -258,11 +236,11 @@ class TestInitializationLogging:
 class TestHybridSearchIntegration:
     """Test hybrid search integration and error handling."""
 
-    @patch("retriever.weaviate.connect_to_custom")
-    @patch("retriever._get_embedding_model")
+    @patch("backend.retriever.weaviate.connect_to_custom")
+    @patch("backend.retriever._get_embedding_model")
     def test_hybrid_search_with_vectorization_integration(self, mock_get_model, mock_connect):
         """Integration test for hybrid search with manual vectorization."""
-        from retriever import get_top_k
+        from backend.retriever import get_top_k
 
         # Setup embedding model mock
         mock_model = MagicMock()
@@ -306,10 +284,7 @@ class TestContainerReadiness:
 
     def test_python_execution_in_container_context(self):
         """Test that Python can execute basic commands in the expected environment."""
-        # This test validates the container environment is working
-        import config
-        import ollama_client
-        import retriever
+        from backend import config, ollama_client, retriever
 
         # Should be able to import all core modules
         assert hasattr(config, "OLLAMA_MODEL")
@@ -318,7 +293,7 @@ class TestContainerReadiness:
 
     def test_weaviate_url_configuration(self):
         """Test that Weaviate URL is properly configured for container environment."""
-        from config import WEAVIATE_URL
+        from backend.config import WEAVIATE_URL
 
         # Should be configured for Docker networking
         assert WEAVIATE_URL is not None
@@ -326,7 +301,7 @@ class TestContainerReadiness:
 
     def test_collection_name_configuration(self):
         """Test that collection name is properly configured."""
-        from config import COLLECTION_NAME
+        from backend.config import COLLECTION_NAME
 
         assert COLLECTION_NAME is not None
         assert len(COLLECTION_NAME) > 0

@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 """Test script to demonstrate Weaviate chunk debug logging."""
 
-import os
-import sys
 import logging
+import os
 
 # Set debug logging level
 os.environ["LOG_LEVEL"] = "DEBUG"
 
-# Add the backend directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
-
-from config import get_logger
-from retriever import get_top_k
+from backend.config import get_logger
+from backend.retriever import get_top_k
 
 
 def test_weaviate_debug():

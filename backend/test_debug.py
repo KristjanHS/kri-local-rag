@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 """Test script to demonstrate debug logging for Weaviate chunks."""
 
-import os
-import sys
 import logging
 
-# Add the backend directory to the path so we can import our modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
-
-from config import get_logger
+from backend.config import get_logger
 
 
 def test_debug_logging():
