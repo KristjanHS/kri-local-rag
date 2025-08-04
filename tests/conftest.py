@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Pytest configuration and fixtures for the test suite."""
 
-import pytest
 import subprocess
 from pathlib import Path
+
+import pytest
 
 
 @pytest.fixture(scope="session")
@@ -27,6 +28,14 @@ def docker_services(request, test_log_file):
     3. Yield control to the tests.
     4. Shut down all services with `docker compose down -v` after the session.
     """
+    # If running inside a Docker container, assume services are already managed
+    if Path("/.dockerenv").exists():
+        print("\\n--- Running inside Docker, skipping Docker service management. ---")
+        # In a Docker environment, we just need to ensure Weaviate is ready.
+        # The services themselves are managed by the CI workflow's docker-compose.
+        yield
+        return
+
     project_root = Path(__file__).parent.parent
     compose_file = project_root / "docker" / "docker-compose.yml"
 
@@ -105,6 +114,7 @@ def docker_services(request, test_log_file):
 
                 # After the standard readiness check, ensure the collection is *not* empty for tests.
                 from urllib.parse import urlparse
+
                 import weaviate
                 from config import COLLECTION_NAME, WEAVIATE_URL
                 from ingest import ingest

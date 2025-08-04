@@ -5,10 +5,17 @@ import pytest
 
 # Mark the entire module as requiring Docker
 pytestmark = pytest.mark.docker
-import subprocess
 import os
+import subprocess
+from pathlib import Path
+
+import pytest
 
 
+@pytest.mark.skipif(
+    Path("/.dockerenv").exists(),
+    reason="CLI script integration tests are not applicable in a Docker environment.",
+)
 class TestCLIScriptIntegration:
     """Test CLI script functionality and container management."""
 
@@ -90,6 +97,10 @@ class TestCLIScriptIntegration:
             pytest.skip("Docker compose not available")
 
 
+@pytest.mark.skipif(
+    Path("/.dockerenv").exists(),
+    reason="CLI script configuration tests are not applicable in a Docker environment.",
+)
 class TestCLIScriptConfiguration:
     """Test CLI script configuration and environment."""
 

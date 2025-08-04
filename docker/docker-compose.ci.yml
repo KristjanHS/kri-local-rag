@@ -2,7 +2,7 @@ name: kri-local-rag-ci
 
 services:
   weaviate:
-    image: cr.weaviate.io/semitechnologies/weaviate:1.25.1
+    image: cr.weaviate.io/semitechnologies/weaviate:1.25.4
     ports:
       - "8080:8080"
       - "50051:50051"
@@ -20,7 +20,7 @@ services:
       start_period: 10s
 
   ollama:
-    image: alpine/ollama  # Lightweight CPU-only image
+    image: ollama/ollama
     ports:
       - "11434:11434"
     healthcheck:
@@ -46,4 +46,4 @@ services:
     environment:
       - OLLAMA_URL=http://ollama:11434
       - WEAVIATE_URL=http://weaviate:8080
-      - OLLAMA_MODEL=llama3:latest # Use a small, default model for CI
+      - OLLAMA_MODEL=cas/mistral-7b-instruct-v0.3
