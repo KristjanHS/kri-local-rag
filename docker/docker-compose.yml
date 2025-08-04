@@ -23,7 +23,7 @@ services:
 
   # ---------- Local LLM server for generating RAG answers ---------------------------------------------------
   ollama:
-    image: ${OLLAMA_IMAGE:-ollama/ollama:latest-gpu}
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
     deploy:
       resources:
         reservations:
