@@ -25,20 +25,20 @@ jobs:
           done
           echo "Weaviate is ready."
 
-      - name: Pull small model and wait for Ollama
+      - name: Pull production model and wait for Ollama
         run: |
           echo "Pulling CI model and waiting for Ollama to be ready..."
-          docker compose -f docker/docker-compose.ci.yml exec ollama ollama pull llama3
+          docker compose -f docker/docker-compose.ci.yml exec ollama ollama pull cas/mistral-7b-instruct-v0.3
           until [ "$(docker compose -f docker/docker-compose.ci.yml exec ollama ollama list)" ]; do
             sleep 1
           done
           echo "Ollama is ready."
       
       - name: Prepare Weaviate for tests
-        run: docker compose -f docker/docker-compose.ci.yml exec app python -c "from tests.conftest import setup_weaviate_for_tests; setup_weaviate_for_tests()"
+        run: docker compose -f docker/docker-compose.ci.yml exec app python -c "from backend.qa_loop import ensure_weaviate_ready_and_populated; ensure_weaviate_ready_and_populated()"
 
       - name: Run test suite in app container
-        run: docker compose -f docker/docker-compose.ci.yml exec app python -m pytest -m docker tests/
+        run: docker compose -f docker/docker-compose.ci.yml exec app python -m pytest tests/
 
       - name: Shutdown Docker services
         if: always()
