@@ -1,5 +1,4 @@
 -e .
---extra-index-url https://download.pytorch.org/whl/cu121
 -r requirements.txt
 pytest
 pytest-cov
@@ -8,3 +7,4 @@ ipython
 ruff
 pudb
 pre-commit
+

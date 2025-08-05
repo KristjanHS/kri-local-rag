@@ -8,28 +8,24 @@ alwaysApply: false
 
 ## Environment Context
 - **Project Root**: The absolute path to the project root is `/home/kristjans/projects/kri-local-rag`.
-- **Terminal Environment**: The Cursor terminal is isolated. It does not reliably inherit shell configurations or `PYTHONPATH`. Do not assume the environment is pre-configured.
+- **Terminal Environment**: The Cursor terminal is mostly isolated, but it correctly activates the project's virtual environment.
 
-## Critical Rules for All Commands
-1.  **Always run commands from the project root.** Before executing any command, ensure the working directory is `/home/kristjans/projects/kri-local-rag`.
+## Best Practices for Terminal Commands
+1.  **Run commands from the project root.** The shell usually starts here, but it's good practice to confirm with `pwd` if you have any doubts.
     <example>
-    cd /home/kristjans/projects/kri-local-rag && some_command
+    pwd && some_command
     </example>
 
-## Critical Rules for Python Commands
-1.  **Use the explicit venv Python interpreter.** Do not use `python` or `python3`. Always use the full path.
-    - **Path**: `/home/kristjans/projects/kri-local-rag/.venv/bin/python`
-
-2.  **Running Python Scripts**: Combine the project root and the explicit interpreter path.
+2.  **Use the `python` alias.** The shell is configured to use the correct Python interpreter from the project's virtual environment.
     <example>
-    cd /home/kristjans/projects/kri-local-rag && /home/kristjans/projects/kri-local-rag/.venv/bin/python backend/some_script.py
+    python --version
     </example>
 
-3.  **Running Pytest**: To ensure imports work correctly, you must set the `PYTHONPATH` environment variable to the project root.
+3.  **Running Pytest**: To ensure `pytest` can find your project's modules, run it as a module and set the `PYTHONPATH`. This is the most reliable way to avoid `ImportError` issues.
     <example>
-    cd /home/kristjans/projects/kri-local-rag && PYTHONPATH=. /home/kristjans/projects/kri-local-rag/.venv/bin/python -m pytest tests/
+    PYTHONPATH=. python -m pytest tests/
     </example>
     <example type="invalid">
-    # This will fail due to import errors.
+    # This may fail if pytest is not in the system PATH or has interpreter issues.
     pytest tests/
     </example>

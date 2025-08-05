@@ -1,14 +1,22 @@
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
-
-[tool.ruff]
-line-length = 120
-exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
 [project]
 name = "kri-local-rag"
 version = "0.1.0"
 description = "A local RAG implementation with Weaviate and Ollama."
+authors = [{ name="Kristjan Sillmann"}]
+readme = "README.md"
+requires-python = ">=3.12"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["backend*"]
+
+[tool.ruff]
+line-length = 120
+exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
+
 [tool.ruff.lint]
 # E203: whitespace-before-punctuation
 # W503: line-break-before-binary-operator
@@ -21,9 +29,6 @@ select = ["E", "F", "W"]
 
 [tool.ruff.format]
 quote-style = "double"
-
-[tool.setuptools.packages.find]
-include = ["backend*"]
 
 [tool.pytest.ini_options]
 addopts = "-ra -q --cov=backend --cov-report=term-missing"
@@ -43,3 +48,43 @@ compose_files = ["docker/docker-compose.yml"]
 [tool.pytest.docker.services_wait_for]
 weaviate = "http://localhost:8080/v1/.well-known/ready"
 ollama = "http://localhost:11434"
+
+[tool.pyright]
+include = ["backend", "tests"]
+exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
+venvPath = "."
+venv = ".venv"
+
+[tool.deptry]
+# --- Where to read declared dependencies ------------------------------
+requirements_files       = ["requirements.txt"]
+requirements_files_dev   = ["requirements-dev.txt"]   # only dev tools here
+
+# --- What to scan / skip ----------------------------------------------
+# keep default excludes (.venv, .git, tests, etc.) and add a few more
+extend_exclude           = ["docs", "dist", "build"]
+ignore_notebooks         = true                       # faster on mixed repos
+
+# --- Tell Deptry these folders are *first-party* code ------------------
+known_first_party        = ["backend", "frontend", "scripts"]
+
+# --- Handle edge-cases -------------------------------------------------
+experimental_namespace_package = true                 # recognise PEP-420 pkgs
+# Map weird wheels → import names (example)
+
+# avoids false DEP003 in src-layout
+json_output  = "deptry_report.json"      # for CI artifacts
+
+[tool.deptry.package_module_name_map]
+python-dotenv = ["dotenv"]
+weaviate-client = ["weaviate"]  # if you ever install it optional-only
+langchain-community = ["langchain_community"]
+
+[project.optional-dependencies]
+test = ["pytest", "ruff"]
+docs = ["mkdocs"]
+
+pep621_dev_dependency_groups = ["tests", "docs"]
+
+[tool.deptry.per_rule_ignores]
+DEP002 = ["boto3"]       # AWS libs pulled in indirectly

@@ -1,9 +1,12 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 
+python-dotenv
+
 # Core Machine Learning Frameworks (CPU-only)
 torch==2.7.1
-torchvision==0.22.1
-torchaudio==2.7.1
+# torchvision==0.22.1
+# torchaudio==2.7.1
+
 
 # Sentence Embeddings
 sentence-transformers==3.0.1
@@ -13,7 +16,7 @@ langchain==0.3.27
 langchain-community==0.3.27
 
 # Vector Database Client
-weaviate-client==4.16.5
+weaviate-client
 
 # Data Processing and File Parsing
 unstructured[pdf]==0.14.8
@@ -28,3 +31,7 @@ streamlit==1.47.0
 
 # Utilities
 protobuf==4.25.3
+
+# for Windows (but doesn't hurt on Linux)
+# https://github.com/Unstructured-IO/unstructured/issues/2237
+# python-magic-bin==0.4.14
