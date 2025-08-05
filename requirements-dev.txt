@@ -1,10 +1,4 @@
--e .
--r requirements.txt
+# Testing frameworks
 pytest
 pytest-cov
-pytest-docker
-ipython
-ruff
-pudb
-pre-commit
-
+pytest-mock
