@@ -2,6 +2,10 @@
 
 python-dotenv
 
+# Linting and formatting
+ruff==0.4.9
+
+
 # Core Machine Learning Frameworks (CPU-only)
 torch==2.7.1
 # torchvision==0.22.1
