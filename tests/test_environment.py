@@ -1,6 +1,13 @@
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
+
+# --- Debugging statements to inspect the test environment ---
+print(f"DEBUG: sys.executable: {sys.executable}")
+print(f"DEBUG: sys.path: {sys.path}")
+# --- End of debugging statements ---
+
 
 # --- Constants for Environment Validation ---
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -13,12 +20,21 @@ def test_python_executable_is_from_venv():
     Verifies that the Python interpreter running the tests is the one
     from the project's virtual environment.
     """
-    current_python_executable = sys.executable
-    assert str(VENV_PYTHON_PATH) == current_python_executable, (
-        f"TEST FAILED: Pytest is running with the wrong Python interpreter.\n"
-        f"Expected: {VENV_PYTHON_PATH}\n"
-        f"Actual:   {current_python_executable}\n"
+    # This test is flexible enough to handle both `python` and `python3` executables.
+    current_python_executable = Path(sys.executable).resolve()
+    venv_bin_path = PROJECT_ROOT / ".venv" / "bin"
+
+    assert current_python_executable.parent == venv_bin_path, (
+        f"TEST FAILED: Pytest is running with a Python interpreter outside the virtual environment.\n"
+        f"Expected interpreter from: {venv_bin_path}\n"
+        f"Actual interpreter:      {current_python_executable}\n"
         "Ensure you are using the command from the 'terminal_and_python.mdc' rule."
+    )
+
+    assert current_python_executable.name in ("python", "python3"), (
+        f"TEST FAILED: The Python executable has an unexpected name.\n"
+        f"Expected name: 'python' or 'python3'\n"
+        f"Actual name:   '{current_python_executable.name}'"
     )
 
 

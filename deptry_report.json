@@ -1,0 +1,518 @@
+[
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'dotenv' imported but it is a transitive dependency"
+        },
+        "module": "dotenv",
+        "location": {
+            "file": "backend/config.py",
+            "line": 2,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'weaviate' imported but it is a transitive dependency"
+        },
+        "module": "weaviate",
+        "location": {
+            "file": "backend/delete_collection.py",
+            "line": 1,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'weaviate' imported but it is a transitive dependency"
+        },
+        "module": "weaviate",
+        "location": {
+            "file": "backend/delete_collection.py",
+            "line": 3,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'torch' imported but it is a transitive dependency"
+        },
+        "module": "torch",
+        "location": {
+            "file": "backend/ingest.py",
+            "line": 24,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'weaviate' imported but it is a transitive dependency"
+        },
+        "module": "weaviate",
+        "location": {
+            "file": "backend/ingest.py",
+            "line": 25,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'langchain' imported but it is a transitive dependency"
+        },
+        "module": "langchain",
+        "location": {
+            "file": "backend/ingest.py",
+            "line": 26,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'langchain' imported but it is a transitive dependency"
+        },
+        "module": "langchain",
+        "location": {
+            "file": "backend/ingest.py",
+            "line": 27,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'langchain_community' imported but it is a transitive dependency"
+        },
+        "module": "langchain_community",
+        "location": {
+            "file": "backend/ingest.py",
+            "line": 28,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'sentence_transformers' imported but it is a transitive dependency"
+        },
+        "module": "sentence_transformers",
+        "location": {
+            "file": "backend/ingest.py",
+            "line": 33,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'httpx' imported but it is a transitive dependency"
+        },
+        "module": "httpx",
+        "location": {
+            "file": "backend/ollama_client.py",
+            "line": 4,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'torch' imported but it is a transitive dependency"
+        },
+        "module": "torch",
+        "location": {
+            "file": "backend/qa_loop.py",
+            "line": 12,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'sentence_transformers' imported but it is a transitive dependency"
+        },
+        "module": "sentence_transformers",
+        "location": {
+            "file": "backend/qa_loop.py",
+            "line": 34,
+            "column": 5
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'weaviate' imported but it is a transitive dependency"
+        },
+        "module": "weaviate",
+        "location": {
+            "file": "backend/qa_loop.py",
+            "line": 248,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'weaviate' imported but it is a transitive dependency"
+        },
+        "module": "weaviate",
+        "location": {
+            "file": "backend/qa_loop.py",
+            "line": 249,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'weaviate' imported but it is a transitive dependency"
+        },
+        "module": "weaviate",
+        "location": {
+            "file": "backend/qa_loop.py",
+            "line": 250,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'weaviate' imported but it is a transitive dependency"
+        },
+        "module": "weaviate",
+        "location": {
+            "file": "backend/retriever.py",
+            "line": 7,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'torch' imported but it is a transitive dependency"
+        },
+        "module": "torch",
+        "location": {
+            "file": "backend/retriever.py",
+            "line": 8,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'weaviate' imported but it is a transitive dependency"
+        },
+        "module": "weaviate",
+        "location": {
+            "file": "backend/retriever.py",
+            "line": 11,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'sentence_transformers' imported but it is a transitive dependency"
+        },
+        "module": "sentence_transformers",
+        "location": {
+            "file": "backend/retriever.py",
+            "line": 15,
+            "column": 5
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'qa_loop' imported but missing from the dependency definitions"
+        },
+        "module": "qa_loop",
+        "location": {
+            "file": "cli.py",
+            "line": 15,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'requests' imported but it is a transitive dependency"
+        },
+        "module": "requests",
+        "location": {
+            "file": "dewpointApp/beach_weather.py",
+            "line": 1,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'numpy' imported but it is a transitive dependency"
+        },
+        "module": "numpy",
+        "location": {
+            "file": "dewpointApp/dewpoint_CLI.py",
+            "line": 7,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'plotly' imported but missing from the dependency definitions"
+        },
+        "module": "plotly",
+        "location": {
+            "file": "dewpointApp/dewpoint_CLI.py",
+            "line": 8,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'numpy' imported but it is a transitive dependency"
+        },
+        "module": "numpy",
+        "location": {
+            "file": "dewpointApp/dewpoint_app.py",
+            "line": 9,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'plotly' imported but missing from the dependency definitions"
+        },
+        "module": "plotly",
+        "location": {
+            "file": "dewpointApp/dewpoint_app.py",
+            "line": 10,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'streamlit' imported but it is a transitive dependency"
+        },
+        "module": "streamlit",
+        "location": {
+            "file": "dewpointApp/dewpoint_app.py",
+            "line": 11,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'dotenv' imported but it is a transitive dependency"
+        },
+        "module": "dotenv",
+        "location": {
+            "file": "dewpointApp/dewpoint_app.py",
+            "line": 13,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'pytz' imported but it is a transitive dependency"
+        },
+        "module": "pytz",
+        "location": {
+            "file": "dewpointApp/dewpoint_app.py",
+            "line": 14,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'dewpoint_weather' imported but missing from the dependency definitions"
+        },
+        "module": "dewpoint_weather",
+        "location": {
+            "file": "dewpointApp/dewpoint_app.py",
+            "line": 16,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'beach_weather' imported but missing from the dependency definitions"
+        },
+        "module": "beach_weather",
+        "location": {
+            "file": "dewpointApp/dewpoint_app.py",
+            "line": 27,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'timezonefinder' imported but missing from the dependency definitions"
+        },
+        "module": "timezonefinder",
+        "location": {
+            "file": "dewpointApp/dewpoint_app.py",
+            "line": 28,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'beach_weather' imported but missing from the dependency definitions"
+        },
+        "module": "beach_weather",
+        "location": {
+            "file": "dewpointApp/dewpoint_app.py",
+            "line": 437,
+            "column": 17
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'beach_weather' imported but missing from the dependency definitions"
+        },
+        "module": "beach_weather",
+        "location": {
+            "file": "dewpointApp/dewpoint_app.py",
+            "line": 446,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'beach_weather' imported but missing from the dependency definitions"
+        },
+        "module": "beach_weather",
+        "location": {
+            "file": "dewpointApp/dewpoint_app.py",
+            "line": 475,
+            "column": 17
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'requests' imported but it is a transitive dependency"
+        },
+        "module": "requests",
+        "location": {
+            "file": "dewpointApp/dewpoint_weather.py",
+            "line": 1,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'numpy' imported but it is a transitive dependency"
+        },
+        "module": "numpy",
+        "location": {
+            "file": "dewpointApp/dewpoint_weather.py",
+            "line": 2,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'streamlit_js_eval' imported but missing from the dependency definitions"
+        },
+        "module": "streamlit_js_eval",
+        "location": {
+            "file": "dewpointApp/dewpoint_weather.py",
+            "line": 170,
+            "column": 5
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'streamlit' imported but it is a transitive dependency"
+        },
+        "module": "streamlit",
+        "location": {
+            "file": "frontend/rag_app.py",
+            "line": 5,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'qa_loop' imported but missing from the dependency definitions"
+        },
+        "module": "qa_loop",
+        "location": {
+            "file": "frontend/rag_app.py",
+            "line": 10,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'config' imported but missing from the dependency definitions"
+        },
+        "module": "config",
+        "location": {
+            "file": "frontend/rag_app.py",
+            "line": 11,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'ingest_pdf' imported but missing from the dependency definitions"
+        },
+        "module": "ingest_pdf",
+        "location": {
+            "file": "frontend/rag_app.py",
+            "line": 12,
+            "column": 1
+        }
+    },
+    {
+        "error": {
+            "code": "DEP003",
+            "message": "'streamlit' imported but it is a transitive dependency"
+        },
+        "module": "streamlit",
+        "location": {
+            "file": "scripts/try_geolocation.py",
+            "line": 1,
+            "column": 8
+        }
+    },
+    {
+        "error": {
+            "code": "DEP001",
+            "message": "'streamlit_geolocation' imported but missing from the dependency definitions"
+        },
+        "module": "streamlit_geolocation",
+        "location": {
+            "file": "scripts/try_geolocation.py",
+            "line": 2,
+            "column": 1
+        }
+    }
+]
