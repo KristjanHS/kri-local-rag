@@ -3,66 +3,46 @@
 
 import logging
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
+import weaviate
+
+from backend.config import COLLECTION_NAME, WEAVIATE_URL
+from backend.ingest import ingest
+from backend.qa_loop import ensure_weaviate_ready_and_populated
+
+# Configure logging for the test suite
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="session")
-def test_log_file(tmp_path_factory):
-    """Creates a unique log file for the test session."""
-    log_dir = tmp_path_factory.mktemp("logs")
-    log_file = log_dir / "test_run.log"
-    print(f"--- Test output is being logged to: {log_file} ---")
-
-    # --- Configure a file handler for the test-specific log file ---
-    for handler in logging.root.handlers[:]:
-        logging.root.removeHandler(handler)
-
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    file_handler.setFormatter(formatter)
-    logging.root.addHandler(file_handler)
-    logging.root.setLevel(logging.INFO)
-
-    return log_file
-
-
-@pytest.fixture(scope="session")
-def services_ready(test_log_file):
+def docker_services_ready(docker_services):
     """
-    Checks if dependent services are ready and populated.
-    This fixture assumes that Docker services are already running.
+    Ensures that Docker services are ready and populated with initial data from test_data/.
+    This fixture uses pytest-docker to manage the lifecycle of the services.
+    It will only ingest data if the collection is empty.
     """
-    project_root = Path(__file__).parent.parent
-    print("\n--- Verifying dependent services are ready ---")
+    logger.info("--- Verifying dependent services are ready ---")
+    try:
+        # This will wait for Weaviate and Ollama and handle initial data.
+        ensure_weaviate_ready_and_populated()
 
-    with open(test_log_file, "a") as log:
-        log.write("--- Service Readiness Check ---\n")
+        # Verify collection has data for the tests
+        parsed = urlparse(WEAVIATE_URL)
+        client = weaviate.connect_to_custom(
+            http_host=parsed.hostname,
+            http_port=parsed.port or 80,
+            grpc_host=parsed.hostname,
+            grpc_port=50051,
+            http_secure=parsed.scheme == "https",
+            grpc_secure=parsed.scheme == "https",
+        )
         try:
-            # --- Ensure Weaviate database is populated for tests ---
-            from urllib.parse import urlparse
-
-            import weaviate
-
-            from backend.config import COLLECTION_NAME, WEAVIATE_URL
-            from backend.ingest import ingest
-            from backend.qa_loop import ensure_weaviate_ready_and_populated
-
-            # This will wait for Weaviate and Ollama and handle initial data.
-            ensure_weaviate_ready_and_populated()
-
-            # Verify collection has data for the tests
-            parsed = urlparse(WEAVIATE_URL)
-            client = weaviate.connect_to_custom(
-                http_host=parsed.hostname,
-                http_port=parsed.port or 80,
-                grpc_host=parsed.hostname,
-                grpc_port=50051,
-                http_secure=parsed.scheme == "https",
-                grpc_secure=parsed.scheme == "https",
-            )
-            try:
+            collection_exists = client.collections.exists(COLLECTION_NAME)
+            has_data = False
+            if collection_exists:
                 collection = client.collections.get(COLLECTION_NAME)
                 try:
                     next(collection.iterator())
@@ -70,22 +50,21 @@ def services_ready(test_log_file):
                 except StopIteration:
                     has_data = False
 
-                if not has_data:
-                    data_dir = project_root / "example_data"
-                    ingest(str(data_dir))
-                    print("✓ Example data ingested for tests.", flush=True)
-                    log.write("✓ Example data ingested for tests.\n")
-                else:
-                    print("✓ Weaviate collection already populated.", flush=True)
-                    log.write("✓ Weaviate collection already populated.\n")
-            finally:
-                client.close()
+            if not collection_exists or not has_data:
+                logger.info(f"--- Weaviate collection '{COLLECTION_NAME}' is empty. Ingesting test data. ---")
+                data_dir = Path(__file__).parent.parent / "test_data"
+                ingest(str(data_dir))
+                logger.info("--- Test data ingested for tests. ---")
+            else:
+                logger.info(f"--- Weaviate collection '{COLLECTION_NAME}' already populated. Skipping ingestion. ---")
 
-            print("✓ All services are ready for tests.", flush=True)
-            log.write("✓ All services are ready for tests.\n")
+        finally:
+            client.close()
 
-        except Exception as e:
-            pytest.fail(f"Failed to verify and populate services: {e}\n. See logs at {test_log_file}")
+        logger.info("--- All services are ready for tests. ---")
+
+    except Exception as e:
+        pytest.fail(f"Failed to verify and populate services: {e}")
 
     yield
 
@@ -105,9 +84,10 @@ def cli_script_path(project_root):
 @pytest.hookimpl(tryfirst=True)
 def pytest_collection_modifyitems(config, items):
     """
-    A pytest hook to dynamically apply the services_ready fixture to all tests.
+    A pytest hook to dynamically apply the docker_services_ready fixture to all tests
+    that are not marked with 'nodocker'.
     """
-    # Apply the fixture to all tests, as they are integration tests.
+
     for item in items:
-        if "services_ready" not in item.fixturenames:
-            item.fixturenames.insert(0, "services_ready")
+        if "docker" in item.keywords and "docker_services_ready" not in item.fixturenames:
+            item.fixturenames.insert(0, "docker_services_ready")

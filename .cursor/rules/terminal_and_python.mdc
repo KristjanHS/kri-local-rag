@@ -33,6 +33,3 @@ alwaysApply: false
     # This will fail due to import errors.
     pytest tests/
     </example>
-
-## Project Structure Rules
-- **Avoid Module Shadowing**: When creating test files in the `tests/` directory, do not use the same filenames as modules inside the `backend/` directory (e.g., `config.py`). This causes import conflicts.

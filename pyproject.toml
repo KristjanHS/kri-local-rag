@@ -21,5 +21,25 @@ select = ["E", "F", "W"]
 
 [tool.ruff.format]
 quote-style = "double"
+
 [tool.setuptools.packages.find]
 include = ["backend*"]
+
+[tool.pytest.ini_options]
+addopts = "-ra -q --cov=backend --cov-report=term-missing"
+markers = [
+    "docker: tests that require running Docker services (deselect with '-m \"not docker\"')",
+]
+testpaths = [
+    "tests",
+]
+log_cli = true
+log_file = "logs/tests.log"
+log_file_level = "INFO"
+
+[tool.pytest.docker]
+compose_files = ["docker/docker-compose.yml"]
+
+[tool.pytest.docker.services_wait_for]
+weaviate = "http://localhost:8080/v1/.well-known/ready"
+ollama = "http://localhost:11434"
