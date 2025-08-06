@@ -66,7 +66,7 @@ def test_batch_upload_is_used(mock_weaviate, mock_docs):
     mock_model = MagicMock()
 
     # Act
-    process_and_upload_chunks(mock_client, mock_docs, mock_model)
+    process_and_upload_chunks(mock_client, mock_docs, mock_model, "test_collection")
 
     # Assert
     assert mock_batch_cm.__enter__.called
@@ -85,7 +85,7 @@ def test_object_properties_are_correct(mock_weaviate, mock_docs):
     mock_model.encode.return_value = [0.1, 0.2, 0.3]
 
     # Act
-    process_and_upload_chunks(mock_client, mock_docs, mock_model)
+    process_and_upload_chunks(mock_client, mock_docs, mock_model, "test_collection")
 
     # Assert
     _, first_call_kwargs = mock_batch_cm.add_object.call_args_list[0]
@@ -108,7 +108,7 @@ def test_vectors_are_generated_and_added(mock_weaviate, mock_docs):
     mock_model.encode.return_value = [0.1, 0.2, 0.3]
 
     # Act
-    process_and_upload_chunks(mock_client, mock_docs, mock_model)
+    process_and_upload_chunks(mock_client, mock_docs, mock_model, "test_collection")
 
     # Assert
     assert mock_model.encode.call_count == len(mock_docs)
