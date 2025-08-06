@@ -31,16 +31,24 @@ select = ["E", "F", "W"]
 quote-style = "double"
 
 [tool.pytest.ini_options]
-addopts = "-ra -q --cov=backend --cov-report=term-missing"
+addopts = [
+    "-ra",
+    "-v",
+    "--tb=short",
+]
 markers = [
-    "docker: tests that require running Docker services (deselect with '-m \"not docker\"')",
+    "unit: Fast unit tests with mocked dependencies",
+    "integration: Integration tests with real services via Testcontainers",
+    "e2e: End-to-end tests requiring full Docker stack",
+    "environment: Environment and setup validation tests",
+    "slow: Tests that take longer to run"
 ]
 testpaths = [
-    "tests",
+    "tests/unit",
+    "tests/integration",
+    "tests/e2e",
+    "tests/environment",
 ]
-log_cli = true
-log_file = "logs/tests.log"
-log_file_level = "INFO"
 
 [tool.pytest.docker]
 compose_files = ["docker/docker-compose.yml"]

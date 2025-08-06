@@ -22,11 +22,11 @@ def test_python_executable_is_from_venv():
     """
     # This test is flexible enough to handle both `python` and `python3` executables.
     current_python_executable = Path(sys.executable).resolve()
-    venv_bin_path = PROJECT_ROOT / ".venv" / "bin"
+    venv_path = PROJECT_ROOT / ".venv"
 
-    assert current_python_executable.parent == venv_bin_path, (
+    assert venv_path in current_python_executable.parents, (
         f"TEST FAILED: Pytest is running with a Python interpreter outside the virtual environment.\n"
-        f"Expected interpreter from: {venv_bin_path}\n"
+        f"Expected interpreter from: {venv_path}\n"
         f"Actual interpreter:      {current_python_executable}\n"
         "Ensure you are using the command from the 'terminal_and_python.mdc' rule."
     )

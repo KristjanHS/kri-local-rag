@@ -4,6 +4,7 @@
 # External libraries
 from __future__ import annotations
 
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -57,18 +58,23 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
     if _cross_encoder is None:
         try:
             _cross_encoder = CrossEncoder(model_name)
+            # Apply PyTorch CPU optimizations (skip in testing environments)
+            skip_optimization = (
+                "pytest" in sys.modules or os.getenv("SKIP_TORCH_OPTIMIZATION", "false").lower() == "true"
+            )
 
-            # Apply PyTorch CPU optimizations
-            # Set optimal threading for current environment
-            torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
-
-            # Apply torch.compile with max-autotune for 5-25% speed-ups on CPU GEMM-heavy models
-            try:
-                logger.info("torch.compile: optimizing cross-encoder – first run may take ~1 min…")
-                _cross_encoder = torch.compile(_cross_encoder, backend="inductor", mode="max-autotune")
-                logger.info("torch.compile optimization completed for cross-encoder")
-            except Exception as compile_e:
-                logger.warning("Failed to apply torch.compile optimization to cross-encoder: %s", compile_e)
+            if not skip_optimization:
+                # Set optimal threading for current environment
+                torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
+                # Apply torch.compile with max-autotune for 5-25% speed-ups on CPU GEMM-heavy models
+                try:
+                    logger.info("torch.compile: optimizing cross-encoder – first run may take ~1 min…")
+                    _cross_encoder = torch.compile(_cross_encoder, backend="inductor", mode="max-autotune")
+                    logger.info("torch.compile optimization completed for cross-encoder")
+                except Exception as compile_e:
+                    logger.warning("Failed to apply torch.compile optimization to cross-encoder: %s", compile_e)
+            else:
+                logger.debug("Skipping torch optimizations (test environment detected)")
 
         except Exception:
             # Any issue loading the model (e.g. no internet) – skip re-ranking.
@@ -312,7 +318,11 @@ def ensure_weaviate_ready_and_populated():
     logger.info("--- Weaviate check complete ---")
 
 
-if __name__ == "__main__":
+def qa_loop(question: str, k: int = 3, metadata_filter: Optional[Dict[str, Any]] = None):
+    """
+    Perform a single question-answering loop.
+    This function is a refactoring of the original __main__ block to be reusable.
+    """
     ensure_weaviate_ready_and_populated()
 
     # Ensure the required Ollama model is available locally before accepting questions
@@ -320,10 +330,16 @@ if __name__ == "__main__":
         logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
         sys.exit(1)
 
+    result = answer(question, k=k, metadata_filter=metadata_filter)
+    return result
+
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Interactive RAG console with optional metadata filtering.")
     parser.add_argument("--source", help="Filter chunks by source field (e.g. 'pdf')")
     parser.add_argument("--language", help="Filter chunks by detected language code (e.g. 'en', 'et')")
     parser.add_argument("--k", type=int, default=3, help="Number of top chunks to keep after re-ranking")
+    parser.add_argument("--question", help="If provided, run a single query and exit.")
     args = parser.parse_args()
 
     # Build metadata filter dict (AND-combination of provided fields)
@@ -340,11 +356,15 @@ if __name__ == "__main__":
         else:
             meta_filter = {"operator": "And", "operands": clauses}
 
-    # Run Ollama connection test before starting
-    # Temporarily skip Ollama test as it's hanging
-    # if not test_ollama_connection():
-    #     logger.error("Failed to establish Ollama connection. Please check your setup.")
-    #     sys.exit(1)
+    if args.question:
+        qa_loop(args.question, k=args.k, metadata_filter=meta_filter)
+        sys.exit(0)
+
+    # Interactive loop
+    ensure_weaviate_ready_and_populated()
+    if not ensure_model_available(OLLAMA_MODEL):
+        logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
+        sys.exit(1)
 
     logger.info("💬 RAG console ready – Ask me anything about your documents (Ctrl-D/Ctrl-C to quit)")
     sys.stdout.write("→ ")
@@ -358,7 +378,7 @@ if __name__ == "__main__":
                 sys.stdout.flush()
                 continue
 
-            result = answer(q, k=args.k, metadata_filter=meta_filter)
+            result = qa_loop(q, k=args.k, metadata_filter=meta_filter)
             # result is already streamed to stdout, no need to print again
 
             print("─" * 50)

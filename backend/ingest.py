@@ -36,12 +36,10 @@ from backend.config import (
     CHUNK_OVERLAP,
     CHUNK_SIZE,
     COLLECTION_NAME,
+    EMBEDDING_MODEL,
     WEAVIATE_URL,
     get_logger,
 )
-
-# --- Centralized Configuration ---
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 # --- Logging Setup ---
 logger = get_logger(__name__)
