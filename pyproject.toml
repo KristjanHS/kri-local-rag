@@ -100,6 +100,7 @@ test = [
     "pytest-html",
     "testcontainers[weaviate]",
     "ruff==0.4.9",
+    "protobuf>=5.26,<7",
     "rich>=13,<14",
 ]
 docs = ["mkdocs"]

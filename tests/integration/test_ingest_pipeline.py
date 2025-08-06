@@ -11,7 +11,7 @@ from backend import config, ingest
 pytestmark = pytest.mark.slow
 
 # --- Constants ---
-EMBEDDING_MODEL = config.OLLAMA_EMBEDDING_MODEL
+EMBEDDING_MODEL = config.EMBEDDING_MODEL
 COLLECTION_NAME = config.COLLECTION_NAME
 
 

@@ -34,7 +34,7 @@ httpx
 streamlit==1.47.0
 
 # Utilities
-protobuf==4.25.3
+protobuf>=5.26,<7
 
 # for Windows (but doesn't hurt on Linux)
 # https://github.com/Unstructured-IO/unstructured/issues/2237
