@@ -99,7 +99,7 @@ test = [
     "pytest-docker",
     "pytest-html",
     "testcontainers[weaviate]",
-    "ruff",
+    "ruff==0.4.9",
     "rich>=13,<14",
 ]
 docs = ["mkdocs"]

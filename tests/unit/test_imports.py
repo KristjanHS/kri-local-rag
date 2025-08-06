@@ -25,9 +25,9 @@ def test_relative_import_fails_when_run_as_script():
     test_file.unlink()
 
     assert result.returncode != 0, "Script should fail when run directly"
-    assert "ImportError" in result.stderr or "ModuleNotFoundError" in result.stderr, (
-        "Script should raise an ImportError or ModuleNotFoundError"
-    )
+    assert (
+        "ImportError" in result.stderr or "ModuleNotFoundError" in result.stderr
+    ), "Script should raise an ImportError or ModuleNotFoundError"
 
 
 @pytest.mark.unit

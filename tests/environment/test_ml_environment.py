@@ -41,9 +41,9 @@ def test_pytorch_is_cpu_only():
         "Test failed: PyTorch was built with CUDA support (torch.version.cuda is not None), "
         "but a CPU-only build is expected. Please reinstall PyTorch from the CPU wheel."
     )
-    assert not torch.backends.mps.is_available(), (
-        "Test failed: PyTorch has access to an MPS device, but it should be CPU-only."
-    )
+    assert (
+        not torch.backends.mps.is_available()
+    ), "Test failed: PyTorch has access to an MPS device, but it should be CPU-only."
 
 
 def test_pytorch_cpu_optimizations_are_available():
@@ -52,9 +52,9 @@ def test_pytorch_cpu_optimizations_are_available():
     expected with the CPU-optimized PyTorch wheel for Intel processors.
     """
     # For modern PyTorch CPU wheels, the Math Kernel Library (MKL) is a key indicator.
-    assert torch.backends.mkl.is_available(), (
-        "Test failed: The MKL backend is not available. This indicates the CPU-optimized wheel may not be in use."
-    )
+    assert (
+        torch.backends.mkl.is_available()
+    ), "Test failed: The MKL backend is not available. This indicates the CPU-optimized wheel may not be in use."
 
 
 def test_sentence_transformer_model_loads_on_cpu(cached_sentence_transformer_model):
