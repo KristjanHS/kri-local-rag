@@ -38,3 +38,7 @@ CI: CI must pass `ruff check . --fix` and `ruff format .`.
 
 10. Ethics & Licensing
 Data licencing: Verify data licensing; document sources in `/data/README.md`.
+
+11. Python Imports and Packaging
+If a `ModuleNotFoundError` is encountered, first verify that the project has been installed in editable mode with `pip install -e .`. The `backend` module and other local packages are made available through this installation. For more details on the project's import strategy, refer to `docs/DEVELOPMENT.md`.
+

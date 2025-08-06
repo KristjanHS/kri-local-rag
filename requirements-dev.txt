@@ -1,4 +1,2 @@
-# Testing frameworks
-pytest
-pytest-cov
-pytest-mock
+-r requirements.txt
+-e .[test,docs,cli]
