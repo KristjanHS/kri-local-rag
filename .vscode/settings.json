@@ -7,7 +7,7 @@
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         // commented out to see if default .venv python works
         //"PATH": "${workspaceFolder}/.tools:${env:PATH}",
-        //"PATH": "${workspaceFolder}/.venv/bin:${env:PATH}",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}",
         "PYTHONHOME": "",
         "PYTHONPATH": ""
     },
