@@ -3,12 +3,7 @@
 
 import logging
 import os
-import sys
 import tempfile
-from pathlib import Path
-
-# Add backend to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from backend.config import get_logger
 from backend.console import console

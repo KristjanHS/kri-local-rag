@@ -70,6 +70,7 @@ def test_config_module_import_and_path():
     except ImportError as e:
         pytest.fail(
             "TEST FAILED: Failed to import 'backend.config'. "
-            "This likely means the PYTHONPATH is not set correctly by the test command. "
+            "This likely means the project is not installed in editable mode. "
+            "Run 'pip install -e .' from the project root. "
             f"Error: {e}"
         )

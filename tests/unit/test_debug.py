@@ -2,11 +2,6 @@
 """Test script to demonstrate debug logging for Weaviate chunks."""
 
 import logging
-import sys
-from pathlib import Path
-
-# Add backend to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from backend.config import get_logger
 from backend.console import console

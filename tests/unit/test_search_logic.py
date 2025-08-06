@@ -2,7 +2,6 @@
 """Test to verify hybrid search works with manual vectorization."""
 
 import os
-import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,8 +9,6 @@ import pytest
 # Disable torch.compile during these mocked tests to avoid unnecessary compile overhead
 os.environ["ENABLE_TORCH_COMPILE"] = "false"
 
-# Add backend to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 # Note: The main 'from retriever import ...' is moved inside the test functions
 # to prevent hanging during pytest collection.

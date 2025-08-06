@@ -6,10 +6,6 @@ Follows Python best practices for command-line interfaces.
 
 import logging
 import sys
-from pathlib import Path
-
-# Add backend to path for imports
-sys.path.insert(0, str(Path(__file__).parent / "backend"))
 
 from backend.console import console, get_logger
 from backend.qa_loop import answer, ensure_weaviate_ready_and_populated
