@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+import weaviate
 from sentence_transformers import SentenceTransformer
 
 from backend import config, ingest
@@ -12,7 +13,7 @@ pytestmark = pytest.mark.slow
 
 # --- Constants ---
 EMBEDDING_MODEL = config.EMBEDDING_MODEL
-COLLECTION_NAME = config.COLLECTION_NAME
+COLLECTION_NAME = "TestCollection"  # Use a dedicated test collection
 
 
 @pytest.fixture(scope="module")
@@ -25,6 +26,18 @@ def sample_documents_path(tmpdir_factory):
     return str(data_dir)
 
 
+@pytest.fixture(scope="module")
+def weaviate_client():
+    """Fixture for a real Weaviate client, ensuring the service is available."""
+    try:
+        client = ingest.connect_to_weaviate()
+        client.collections.delete(COLLECTION_NAME)
+        yield client
+        client.collections.delete(COLLECTION_NAME)
+    except weaviate.exceptions.WeaviateStartUpError:
+        pytest.skip("Weaviate is not running, skipping integration test.")
+
+
 @pytest.fixture
 def weaviate_collection_mock():
     """Fixture for mocking the Weaviate collection."""
@@ -34,6 +47,19 @@ def weaviate_collection_mock():
         mock_client.collections.create.return_value = mock_collection
         mock_connect.return_value = mock_client
         yield mock_collection
+
+
+@pytest.mark.integration
+def test_ingest_pipeline_with_real_weaviate(weaviate_client):
+    """Test the full ingestion pipeline with a real Weaviate instance."""
+    # Run the ingestion process on the 'test_data' directory
+    ingest.ingest(directory="test_data/", collection_name=COLLECTION_NAME)
+
+    # --- Assertions ---
+    # Check that the collection was created and contains the correct number of documents
+    collection = weaviate_client.collections.get(COLLECTION_NAME)
+    count = collection.aggregate.over_all(total_count=True)
+    assert count.total_count >= 2  # test.md and test.pdf
 
 
 @pytest.mark.integration

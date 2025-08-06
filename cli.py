@@ -13,6 +13,10 @@ from backend.qa_loop import answer, ensure_weaviate_ready_and_populated
 logger = get_logger(__name__)
 
 
+from backend.config import OLLAMA_MODEL
+from backend.ollama_client import ensure_model_available
+
+
 def main():
     """Main CLI entry point."""
     import argparse
@@ -43,6 +47,11 @@ Examples:
     try:
         # Ensure Weaviate is ready
         ensure_weaviate_ready_and_populated()
+
+        # Ensure the required Ollama model is available
+        if not ensure_model_available(OLLAMA_MODEL):
+            logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
+            sys.exit(1)
 
         if args.question:
             # Single question mode
@@ -79,7 +88,10 @@ Examples:
                     break
 
     except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}", file=sys.stderr)
+        from rich.console import Console
+
+        console_stderr = Console(file=sys.stderr)
+        console_stderr.print(f"[bold red]Error:[/] {e}")
         sys.exit(1)
 
 

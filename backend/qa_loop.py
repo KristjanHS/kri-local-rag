@@ -281,7 +281,10 @@ def ensure_weaviate_ready_and_populated():
             create_collection_if_not_exists(client)
 
             # Ingest example data to ensure all modules are warm, then remove it.
-            ingest("../example_data/")
+            # Get the absolute path to the project root, which is the parent of the 'backend' directory
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            example_data_path = os.path.join(project_root, "example_data")
+            ingest(example_data_path)
 
             # Clean up the example data now that the schema is created.
             # This check is important in case the example_data folder was empty.

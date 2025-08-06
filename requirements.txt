@@ -34,7 +34,10 @@ httpx
 streamlit==1.47.0
 
 # Utilities
-protobuf>=5.26,<7
+protobuf==5.29.0
+grpcio==1.63.0
+grpcio-health-checking==1.63.0
+grpcio-status==1.63.0
 
 # for Windows (but doesn't hurt on Linux)
 # https://github.com/Unstructured-IO/unstructured/issues/2237
