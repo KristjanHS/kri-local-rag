@@ -1,209 +1,194 @@
-#!/usr/bin/env python3
-"""Test CLI script integration and container management."""
+"""E2E test for the CLI script."""
+
+import logging
+import os
+import subprocess
+import time
+from unittest.mock import patch
 
 import pytest
 
-# Mark the entire module as requiring Docker
-pytestmark = pytest.mark.docker
-import subprocess
-import os
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Mark the entire module as 'slow'
+pytestmark = pytest.mark.slow
 
 
-class TestCLIScriptIntegration:
-    """Test CLI script functionality and container management."""
+@pytest.fixture(scope="module", autouse=True)
+def manage_docker_compose():
+    """Fixture to manage Docker Compose lifecycle for E2E tests."""
+    compose_file = os.path.join(os.path.dirname(__file__), "..", "..", "docker", "docker-compose.yml")
 
-    def test_cli_script_exists_and_executable(self, cli_script_path):
-        """Test that CLI script exists and is executable."""
-        assert cli_script_path.exists(), "CLI script should exist"
-        assert os.access(cli_script_path, os.X_OK), "CLI script should be executable"
+    # Start Docker Compose
+    logger.info("\n--- E2E: Starting Docker services... ---")
+    start_command = ["docker", "compose", "-f", compose_file, "up", "-d", "--build"]
+    subprocess.run(start_command, check=True)
 
-    def test_docker_compose_file_exists(self, project_root):
-        """Test that docker-compose file exists."""
-        compose_file = project_root / "docker" / "docker-compose.yml"
-        assert compose_file.exists(), "Docker compose file should exist"
+    # Wait for services to be ready
+    logger.info("--- E2E: Waiting for services to initialize... ---")
+    time.sleep(15)  # Give time for containers to start
 
-    def test_container_python_execution(self):
-        """Test that Python can execute in the app container."""
-        try:
-            # Test basic Python execution in container
-            result = subprocess.run(
-                [
-                    "docker",
-                    "compose",
-                    "-f",
-                    "docker/docker-compose.yml",
-                    "exec",
-                    "-T",
-                    "app",
-                    "python",
-                    "-c",
-                    "print('Container test successful')",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
+    # Verify that the 'app' container is running
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-f",
+                "docker/docker-compose.yml",
+                "exec",
+                "-T",
+                "app",
+                "python",
+                "-c",
+                "print('Container test successful')",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+        )
+        logger.info(f"Container check output: {result.stdout.strip()}")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        # If the check fails, get logs to help debug
+        log_command = ["docker", "compose", "-f", compose_file, "logs"]
+        logs = subprocess.run(log_command, capture_output=True, text=True)
+        pytest.fail(
+            f"E2E setup failed: 'app' container not responding. Error: {e}.\nDocker logs:\n{logs.stdout}\n{logs.stderr}"
+        )
 
-            if result.returncode == 0:
-                assert "Container test successful" in result.stdout
-            else:
-                # Container might not be running, which is acceptable for this test
-                pytest.skip("Container not available for testing")
+    yield  # E2E tests run here
 
-        except subprocess.TimeoutExpired:
-            pytest.skip("Container execution timed out")
-        except FileNotFoundError:
-            pytest.skip("Docker compose not available")
-
-    def test_container_backend_imports(self):
-        """Test that backend modules can be imported in container."""
-        try:
-            result = subprocess.run(
-                [
-                    "docker",
-                    "compose",
-                    "-f",
-                    "docker/docker-compose.yml",
-                    "exec",
-                    "-T",
-                    "app",
-                    "bash",
-                    "-c",
-                    (
-                        "cd /app/backend && python -c 'import config; import retriever; "
-                        'import ollama_client; print("Backend imports successful")\''
-                    ),
-                ],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-
-            if result.returncode == 0:
-                assert "Backend imports successful" in result.stdout
-            else:
-                pytest.skip("Container not available for backend import testing")
-
-        except subprocess.TimeoutExpired:
-            pytest.skip("Container import test timed out")
-        except FileNotFoundError:
-            pytest.skip("Docker compose not available")
+    # Stop Docker Compose
+    logger.info("\n--- E2E: Stopping Docker services... ---")
+    stop_command = ["docker", "compose", "-f", compose_file, "down"]
+    subprocess.run(stop_command, check=True)
 
 
-class TestCLIScriptConfiguration:
-    """Test CLI script configuration and environment."""
-
-    def test_script_has_proper_shebang(self, project_root):
-        """Test that CLI script has proper shebang."""
-        cli_script = project_root / "scripts" / "cli.sh"
-        if cli_script.exists():
-            with open(cli_script, "r") as f:
-                first_line = f.readline().strip()
-                assert first_line.startswith("#!/"), "Script should have proper shebang"
-
-    def test_config_script_exists(self, project_root):
-        """Test that config script exists."""
-        config_script = project_root / "scripts" / "config.sh"
-        assert config_script.exists(), "Config script should exist"
-
-    def test_docker_compose_has_app_service(self, project_root):
-        """Test that docker-compose defines the app service."""
-        compose_file = project_root / "docker" / "docker-compose.yml"
-        if compose_file.exists():
-            with open(compose_file, "r") as f:
-                content = f.read()
-                assert "app:" in content, "Docker compose should define app service"
-                assert "weaviate:" in content, "Docker compose should define weaviate service"
-                assert "ollama:" in content, "Docker compose should define ollama service"
-
-
-class TestContainerDependencyOptimization:
-    """Test the container dependency optimizations implemented."""
-
-    def test_docker_compose_dependency_configuration(self, project_root):
-        """Test that Docker compose dependencies are optimized."""
-        compose_file = project_root / "docker" / "docker-compose.yml"
-        if compose_file.exists():
-            with open(compose_file, "r") as f:
-                content = f.read()
-
-                # Should have simple dependencies, not health check dependencies
-                assert "depends_on:" in content, "Should have dependency configuration"
-
-                # Should not have the old health check format
-                assert "condition: service_healthy" not in content, "Should not use slow health check dependencies"
-
-    def test_cli_script_readiness_check_optimization(self, project_root):
-        """Test that CLI script has optimized readiness checks."""
-        cli_script = project_root / "scripts" / "cli.sh"
-        if cli_script.exists():
-            with open(cli_script, "r") as f:
-                content = f.read()
-
-                # Should have container readiness check
-                assert "Container ready" in content, "Should have readiness check"
-
-                # Should not have excessive sleep delays
-                sleep_count = content.count("sleep")
-                assert sleep_count <= 1, f"Should not have excessive sleep commands, found {sleep_count}"
+@pytest.mark.e2e
+def test_backend_container_imports_successfully():
+    """Verify that Python imports work correctly inside the 'app' container."""
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-f",
+                "docker/docker-compose.yml",
+                "exec",
+                "-T",
+                "app",
+                "bash",
+                "-c",
+                (
+                    "cd /app/backend && python -c 'import config; import retriever; "
+                    'import ollama_client; print("Backend imports successful")\''
+                ),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+        )
+        assert "Backend imports successful" in result.stdout
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        pytest.fail(f"E2E test failed: Backend container could not import modules. Error: {e.stderr}")
 
 
-class TestErrorHandlingAndFallbacks:
-    """Test error handling and fallback behaviors."""
-
-    def test_import_error_handling_patterns(self, project_root):
-        """Test that code properly handles import errors."""
-        # Test qa_loop.py handles sentence_transformers import errors
-        qa_loop_file = project_root / "backend" / "qa_loop.py"
-        if qa_loop_file.exists():
-            with open(qa_loop_file, "r") as f:
-                content = f.read()
-                assert "try:" in content and "ImportError:" in content, "Should handle import errors gracefully"
-
-        # Test retriever.py handles sentence_transformers import errors
-        retriever_file = project_root / "backend" / "retriever.py"
-        if retriever_file.exists():
-            with open(retriever_file, "r") as f:
-                content = f.read()
-                assert "try:" in content and "ImportError:" in content, "Should handle import errors gracefully"
-
-    def test_hybrid_search_fallback_mechanism(self, project_root):
-        """Test that hybrid search has proper fallback to BM25."""
-        retriever_file = project_root / "backend" / "retriever.py"
-        if retriever_file.exists():
-            with open(retriever_file, "r") as f:
-                content = f.read()
-                assert "bm25" in content.lower(), "Should have BM25 fallback"
-                assert "hybrid" in content.lower(), "Should have hybrid search"
+@pytest.mark.e2e
+@patch("os.system")
+def test_cli_script_handles_no_args(mock_system):
+    """Test that the CLI script runs without arguments and prints help text."""
+    # Since we can't easily run the CLI from the host to the container,
+    # we'll execute it directly inside the container.
+    command = "cd /app && python main.py"
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "-f", "docker/docker-compose.yml", "exec", "-T", "app", "bash", "-c", command],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=True,
+        )
+        # Expectation: running with no args should default to showing help or a welcome message
+        assert "usage: main.py [-h]" in result.stdout or "Welcome" in result.stdout
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        pytest.fail(f"E2E test failed: CLI script could not be executed. Error: {e.stderr}")
 
 
-class TestLoggingOptimizations:
-    """Test logging optimizations and message deduplication."""
+@pytest.mark.e2e
+def test_cli_script_handles_query_command():
+    """Test the 'query' command with a sample question."""
+    # A simple, non-consequential question
+    question = "What is the capital of France?"
+    command = f"cd /app && python main.py query '{question}'"
 
-    def test_qa_loop_has_clean_logging(self, project_root):
-        """Test that QA loop has clean, non-duplicate logging."""
-        qa_loop_file = project_root / "backend" / "qa_loop.py"
-        if qa_loop_file.exists():
-            with open(qa_loop_file, "r") as f:
-                content = f.read()
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "-f", "docker/docker-compose.yml", "exec", "-T", "app", "bash", "-c", command],
+            capture_output=True,
+            text=True,
+            timeout=60,  # Allow more time for a query
+            check=True,
+        )
+        # We expect some kind of answer, even if it's "I don't know"
+        # A good check is that the output is not empty and doesn't contain error traces.
+        assert len(result.stdout.strip()) > 0
+        assert "Traceback" not in result.stderr
+        # We can also check for some expected keywords in the answer
+        assert "Answer" in result.stdout or "Sources" in result.stdout
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        pytest.fail(f"E2E test failed: 'query' command failed. Error: {e.stderr}")
 
-                # Should have clean ready message
-                assert "RAG console ready" in content, "Should have ready message"
 
-                # Should not have timing debug code
-                assert "import time" not in content, "Should not have debug timing code"
-                assert "start_time" not in content, "Should not have timing variables"
+@pytest.mark.e2e
+def test_cli_script_handles_ingest_command_force_option():
+    """Test the 'ingest' command with the '--force' option."""
+    # This test ensures the ingest command can be triggered.
+    # We use '--force' to ensure it runs even if the collection exists.
+    command = "cd /app && python main.py ingest --force"
 
-    def test_retriever_has_info_level_chunk_logging(self, project_root):
-        """Test that retriever shows chunk heads at INFO level."""
-        retriever_file = project_root / "backend" / "retriever.py"
-        if retriever_file.exists():
-            with open(retriever_file, "r") as f:
-                content = f.read()
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "-f", "docker/docker-compose.yml", "exec", "-T", "app", "bash", "-c", command],
+            capture_output=True,
+            text=True,
+            timeout=120,  # Ingestion can be slow
+            check=True,
+        )
+        # Check for log messages that indicate success
+        assert "Starting ingestion process" in result.stdout
+        assert "Finished ingestion process" in result.stdout
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        pytest.fail(f"E2E test failed: 'ingest --force' command failed. Error: {e.stderr}")
 
-                # Should show chunk information at INFO level
-                assert 'logger.info("Chunk %d:' in content, "Should log chunk heads at INFO level"
+
+@pytest.mark.e2e
+def test_cli_script_handles_chat_command_with_mocked_input():
+    """Test the 'chat' command with a single mocked input."""
+    # We'll send a single question and then 'exit'
+    chat_session_commands = "echo 'What is Weaviate?' && echo 'exit'"
+    command = f"cd /app && {chat_session_commands} | python main.py chat"
+
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "-f", "docker/docker-compose.yml", "exec", "-T", "app", "bash", "-c", command],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=True,
+        )
+        # Check for the chat welcome message and the answer
+        assert "Entering chat mode" in result.stdout
+        # We expect some answer related to the question
+        assert "database" in result.stdout.lower() or "vector" in result.stdout.lower()
+        # Check for the exit message
+        assert "Exiting chat mode" in result.stdout
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        pytest.fail(f"E2E test failed: 'chat' command failed. Error: {e.stderr}")
 
 
 if __name__ == "__main__":
-    pytest.main([__file__])
+    pytest.main(["-s", __file__])

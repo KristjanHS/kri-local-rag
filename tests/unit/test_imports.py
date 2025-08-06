@@ -1,17 +1,42 @@
-#!/usr/bin/env python3
+import subprocess
+import sys
+from pathlib import Path
 
-# Test relative import from within the same package (will fail if run as a script)
-try:
-    from .config import OLLAMA_MODEL as RELATIVE_MODEL
+import pytest
 
-    print("✓ Relative import works:", RELATIVE_MODEL)
-except ImportError as e:
-    print(f"✗ Relative import failed as expected when run as script: {e}")
+# Add project root to the Python path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
-# Test absolute import from the project root
-try:
-    from backend.config import OLLAMA_MODEL as ABSOLUTE_MODEL
+from backend.config import EMBEDDING_MODEL, OLLAMA_MODEL
 
-    print("✓ Absolute import works:", ABSOLUTE_MODEL)
-except ImportError as e:
-    print(f"✗ Absolute import failed: {e}")
+
+@pytest.mark.unit
+def test_relative_import_fails_when_run_as_script():
+    """Verify that running the test file as a script fails due to relative imports."""
+    # Create a temporary test file with a relative import
+    test_file_content = "from . import some_nonexistent_module"
+    test_file = Path(__file__).parent / "temp_test_import_script.py"
+    with open(test_file, "w") as f:
+        f.write(test_file_content)
+
+    result = subprocess.run(
+        ["python", str(test_file)],
+        capture_output=True,
+        text=True,
+    )
+
+    # Clean up the temporary file
+    test_file.unlink()
+
+    assert result.returncode != 0, "Script should fail when run directly"
+    assert (
+        "ImportError" in result.stderr or "ModuleNotFoundError" in result.stderr
+    ), "Script should raise an ImportError or ModuleNotFoundError"
+
+
+@pytest.mark.unit
+def test_absolute_imports_work():
+    """Verify that absolute imports from the project root work correctly."""
+    assert OLLAMA_MODEL, "OLLAMA_MODEL should be imported"
+    assert EMBEDDING_MODEL, "EMBEDDING_MODEL should be imported"

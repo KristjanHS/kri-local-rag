@@ -1,67 +1,67 @@
 # Testing Guide
 
-Fast unit tests for ML-heavy RAG application.
+This guide outlines the testing strategy for the local RAG application, which is designed to ensure code quality, maintainability, and confidence in the system's functionality.
 
-## Problem & Solution
+## Test Suites
 
-**Problem**: ML models (CrossEncoder) take 1-5 minutes to load, stalling tests.
+The test suite is divided into several distinct categories, each serving a specific purpose. This separation allows for targeted testing, faster feedback loops, and clearer intent.
 
-**Solution**: Mock the helper function `_get_cross_encoder()`, not the class.
-
-## Key Pattern
-
-```python
-# Production: Skip torch optimizations in tests
-skip_optimization = "pytest" in sys.modules or os.getenv("SKIP_TORCH_OPTIMIZATION") == "true"
-
-# Tests: Mock the helper function
-@contextmanager
-def mock_encoder_success():
-    with patch("backend.qa_loop._get_cross_encoder") as get_ce:
-        mock = MagicMock()
-        mock.predict.return_value = [0.9, 0.1]
-        get_ce.return_value = mock
-        yield
-```
-
-## Test Scenarios
-
-```python
-# Success path
-def mock_encoder_success():
-    # Returns working encoder with mock.predict.return_value = [0.9, 0.1]
-
-# Predict failure (fallback to keyword scoring)  
-def mock_encoder_predict_failure():
-    # Returns encoder where mock.predict.side_effect = Exception()
-
-# Model unavailable (graceful degradation)
-def mock_encoder_unavailable():
-    # Returns None (no encoder available)
-```
+-   **Unit Tests** (`@pytest.mark.unit`): These are fast, isolated tests that verify the correctness of individual functions or classes. They use mocking extensively to remove external dependencies, ensuring they run in seconds.
+-   **Integration Tests** (`@pytest.g.integration`): These tests verify the interaction between different components of the application. Some may use `Testcontainers` to spin up real services, providing a realistic testing environment.
+-   **End-to-End (E2E) Tests** (`@pytest.mark.e2e`): These tests validate the entire application workflow from start to finish. They are slow and require a fully configured Docker environment.
+-   **Docker-Dependent Tests** (`@pytest.mark.docker`): A subset of tests that specifically require a running Docker daemon.
+-   **Slow Tests** (`@pytest.mark.slow`): Marks tests that have a significant runtime.
+-   **Environment Tests** (`@pytest.mark.environment`): Meta-tests that validate the local development environment.
 
 ## Running Tests
 
-```bash
-# Unit tests (fast, ~5 seconds)
-PYTHONPATH=. .venv/bin/python -m pytest tests/unit/ -v
+By default, running `pytest` will only execute fast tests (unit and integration tests that are not marked as slow). You can, however, select specific test suites using markers.
 
-# Integration tests (slow, real models)
-SKIP_TORCH_OPTIMIZATION=false PYTHONPATH=. .venv/bin/python -m pytest tests/integration/ -v
+### Default Test Run (Fast Tests)
+
+This command runs all tests that are not marked as `environment`, `e2e`, or `slow`. It is the standard command to run for most development work.
+
+```bash
+PYTHONPATH=. .venv/bin/python -m pytest -v
 ```
+
+### Running Specific Test Suites
+
+You can run specific test suites using the `-m` flag.
+
+-   **Unit Tests Only (Fastest)**
+
+    ```bash
+    PYTHONPATH=. .venv/bin/python -m pytest -v -m "unit"
+    ```
+
+-   **Run All Tests (including slow and E2E)**
+
+    This command runs the entire test suite.
+
+    ```bash
+    PYTHONPATH=. .venv/bin/python -m pytest -v -m "not environment"
+    ```
+
+-   **E2E and Docker Tests Only (Slowest)**
+
+    ```bash
+    PYTHONPATH=. .venv/bin/python -m pytest -v -m "e2e or docker"
+    ```
+
+-   **Environment Sanity Checks**
+
+    Use this command to validate your local development setup.
+
+    ```bash
+    PYTHONPATH=. .venv/bin/python -m pytest -v -m "environment"
+    ```
 
 ## Best Practices
 
-**✅ Do:**
-- Mock helper functions (`_get_cross_encoder`) not classes (`CrossEncoder`)
-- Use context managers for clean setup
-- Test actual fallback behavior
-- Keep unit tests < 5 seconds
+-   **Isolate Your Tests**: Ensure unit tests are fast and free of external dependencies. Use integration tests to verify component interactions.
+-   **Use Markers**: Leverage pytest markers to organize and selectively run tests.
+-   **Mock Strategically**: Mock at the boundaries of your system to isolate the code under test. In unit tests, it's often better to mock a helper function that creates an object rather than the object's class itself.
+-   **Write Clear Assertions**: Make your test's intent clear with descriptive assertion messages.
 
-**❌ Don't:**
-- Load real models in unit tests
-- Mock too broadly (entire modules)
-- Test implementation details
-- Modify production code just for tests
-
-See `tests/unit/test_qa_loop_logic.py` for complete examples.
+See `tests/unit/test_qa_loop_logic.py` for examples of effective mocking and `tests/integration/test_qa_pipeline.py` for Testcontainer-based integration tests.

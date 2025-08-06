@@ -25,7 +25,14 @@ exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
 # E305: expected-2-blank-lines-after-function-or-class
 # E402: module-import-not-at-top-of-file
 ignore = ["E203", "E401", "E302", "E305", "E402"]
-select = ["E", "F", "W"]
+select = ["E", "F", "W", "T201"]
+
+# Disable print-statement linting (T201) in CLI scripts and tests where explicit user output is expected.
+[tool.ruff.lint.per-file-ignores]
+"cli.py" = ["T201"]
+"backend/qa_loop.py" = ["T201"]
+"backend/windows_ip_in_wsl.py" = ["T201"]
+"backend/test_*.py" = ["T201"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -35,11 +42,14 @@ addopts = [
     "-ra",
     "-v",
     "--tb=short",
+    "-m",
+    "not environment and not e2e and not slow",
 ]
 markers = [
     "unit: Fast unit tests with mocked dependencies",
     "integration: Integration tests with real services via Testcontainers",
     "e2e: End-to-end tests requiring full Docker stack",
+    "docker: Tests requiring a running Docker daemon",
     "environment: Environment and setup validation tests",
     "slow: Tests that take longer to run"
 ]

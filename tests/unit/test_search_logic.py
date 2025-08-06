@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """Test to verify hybrid search works with manual vectorization."""
 
-import pytest
-from unittest.mock import MagicMock, patch
-import sys
 import os
+import sys
+from unittest.mock import MagicMock, patch
 
-# Add a print statement to indicate when this test file starts
-print("\n--- Running tests from: tests/test_hybrid_search_fix.py ---")
+import pytest
 
 # Disable torch.compile during these mocked tests to avoid unnecessary compile overhead
 os.environ["ENABLE_TORCH_COMPILE"] = "false"
@@ -25,10 +23,9 @@ class TestHybridSearchFix:
     @patch("retriever.SentenceTransformer")
     def test_embedding_model_loading(self, mock_st):
         """Test that embedding model can be loaded."""
-        from retriever import _get_embedding_model
-
         # Reset the global cache
         import retriever
+        from retriever import _get_embedding_model
 
         retriever._embedding_model = None
 
@@ -45,8 +42,8 @@ class TestHybridSearchFix:
     @patch("retriever.SentenceTransformer")
     def test_embedding_model_caching(self, mock_st):
         """Test that embedding model is cached after first load."""
-        from retriever import _get_embedding_model
         import retriever
+        from retriever import _get_embedding_model
 
         retriever._embedding_model = None
 
@@ -65,6 +62,7 @@ class TestHybridSearchFix:
         """Test behavior when SentenceTransformer is not available."""
         with patch.dict("sys.modules", {"sentence_transformers": None}):
             import importlib
+
             import retriever
 
             importlib.reload(retriever)
@@ -217,6 +215,7 @@ class TestHybridSearchFix:
         """Test behavior when vectorization fails."""
         with patch.dict("sys.modules", {"sentence_transformers": None}):
             import importlib
+
             import retriever
 
             importlib.reload(retriever)
