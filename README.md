@@ -142,6 +142,26 @@ This project contains additional documentation in the `docs/` directory:
 - [Cursor Terminal Fix](docs/cursor_terminal_fix.md) – Notes on fixing and improving the integrated terminal experience.
 - [Reorganization Summary](docs/REORGANIZATION_SUMMARY.md) – Summary of the project's code and file structure reorganization.
 
+## Local CI with `act`
+
+This project uses `act` to run GitHub Actions locally. This allows you to test your changes before pushing them to GitHub, which can save time and prevent broken builds.
+
+To run the local CI, you'll need to have `act` installed. You can find installation instructions on the official `act` repository.
+
+This project is configured to use a specific Docker image for `act` that includes all the necessary dependencies for our CI environment. This configuration is defined in the `.actrc` file in the root of the project. This file is automatically used by `act`, so you don't need to do any special configuration to use it.
+
+To run the local CI, simply run the following command in your terminal:
+
+```bash
+act
+```
+
+This will run all the jobs in the workflow. If you want to run a specific job, you can use the `-j` flag:
+
+```bash
+act -j lint-and-test
+```
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file.

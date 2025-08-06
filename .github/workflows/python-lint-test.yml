@@ -12,16 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install dependencies (online only)
-        if: env.ACT != 'true'
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -35,44 +30,40 @@ jobs:
       #  run: |
       #    python -m pytest || true
 
-  #integration-tests:
-  #  needs: lint-and-test
-  #  runs-on: ubuntu-latest
-  #  steps:
-  #    - uses: actions/checkout@v4
-  #    - name: Set up Node.js
-  #      uses: actions/setup-node@v4
-  #      with:
-  #        node-version: '20'
-  #    - name: Set up Python
-  #      uses: actions/setup-python@v5
-  #      with:
-  #        python-version: '3.12'
-  #    - name: Install test dependencies
-  #      run: |
-  #        python -m pip install --upgrade pip
-  #        pip install pytest
-  #
-  #    - name: Build and start container stack
-  #      run: |
-  #        docker compose -f docker/docker-compose.yml up -d --build
-  #    - name: Wait for Weaviate readiness
-  #      run: |
-  #        timeout=120; until curl -s http://localhost:8080/v1/.well-known/ready >/dev/null 2>&1; do \
-  #          echo "Waiting for Weaviate..."; sleep 5; timeout=$((timeout-5)); if [ $timeout -le 0 ]; then echo "Weaviate not ready"; docker compose -f docker/docker-compose.yml logs weaviate; exit 1; fi; done
-  #    - name: Run integration tests inside container
-  #      run: |
-  #        set -o pipefail
-  #        docker compose -f docker/docker-compose.yml exec -T app pytest -sv tests/test_cli_script_integration.py | tee pytest.log
-  #        EXIT_CODE=${PIPESTATUS[0]}
-  #        if [ $EXIT_CODE -ne 0 ]; then
-  #          echo "\n🔴 Pytest failed — showing container logs for debugging:\n"
-  #          docker compose -f docker/docker-compose.yml logs app || true
-  #          docker compose -f docker/docker-compose.yml logs weaviate || true
-  #          docker compose -f docker/docker-compose.yml logs ollama || true
-  #          exit $EXIT_CODE
-  #        fi
-  #    - name: Tear down stack
-  #      if: always()
-  #      run: |
-  #        docker compose -f docker/docker-compose.yml down -v
+  integration-tests:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Build and start container stack
+        run: |
+          docker compose -f docker/docker-compose.yml up -d --build
+      - name: Wait for Weaviate readiness
+        run: |
+          timeout=120; until curl -s http://localhost:8080/v1/.well-known/ready >/dev/null 2>&1; do \
+            echo "Waiting for Weaviate..."; sleep 5; timeout=$((timeout-5)); if [ $timeout -le 0 ]; then echo "Weaviate not ready"; docker compose -f docker/docker-compose.yml logs weaviate; exit 1; fi; done
+      - name: Run integration tests inside container
+        run: |
+          set -o pipefail
+          docker compose -f docker/docker-compose.yml exec -T app pytest -sv tests/test_cli_script_integration.py | tee pytest.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "\n🔴 Pytest failed — showing container logs for debugging:\n"
+            docker compose -f docker/docker-compose.yml logs app || true
+            docker compose -f docker/docker-compose.yml logs weaviate || true
+            docker compose -f docker/docker-compose.yml logs ollama || true
+            exit $EXIT_CODE
+          fi
+      - name: Tear down stack
+        if: always()
+        run: |
+          docker compose -f docker/docker-compose.yml down -v
