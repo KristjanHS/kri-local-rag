@@ -107,7 +107,7 @@ def _score_chunks(question: str, chunks: List[str]) -> List[ScoredChunk]:
         logger.debug("Attempting keyword overlap scoring.")
 
         def preprocess(text: str) -> set:
-            words = re.findall(r"\\b\\w+\\b", text.lower())
+            words = re.findall(r"\b\w+\b", text.lower())
             return set(words)
 
         question_words = preprocess(question)

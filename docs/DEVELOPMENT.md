@@ -109,6 +109,21 @@ To run the test suite, ensure you have installed the full development and testin
 
 ---
 
+## Troubleshooting
+
+### ModuleNotFoundError
+
+If you encounter a `ModuleNotFoundError` when running tests or scripts, it typically means that the `backend` package is not correctly installed in your virtual environment. This can happen if you forget to install the project in editable mode.
+
+- **Error example**: `ModuleNotFoundError: No module named 'backend'`
+- **Solution**: Make sure you have installed the project in editable mode. This command needs to be run from the root of the project, with your virtual environment activated:
+  ```bash
+  pip install -e .
+  ```
+This will link the `backend` directory into your environment, allowing Python to find and import your local modules.
+
+---
+
 ## Docker Workflow
 
 The Docker image for production should be built using `requirements.txt` to ensure a lean and reproducible container.

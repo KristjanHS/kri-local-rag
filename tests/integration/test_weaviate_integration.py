@@ -5,7 +5,7 @@ import pytest
 from testcontainers.weaviate import WeaviateContainer
 
 
-@pytest.mark.integration
+@pytest.mark.slow
 def test_weaviate_container_starts():
     """Verify that the Weaviate container starts and is accessible."""
     with WeaviateContainer() as weaviate_container:
