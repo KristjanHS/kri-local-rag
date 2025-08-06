@@ -59,6 +59,6 @@ if [[ ! -x "$PY" ]]; then
 fi
 
 _green "Running pytest …"
-PYTHONPATH="$ROOT_DIR" "$PY" -m pytest -q tests/
+"$PY" -m pytest -q tests/
 
 _green "All checks passed!"

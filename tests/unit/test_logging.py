@@ -3,14 +3,20 @@
 
 import logging
 import os
+import sys
 import tempfile
+from pathlib import Path
+
+# Add backend to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from backend.config import get_logger
+from backend.console import console
 
 
 def test_basic_logging():
     """Test basic logging functionality with different levels."""
-    print("=== Testing Basic Logging ===")
+    console.print("=== Testing Basic Logging ===")
 
     logger = get_logger("test_basic")
 
@@ -20,15 +26,15 @@ def test_basic_logging():
     logger.warning("This is a WARNING message")
     logger.error("This is an ERROR message")
 
-    print("Basic logging test completed\n")
+    console.print("Basic logging test completed\n")
 
 
 def test_log_levels():
     """Test logging with different log levels."""
-    print("=== Testing Log Levels ===")
+    console.print("=== Testing Log Levels ===")
 
     # Test with INFO level
-    print("--- INFO Level ---")
+    console.print("--- INFO Level ---")
     logger = get_logger("test_info")
     logger.setLevel(logging.INFO)
     logger.debug("This DEBUG message should NOT appear")
@@ -36,17 +42,17 @@ def test_log_levels():
     logger.warning("This WARNING message should appear")
 
     # Test with DEBUG level
-    print("\n--- DEBUG Level ---")
+    console.print("\n--- DEBUG Level ---")
     logger.setLevel(logging.DEBUG)
     logger.debug("This DEBUG message should appear")
     logger.info("This INFO message should appear")
 
-    print("Log levels test completed\n")
+    console.print("Log levels test completed\n")
 
 
 def test_log_formatting():
     """Test log message formatting and structure."""
-    print("=== Testing Log Formatting ===")
+    console.print("=== Testing Log Formatting ===")
 
     logger = get_logger("test_format")
 
@@ -60,12 +66,12 @@ def test_log_formatting():
     data = {"key": "value", "number": 42}
     logger.info("Structured data: %s", data)
 
-    print("Log formatting test completed\n")
+    console.print("Log formatting test completed\n")
 
 
 def test_logger_creation():
     """Test logger creation and configuration."""
-    print("=== Testing Logger Creation ===")
+    console.print("=== Testing Logger Creation ===")
 
     # Test creating multiple loggers
     loggers = []
@@ -78,12 +84,12 @@ def test_logger_creation():
     for i, logger in enumerate(loggers):
         logger.info(f"Logger {i} is still working")
 
-    print("Logger creation test completed\n")
+    console.print("Logger creation test completed\n")
 
 
 def test_error_logging():
     """Test error logging and exception handling."""
-    print("=== Testing Error Logging ===")
+    console.print("=== Testing Error Logging ===")
 
     logger = get_logger("test_error")
 
@@ -96,16 +102,16 @@ def test_error_logging():
 
     try:
         # Simulate another error
-        undefined_variable
+        undefined_variable  # type: ignore
     except NameError as e:
         logger.error("Caught name error: %s", e)
 
-    print("Error logging test completed\n")
+    console.print("Error logging test completed\n")
 
 
 def test_log_file_output():
     """Test logging to file (if file logging is configured)."""
-    print("=== Testing Log File Output ===")
+    console.print("=== Testing Log File Output ===")
 
     # Create a temporary log file
     with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as temp_file:
@@ -127,22 +133,22 @@ def test_log_file_output():
         logger.warning("Warning message to file")
 
         # Read and display the log file contents
-        with open(temp_log_path, "r") as f:
+        with open(temp_log_path) as f:
             log_contents = f.read()
-            print("Log file contents:")
-            print(log_contents)
+            console.print("Log file contents:")
+            console.print(log_contents)
 
     finally:
         # Clean up
         if os.path.exists(temp_log_path):
             os.unlink(temp_log_path)
 
-    print("Log file output test completed\n")
+    console.print("Log file output test completed\n")
 
 
 def test_weaviate_logging():
     """Test logging specifically for Weaviate operations."""
-    print("=== Testing Weaviate Logging ===")
+    console.print("=== Testing Weaviate Logging ===")
 
     logger = get_logger("test_weaviate")
 
@@ -159,12 +165,12 @@ def test_weaviate_logging():
     logger.info("Received response from Weaviate")
     logger.debug("Response contains 5 objects")
 
-    print("Weaviate logging test completed\n")
+    console.print("Weaviate logging test completed\n")
 
 
 def test_performance_logging():
     """Test logging for performance monitoring."""
-    print("=== Testing Performance Logging ===")
+    console.print("=== Testing Performance Logging ===")
 
     logger = get_logger("test_performance")
 
@@ -184,12 +190,12 @@ def test_performance_logging():
     logger.debug("Memory usage: 128MB")
     logger.debug("CPU usage: 15%%")
 
-    print("Performance logging test completed\n")
+    console.print("Performance logging test completed\n")
 
 
 def run_all_tests():
     """Run all logging tests."""
-    print("Starting comprehensive logging tests...\n")
+    console.print("Starting comprehensive logging tests...\n")
 
     tests = [
         test_basic_logging,
@@ -206,10 +212,10 @@ def run_all_tests():
         try:
             test()
         except Exception as e:
-            print(f"Test {test.__name__} failed: {e}")
-            print()
+            console.print(f"Test {test.__name__} failed: {e}")
+            console.print()
 
-    print("All logging tests completed!")
+    console.print("All logging tests completed!")
 
 
 if __name__ == "__main__":

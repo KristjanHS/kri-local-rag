@@ -2,15 +2,21 @@
 """Test script to demonstrate debug logging for Weaviate chunks."""
 
 import logging
+import sys
+from pathlib import Path
+
+# Add backend to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from backend.config import get_logger
+from backend.console import console
 
 
 def test_debug_logging():
     """Test debug logging with different log levels."""
 
     # Test with INFO level (default)
-    print("=== Testing with INFO level (default) ===")
+    console.print("=== Testing with INFO level (default) ===")
     logger = get_logger("test")
     logger.setLevel(logging.INFO)
 
@@ -18,10 +24,10 @@ def test_debug_logging():
     logger.info("This is an INFO message")
     logger.debug("This DEBUG message won't show with INFO level")
 
-    print("\n" + "=" * 50 + "\n")
+    console.print("\n" + "=" * 50 + "\n")
 
     # Test with DEBUG level
-    print("=== Testing with DEBUG level ===")
+    console.print("=== Testing with DEBUG level ===")
     logger.setLevel(logging.DEBUG)
 
     logger.info("This is an INFO message")
@@ -40,14 +46,14 @@ def test_debug_logging():
         "Third chunk example with more content to show the full debug output format.",
     ]
 
-    print("\n=== Simulated Weaviate chunk debug output ===")
+    console.print("\n=== Simulated Weaviate chunk debug output ===")
     for i, content in enumerate(mock_chunks):
         logger.debug("Chunk %d:", i + 1)
         logger.debug("  Distance: 0.1234")
         logger.debug("  Score: 0.8765")
         logger.debug("  Content: %s", content[:100] + "..." if len(content) > 100 else content)
         logger.debug("  Content length: %d characters", len(content))
-        print()
+        console.print()
 
 
 if __name__ == "__main__":

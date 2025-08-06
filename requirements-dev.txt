@@ -1,7 +1,2 @@
-# Testing frameworks
-pytest
-pytest-cov
-pytest-mock
-pytest-docker
-pytest-html
-testcontainers[weaviate]
+-r requirements.txt
+-e .[test,docs,cli]

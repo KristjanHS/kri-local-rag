@@ -1,7 +1,7 @@
-from unittest.mock import patch, MagicMock
 from contextlib import contextmanager
+from unittest.mock import MagicMock, patch
 
-from backend.qa_loop import _rerank, _score_chunks
+from backend.qa_loop import _rerank, _score_chunks, answer
 
 
 @contextmanager
@@ -119,3 +119,22 @@ def test_keyword_scoring_no_union():
 
         assert len(scored_chunks) == 2
         assert all(sc.score == 0.0 for sc in scored_chunks)
+
+
+@patch("backend.qa_loop.generate_response")
+@patch("backend.qa_loop.get_top_k")
+def test_answer_streaming_output(mock_get_top_k, mock_generate_response, capsys):
+    """Test that the answer function streams tokens to the console."""
+    mock_get_top_k.return_value = ["Some context."]
+
+    # Simulate generate_response calling on_token
+    def mock_streamer(prompt, model, context, on_token, **kwargs):
+        on_token("Hello")
+        on_token(" World")
+        return "Hello World", None
+
+    mock_generate_response.side_effect = mock_streamer
+
+    answer("test question")
+    captured = capsys.readouterr()
+    assert captured.out == "Answer: Hello World\n"

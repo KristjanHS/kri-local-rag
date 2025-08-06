@@ -22,7 +22,7 @@ By default, running `pytest` will only execute fast tests (unit and integration 
 This command runs all tests that are not marked as `environment`, `e2e`, or `slow`. It is the standard command to run for most development work.
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m pytest -v
+.venv/bin/python -m pytest -v
 ```
 
 ### Running Specific Test Suites
@@ -32,7 +32,7 @@ You can run specific test suites using the `-m` flag.
 -   **Unit Tests Only (Fastest)**
 
     ```bash
-    PYTHONPATH=. .venv/bin/python -m pytest -v -m "unit"
+    .venv/bin/python -m pytest -v -m "unit"
     ```
 
 -   **Run All Tests (including slow and E2E)**
@@ -40,13 +40,13 @@ You can run specific test suites using the `-m` flag.
     This command runs the entire test suite.
 
     ```bash
-    PYTHONPATH=. .venv/bin/python -m pytest -v -m "not environment"
+    .venv/bin/python -m pytest -v -m "not environment"
     ```
 
 -   **E2E and Docker Tests Only (Slowest)**
 
     ```bash
-    PYTHONPATH=. .venv/bin/python -m pytest -v -m "e2e or docker"
+    .venv/bin/python -m pytest -v -m "e2e or docker"
     ```
 
 -   **Environment Sanity Checks**
@@ -54,7 +54,7 @@ You can run specific test suites using the `-m` flag.
     Use this command to validate your local development setup.
 
     ```bash
-    PYTHONPATH=. .venv/bin/python -m pytest -v -m "environment"
+    .venv/bin/python -m pytest -v -m "environment"
     ```
 
 ## Best Practices

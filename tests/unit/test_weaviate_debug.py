@@ -3,11 +3,17 @@
 
 import logging
 import os
+import sys
+from pathlib import Path
+
+# Add backend to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 # Set debug logging level
 os.environ["LOG_LEVEL"] = "DEBUG"
 
 from backend.config import get_logger
+from backend.console import console
 from backend.retriever import get_top_k
 
 
@@ -17,10 +23,10 @@ def test_weaviate_debug():
     logger = get_logger("weaviate_test")
     logger.setLevel(logging.DEBUG)
 
-    print("=== Testing Weaviate Debug Logging ===")
-    print("This will show detailed chunk information when debug=True")
-    print("Make sure you have data in your Weaviate collection first!")
-    print()
+    console.print("=== Testing Weaviate Debug Logging ===")
+    console.print("This will show detailed chunk information when debug=True")
+    console.print("Make sure you have data in your Weaviate collection first!")
+    console.print()
 
     # Test with a simple query
     test_questions = [
@@ -30,19 +36,19 @@ def test_weaviate_debug():
     ]
 
     for i, question in enumerate(test_questions, 1):
-        print(f"--- Test Query {i}: '{question}' ---")
+        console.print(f"--- Test Query {i}: '{question}' ---")
         try:
             chunks = get_top_k(question, k=3)
-            print(f"Found {len(chunks)} chunks")
+            console.print(f"Found {len(chunks)} chunks")
             if chunks:
-                print("Chunk previews:")
+                console.print("Chunk previews:")
                 for j, chunk in enumerate(chunks[:2], 1):  # Show first 2 chunks
                     preview = chunk[:100] + "..." if len(chunk) > 100 else chunk
-                    print(f"  {j}. {preview}")
-            print()
+                    console.print(f"  {j}. {preview}")
+            console.print()
         except Exception as e:
-            print(f"Error: {e}")
-            print()
+            console.print(f"Error: {e}")
+            console.print()
 
 
 if __name__ == "__main__":

@@ -64,7 +64,6 @@ services:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
       - WEAVIATE_URL=http://weaviate:8080
-      - PYTHONPATH=/app
 
   # ---------- One-off Ingestion Utility -----------------------------------------
   ingester:

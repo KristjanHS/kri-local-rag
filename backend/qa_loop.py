@@ -13,7 +13,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import torch
 
 # Local .py imports
-from backend.config import OLLAMA_MODEL, get_logger
+from backend.config import OLLAMA_MODEL
+from backend.console import console, get_logger
 from backend.ollama_client import ensure_model_available, generate_response
 from backend.retriever import get_top_k
 
@@ -106,7 +107,7 @@ def _score_chunks(question: str, chunks: List[str]) -> List[ScoredChunk]:
         logger.debug("Attempting keyword overlap scoring.")
 
         def preprocess(text: str) -> set:
-            words = re.findall(r"\b\w+\b", text.lower())
+            words = re.findall(r"\\b\\w+\\b", text.lower())
             return set(words)
 
         question_words = preprocess(question)
@@ -212,8 +213,7 @@ def answer(
         if token:
             collected_tokens.append(token)
             # Print tokens immediately for better UX
-            sys.stdout.write(token)
-            sys.stdout.flush()
+            console.print(token, end="")
 
     if on_debug is None:
         on_debug = cli_on_debug
@@ -222,8 +222,7 @@ def answer(
 
     # Show "Answer: " before streaming starts (for CLI mode)
     if on_token is not None:
-        sys.stdout.write("Answer: ")
-        sys.stdout.flush()
+        console.print("Answer: ", end="")
 
     answer_text, updated_context = generate_response(
         prompt_text,
@@ -237,8 +236,7 @@ def answer(
 
     # Add newline after streaming completes to position cursor properly
     if on_token is not None:
-        sys.stdout.write("\n")
-        sys.stdout.flush()
+        console.print()
 
     # Update context for next interaction
     _ollama_context = updated_context
@@ -309,9 +307,9 @@ def ensure_weaviate_ready_and_populated():
         raise WeaviateConnectionError(
             "Failed to connect to Weaviate. "
             "Please ensure Weaviate is running and accessible before starting the backend."
-        )
+        ) from None
     except Exception as e:
-        raise Exception(f"An unexpected error occurred during Weaviate check: {e}")
+        raise Exception(f"An unexpected error occurred during Weaviate check: {e}") from e
     finally:
         if "client" in locals() and client.is_connected():
             client.close()
@@ -367,25 +365,22 @@ if __name__ == "__main__":
         sys.exit(1)
 
     logger.info("💬 RAG console ready – Ask me anything about your documents (Ctrl-D/Ctrl-C to quit)")
-    sys.stdout.write("→ ")
-    sys.stdout.flush()
+    console.print("→ ", end="")
     try:
         for line in sys.stdin:
             q = line.strip()
             if not q:
                 # For empty input, just show the prompt again on a new line
-                sys.stdout.write("→ ")
-                sys.stdout.flush()
+                console.print("→ ", end="")
                 continue
 
             result = qa_loop(q, k=args.k, metadata_filter=meta_filter)
             # result is already streamed to stdout, no need to print again
 
-            print("─" * 50)
-            print("💬 Ready for next question... (Ctrl-D/Ctrl-C to quit)")
-            print("─" * 50)
-            print()  # Extra newline for spacing
-            sys.stdout.write("→ ")
-            sys.stdout.flush()  # Ensure prompt is displayed immediately
+            console.print("─" * 50)
+            console.print("💬 Ready for next question... (Ctrl-D/Ctrl-C to quit)")
+            console.print("─" * 50)
+            console.print()  # Extra newline for spacing
+            console.print("→ ", end="")
     except (EOFError, KeyboardInterrupt):
         pass

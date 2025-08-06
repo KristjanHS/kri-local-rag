@@ -1,14 +1,12 @@
----
-description: "Instructions for running terminal commands in this project, especially for Python and pytest, to avoid environment and path issues."
-globs: 
-alwaysApply: false
----
 
 # Rules for Terminal Command Execution
 
 ## Environment Context
 - **Project Root**: The absolute path to the project root is `/home/kristjans/projects/kri-local-rag`.
 - **Terminal Environment**: The Cursor terminal is mostly isolated, but it correctly activates the project's virtual environment.
+
+## ⚠️ Important: Avoid PYTHONPATH
+**NEVER use PYTHONPATH in this project.** Setting PYTHONPATH can cause AppImage overrides that break virtual environment detection for Cursor IDE and agents. This project uses proper Python module structure with `pyproject.toml` configuration and editable installs.
 
 ## Best Practices for Terminal Commands
 1.  **Run commands from the project root.** The shell usually starts here, but it's good practice to confirm with `pwd` if you have any doubts.
@@ -21,11 +19,15 @@ alwaysApply: false
     python --version
     </example>
 
-3.  **Running Pytest**: To ensure `pytest` can find your project's modules, run it as a module and set the `PYTHONPATH`. This is the most reliable way to avoid `ImportError` issues.
+3.  **Running Pytest**: To ensure `pytest` can find your project's modules, run it as a module from the project root. This is the most reliable way to avoid `ImportError` issues.
     <example>
-    PYTHONPATH=. python -m pytest tests/
+    python -m pytest tests/
     </example>
     <example type="invalid">
     # This may fail if pytest is not in the system PATH or has interpreter issues.
     pytest tests/
+    </example>
+    <example type="invalid">
+    # NEVER use PYTHONPATH - it breaks venv detection and AppImage compatibility
+    PYTHONPATH=. python -m pytest tests/
     </example>

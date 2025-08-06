@@ -1,153 +1,102 @@
-"""Test the full QA pipeline from question to answer."""
+"""Integration tests for the QA pipeline and retriever."""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
-from sentence_transformers import SentenceTransformer
 
-from backend import config, qa_loop
+from backend.qa_loop import answer
+from backend.retriever import get_top_k
 
 # Mark the entire module as 'slow'
 pytestmark = pytest.mark.slow
 
 
-# --- Constants ---
-EMBEDDING_MODEL = config.OLLAMA_EMBEDDING_MODEL
-COLLECTION_NAME = config.COLLECTION_NAME
-
-
-@pytest.fixture(scope="module")
-def sample_documents():
-    """Fixture for providing sample documents for ingestion."""
-    return [
-        "France is a country in Western Europe.",
-        "The capital of France is Paris, known for its art and culture.",
-        "The Eiffel Tower is a famous landmark in Paris.",
-        "Germany is a country in Central Europe.",
-        "Berlin is the capital of Germany.",
-    ]
-
-
-@pytest.fixture(scope="module")
-def weaviate_collection_mock():
-    """Fixture for mocking a Weaviate collection with pre-ingested data."""
-    with patch("weaviate.connect_to_custom") as mock_connect:
-        mock_client = MagicMock()
-        mock_collection = MagicMock()
-
-        # Mock is_ready and exists
-        mock_client.is_ready.return_value = True
-        mock_client.collections.exists.return_value = True
-
-        # Mock the query interface
-        mock_query = MagicMock()
-
-        class MockObject:
-            def __init__(self, content):
-                self.properties = {"content": content}
-
-        # Simulate a hybrid search result
-        mock_result = MagicMock()
-        mock_result.objects = [MockObject("The capital of France is Paris.")]
-        mock_query.hybrid.return_value = mock_result
-
-        # Connect the mocks
-        mock_collection.query = mock_query
-        mock_client.collections.get.return_value = mock_collection
-        mock_connect.return_value = mock_client
-
-        # Provide a real embedding model for the retriever
-        model = SentenceTransformer(EMBEDDING_MODEL)
-        with patch("backend.retriever._get_embedding_model", return_value=model):
-            yield mock_collection
+# -----------------------------------------------------------------------------
+# QA pipeline (happy-path) ------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 @pytest.mark.integration
-@patch("backend.qa_loop.Ollama")
-def test_qa_pipeline_produces_answer(mock_ollama, weaviate_collection_mock):
-    """Test the full QA pipeline to ensure a coherent answer is generated."""
-    # Mock the Ollama LLM
-    mock_llm = MagicMock()
-    mock_llm.invoke.return_value = "The capital of France is indeed Paris."
-    mock_ollama.return_value = mock_llm
+@patch("backend.qa_loop.generate_response")
+@patch("backend.qa_loop.get_top_k")
+def test_qa_pipeline_produces_answer(mock_get_top_k, mock_generate_response):
+    """Ensure `answer()` returns a meaningful response and embeds context chunks in the prompt."""
+    context_chunk = "France is a country in Western Europe."
+    mock_get_top_k.return_value = [context_chunk]
 
-    # The user's question
+    captured_prompt: list[str] = []
+
+    def _fake_generate_response(prompt, *_, **__):  # noqa: ANN001 – external signature
+        captured_prompt.append(prompt)
+        return ("The capital of France is Paris.", None)
+
+    mock_generate_response.side_effect = _fake_generate_response
+
     question = "What is the capital of France?"
+    result = answer(question)
 
-    # Run the QA loop
-    answer, sources = qa_loop.run_qa_loop(question, weaviate_collection_mock)
+    # ─── Assertions ──────────────────────────────────────────────────────────
+    assert "Paris" in result
+    mock_get_top_k.assert_called_once_with(question, k=60, metadata_filter=None)
+    mock_generate_response.assert_called_once()
 
-    # --- Assertions ---
-    # Check that the retriever was called correctly
-    weaviate_collection_mock.query.hybrid.assert_called_once()
-    call_args = weaviate_collection_mock.query.hybrid.call_args
-    assert call_args.kwargs["query"] == question
-    assert "vector" in call_args.kwargs  # Ensure vector was passed
+    # Prompt should contain both the question and the retrieved context
+    assert captured_prompt, "Prompt was not captured via generate_response side-effect."
+    prompt_text = captured_prompt[0]
+    assert question in prompt_text
+    assert context_chunk in prompt_text
 
-    # Check that the LLM was invoked with the right context
-    mock_llm.invoke.assert_called_once()
-    prompt = mock_llm.invoke.call_args[0][0]
-    assert question in prompt
-    assert "The capital of France is Paris." in prompt  # Check if context is in prompt
 
-    # Check the final answer and sources
-    assert "Paris" in answer
-    assert "The capital of France is Paris." in sources
+# -----------------------------------------------------------------------------
+# QA pipeline (no context) ------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 @pytest.mark.integration
-def test_get_top_k_retrieves_correct_documents(weaviate_collection_mock):
-    """Test that the retriever fetches the most relevant document."""
-    from backend.retriever import get_top_k
+@patch("backend.qa_loop.get_top_k")
+def test_qa_pipeline_no_context(mock_get_top_k):
+    """`answer()` should return a graceful message when the retriever finds nothing."""
+    mock_get_top_k.return_value = []
 
-    # The user's question
     question = "What is the capital of France?"
+    result = answer(question)
 
-    # Run the retriever
-    top_k_docs = get_top_k(question, k=1, collection=weaviate_collection_mock)
+    assert "I found no relevant context" in result
+    mock_get_top_k.assert_called_once()
 
-    # --- Assertions ---
-    # Check that the query was executed
-    weaviate_collection_mock.query.hybrid.assert_called_once()
-    # Check that the correct document was returned
-    assert len(top_k_docs) == 1
-    assert "Paris" in top_k_docs[0]
+
+# -----------------------------------------------------------------------------
+# Retriever hybrid search parameters ------------------------------------------
+# -----------------------------------------------------------------------------
 
 
 @pytest.mark.integration
-@patch("backend.qa_loop.Ollama")
-def test_qa_pipeline_handles_no_context_gracefully(mock_ollama, weaviate_collection_mock):
-    """Test how the QA pipeline behaves when the retriever finds no relevant documents."""
-    # Mock the retriever to return no documents
-    mock_query = weaviate_collection_mock.query
+@patch("weaviate.connect_to_custom")
+def test_get_top_k_hybrid_parameters(mock_connect):
+    """Verify that `get_top_k` issues a `hybrid()` query with the expected parameters."""
+    # Build a fake Weaviate client->collection->query chain
+    mock_client = MagicMock()
+    mock_collection = MagicMock()
+    mock_query = MagicMock()
     mock_result = MagicMock()
-    mock_result.objects = []  # No documents found
+    mock_obj = MagicMock()
+    mock_obj.properties = {"content": "The capital of France is Paris."}
+    mock_result.objects = [mock_obj]
+
+    # Wire the mocks together
     mock_query.hybrid.return_value = mock_result
+    mock_collection.query = mock_query
+    mock_client.collections.get.return_value = mock_collection
+    mock_connect.return_value = mock_client
 
-    # Mock the Ollama LLM
-    mock_llm = MagicMock()
-    mock_llm.invoke.return_value = "I am sorry, but I do not have enough information to answer that question."
-    mock_ollama.return_value = mock_llm
+    question = "What is the capital of France?"
+    _ = get_top_k(question, k=2)
 
-    # The user's question
-    question = "What is the largest city in Australia?"
+    # hybrid() should have been called once with correct kwargs
+    mock_query.hybrid.assert_called_once()
+    kwargs = mock_query.hybrid.call_args.kwargs
+    assert kwargs["query"] == question
+    assert kwargs["limit"] == 2
 
-    # Run the QA loop
-    answer, sources = qa_loop.run_qa_loop(question, weaviate_collection_mock)
-
-    # --- Assertions ---
-    # Check that the retriever was called
-    weaviate_collection_mock.query.hybrid.assert_called_once()
-
-    # Check that the LLM was still invoked but with a different prompt
-    mock_llm.invoke.assert_called_once()
-    prompt = mock_llm.invoke.call_args[0][0]
-    assert "could not find any relevant information" in prompt.lower()
-
-    # Check the final answer and sources
-    assert "sorry" in answer.lower() or "do not have enough information" in answer.lower()
-    assert len(sources) == 0
-
-
-if __name__ == "__main__":
-    pytest.main(["-s", __file__])
+    # Client should be closed in the finally block
+    mock_client.close.assert_called_once()

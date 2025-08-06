@@ -70,6 +70,22 @@ This project includes a suite of scripts in the `scripts/` directory to automate
 
 Once complete, the Streamlit app will be available at **[http://localhost:8501](http://localhost:8501)**.
 
+### Development Installation
+
+If you want to run the scripts locally for development, you'll need to install the project in editable mode.
+
+1.  Create a virtual environment:
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate
+    ```
+
+2.  Install the project in editable mode with all optional dependencies:
+    ```bash
+    pip install -e ".[test,docs,cli]"
+    ```
+    This will install the project and its dependencies, including the CLI and its `rich` dependency.
+
 ### Subsequent Launches
 
 To restart the services after they have been stopped (e.g., with `docker compose down`):

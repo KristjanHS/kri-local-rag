@@ -27,13 +27,6 @@ exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
 ignore = ["E203", "E401", "E302", "E305", "E402"]
 select = ["E", "F", "W", "T201"]
 
-# Disable print-statement linting (T201) in CLI scripts and tests where explicit user output is expected.
-[tool.ruff.lint.per-file-ignores]
-"cli.py" = ["T201"]
-"backend/qa_loop.py" = ["T201"]
-"backend/windows_ip_in_wsl.py" = ["T201"]
-"backend/test_*.py" = ["T201"]
-
 [tool.ruff.format]
 quote-style = "double"
 
@@ -99,10 +92,20 @@ weaviate-client = ["weaviate"]  # if you ever install it optional-only
 langchain-community = ["langchain_community"]
 
 [project.optional-dependencies]
-test = ["pytest", "ruff"]
+test = [
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+    "pytest-docker",
+    "pytest-html",
+    "testcontainers[weaviate]",
+    "ruff",
+    "rich>=13,<14",
+]
 docs = ["mkdocs"]
+cli = ["rich"]
 
-pep621_dev_dependency_groups = ["tests", "docs"]
+pep621_dev_dependency_groups = ["tests", "docs", "cli"]
 
 [tool.deptry.per_rule_ignores]
 DEP002 = ["boto3"]       # AWS libs pulled in indirectly

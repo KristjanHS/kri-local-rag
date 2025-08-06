@@ -2,6 +2,13 @@
 
 This guide covers setting up your development environment, managing dependencies, and running tests.
 
+## ⚠️ Important: Avoid PYTHONPATH
+
+**NEVER use PYTHONPATH in this project.** Setting PYTHONPATH can cause AppImage overrides that break virtual environment detection for Cursor IDE and agents. This project uses proper Python module structure with `pyproject.toml` configuration and editable installs.
+
+- ✅ **Correct**: `python -m pytest tests/`
+- ❌ **Incorrect**: `PYTHONPATH=. python -m pytest tests/`
+
 ---
 
 ## Quick Project Launcher (WSL/VS Code)
@@ -123,13 +130,6 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY backend/ ./backend
 COPY pyproject.toml .
 RUN pip install -e .
-```
-
-Additionally, the `app` service in `docker/docker-compose.yml` sets the `PYTHONPATH` to ensure imports work correctly:
-
-```yaml
-environment:
-  - PYTHONPATH=/app
 ```
 
 ### Cleanly Rebuilding the `app` Container
