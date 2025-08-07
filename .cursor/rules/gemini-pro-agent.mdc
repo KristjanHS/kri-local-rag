@@ -1,0 +1,8 @@
+---
+description: Ensure JSON schemas are validated before applying edits
+type: agent-select
+globs: []
+alwaysApply: false
+---
+- Before making schema changes, run a validation step via mcp-search.
+- Wrap multi-file edits in proper diff blocks to avoid truncation.

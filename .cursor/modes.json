@@ -1,0 +1,33 @@
+{
+    "agents": [
+      {
+        "id": "gemini-pro-plan",
+        "name": "Gemini Pro Plan Agent",
+        "description": "Drafts a step-by-step plan before making changes",
+        "model": "gemini-2.5-pro",
+        "temperature": 0.8,
+        "max_tokens": 8192,
+        "tools": [
+          "mcp-search",
+          "cursor-complete"
+        ],
+        "fallback_model": "gpt-4o-mini"
+      },
+      {
+        "id": "gemini-pro-exec",
+        "name": "Gemini Pro Exec Agent",
+        "description": "Follows the approved plan deterministically to apply edits",
+        "model": "gemini-2.5-pro",
+        "temperature": 0.2,
+        "max_tokens": 4096,
+        "tools": [
+          "cursor-complete",
+          "cursor-edit",
+          "shell",
+          "mcp-search"
+        ],
+        "fallback_model": "gpt-4o-mini"
+      }
+    ]
+  }
+  
