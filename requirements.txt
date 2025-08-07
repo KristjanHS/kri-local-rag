@@ -3,7 +3,7 @@
 python-dotenv
 
 # Linting and formatting
-ruff==0.4.9
+ruff==0.5.3
 
 
 # Core Machine Learning Frameworks (CPU-only)
