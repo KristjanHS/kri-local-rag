@@ -1,32 +1,76 @@
-name: Python Lint and Test
+name: Python Lint, Fast Tests, and Slow Tests
+
+env:
+  ACT: ""
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [main, dev]
+  workflow_dispatch: # Allows manual triggering for slow tests
+  schedule:
+    - cron: "0 2 * * 0" # Weekly on Sunday at 2 AM for slow tests
 
 jobs:
-  lint-and-test:
+  lint_and_fast_tests:
+    name: Lint and Fast Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.12"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          #pip install -r phase0/requirements.txt || pip install -r phase1/requirements.txt
-          pip install black flake8
-      - name: Lint with flake8
+          pip install -r requirements-dev.txt
+      - name: Ruff static analysis
         run: |
-          flake8 --version
-          #  flake8 .
-      - name: Format with black
+          ruff check .
+      - name: Ruff formatting check
         run: |
-          black .
-      #- name: Run tests
-      #  run: |
-      #    python -m pytest || true
+          ruff format --check .
+      - name: Run fast tests
+        run: |
+          # This command runs all tests NOT marked as 'slow'
+          # based on the configuration in pytest.ini
+          python -m pytest
+
+  slow_tests:
+    name: Slow Integration Tests
+    # This job runs only on schedule or when manually dispatched.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: lint_and_fast_tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        # Python is needed for the runner environment, but dependencies are inside the container
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build and start container stack
+        run: |
+          docker compose -f docker/docker-compose.yml up -d --build
+      - name: Wait for Weaviate readiness
+        run: |
+          timeout=120; until curl -s http://localhost:8080/v1/.well-known/ready >/dev/null 2>&1; do \
+            echo "Waiting for Weaviate..."; sleep 5; timeout=$((timeout-5)); if [ $timeout -le 0 ]; then echo "Weaviate not ready"; docker compose -f docker/docker-compose.yml logs weaviate; exit 1; fi; done
+      - name: Run slow tests inside container
+        run: |
+          set -o pipefail
+          # This command runs ONLY tests marked as 'slow'
+          docker compose -f docker/docker-compose.yml exec -T app pytest -sv -m slow | tee pytest.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo -e "\n🔴 Pytest failed — showing container logs for debugging:\n"
+            docker compose -f docker/docker-compose.yml logs app || true
+            docker compose -f docker/docker-compose.yml logs weaviate || true
+            docker compose -f docker/docker-compose.yml logs ollama || true
+            exit $EXIT_CODE
+          fi
+      - name: Tear down stack
+        if: always()
+        run: |
+          docker compose -f docker/docker-compose.yml down -v

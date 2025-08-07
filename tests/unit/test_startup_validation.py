@@ -1,23 +1,26 @@
 #!/usr/bin/env python3
 """Test startup performance and initialization behaviors."""
 
-import pytest
-from unittest.mock import patch, MagicMock
-import sys
+import logging
 import os
+import sys
 import time
+from unittest.mock import MagicMock, patch
 
-# Add backend to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
+import pytest
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
+@pytest.mark.slow
 class TestStartupPerformance:
     """Test application startup performance and initialization."""
 
     def test_backend_files_exist(self):
         """Test that core backend files exist without importing them."""
-        print("\n=== TESTING FILE EXISTENCE ===", flush=True)
-        import os
+        logger.info("\n=== TESTING FILE EXISTENCE ===")
 
         backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
 
@@ -25,44 +28,42 @@ class TestStartupPerformance:
 
         for filename in files_to_check:
             filepath = os.path.join(backend_dir, filename)
-            print(f"Checking {filename}...", flush=True)
+            logger.info(f"Checking {filename}...")
             assert os.path.exists(filepath), f"{filename} should exist"
-            print(f"✓ {filename} exists", flush=True)
+            logger.info(f"✓ {filename} exists")
 
-        print("=== FILE EXISTENCE TEST COMPLETED ===", flush=True)
+        logger.info("=== FILE EXISTENCE TEST COMPLETED ===")
 
     def test_import_structure_without_execution(self):
         """Test import structure by reading files as text without executing them."""
-        print("\n=== TESTING IMPORT STRUCTURE ===", flush=True)
-        import os
+        logger.info("\n=== TESTING IMPORT STRUCTURE ===")
 
         backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
 
         # Test config.py has expected variables
-        print("Analyzing config.py...", flush=True)
+        logger.info("Analyzing config.py...")
         config_path = os.path.join(backend_dir, "config.py")
         with open(config_path, "r") as f:
             config_content = f.read()
             assert "OLLAMA_MODEL" in config_content
             assert "WEAVIATE_URL" in config_content
             assert "COLLECTION_NAME" in config_content
-        print("✓ config.py structure validated", flush=True)
+        logger.info("✓ config.py structure validated")
 
         # Test retriever.py has proper import fallback
-        print("Analyzing retriever.py...", flush=True)
+        logger.info("Analyzing retriever.py...")
         retriever_path = os.path.join(backend_dir, "retriever.py")
         with open(retriever_path, "r") as f:
             retriever_content = f.read()
             assert "try:" in retriever_content
             assert "ImportError:" in retriever_content
             assert "sentence_transformers" in retriever_content
-        print("✓ retriever.py import fallback structure validated", flush=True)
+        logger.info("✓ retriever.py import fallback structure validated")
 
-        print("=== IMPORT STRUCTURE TEST COMPLETED ===", flush=True)
+        logger.info("=== IMPORT STRUCTURE TEST COMPLETED ===")
 
     def test_python_syntax_is_valid(self):
         """Test that all Python files have valid syntax without importing."""
-        import os
         import ast
 
         backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
@@ -80,75 +81,58 @@ class TestStartupPerformance:
 
     def test_detect_interactive_prompts_in_imports(self):
         """Test to detect if imports are waiting for interactive prompts."""
-        print("\n=== TESTING FOR INTERACTIVE PROMPTS ===", flush=True)
+        logger.info("\n=== TESTING FOR INTERACTIVE PROMPTS ===")
         import subprocess
-        import os
 
-        # Try to import config.py in a subprocess to see what happens
-        backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
+        project_root = os.path.join(os.path.dirname(__file__), "..")
 
-        print("Testing config.py import in subprocess...", flush=True)
+        logger.info("Testing config.py import in subprocess...")
         try:
             result = subprocess.run(
-                [
-                    "python",
-                    "-c",
-                    f"import sys; sys.path.insert(0, '{backend_dir}'); import config; print('CONFIG_IMPORT_SUCCESS')",
-                ],
+                ["python", "-m", "backend.config"],
                 capture_output=True,
                 text=True,
                 timeout=10,  # 10-second timeout
-                cwd=backend_dir,
+                cwd=project_root,
             )
 
             if result.returncode == 0:
-                if "CONFIG_IMPORT_SUCCESS" in result.stdout:
-                    print("✓ config.py imports without hanging", flush=True)
-                else:
-                    print(f"⚠ config.py import had unexpected output: {result.stdout}", flush=True)
+                logger.info("✓ config.py imports without hanging")
             else:
-                print(f"⚠ config.py import failed: {result.stderr}", flush=True)
+                logger.warning(f"⚠ config.py import failed: {result.stderr}")
 
         except subprocess.TimeoutExpired:
-            print("✗ config.py import timed out - likely waiting for input!", flush=True)
+            logger.error("✗ config.py import timed out - likely waiting for input!")
         except Exception as e:
-            print(f"✗ config.py import test failed: {e}", flush=True)
+            logger.error(f"✗ config.py import test failed: {e}")
 
-        print("=== INTERACTIVE PROMPT TEST COMPLETED ===", flush=True)
+        logger.info("=== INTERACTIVE PROMPT TEST COMPLETED ===")
 
     def test_safe_config_import_only(self):
         """Test importing only the config module safely."""
-        print("\n=== TESTING SAFE CONFIG IMPORT ===", flush=True)
-        import sys
-        import os
+        logger.info("\n=== TESTING SAFE CONFIG IMPORT ===")
 
-        # Add backend to path
-        backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
-        if backend_dir not in sys.path:
-            sys.path.insert(0, backend_dir)
-
-        print("About to import config module...", flush=True)
-        sys.stdout.flush()
+        logger.info("About to import config module...")
 
         try:
-            import config
+            from backend import config
 
-            print("✓ Config module imported successfully!", flush=True)
+            logger.info("✓ Config module imported successfully!")
 
             # Test some basic attributes
-            print("Testing config attributes...", flush=True)
+            logger.info("Testing config attributes...")
             assert hasattr(config, "OLLAMA_MODEL"), "Should have OLLAMA_MODEL"
             assert hasattr(config, "WEAVIATE_URL"), "Should have WEAVIATE_URL"
-            print("✓ Config attributes validated", flush=True)
+            logger.info("✓ Config attributes validated")
 
         except Exception as e:
-            print(f"✗ Config import failed: {e}", flush=True)
+            logger.error(f"✗ Config import failed: {e}")
             raise
 
-        print("=== SAFE CONFIG IMPORT COMPLETED ===", flush=True)
+        logger.info("=== SAFE CONFIG IMPORT COMPLETED ===")
 
-    @patch("qa_loop.ensure_weaviate_ready_and_populated")
-    @patch("qa_loop.ensure_model_available")
+    @patch("backend.qa_loop.ensure_weaviate_ready_and_populated")
+    @patch("backend.qa_loop.ensure_model_available")
     def test_qa_loop_initialization_components(self, mock_ensure_model, mock_ensure_weaviate):
         """Test that QA loop initialization components work correctly."""
         # Mock successful initialization
@@ -163,27 +147,24 @@ class TestStartupPerformance:
 
     def test_heavy_imports_eventually_succeed(self):
         """Test that heavy ML library imports eventually succeed."""
-        import sys
-
-        print("\n=== STARTING HEAVY IMPORT TEST ===", flush=True)
+        logger.info("\n=== STARTING HEAVY IMPORT TEST ===")
         start_time = time.time()
 
         try:
-            print("Step 1: About to import retriever module...", flush=True)
-            sys.stdout.flush()
+            logger.info("Step 1: About to import retriever module...")
 
-            print("Step 2: Retriever imported successfully!", flush=True)
+            logger.info("Step 2: Retriever imported successfully!")
             import_time = time.time() - start_time
-            print(f"Step 3: Import completed in {import_time:.2f}s", flush=True)
+            logger.info(f"Step 3: Import completed in {import_time:.2f}s")
 
             # Allow generous time for ML library imports on first run
             assert import_time < 30.0, f"Heavy imports took {import_time:.2f}s, should be < 30.0s"
 
         except Exception as e:
-            print(f"Step X: Import failed with error: {e}", flush=True)
+            logger.error(f"Step X: Import failed with error: {e}")
             pytest.skip(f"Heavy imports failed (expected in some environments): {e}")
 
-        print("=== HEAVY IMPORT TEST COMPLETED ===", flush=True)
+        logger.info("=== HEAVY IMPORT TEST COMPLETED ===")
 
     def test_sentence_transformers_graceful_fallback(self):
         """Test graceful fallback when sentence_transformers is not available."""
@@ -192,11 +173,11 @@ class TestStartupPerformance:
             # This should not hang because we're mocking the import
             try:
                 # Clear any cached module
-                if "qa_loop" in sys.modules:
-                    del sys.modules["qa_loop"]
+                if "backend.qa_loop" in sys.modules:
+                    del sys.modules["backend.qa_loop"]
 
                 # Now test the fallback
-                import qa_loop
+                from backend import qa_loop
 
                 result = qa_loop._get_cross_encoder()
                 assert result is None
@@ -210,7 +191,8 @@ class TestStartupPerformance:
         # the retriever module still loads and functions without errors.
         with patch.dict("sys.modules", {"sentence_transformers": None}):
             import importlib
-            import retriever
+
+            from backend import retriever
 
             importlib.reload(retriever)
 
@@ -221,7 +203,7 @@ class TestStartupPerformance:
 class TestInitializationLogging:
     """Test initialization logging and message deduplication."""
 
-    @patch("qa_loop.weaviate.connect_to_custom")
+    @patch("weaviate.connect_to_custom")
     def test_weaviate_check_logging(self, mock_connect):
         """Test that Weaviate check produces appropriate log messages."""
         # Mock successful connection
@@ -230,7 +212,7 @@ class TestInitializationLogging:
         mock_client.collections.exists.return_value = True
         mock_connect.return_value = mock_client
 
-        from qa_loop import ensure_weaviate_ready_and_populated
+        from backend.qa_loop import ensure_weaviate_ready_and_populated
 
         # Should complete without exceptions
         ensure_weaviate_ready_and_populated()
@@ -240,10 +222,10 @@ class TestInitializationLogging:
         mock_client.collections.exists.assert_called_once()
         mock_client.close.assert_called_once()
 
-    @patch("ollama_client.httpx.get")
+    @patch("backend.ollama_client.httpx.get")
     def test_ollama_model_check_logging(self, mock_get):
         """Test Ollama model availability check logging."""
-        from ollama_client import ensure_model_available
+        from backend.ollama_client import ensure_model_available
 
         # Mock successful model check
         mock_response = MagicMock()
@@ -258,11 +240,11 @@ class TestInitializationLogging:
 class TestHybridSearchIntegration:
     """Test hybrid search integration and error handling."""
 
-    @patch("retriever.weaviate.connect_to_custom")
-    @patch("retriever._get_embedding_model")
+    @patch("backend.retriever.weaviate.connect_to_custom")
+    @patch("backend.retriever._get_embedding_model")
     def test_hybrid_search_with_vectorization_integration(self, mock_get_model, mock_connect):
         """Integration test for hybrid search with manual vectorization."""
-        from retriever import get_top_k
+        from backend.retriever import get_top_k
 
         # Setup embedding model mock
         mock_model = MagicMock()
@@ -301,15 +283,13 @@ class TestHybridSearchIntegration:
         assert result == ["Test content 1", "Test content 2"]
 
 
+@pytest.mark.slow
 class TestContainerReadiness:
     """Test container readiness and CLI behaviors."""
 
     def test_python_execution_in_container_context(self):
         """Test that Python can execute basic commands in the expected environment."""
-        # This test validates the container environment is working
-        import config
-        import ollama_client
-        import retriever
+        from backend import config, ollama_client, retriever
 
         # Should be able to import all core modules
         assert hasattr(config, "OLLAMA_MODEL")
@@ -318,7 +298,7 @@ class TestContainerReadiness:
 
     def test_weaviate_url_configuration(self):
         """Test that Weaviate URL is properly configured for container environment."""
-        from config import WEAVIATE_URL
+        from backend.config import WEAVIATE_URL
 
         # Should be configured for Docker networking
         assert WEAVIATE_URL is not None
@@ -326,7 +306,7 @@ class TestContainerReadiness:
 
     def test_collection_name_configuration(self):
         """Test that collection name is properly configured."""
-        from config import COLLECTION_NAME
+        from backend.config import COLLECTION_NAME
 
         assert COLLECTION_NAME is not None
         assert len(COLLECTION_NAME) > 0

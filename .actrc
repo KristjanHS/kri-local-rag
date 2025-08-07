@@ -1,0 +1,7 @@
+# Act configuration file
+# Use the recommended catthehacker image which includes Node.js and most GitHub Actions tools
+# This solves the "Cannot find: node in PATH" issue when running actions/setup-python locally
+
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+-P ubuntu-22.04=catthehacker/ubuntu:act-22.04
+-P ubuntu-20.04=catthehacker/ubuntu:act-20.04

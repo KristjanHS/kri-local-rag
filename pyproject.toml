@@ -1,3 +1,18 @@
+[project]
+name = "kri-local-rag"
+version = "0.1.0"
+description = "A local RAG implementation with Weaviate and Ollama."
+authors = [{ name="Kristjan Sillmann"}]
+readme = "README.md"
+requires-python = ">=3.12"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["backend*"]
+
 [tool.ruff]
 line-length = 120
 exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
@@ -10,7 +25,88 @@ exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
 # E305: expected-2-blank-lines-after-function-or-class
 # E402: module-import-not-at-top-of-file
 ignore = ["E203", "E401", "E302", "E305", "E402"]
-select = ["E", "F", "W"]
+select = ["E", "F", "W", "T201"]
 
 [tool.ruff.format]
 quote-style = "double"
+
+[tool.pytest.ini_options]
+addopts = [
+    "-ra",
+    "-v",
+    "--tb=short",
+    "-m",
+    "not environment and not e2e and not slow",
+]
+markers = [
+    "unit: Fast unit tests with mocked dependencies",
+    "integration: Integration tests with real services via Testcontainers",
+    "e2e: End-to-end tests requiring full Docker stack",
+    "docker: Tests requiring a running Docker daemon",
+    "environment: Environment and setup validation tests",
+    "slow: Tests that take longer to run"
+]
+testpaths = [
+    "tests/unit",
+    "tests/integration",
+    "tests/e2e",
+    "tests/environment",
+]
+
+[tool.pytest.docker]
+compose_files = ["docker/docker-compose.yml"]
+
+[tool.pytest.docker.services_wait_for]
+weaviate = "http://localhost:8080/v1/.well-known/ready"
+ollama = "http://localhost:11434"
+
+[tool.pyright]
+include = ["backend", "tests"]
+exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
+venvPath = "."
+venv = ".venv"
+
+[tool.deptry]
+# --- Where to read declared dependencies ------------------------------
+requirements_files       = ["requirements.txt"]
+requirements_files_dev   = ["requirements-dev.txt"]   # only dev tools here
+
+# --- What to scan / skip ----------------------------------------------
+# keep default excludes (.venv, .git, tests, etc.) and add a few more
+extend_exclude           = ["docs", "dist", "build"]
+ignore_notebooks         = true                       # faster on mixed repos
+
+# --- Tell Deptry these folders are *first-party* code ------------------
+known_first_party        = ["backend", "frontend", "scripts"]
+
+# --- Handle edge-cases -------------------------------------------------
+experimental_namespace_package = true                 # recognise PEP-420 pkgs
+# Map weird wheels → import names (example)
+
+# avoids false DEP003 in src-layout
+json_output  = "deptry_report.json"      # for CI artifacts
+
+[tool.deptry.package_module_name_map]
+python-dotenv = ["dotenv"]
+weaviate-client = ["weaviate"]  # if you ever install it optional-only
+langchain-community = ["langchain_community"]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+    "pytest-docker",
+    "pytest-html",
+    "testcontainers[weaviate]",
+    "ruff==0.5.3",
+    "protobuf>=5.26,<7",
+    "rich>=13,<14",
+]
+docs = ["mkdocs"]
+cli = ["rich"]
+
+pep621_dev_dependency_groups = ["tests", "docs", "cli"]
+
+[tool.deptry.per_rule_ignores]
+DEP002 = ["boto3"]       # AWS libs pulled in indirectly

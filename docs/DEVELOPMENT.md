@@ -1,6 +1,13 @@
 # Development Guide
 
-This guide covers setting up your development environment, automating project startup, and (optionally) migrating the repository.
+This guide covers setting up your development environment, managing dependencies, and running tests.
+
+## ⚠️ Important: Avoid PYTHONPATH
+
+**NEVER use PYTHONPATH in this project.** Setting PYTHONPATH can cause AppImage overrides that break virtual environment detection for Cursor IDE and agents. This project uses proper Python module structure with `pyproject.toml` configuration and editable installs.
+
+- ✅ **Correct**: `python -m pytest tests/`
+- ❌ **Incorrect**: `PYTHONPATH=. python -m pytest tests/`
 
 ---
 
@@ -28,29 +35,147 @@ llm () {
   ```
 ---
 
-## Appendix: Repository Migration
+## Local Development
 
-If you need to migrate a part of this project to new repo, follow these steps:
+### Dependency Management
 
-### 1. Prepare the New Repo
-- Create a new empty repo on GitHub (no README, .gitignore, or license)
-- Clone it locally
+This project uses a standard `requirements.txt` based approach for managing dependencies.
 
-### 2. Copy Files
-- Copy the desired files and folders from the old repo to the new one
-- Use `cp` or your file manager
+-   `requirements.txt`: Contains the core application dependencies for production.
+-   `requirements-dev.txt`: Has additional dependencies for development and testing, and includes `requirements.txt`.
 
-### 3. Initialize and Push
-```bash
-git init -b main
-git remote add origin <your-new-repo-url>
-git add --all
-git commit -m "Initial import"
-git push -u origin main
+### Setup
+
+1.  **Create a virtual environment (recommended)**
+
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate
+    ```
+
+2.  **Install Dependencies**
+
+    You have two main sets of dependencies you can install.
+
+    *   **For core application development (production-like environment):**
+        ```bash
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        ```
+
+    *   **For running tests and using linters (full development environment):**
+        ```bash
+        pip install --upgrade pip
+        pip install -r requirements-dev.txt
+        ```
+
+3.  **Install the project in editable mode**
+
+    This step makes your local `backend` code importable.
+
+    ```bash
+    pip install -e .
+    ```
+
+    Running `pip install -e .` tells Python to resolve all imports that start with `backend.` directly from your working copy. Any changes you make under the `backend/` directory are picked up immediately without an extra install step.
+
+4.  **Launch the QA loop**
+
+    ```bash
+    python -m backend.qa_loop
+    ```
+
+### Updating Dependencies
+
+When you need to add or update a package, edit the appropriate `requirements.txt` or `requirements-dev.txt` file directly.
+
+---
+
+## Running Tests
+
+To run the test suite, ensure you have installed the full development and testing dependencies, then run `pytest` from the project root.
+
+1.  **Set up the test environment:**
+    ```bash
+    # Make sure your virtualenv is active
+    pip install -r requirements-dev.txt
+    pip install -e .
+    ```
+2.  **Run the tests:**
+    ```bash
+    python -m pytest
+    ```
+    Using `python -m pytest` is the most robust method, as it ensures imports are resolved correctly from the project root.
+
+---
+
+## Troubleshooting
+
+### ModuleNotFoundError
+
+If you encounter a `ModuleNotFoundError` when running tests or scripts, it typically means that the `backend` package is not correctly installed in your virtual environment. This can happen if you forget to install the project in editable mode.
+
+- **Error example**: `ModuleNotFoundError: No module named 'backend'`
+- **Solution**: Make sure you have installed the project in editable mode. This command needs to be run from the root of the project, with your virtual environment activated:
+  ```bash
+  pip install -e .
+  ```
+This will link the `backend` directory into your environment, allowing Python to find and import your local modules.
+
+---
+
+## Docker Workflow
+
+The Docker image for production should be built using `requirements.txt` to ensure a lean and reproducible container.
+
+*   `pip install -r requirements.txt` installs the pinned *external* libraries for the application.
+*   `pip install -e .` installs the *project itself* in editable mode so that Python can import `backend.*` from `/app/backend`.
+
+This logic should be reflected in your `docker/app.Dockerfile`:
+
+```dockerfile
+# Copy only the production requirements file
+COPY requirements.txt .
+
+# Install production dependencies
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt
+
+# Copy project source and install it
+COPY backend/ ./backend
+COPY pyproject.toml .
+RUN pip install -e .
 ```
 
-### Troubleshooting
-- If you see `fatal: refusing to merge unrelated histories`, recreate the repo without initial files
+### Cleanly Rebuilding the `app` Container
+When you make changes to `docker/app.Dockerfile` or want to ensure a fresh build after updating `requirements.txt`, use this two-step process:
+
+1.  **Build the image without using the cache:**
+    ```bash
+    docker compose -f docker/docker-compose.yml build --no-cache app
+    ```
+
+2.  **Restart the container to use the new image:**
+    ```bash
+    docker compose -f docker/docker-compose.yml up -d --force-recreate app
+    ```
+
+---
+
+## Python Module and Import Strategy
+
+To ensure a scalable and maintainable codebase, this project adheres to the following Python import and module conventions:
+
+1.  **Packages over Directories**: Directories containing Python source code (like `backend/`) are treated as official packages. This is enforced by including an `__init__.py` file in them and configuring `pyproject.toml`.
+
+2.  **Absolute Imports**: All internal imports must be **absolute** from the project root. This practice, recommended by [PEP 8](https://www.python.org/dev/peps/pep-0008/#imports), makes dependencies explicit and avoids ambiguity.
+    *   **Correct**: `from backend.config import get_logger`
+    *   **Incorrect**: `from config import get_logger`
+
+3.  **Module Execution**: Scripts within a package should be executed as modules using the `-m` flag. This ensures that Python's import system correctly resolves package-level imports.
+    *   **Correct**: `python -m backend.qa_loop`
+    *   **Incorrect**: `python backend/qa_loop.py`
+
 ---
 
 ## Backend Architecture
@@ -81,88 +206,3 @@ git push -u origin main
 - Vector similarity search
 - Context chunk retrieval
 - Metadata filtering
-
-## Configuration
-
-### Model Settings
-Default: `cas/mistral-7b-instruct-v0.3`
-
-Edit `ollama_client.py`:
-```python
-OLLAMA_MODEL = "your-model-name"
-```
-
-### Debug Levels
-- **0**: Minimal output (default)
-- **1**: Basic debug info
-- **2**: Detailed debug info
-- **3**: Verbose debug info
-
-## Local Development
-
-### Setup
-```bash
-pip install -r requirements.txt
-python qa_loop.py
-```
-
-### Testing
-```bash
-# Test Ollama connection
-python -c "from ollama_client import test_ollama_connection; test_ollama_connection()"
-
-# Test Weaviate connection
-python -c "import weaviate; client = weaviate.Client('http://localhost:8080'); print('Connected')"
-```
-
-## Docker Workflow
-
-### Cleanly Rebuilding the `app` Container
-When you make changes to `docker/app.Dockerfile` or want to ensure a fresh build, use this two-step process:
-
-1.  **Build the image without using the cache:**
-    ```bash
-    docker compose -f docker/docker-compose.yml build --no-cache app
-    ```
-
-2.  **Restart the container to use the new image:**
-    ```bash
-    docker compose -f docker/docker-compose.yml up -d --force-recreate app
-    ```
-
-## Performance
-
-### Optimization Tips
-- Use GPU for faster LLM inference
-- Adjust chunk size based on documents
-- Monitor memory usage during ingestion
-- Use appropriate debug levels
-
-### Resource Requirements
-- **CPU**: 4+ cores recommended
-- **RAM**: 8GB+ for smooth operation
-- **GPU**: Optional but recommended
-- **Storage**: 10GB+ for models and data
-
----
-
-## Python Module and Import Strategy
-
-To ensure a scalable and maintainable codebase, this project adheres to the following Python import and module conventions:
-
-1.  **Packages over Directories**: Directories containing Python source code (like `backend/`) are treated as official packages. This is enforced by including an `__init__.py` file in them.
-
-2.  **Absolute Imports**: All internal imports must be **absolute** from the project root. This practice, recommended by [PEP 8](https://www.python.org/dev/peps/pep-0008/#imports), makes dependencies explicit and avoids ambiguity.
-    *   **Correct**: `from backend.config import get_logger`
-    *   **Incorrect**: `from config import get_logger`
-
-3.  **Module Execution**: Scripts within a package should be executed as modules using the `-m` flag. This ensures that Python's import system correctly resolves package-level imports.
-    *   **Correct**: `python -m backend.qa_loop`
-    *   **Incorrect**: `python backend/qa_loop.py`
-
-## Docker Dependency Management
-
-To ensure that the Docker containers are always running with the latest dependencies from `requirements.txt`, it's sometimes necessary to force a rebuild of the image, bypassing the cache.
-
-*   **Command**: `docker compose -f docker/docker-compose.yml build --no-cache app`
-*   **When to Use**: Use this command after adding or updating dependencies in `requirements.txt` to ensure they are installed in the Docker image.

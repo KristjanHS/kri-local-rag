@@ -4,6 +4,7 @@
 # External libraries
 from __future__ import annotations
 
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -12,7 +13,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import torch
 
 # Local .py imports
-from backend.config import OLLAMA_MODEL, get_logger
+from backend.config import OLLAMA_MODEL
+from backend.console import console, get_logger
 from backend.ollama_client import ensure_model_available, generate_response
 from backend.retriever import get_top_k
 
@@ -57,37 +59,23 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
     if _cross_encoder is None:
         try:
             _cross_encoder = CrossEncoder(model_name)
+            # Apply PyTorch CPU optimizations (skip in testing environments)
+            skip_optimization = (
+                "pytest" in sys.modules or os.getenv("SKIP_TORCH_OPTIMIZATION", "false").lower() == "true"
+            )
 
-            # Apply PyTorch CPU optimizations
-            # Set optimal threading for current environment
-            torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
-
-            # Apply torch.compile for 5-25% speed-ups, but fail gracefully
-            try:
-                logger.info("torch.compile: optimizing cross-encoder – first run may take ~1 min…")
-
-                # Check if this is a pytest run. If so, torch.compile can be unstable.
-                # It may be better to just skip it.
-                is_pytest_run = "pytest" in sys.modules
-
-                if not is_pytest_run:
-                    if callable(_cross_encoder):
-                        _cross_encoder = torch.compile(_cross_encoder, backend="inductor", mode="max-autotune")
-                        logger.info("torch.compile optimization completed for cross-encoder")
-                    else:
-                        logger.warning(
-                            "Cross-encoder object is not callable (type: %s), skipping torch.compile.",
-                            type(_cross_encoder).__name__,
-                        )
-                else:
-                    logger.warning("Skipping torch.compile during pytest run to avoid instability.")
-
-            except RuntimeError as e:
-                # This can happen on some CPU architectures or with repeated pytest runs.
-                logger.warning("torch.compile failed with a RuntimeError (this is often safe to ignore): %s", e)
-            except Exception as e:
-                # Catch any other unexpected errors during compilation.
-                logger.error("An unexpected error occurred during torch.compile: %s", e, exc_info=True)
+            if not skip_optimization:
+                # Set optimal threading for current environment
+                torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
+                # Apply torch.compile with max-autotune for 5-25% speed-ups on CPU GEMM-heavy models
+                try:
+                    logger.info("torch.compile: optimizing cross-encoder – first run may take ~1 min…")
+                    _cross_encoder = torch.compile(_cross_encoder, backend="inductor", mode="max-autotune")
+                    logger.info("torch.compile optimization completed for cross-encoder")
+                except Exception as compile_e:
+                    logger.warning("Failed to apply torch.compile optimization to cross-encoder: %s", compile_e)
+            else:
+                logger.debug("Skipping torch optimizations (test environment detected)")
 
         except Exception:
             # Any issue loading the model (e.g. no internet) – skip re-ranking.
@@ -225,8 +213,7 @@ def answer(
         if token:
             collected_tokens.append(token)
             # Print tokens immediately for better UX
-            sys.stdout.write(token)
-            sys.stdout.flush()
+            console.print(token, end="")
 
     if on_debug is None:
         on_debug = cli_on_debug
@@ -235,8 +222,7 @@ def answer(
 
     # Show "Answer: " before streaming starts (for CLI mode)
     if on_token is not None:
-        sys.stdout.write("Answer: ")
-        sys.stdout.flush()
+        console.print("Answer: ", end="")
 
     answer_text, updated_context = generate_response(
         prompt_text,
@@ -250,8 +236,7 @@ def answer(
 
     # Add newline after streaming completes to position cursor properly
     if on_token is not None:
-        sys.stdout.write("\n")
-        sys.stdout.flush()
+        console.print()
 
     # Update context for next interaction
     _ollama_context = updated_context
@@ -296,7 +281,10 @@ def ensure_weaviate_ready_and_populated():
             create_collection_if_not_exists(client)
 
             # Ingest example data to ensure all modules are warm, then remove it.
-            ingest("../example_data/")
+            # Get the absolute path to the project root, which is the parent of the 'backend' directory
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            example_data_path = os.path.join(project_root, "example_data")
+            ingest(example_data_path)
 
             # Clean up the example data now that the schema is created.
             # This check is important in case the example_data folder was empty.
@@ -318,23 +306,24 @@ def ensure_weaviate_ready_and_populated():
         # and re-populating, which could be slow on large user databases.
         logger.info("   ✓ Collection '%s' exists.", COLLECTION_NAME)
 
-    except WeaviateConnectionError as e:
-        logger.error(
-            "Failed to connect to Weaviate: %s. "
-            "Please ensure Weaviate is running and accessible before starting the backend.",
-            e,
-        )
-        exit(1)
+    except WeaviateConnectionError:
+        raise WeaviateConnectionError(
+            "Failed to connect to Weaviate. "
+            "Please ensure Weaviate is running and accessible before starting the backend."
+        ) from None
     except Exception as e:
-        logger.error("An unexpected error occurred during Weaviate check: %s", e)
-        exit(1)
+        raise Exception(f"An unexpected error occurred during Weaviate check: {e}") from e
     finally:
         if "client" in locals() and client.is_connected():
             client.close()
     logger.info("--- Weaviate check complete ---")
 
 
-if __name__ == "__main__":
+def qa_loop(question: str, k: int = 3, metadata_filter: Optional[Dict[str, Any]] = None):
+    """
+    Perform a single question-answering loop.
+    This function is a refactoring of the original __main__ block to be reusable.
+    """
     ensure_weaviate_ready_and_populated()
 
     # Ensure the required Ollama model is available locally before accepting questions
@@ -342,10 +331,16 @@ if __name__ == "__main__":
         logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
         sys.exit(1)
 
+    result = answer(question, k=k, metadata_filter=metadata_filter)
+    return result
+
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Interactive RAG console with optional metadata filtering.")
     parser.add_argument("--source", help="Filter chunks by source field (e.g. 'pdf')")
     parser.add_argument("--language", help="Filter chunks by detected language code (e.g. 'en', 'et')")
     parser.add_argument("--k", type=int, default=3, help="Number of top chunks to keep after re-ranking")
+    parser.add_argument("--question", help="If provided, run a single query and exit.")
     args = parser.parse_args()
 
     # Build metadata filter dict (AND-combination of provided fields)
@@ -362,32 +357,33 @@ if __name__ == "__main__":
         else:
             meta_filter = {"operator": "And", "operands": clauses}
 
-    # Run Ollama connection test before starting
-    # Temporarily skip Ollama test as it's hanging
-    # if not test_ollama_connection():
-    #     logger.error("Failed to establish Ollama connection. Please check your setup.")
-    #     sys.exit(1)
+    if args.question:
+        qa_loop(args.question, k=args.k, metadata_filter=meta_filter)
+        sys.exit(0)
+
+    # Interactive loop
+    ensure_weaviate_ready_and_populated()
+    if not ensure_model_available(OLLAMA_MODEL):
+        logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
+        sys.exit(1)
 
     logger.info("💬 RAG console ready – Ask me anything about your documents (Ctrl-D/Ctrl-C to quit)")
-    sys.stdout.write("→ ")
-    sys.stdout.flush()
+    console.print("→ ", end="")
     try:
         for line in sys.stdin:
             q = line.strip()
             if not q:
                 # For empty input, just show the prompt again on a new line
-                sys.stdout.write("→ ")
-                sys.stdout.flush()
+                console.print("→ ", end="")
                 continue
 
-            result = answer(q, k=args.k, metadata_filter=meta_filter)
+            result = qa_loop(q, k=args.k, metadata_filter=meta_filter)
             # result is already streamed to stdout, no need to print again
 
-            print("─" * 50)
-            print("💬 Ready for next question... (Ctrl-D/Ctrl-C to quit)")
-            print("─" * 50)
-            print()  # Extra newline for spacing
-            sys.stdout.write("→ ")
-            sys.stdout.flush()  # Ensure prompt is displayed immediately
+            console.print("─" * 50)
+            console.print("💬 Ready for next question... (Ctrl-D/Ctrl-C to quit)")
+            console.print("─" * 50)
+            console.print()  # Extra newline for spacing
+            console.print("→ ", end="")
     except (EOFError, KeyboardInterrupt):
         pass

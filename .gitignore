@@ -67,7 +67,6 @@ faiss_index/
 # Third-party libraries you've vendored/included
 vendor/
 third_party/
-
 # secrets
 secrets/
 secrets.*

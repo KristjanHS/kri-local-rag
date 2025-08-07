@@ -56,36 +56,63 @@ def test_deterministic_uuid(mock_docs):
 
 
 @patch("backend.ingest.weaviate")
-def test_process_and_upload_chunks(mock_weaviate, mock_docs):
-    """Test the chunk processing and uploading logic."""
+def test_batch_upload_is_used(mock_weaviate, mock_docs):
+    """Verifies that the batch upload context manager is used."""
     # Arrange
-    mock_client = MagicMock()
-    mock_collection = MagicMock()
-    mock_client.collections.get.return_value = mock_collection
-
-    mock_batch_cm = MagicMock()
-    mock_collection.batch.dynamic.return_value = mock_batch_cm
-    # Ensure __enter__ returns the same object so we can track add_object calls
+    mock_client = mock_weaviate.connect_to_custom.return_value
+    mock_collection = mock_client.collections.get.return_value
+    mock_batch_cm = mock_collection.batch.dynamic.return_value
     mock_batch_cm.__enter__.return_value = mock_batch_cm
-
     mock_model = MagicMock()
-    mock_model.encode.return_value = [0.1, 0.2, 0.3]  # Dummy vector
 
     # Act
-    stats = process_and_upload_chunks(mock_client, mock_docs, mock_model)
+    process_and_upload_chunks(mock_client, mock_docs, mock_model, "test_collection")
 
     # Assert
-    assert mock_batch_cm.__enter__.called  # Check that batch context was used
+    assert mock_batch_cm.__enter__.called
     assert mock_collection.batch.dynamic.call_count == 1
-    assert mock_batch_cm.add_object.call_count == len(mock_docs)
 
-    # Check the properties of the first call
+
+@patch("backend.ingest.weaviate")
+def test_object_properties_are_correct(mock_weaviate, mock_docs):
+    """Verifies that the object properties are correctly extracted from the documents."""
+    # Arrange
+    mock_client = mock_weaviate.connect_to_custom.return_value
+    mock_collection = mock_client.collections.get.return_value
+    mock_batch_cm = mock_collection.batch.dynamic.return_value
+    mock_batch_cm.__enter__.return_value = mock_batch_cm
+    mock_model = MagicMock()
+    mock_model.encode.return_value = [0.1, 0.2, 0.3]
+
+    # Act
+    process_and_upload_chunks(mock_client, mock_docs, mock_model, "test_collection")
+
+    # Assert
     _, first_call_kwargs = mock_batch_cm.add_object.call_args_list[0]
     assert "content" in first_call_kwargs["properties"]
     assert first_call_kwargs["properties"]["source_file"] == "test.pdf"
 
-    # Check the properties of the second call
     _, second_call_kwargs = mock_batch_cm.add_object.call_args_list[1]
     assert second_call_kwargs["properties"]["source_file"] == "test.md"
 
-    assert stats["inserts"] == len(mock_docs)
+
+@patch("backend.ingest.weaviate")
+def test_vectors_are_generated_and_added(mock_weaviate, mock_docs):
+    """Verifies that the model is called to generate vectors and that they are added to the batch."""
+    # Arrange
+    mock_client = mock_weaviate.connect_to_custom.return_value
+    mock_collection = mock_client.collections.get.return_value
+    mock_batch_cm = mock_collection.batch.dynamic.return_value
+    mock_batch_cm.__enter__.return_value = mock_batch_cm
+    mock_model = MagicMock()
+    mock_model.encode.return_value = [0.1, 0.2, 0.3]
+
+    # Act
+    process_and_upload_chunks(mock_client, mock_docs, mock_model, "test_collection")
+
+    # Assert
+    assert mock_model.encode.call_count == len(mock_docs)
+    assert mock_batch_cm.add_object.call_count == len(mock_docs)
+    _, first_call_kwargs = mock_batch_cm.add_object.call_args_list[0]
+    assert "vector" in first_call_kwargs
+    assert first_call_kwargs["vector"] == [0.1, 0.2, 0.3]

@@ -1,15 +1,12 @@
 # run locally: ~/projects/kri-local-rag$ streamlit run frontend/rag_app.py
-import sys
 import os
 import threading
 import streamlit as st
 import io, contextlib
 
-# Add backend directory to sys.path for imports
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../backend")))
-from qa_loop import answer, ensure_weaviate_ready_and_populated
-from config import OLLAMA_CONTEXT_TOKENS, get_logger
-from ingest_pdf import ingest
+from backend.qa_loop import answer, ensure_weaviate_ready_and_populated
+from backend.config import OLLAMA_CONTEXT_TOKENS, get_logger
+from backend.ingest import ingest
 
 # Set up logging for this module
 logger = get_logger(__name__)

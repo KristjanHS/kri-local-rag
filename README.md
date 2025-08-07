@@ -97,9 +97,41 @@ The backend uses a RAG pipeline that works as follows:
     docker compose -f docker/docker-compose.yml run --rm ingester
     ```
 
+<<<<<<< HEAD
 4.  **Start Chatting**
     - **CLI**: `docker attach <your-app-container-name>`
     - **Web App**: Open your browser to `http://localhost:8501`.
+=======
+3.  Run the automated setup script:
+    ```bash
+    ./scripts/docker-setup.sh
+    ```
+    **Note:** The first run can be very slow as it downloads several gigabytes of models.
+
+    Once complete, the Streamlit app will be available at **[http://localhost:8501](http://localhost:8501)**.
+
+### Development Installation
+
+If you want to run the scripts locally for development, you'll need to install the project in editable mode.
+
+1.  Create a virtual environment:
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate
+    ```
+
+2.  Install the project in editable mode with all optional dependencies:
+    ```bash
+    pip install -e ".[test,docs,cli]"
+    ```
+    This will install the project and its dependencies, including the CLI and its `rich` dependency.
+
+### Subsequent Launches
+
+To restart the services after they have been stopped (e.g., with `docker compose down`):
+```bash
+docker compose -f docker/docker-compose.yml up -d --no-build
+```
 
 ---
 
@@ -140,6 +172,26 @@ The web application provides a more user-friendly interface. Open `http://localh
 - The web app is simple and could be improved with more features.
 
 ---
+
+## Local CI with `act`
+
+This project uses `act` to run GitHub Actions locally. This allows you to test your changes before pushing them to GitHub, which can save time and prevent broken builds.
+
+To run the local CI, you'll need to have `act` installed. You can find installation instructions on the official `act` repository.
+
+This project is configured to use a specific Docker image for `act` that includes all the necessary dependencies for our CI environment. This configuration is defined in the `.actrc` file in the root of the project. This file is automatically used by `act`, so you don't need to do any special configuration to use it.
+
+To run the local CI, simply run the following command in your terminal:
+
+```bash
+act
+```
+
+This will run all the jobs in the workflow. If you want to run a specific job, you can use the `-j` flag:
+
+```bash
+act -j lint-and-test
+```
 
 ## License
 

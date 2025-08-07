@@ -5,10 +5,8 @@ alwaysApply: true
 Modules: Organize your code into modules such as data_processing, model_training, and api.
 Entry Point: Have a clear entry point like main.py to start your application.
 
-2. Python Coding Standards
-PEP 8: Follow PEP 8 guidelines for Python code style.
-Type Annotations: Use type annotations for better code clarity and maintainability.
-Docstrings: Include docstrings in your functions and classes to explain their purpose.
+2. Linting and Formatting
+Use `ruff` for all Python linting and formatting. This covers PEP 8, type annotations, docstrings, and more, ensuring consistent code style. Run `ruff check . --fix` and `ruff format .` before committing.
 
 3. LangChain Integration
 Environment Configuration: Use environment variables to manage API keys and other sensitive information.
@@ -36,7 +34,11 @@ Prompts: Keep prompts in `/prompts/*.yaml`, each with context and safety notes.
 
 9. Commits & CI
 Commits: Use Conventional Commits 
-CI: CI must pass lint and type check
+CI: CI must pass `ruff check . --fix` and `ruff format .`.
 
 10. Ethics & Licensing
 Data licencing: Verify data licensing; document sources in `/data/README.md`.
+
+11. Python Imports and Packaging
+If a `ModuleNotFoundError` is encountered, first verify that the project has been installed in editable mode with `pip install -e .`. The `backend` module and other local packages are made available through this installation. For more details on the project's import strategy, refer to `docs/DEVELOPMENT.md`.
+

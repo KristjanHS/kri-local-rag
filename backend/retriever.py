@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 import os
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-import weaviate
 import torch
-
-from backend.config import COLLECTION_NAME, DEFAULT_HYBRID_ALPHA, WEAVIATE_URL, get_logger
+import weaviate
 from weaviate.exceptions import WeaviateQueryError
+
+from backend.config import (
+    COLLECTION_NAME,
+    DEFAULT_HYBRID_ALPHA,
+    EMBEDDING_MODEL,
+    WEAVIATE_URL,
+    get_logger,
+)
 
 # For manual vectorization
 try:
@@ -27,7 +33,7 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _get_embedding_model(model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+def _get_embedding_model(model_name: str = EMBEDDING_MODEL):
     """Return a (cached) SentenceTransformer instance for manual vectorization.
 
     Uses the same model as specified in ingest.py to ensure consistency.
