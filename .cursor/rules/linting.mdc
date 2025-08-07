@@ -1,0 +1,10 @@
+---
+description: "Rules for linting and formatting Python code with ruff"
+type: agent-select
+globs:
+  - "**/*.py"
+alwaysApply: false
+---
+- Use `ruff` for all Python linting and formatting.
+- This covers PEP 8, type annotations, docstrings, and more, ensuring consistent code style.
+- Run `ruff check . --fix` and `ruff format .` before committing.

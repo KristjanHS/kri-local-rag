@@ -1,0 +1,8 @@
+---
+description: Handle failures in validation and tests gracefully
+type: agent-select
+globs: []
+alwaysApply: false
+---
+- On validation (`jsonlint`) or test failures, stop further edits.
+- Output the failure reason and suggested next steps.

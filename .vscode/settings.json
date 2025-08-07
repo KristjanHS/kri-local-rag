@@ -11,6 +11,9 @@
         "PYTHONHOME": "",
         "PYTHONPATH": ""
     },
+    "workbench.editorAssociations": {
+        "*.mdc": "default"
+    }
     "files.exclude": {
         "**/.venv": true
     },
@@ -22,7 +25,10 @@
     },
     "python.languageServer": "None",
     "python.formatting.provider": "none",
-    "python.venvPath": "${workspaceFolder}",
+
+    // Don't set this if you're just using a single .venv within your project.
+    //"python.venvPath": "${workspaceFolder}",
+    
     "python.envFile": "${workspaceFolder}/.env",
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",

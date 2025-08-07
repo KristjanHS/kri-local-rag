@@ -1,0 +1,11 @@
+---
+description: "Rules for testing Python code"
+type: agent-select
+globs:
+  - "tests/**/*.py"
+  - "**/*_test.py"
+alwaysApply: false
+---
+- Write unit tests for your functions and components.
+- Ensure your app works as expected with LangChain through integration tests.
+- Run tests using `python -m pytest tests/`.
