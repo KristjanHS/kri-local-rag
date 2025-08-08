@@ -265,7 +265,6 @@ PY
   ```bash
   .venv/bin/python -m pytest -q -m e2e
   ```
-
   Note: To narrow the scope during debugging, you can run subsets without adding new steps:
   - Streamlit smoke only: `.venv/bin/python -m pytest -q tests/e2e_streamlit/test_app_smoke.py -q`
   - CLI smoke only: `.venv/bin/python -m pytest -q tests/e2e/test_cli_script_e2e.py -q`
