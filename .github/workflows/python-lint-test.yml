@@ -2,6 +2,12 @@ name: Python Lint, Fast Tests, and Slow Tests
 
 env:
   ACT: ""
+# NOTE FOR LOCAL CI (act):
+# - The pre-push Git hook (.git/hooks/pre-push) runs:
+#     act pull_request -j lint_and_fast_tests --pull=false --log-prefix-job-id
+#   so local pushes mimic the 'lint_and_fast_tests' job for PRs.
+# - To run this workflow manually with act:
+#     act pull_request -j lint_and_fast_tests
 
 on:
   pull_request:

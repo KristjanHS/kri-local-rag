@@ -160,23 +160,23 @@ This project contains additional documentation in the `docs/` directory:
 
 ## Local CI with `act`
 
-This project uses `act` to run GitHub Actions locally. This allows you to test your changes before pushing them to GitHub, which can save time and prevent broken builds.
+This project uses `act` to run GitHub Actions locally.
 
-To run the local CI, you'll need to have `act` installed. You can find installation instructions on the official `act` repository.
+- Pre-push hook: `.git/hooks/pre-push` runs
+  ```bash
+  act pull_request -j lint_and_fast_tests --pull=false --log-prefix-job-id
+  ```
+  so local pushes mimic the PR “Lint and Fast Tests” job.
+- Manual run matching the hook:
+  ```bash
+  ./scripts/ci_act.sh
+  # or directly
+  act pull_request -j lint_and_fast_tests
+  ```
 
-This project is configured to use a specific Docker image for `act` that includes all the necessary dependencies for our CI environment. This configuration is defined in the `.actrc` file in the root of the project. This file is automatically used by `act`, so you don't need to do any special configuration to use it.
-
-To run the local CI, simply run the following command in your terminal:
-
-```bash
-act
-```
-
-This will run all the jobs in the workflow. If you want to run a specific job, you can use the `-j` flag:
-
-```bash
-act -j lint-and-test
-```
+Notes
+- Act runner images pinned in `.actrc`.
+- Full workflow file: `.github/workflows/python-lint-test.yml`.
 
 ## License
 

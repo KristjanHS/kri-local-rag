@@ -20,9 +20,12 @@ COLLECTION_NAME = "TestCollection"  # Use a dedicated test collection
 def sample_documents_path(tmpdir_factory):
     """Fixture for creating a temporary directory with sample markdown files."""
     data_dir = tmpdir_factory.mktemp("data")
-    (data_dir / "doc1.md").write_text("This is the first document.")
-    (data_dir / "doc2.md").write_text("This is the second document, with more text.")
-    (data_dir / "subdir" / "doc3.md").write_text("This is a nested document.")
+    # Ensure subdir exists for nested document
+    (data_dir / "subdir").mkdir()
+    # Explicitly specify encoding for compatibility with py.path LocalPath API
+    (data_dir / "doc1.md").write_text("This is the first document.", encoding="utf-8")
+    (data_dir / "doc2.md").write_text("This is the second document, with more text.", encoding="utf-8")
+    (data_dir / "subdir" / "doc3.md").write_text("This is a nested document.", encoding="utf-8")
     return str(data_dir)
 
 

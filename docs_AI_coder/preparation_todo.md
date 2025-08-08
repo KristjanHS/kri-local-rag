@@ -3,25 +3,89 @@
 Context
 - App: Local RAG using Weaviate (8080), Ollama (11434), Streamlit UI (8501).
 - Only Streamlit should be user-visible. Other services should be local-only (loopback or compose-internal).
-- Mandatory env vars used by code: `OLLAMA_URL`, `WEAVIATE_URL`, plus flags: `RETRIEVER_EMBEDDING_TORCH_COMPILE`, `RERANKER_CROSS_ENCODER_OPTIMIZATIONS`.
+ - Python execution: avoid `PYTHONPATH`; run modules with `python -m` from project root to ensure imports work.
+
+Conventions
+- Each step has Action and Verify. Aim for one change per step to allow quick fix-and-retry.
+- Prefer the project venv (`.venv/bin/python`) or an equivalent Python environment.
+- Commands are examples, not prescriptions. Any equivalent approach that achieves the Verify outcome is acceptable.
+- Paths, ports, and model names shown are examples; adapt to your environment.
+ - On any Verify failure: stop and create a focused debugging plan before proceeding (assume even these TODO instructions may be stale or mistaken). The plan should:
+   - Summarize expected vs. actual behavior and include the exact command/output/exit code.
+   - Gather quick signals (only the minimum needed): relevant service logs, port bindings, container status, environment variables, and config diffs.
+   - Re-check key assumptions (host vs container URLs, credentials, network bindings, versions, availability of external services).
+   - Consider that the step description might be wrong; cross-check code, `README.md`, and `docker/` for the source of truth.
+   - Propose 1–3 small, reversible next actions with a clear Verify for each. Apply the smallest change first.
+   - After a change, re-run the same Verify command from the failed step. Only then continue.
+   - If blocked, mark the step as `[BLOCKED: <short reason/date>]` in this file and proceed to the smallest independent next step if any; otherwise stop and request help.
+ - Host vs container URLs when executing steps:
+   - From the host (your terminal): use `http://localhost:8080` (Weaviate) and `http://localhost:11434` (Ollama). You can export for convenience:
+     ```bash
+     export WEAVIATE_URL=http://localhost:8080
+     export OLLAMA_URL=http://localhost:11434
+     ```
+   - From inside containers: use `http://weaviate:8080` and `http://ollama:11434`.
 
 Repository preparation tasks
 0) Preflight
-- [ ] Docker + Compose v2 installed locally
-- [ ] Adequate disk space for models/DB (several GB)
+- [x] Action: Check Docker is installed. Verify:
+  ```bash
+  docker --version
+  ```
+  Expect output starts with "Docker version".
+- [x] Action: Check Compose v2 is available. Verify:
+  ```bash
+  docker compose version
+  ```
+  Expect a version string. v2 is recommended.
+- [x] Action: Check free disk space for models/DB. Verify:
+  ```bash
+  df -h / /var/lib/docker | cat
+  ```
+  Expect sufficient free space for selected models (several GB). Adjust based on model size.
+- [x] Action: Ensure scripts are executable. Verify:
+  ```bash
+  chmod +x scripts/*.sh; ls -l scripts | grep -E "cli.sh|ingest.sh|docker-setup.sh" | cat
+  ```
+  Expect `-rwx` permissions on key scripts, or plan to run equivalent commands directly.
 
-1) Environment
-- [ ] Add `.env.example` with minimal keys:
-  - `LOG_LEVEL=INFO`
-  - `OLLAMA_MODEL=cas/mistral-7b-instruct-v0.3`
-  - `OLLAMA_CONTEXT_TOKENS=8192`
-  - `RETRIEVER_EMBEDDING_TORCH_COMPILE=false`
-  - `RERANKER_CROSS_ENCODER_OPTIMIZATIONS=false`
-  - `OLLAMA_URL=http://ollama:11434`
-  - `WEAVIATE_URL=http://weaviate:8080`
+- 1) Environment
+- [x] Action: Ensure `.env.example` exists with minimal keys and copy to `.env` (use values appropriate for your setup). Example contents:
+  ```
+  LOG_LEVEL=INFO
+  OLLAMA_MODEL=cas/mistral-7b-instruct-v0.3  # or another model available to your Ollama
+  OLLAMA_CONTEXT_TOKENS=8192
+  RETRIEVER_EMBEDDING_TORCH_COMPILE=false
+  RERANKER_CROSS_ENCODER_OPTIMIZATIONS=false
+  OLLAMA_URL=http://ollama:11434
+  WEAVIATE_URL=http://weaviate:8080
+  ```
+  Example (optional) create/copy:
+  ```bash
+  test -f .env.example || printf "%s\n" \
+    "LOG_LEVEL=INFO" \
+    "OLLAMA_MODEL=cas/mistral-7b-instruct-v0.3" \
+    "OLLAMA_CONTEXT_TOKENS=8192" \
+    "RETRIEVER_EMBEDDING_TORCH_COMPILE=false" \
+    "RERANKER_CROSS_ENCODER_OPTIMIZATIONS=false" \
+    "OLLAMA_URL=http://ollama:11434" \
+    "WEAVIATE_URL=http://weaviate:8080" > .env.example
+  cp -n .env.example .env || true
+  ```
+  Verify `.env` contains at least these keys (values may differ):
+  ```bash
+  grep -E "^(OLLAMA_URL|WEAVIATE_URL|OLLAMA_MODEL)=" .env | cat
+  ```
+  Expect 3+ lines printed with expected keys present.
+- [x] Action: Prepare a Python environment and install dev deps (venv, conda, or system). Example:
+  ```bash
+  python -m venv .venv; .venv/bin/pip install -r requirements-dev.txt
+  .venv/bin/python --version && .venv/bin/ruff --version | cat
+  ```
+  Verify your Python is available and a linter (`ruff`) is installed (version prints).
 
 2) Network exposure (security)
-- [ ] Edit `docker/docker-compose.yml` to bind Weaviate and Ollama to loopback and publish only Streamlit:
+- [x] Action: Ensure Weaviate (8080) and Ollama (11434) are not publicly exposed (bind to loopback or compose-internal). Publish only Streamlit (8501). Example compose snippet:
   ```yaml
   weaviate:
     ports: ["127.0.0.1:8080:8080", "127.0.0.1:50051:50051"]
@@ -30,64 +94,100 @@ Repository preparation tasks
   app:
     ports: ["8501:8501"]
   ```
-- [ ] Verify exposure from host:
-  ```bash
-  ss -tulpen | grep -E ":(8501|8080|11434)"
-  ```
+- [x] Verify (method of your choice). Examples:
+  - Example A (inspect bindings without starting):
+    ```bash
+    grep -n "127.0.0.1:8080" docker/docker-compose.yml && \
+    grep -n "127.0.0.1:11434" docker/docker-compose.yml && \
+    grep -n "8501:8501" docker/docker-compose.yml | cat
+    ```
+  - Example B (after starting):
+    ```bash
+    ss -tulpen | grep -E ":(8501|8080|11434)" | cat
+    ```
+  Expect internal services bound to 127.0.0.1 and only 8501 user-visible.
 
 3) Minimal, incremental bring-up (assume CLI and app may be broken)
 3.0) Trusted tests to drive bring-up (match local CI/act)
-- [ ] Use the same selection CI runs (ruff + pytest with default markers from `pyproject.toml`):
+- [x] Action: Run fast local checks (ruff + pytest with default markers). Verify exit code 0:
   ```bash
-  ./scripts/ci_local.sh
+  ./scripts/ci_local_fast.sh
   ```
-  This runs:
-  - Ruff checks
-  - `pytest -q tests/` with default addopts: excludes `environment`, `e2e`, and `slow`, so it runs unit + integration tests
-- [ ] If a single failing test blocks iteration, narrow temporarily:
+  Expect linter output and tests pass.
+- [ ] If a single failing test blocks iteration, temporarily narrow. Verify failure is isolated:
   ```bash
-  .venv/bin/python -m pytest -q -k "test_name_or_class"  # then restore full run
+  .venv/bin/python -m pytest -q -k "<substring>"
   ```
-3.1) Lint & fast tests first
-- [ ] Run linter: `.venv/bin/python -m ruff check .`
-- [ ] Run unit tests only: `.venv/bin/python -m pytest -q -m unit`
-- [ ] Fix import errors or missing deps reported by tests/linter
+
+3.1) Lint & unit-only smoke
+- [x] Action: Run linter. Verify no errors:
+  ```bash
+  .venv/bin/python -m ruff check .
+  ```
+- [x] Action: Run unit tests only. Verify exit code 0:
+  ```bash
+  .venv/bin/python -m pytest -q -m unit
+  ```
 
 3.2) Validate external services standalone
-- [ ] Start only `weaviate` and `ollama`:
+- [x] Action: Start only `weaviate` and `ollama`. Verify readiness (or equivalent checks):
   ```bash
   docker compose -f docker/docker-compose.yml up -d weaviate ollama
-  docker compose -f docker/docker-compose.yml exec weaviate wget -qO - http://localhost:8080/v1/.well-known/ready
-  docker compose -f docker/docker-compose.yml exec ollama curl -s http://localhost:11434/api/tags
+  # Weaviate (inside container):
+  docker compose -f docker/docker-compose.yml exec -T weaviate wget -qO - http://localhost:8080/v1/.well-known/ready
+  # Ollama (host → container):
+  curl -s -o /dev/null -w "%{http_code}\n" http://localhost:11434/api/tags
+  # Alternatively for Ollama readiness, rely on its healthcheck or run inside the container:
+  docker compose -f docker/docker-compose.yml ps | grep -E "ollama" | grep -q "healthy" && echo OLLAMA_HEALTHY || echo OLLAMA_NOT_HEALTHY
+  docker compose -f docker/docker-compose.yml exec -T ollama ollama list >/dev/null && echo OLLAMA_OK
+  ```
+  Expect Weaviate readiness JSON and HTTP 200 from Ollama. The models list may be empty if none are pulled yet.
+ - [ ] If readiness fails, make activity visible and debug incrementally, then retry the same Verify:
+  ```bash
+  # Show status and recent logs
+  docker compose -f docker/docker-compose.yml ps
+  docker compose -f docker/docker-compose.yml logs --tail=200 weaviate | cat
+  docker compose -f docker/docker-compose.yml logs --tail=200 ollama | cat
+  # Optional: live stream logs while waiting (Ctrl+C to stop)
+  # docker compose -f docker/docker-compose.yml logs -f ollama
+  # If Ollama needs a model, pulls can take a long time. Trigger an explicit pull to see progress in logs:
+  # Use the model from .env (host):
+  export OLLAMA_MODEL=${OLLAMA_MODEL:-cas/mistral-7b-instruct-v0.3}
+  curl -s -X POST http://localhost:11434/api/pull -d "{\"name\":\"$OLLAMA_MODEL\"}"
+  # Or inside the container (pull shows progress in logs):
+  docker compose -f docker/docker-compose.yml exec -T ollama ollama pull "$OLLAMA_MODEL"
   ```
 
 3.3) Backend primitives in isolation (no UI)
-- [ ] Quick Weaviate connect from host Python:
+- [x] Action: Quick Weaviate connect from host Python. Verify prints `is_ready= True`:
   ```bash
   .venv/bin/python - <<'PY'
 import os, weaviate
 from urllib.parse import urlparse
-weaviate_url=os.getenv('WEAVIATE_URL','http://weaviate:8080')
+weaviate_url=os.getenv('WEAVIATE_URL','http://localhost:8080')
 pu=urlparse(weaviate_url)
 client=weaviate.connect_to_custom(http_host=pu.hostname or 'localhost', http_port=pu.port or 80, grpc_host=pu.hostname or 'localhost', grpc_port=50051, http_secure=pu.scheme=='https', grpc_secure=pu.scheme=='https')
 print('is_ready=', client.is_ready())
 client.close()
 PY
   ```
-- [ ] Quick Ollama generate (tiny prompt) via `backend/ollama_client.test_ollama_connection()` using a small helper snippet or with `curl`:
+ - [x] Action: Confirm Ollama API is reachable (no model pull). Verify HTTP 200 JSON with `models` key:
   ```bash
-  docker compose -f docker/docker-compose.yml exec ollama curl -s http://localhost:11434/api/tags
+  # Host → container (container may not have curl installed):
+  curl -s -o /dev/null -w "%{http_code}\n" http://localhost:11434/api/tags
+  # Inside container, prefer the Ollama CLI for visibility:
+  docker compose -f docker/docker-compose.yml exec -T ollama ollama list | head -n 2
   ```
 
 3.4) Backend modules
-- [ ] Import `backend.retriever` and call `get_top_k("test", k=1)` with empty DB → expect [] (no crash):
+- [x] Action: Import `backend.retriever` and call minimal retrieval. Verify output is `[]` (no crash):
   ```bash
   .venv/bin/python - <<'PY'
 from backend.retriever import get_top_k
 print(get_top_k('test', k=1))
 PY
   ```
-- [ ] Import `backend.qa_loop` and run `ensure_weaviate_ready_and_populated()` → expect collection created with example warmup then cleaned, no crash:
+- [x] Action: Run `ensure_weaviate_ready_and_populated()`. Verify prints `weaviate ok` and no exception:
   ```bash
   .venv/bin/python - <<'PY'
 from backend.qa_loop import ensure_weaviate_ready_and_populated
@@ -97,46 +197,108 @@ PY
   ```
 
 3.5) Ingestion minimal path
-- [ ] Place a tiny PDF in `data/` (or use `example_data/test.pdf` if present)
-- [ ] Run ingestion: `./scripts/ingest.sh data`
-- [ ] Re-run `get_top_k('test', k=1)` → expect non-empty or still stable behavior without exceptions
+- [x] Action: Ensure a tiny PDF exists. Verify one file present:
+  ```bash
+  test -f example_data/test.pdf && cp -n example_data/test.pdf data/ || true
+  ls -1 data/*.pdf | head -n 1 | cat
+  ```
+ - [x] Action: Run ingestion (choose one). Verify exit code 0:
+   - Preferred (host, avoids container package drift):
+     ```bash
+     .venv/bin/python -m backend.ingest --data-dir data
+     ```
+   - Example A (helper script; uses a temporary container):
+     ```bash
+     ./scripts/ingest.sh data
+     ```
+   - Example B (compose profile):
+     ```bash
+     docker compose -f docker/docker-compose.yml --profile ingest up --build --abort-on-container-exit
+     ```
+   - Example C (inside app container):
+     ```bash
+     docker compose -f docker/docker-compose.yml exec app python -m backend.ingest --data-dir /app/data
+     ```
+   Notes:
+   - If container-based methods error with Python package mismatches (e.g., protobuf), prefer the host method above or rebuild the app image.
+- [x] Action: Re-run retrieval. Verify non-empty (or still stable with `[]` but no exceptions):
+  ```bash
+  .venv/bin/python - <<'PY'
+from backend.retriever import get_top_k
+print(get_top_k('test', k=1))
+PY
+  ```
 
 3.6) CLI minimal
-- [ ] Run CLI single question path in verbose mode to surface errors early:
-  ```bash
-  ./scripts/cli.sh --debug --question "hello"
-  ```
-- [ ] If it fails, capture the first error, fix, and retry; repeat until CLI single-shot works
+- [x] Action: Run CLI one-shot in verbose mode (or equivalent). Verify it prints an `Answer:` without stack trace:
+  - Example A (wrapper script):
+    ```bash
+    ./scripts/cli.sh --debug --question "hello"
+    ```
+  - Example B (direct Python):
+    ```bash
+    .venv/bin/python -m cli --question "hello"
+    ```
+  - Example C (inside container):
+    ```bash
+    docker compose -f docker/docker-compose.yml exec app python -m cli --question "hello"
+    ```
+- [ ] If it fails, capture and fix the first error, then retry the same command.
 
 3.7) Streamlit minimal
-- [ ] Start only `app`: `docker compose -f docker/docker-compose.yml up -d app`
-- [ ] Open `http://localhost:8501` and submit a single short question
-- [ ] If it fails, read container logs: `docker compose -f docker/docker-compose.yml logs --tail=200 app`
-- [ ] Fix one error at a time and retry the same action
+- [x] Action: Start only `app`. Verify port 8501 returns 200:
+  ```bash
+  docker compose -f docker/docker-compose.yml up -d app
+  curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8501
+  ```
+- [ ] If it fails, read logs and fix first error, then retry verify:
+  ```bash
+  docker compose -f docker/docker-compose.yml logs --tail=200 app | cat
+  ```
 
 4) Broader tests
-- [ ] Run integration tests (optionally with dockerized services): `.venv/bin/python -m pytest -q -m integration`
-- [ ] Run e2e tests when stable: `.venv/bin/python -m pytest -q -m e2e`
+- [x] Action: Run integration tests. Verify exit code 0:
+  ```bash
+  .venv/bin/python -m pytest -q -m integration
+  ```
+- [ ] Action: Run e2e tests (when stable). Verify exit code 0:
+  ```bash
+  .venv/bin/python -m pytest -q -m e2e
+  ```
 
 5) Build validation
-- [ ] `docker compose -f docker/docker-compose.yml build app`
-- [ ] Ensure build completes without errors
+- [ ] Action: Build app image. Verify build finishes without errors:
+  ```bash
+  docker compose -f docker/docker-compose.yml build app | cat
+  ```
 
 6) Persistence
-- [ ] Restart Weaviate and app: `docker compose -f docker/docker-compose.yml restart weaviate app`
-- [ ] Re-ask a prior question; confirm data persists and answers remain grounded
+- [ ] Action: Restart Weaviate and app. Verify they return healthy and previously ingested data still answers:
+  ```bash
+  docker compose -f docker/docker-compose.yml restart weaviate app
+  ./scripts/cli.sh --question "hello"
+  ```
 
 7) Handover bundle
-- [ ] Ensure `docs_AI_coder/mvp_deployment.md` is up to date for admin
-- [ ] Provide `.env.example` and any model/tag pin notes
+- [ ] Action: Ensure `docs_AI_coder/mvp_deployment.md` is up to date. Verify a recent edit timestamp in git:
+  ```bash
+  git log -1 --format=%ci -- docs_AI_coder/mvp_deployment.md | cat
+  ```
+- [ ] Action: Confirm `.env.example` exists and contains model/tag pins. Verify:
+  ```bash
+  test -f .env.example && grep -E "^(OLLAMA_MODEL|OLLAMA_CONTEXT_TOKENS)=" .env.example | cat
+  ```
 
 8) Done criteria (all must pass)
-- [ ] Services healthy; UI loads
+- [ ] Services healthy; UI loads (`curl 8501` returns 200)
 - [ ] CLI single-shot works for a trivial question
 - [ ] First answer latency acceptable (< ~2 min on fresh model)
 - [ ] Ingestion succeeds; answers are grounded and coherent
 - [ ] Data persists after restart
-- [ ] Logs present; no critical errors in `logs/rag_system.log`
+- [ ] Logs present; no critical errors in `logs/rag_system.log` (grep should be empty):
+  ```bash
+  test -f logs/rag_system.log && grep -Ei "(error|traceback)" logs/rag_system.log || true
+  ```
 
 Post-MVP (defer)
 - [ ] Add app healthcheck/readiness for Streamlit

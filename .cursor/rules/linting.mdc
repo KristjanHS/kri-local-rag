@@ -5,6 +5,9 @@ globs:
   - "**/*.py"
 alwaysApply: false
 ---
-- Use `ruff` for all Python linting and formatting.
-- This covers PEP 8, type annotations, docstrings, and more, ensuring consistent code style.
-- Run `ruff check . --fix` and `ruff format .` before committing.
+- Use Ruff for all Python linting and formatting.
+- Ruff runs automatically on save (via the Ruff editor extension) and on commit (via pre-commit).
+- CI enforces Ruff (lint and format checks) in PRs.
+- Do not manually run Ruff after each edit; rely on the editor and pre-commit. If working headless or fixing CI, use:
+  - `ruff check . --fix`
+  - `ruff format .`

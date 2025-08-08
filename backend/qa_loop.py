@@ -171,7 +171,8 @@ def answer(
     global _ollama_context
 
     # ---------- 1) Retrieve -----------------------------------------------------
-    initial_k = max(k * 20, 100)  # ask vector DB for more than we eventually keep
+    # Ask vector DB for more than we eventually keep to improve re-ranking quality
+    initial_k = k * 20
     candidates = get_top_k(question, k=initial_k, metadata_filter=metadata_filter)
     if not candidates:
         return "I found no relevant context to answer that question. The database may be empty. Ingest a PDF first."
