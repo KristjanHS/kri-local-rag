@@ -183,22 +183,15 @@ log_step "Checking out main and pulling (ff-only)…"
 git checkout main | tee -a "$LOG_FILE"
 git pull --ff-only | tee -a "$LOG_FILE"
 
-set +e
-git merge --ff-only dev 2>/dev/null
-FF_EXIT=$?
-set -e
-
-if [[ $FF_EXIT -eq 0 ]]; then
+# Try a fast-forward first. Use an if-guard to avoid triggering ERR trap on non-zero.
+if git merge --ff-only dev >/dev/null 2>&1; then
   _green "Fast-forward succeeded." | tee -a "$LOG_FILE"
 else
   _yellow "Fast-forward not possible; performing a merge…" | tee -a "$LOG_FILE"
-  # Perform merge (may create conflicts)
-  set +e
-  git merge dev -m "chore: merge dev into main" | tee -a "$LOG_FILE"
-  MERGE_EXIT=${PIPESTATUS[0]}
-  set -e
-
-  if [[ $MERGE_EXIT -ne 0 ]]; then
+  # Perform merge (may create conflicts). Pipeline guarded by if to avoid ERR trap.
+  if git merge dev -m "chore: merge dev into main" | tee -a "$LOG_FILE"; then
+    :
+  else
     _yellow "Merge reported conflicts; attempting auto-resolution…" | tee -a "$LOG_FILE"
     auto_resolve_conflicts "$PREFER_DEV_ALL"
   fi
