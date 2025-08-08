@@ -21,6 +21,13 @@ pip install -e .
 ```
 
 ## Run tests
+
+- Quick/quiet fast tests (recommended for local iteration):
+```bash
+.venv/bin/python -m pytest -q tests/
+```
+
+- Full verbose test output:
 ```bash
 .venv/bin/python -m pytest -v
 ```
