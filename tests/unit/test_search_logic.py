@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # Disable torch.compile during these mocked tests to avoid unnecessary compile overhead
-os.environ["ENABLE_TORCH_COMPILE"] = "false"
+os.environ["RETRIEVER_EMBEDDING_TORCH_COMPILE"] = "false"
 
 
 # Note: The main 'from retriever import ...' is moved inside the test functions

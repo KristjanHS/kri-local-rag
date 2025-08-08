@@ -2,7 +2,7 @@
   {
     "id": "gemini-pro-plan",
     "name": "Gemini Pro Plan Agent",
-    "description": "Drafts a step-by-step plan before making changes",
+    "description": "Drafts a step-by-step plan but does not start to execute on it",
     "model": "gemini-2.5-pro",
     "temperature": 0.8,
     "max_tokens": 8192,

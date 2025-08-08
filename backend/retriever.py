@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 import torch
@@ -16,14 +16,18 @@ from backend.config import (
     get_logger,
 )
 
-# For manual vectorization
+# For manual vectorization – import type only for type-checkers
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from sentence_transformers import SentenceTransformer as SentenceTransformerType
+else:
+    SentenceTransformerType = object  # fallback at runtime
 try:
     from sentence_transformers import SentenceTransformer  # type: ignore
-except ImportError:
+except ImportError:  # pragma: no cover – optional dep
     SentenceTransformer = None  # type: ignore
 
 # Cache the embedding model instance after first load
-_embedding_model: "SentenceTransformer | None" = None
+_embedding_model: Any = None
 
 # Set up logging for this module
 logger = get_logger(__name__)
@@ -53,9 +57,9 @@ def _get_embedding_model(model_name: str = EMBEDDING_MODEL):
             # Apply torch.compile for production performance, but allow skipping for tests
             from unittest.mock import MagicMock  # type: ignore
 
-            if os.getenv("ENABLE_TORCH_COMPILE", "true").lower() == "true" and not isinstance(
-                _embedding_model, MagicMock
-            ):
+            enable_compile_str = os.getenv("RETRIEVER_EMBEDDING_TORCH_COMPILE", "true")
+
+            if enable_compile_str.lower() == "true" and not isinstance(_embedding_model, MagicMock):
                 try:
                     logger.info("torch.compile: optimizing embedding model – first run may take up to a minute…")
                     _embedding_model = torch.compile(_embedding_model, backend="inductor", mode="max-autotune")
@@ -101,10 +105,12 @@ def get_top_k(
     """
 
     parsed_url = urlparse(WEAVIATE_URL)
+    http_host = parsed_url.hostname or "localhost"
+    grpc_host = parsed_url.hostname or "localhost"
     client = weaviate.connect_to_custom(
-        http_host=parsed_url.hostname,
+        http_host=http_host,
         http_port=parsed_url.port or 80,
-        grpc_host=parsed_url.hostname,
+        grpc_host=grpc_host,
         grpc_port=50051,
         http_secure=parsed_url.scheme == "https",
         grpc_secure=parsed_url.scheme == "https",
@@ -120,7 +126,13 @@ def get_top_k(
             embedding_model = _get_embedding_model()
             if embedding_model is not None:
                 # Vectorize the query using the same model as ingestion
-                query_vector = embedding_model.encode(question).tolist()
+                query_vector_raw = embedding_model.encode(question)
+                # Normalize to a plain Python list of floats for Weaviate client
+                query_vector: List[float]
+                if hasattr(query_vector_raw, "tolist"):
+                    query_vector = list(query_vector_raw.tolist())  # type: ignore[assignment]
+                else:
+                    query_vector = list(query_vector_raw)  # type: ignore[arg-type]
                 # Hybrid search with manually provided vector
                 res = q.hybrid(vector=query_vector, query=question, alpha=alpha, limit=k)
                 logger.info("hybrid search used with manual vectorization (alpha=%s)", alpha)
