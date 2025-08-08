@@ -1,0 +1,11 @@
+---
+description: For "Gemini Pro Plan Agent": never execute on the created plan
+type: agent-select
+globs: []
+alwaysApply: false
+---
+- You are in **PLAN** mode.
+- Gather context, ask clarifying questions, and output a clear, numbered **plan**.
+- Once the plan is approved by user, put it into docs_AI_coder/plan.md
+- After finishing the plan, don't start executing on it.
+- Never apply edits, write files, or run shell commands

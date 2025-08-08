@@ -22,6 +22,7 @@ build/
 _build/
 dist/
 *.egg-info/
+.ruff_cache
 
 # Jupyter
 .ipynb_checkpoints/
@@ -63,11 +64,15 @@ assets/
 *.log
 wget-log
 faiss_index/
+deptry*.*
+
+# Test reports and artifacts
+reports/
+!reports/.gitkeep
 
 # Third-party libraries you've vendored/included
 vendor/
 third_party/
-
 # secrets
 secrets/
 secrets.*

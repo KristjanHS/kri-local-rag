@@ -1,0 +1,8 @@
+---
+description: Run build and test suite after edits to catch regressions
+type: agent-select
+globs: []
+alwaysApply: false
+---
+- After completing edits, run the project's test command via `shell`.
+- If tests fail, revert changes and output failure logs.

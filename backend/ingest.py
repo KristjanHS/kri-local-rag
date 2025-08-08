@@ -19,7 +19,7 @@ import hashlib
 import os
 import time
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 import torch
 import weaviate
@@ -36,12 +36,10 @@ from backend.config import (
     CHUNK_OVERLAP,
     CHUNK_SIZE,
     COLLECTION_NAME,
+    EMBEDDING_MODEL,
     WEAVIATE_URL,
     get_logger,
 )
-
-# --- Centralized Configuration ---
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 # --- Logging Setup ---
 logger = get_logger(__name__)
@@ -77,16 +75,20 @@ def load_and_split_documents(directory: str) -> List[Document]:
     return chunked_docs
 
 
+from urllib.parse import urlparse
+
+
 def connect_to_weaviate() -> weaviate.WeaviateClient:
     """Connect to the Weaviate instance."""
     logger.info(f"Connecting to Weaviate at {WEAVIATE_URL}...")
+    parsed_url = urlparse(WEAVIATE_URL)
     client = weaviate.connect_to_custom(
-        http_host=weaviate.urlparse(WEAVIATE_URL).hostname,
-        http_port=weaviate.urlparse(WEAVIATE_URL).port or 80,
-        grpc_host=weaviate.urlparse(WEAVIATE_URL).hostname,
+        http_host=parsed_url.hostname,
+        http_port=parsed_url.port or 80,
+        grpc_host=parsed_url.hostname,
         grpc_port=50051,
-        http_secure=weaviate.urlparse(WEAVIATE_URL).scheme == "https",
-        grpc_secure=weaviate.urlparse(WEAVIATE_URL).scheme == "https",
+        http_secure=parsed_url.scheme == "https",
+        grpc_secure=parsed_url.scheme == "https",
     )
     logger.info("Connection successful.")
     return client
@@ -111,29 +113,30 @@ def deterministic_uuid(doc: Document) -> str:
     return hashlib.md5(f"{source_file}:{content_hash}".encode("utf-8")).hexdigest()
 
 
-def create_collection_if_not_exists(client: weaviate.WeaviateClient):
+def create_collection_if_not_exists(client: weaviate.WeaviateClient, collection_name: str):
     """Create the collection in Weaviate if it doesn't exist."""
-    if not client.collections.exists(COLLECTION_NAME):
+    if not client.collections.exists(collection_name):
         client.collections.create(
-            name=COLLECTION_NAME,
+            name=collection_name,
             # The vectorizer is set to "none" because we are providing our own vectors.
             # Weaviate will not generate vectors for us.
             vectorizer_config=weaviate.classes.config.Configure.Vectorizer.none(),
             # The generative module is set to "none" as we are using a separate LLM.
-            generative_config=weaviate.classes.config.Configure.Generative.none(),
+            # generative_config=weaviate.classes.config.Configure.Generative.none(),
         )
-        logger.info(f"→ Collection '{COLLECTION_NAME}' created for manual vectorization.")
+        logger.info(f"→ Collection '{collection_name}' created for manual vectorization.")
     else:
-        logger.info(f"→ Collection '{COLLECTION_NAME}' already exists.")
+        logger.info(f"→ Collection '{collection_name}' already exists.")
 
 
 def process_and_upload_chunks(
     client: weaviate.WeaviateClient,
     docs: List[Document],
     model: SentenceTransformer,
+    collection_name: str,
 ):
     """Process each document chunk and upload it to Weaviate."""
-    collection = client.collections.get(COLLECTION_NAME)
+    collection = client.collections.get(collection_name)
     stats = {"inserts": 0, "updates": 0, "skipped": 0}
 
     with collection.batch.dynamic() as batch:
@@ -167,7 +170,30 @@ def process_and_upload_chunks(
     return stats
 
 
-def ingest(directory: str):
+"""
+Test-only hooks (re-exported for integration tests)
+These are re-exported from backend._test_support so tests can patch via
+backend.ingest.get_embedding_model / backend.ingest.ingest_documents
+without changing their import paths.
+"""
+try:  # pragma: no cover - optional in production
+    from backend._test_support import (  # type: ignore
+        get_embedding_model as get_embedding_model,
+    )
+    from backend._test_support import (
+        ingest_documents as ingest_documents,
+    )
+except Exception:  # pragma: no cover
+    pass
+
+
+def ingest(
+    directory: str,
+    collection_name: str = COLLECTION_NAME,
+    *,
+    embedding_model: Optional[SentenceTransformer] = None,
+    client: Optional[weaviate.WeaviateClient] = None,
+):
     """Main ingestion pipeline."""
     start_time = time.time()
 
@@ -175,21 +201,30 @@ def ingest(directory: str):
     if not chunked_docs:
         return
 
-    logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
-    model = SentenceTransformer(EMBEDDING_MODEL)
+    # Resolve embedding model (allow DI for tests)
+    if embedding_model is None:
+        logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
+        model = SentenceTransformer(EMBEDDING_MODEL)
+        try:
+            logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
+            model = torch.compile(model, backend="inductor", mode="max-autotune")  # type: ignore[attr-defined]
+            logger.info("torch.compile optimization completed.")
+        except Exception as e:
+            logger.warning(f"Could not apply torch.compile: {e}")
+    else:
+        model = embedding_model
 
+    # Resolve client (allow DI for tests)
+    created_client = False
+    if client is None:
+        client = connect_to_weaviate()
+        created_client = True
     try:
-        logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
-        model = torch.compile(model, backend="inductor", mode="max-autotune")
-        logger.info("torch.compile optimization completed.")
-    except Exception as e:
-        logger.warning(f"Could not apply torch.compile: {e}")
-
-    client = connect_to_weaviate()
-    try:
-        process_and_upload_chunks(client, chunked_docs, model)
+        create_collection_if_not_exists(client, collection_name)
+        process_and_upload_chunks(client, chunked_docs, model, collection_name)
     finally:
-        client.close()
+        if created_client and hasattr(client, "close"):
+            client.close()
 
     elapsed = time.time() - start_time
     logger.info("── Summary ─────────────────────────────")

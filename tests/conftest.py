@@ -1,9 +1,91 @@
-#!/usr/bin/env python3
-"""Pytest configuration and fixtures for the test suite."""
+"""Global pytest configuration for logging and per-test log capture."""
+
+from __future__ import annotations
+
+import logging
+import os
+from pathlib import Path
+from typing import Iterator
 
 import pytest
+
+REPORTS_DIR = Path("reports")
+LOGS_DIR = REPORTS_DIR / "logs"
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: D401
+    """Ensure report directories exist before any logging is configured."""
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _ensure_logs_dir() -> Iterator[None]:
+    # Reduce noise from third-party libs
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("weaviate").setLevel(logging.INFO)
+    yield
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    """Attach a per-test file handler to the root logger."""
+    nodeid_sanitized = item.nodeid.replace(os.sep, "_").replace("::", "__")
+    logfile = LOGS_DIR / f"{nodeid_sanitized}.log"
+    logfile.parent.mkdir(parents=True, exist_ok=True)
+
+    handler = logging.FileHandler(logfile, encoding="utf-8")
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(
+        fmt="%(asctime)s %(levelname)s %(name)s - %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+    handler.setFormatter(formatter)
+
+    # Store a reference so we can remove it later
+    item._log_file_handler = handler  # type: ignore[attr-defined]
+
+    root = logging.getLogger()
+    root.addHandler(handler)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_teardown(item: pytest.Item) -> None:
+    """Detach the per-test file handler."""
+    handler: logging.Handler | None = getattr(item, "_log_file_handler", None)  # type: ignore[attr-defined]
+    if handler is not None:
+        root = logging.getLogger()
+        root.removeHandler(handler)
+        handler.close()
+        delattr(item, "_log_file_handler")  # type: ignore[attr-defined]
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:  # noqa: D401
+    """On failure, emit path to the per-test logfile for quick discovery."""
+    if report.when == "call" and report.failed:
+        try:
+            nodeid_sanitized = report.nodeid.replace(os.sep, "_").replace("::", "__")
+            logfile = LOGS_DIR / f"{nodeid_sanitized}.log"
+            logging.getLogger(__name__).warning("Per-test log: %s", logfile)
+        except Exception:
+            # best-effort; don't break test reporting
+            pass
+
+
+#!/usr/bin/env python3
+"""Root-level pytest configuration and fixtures."""
+
 import subprocess
 from pathlib import Path
+
+import pytest
+from rich.console import Console
+
+# Set up a logger for this module
+logger = logging.getLogger(__name__)
+console = Console()
 
 
 @pytest.fixture(scope="session")
@@ -11,7 +93,7 @@ def test_log_file(tmp_path_factory):
     """Creates a unique log file for the test session."""
     log_dir = tmp_path_factory.mktemp("logs")
     log_file = log_dir / "test_run.log"
-    print(f"--- Test output is being logged to: {log_file} ---")
+    console.print(f"--- Test output is being logged to: {log_file} ---")
     return log_file
 
 
@@ -27,6 +109,14 @@ def docker_services(request, test_log_file):
     3. Yield control to the tests.
     4. Shut down all services with `docker compose down -v` after the session.
     """
+    # If running inside a Docker container, assume services are already managed
+    if Path("/.dockerenv").exists():
+        console.print("\\n--- Running inside Docker, skipping Docker service management. ---")
+        # In a Docker environment, we just need to ensure Weaviate is ready.
+        # The services themselves are managed by the CI workflow's docker-compose.
+        yield
+        return
+
     project_root = Path(__file__).parent.parent
     compose_file = project_root / "docker" / "docker-compose.yml"
 
@@ -37,19 +127,17 @@ def docker_services(request, test_log_file):
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as e:
         # If Docker is not running, not installed, or times out, skip all Docker-dependent tests
         if isinstance(e, subprocess.TimeoutExpired):
-            print("\n--- Docker daemon is unresponsive. Skipping Docker-dependent tests. ---")
+            console.print("\n--- Docker daemon is unresponsive. Skipping Docker-dependent tests. ---")
         else:
-            print("\n--- Docker is not running or not installed. Skipping Docker-dependent tests. ---")
+            console.print("\n--- Docker is not running or not installed. Skipping Docker-dependent tests. ---")
 
         pytest.skip("Docker is not available or unresponsive, skipping Docker-dependent tests.")
 
     # Docker is available, manage the services
-    print("\n--- Setting up Docker services for testing ---")
+    console.print("\n--- Setting up Docker services for testing ---")
 
     with open(test_log_file, "a") as log:
         # --- Configure a file handler for the test-specific log file ---
-        import logging
-
         # Remove any existing handlers to avoid duplicate logs
         for handler in logging.root.handlers[:]:
             logging.root.removeHandler(handler)
@@ -77,7 +165,7 @@ def docker_services(request, test_log_file):
             # Stream stdout
             for line in process.stdout:
                 log.write(line)
-                print(line, end="")  # Also print to terminal for visibility
+                logger.info(line.strip())  # Also log to terminal for visibility
 
             # Wait for the process to complete and get the return code
             process.wait(timeout=300)
@@ -89,7 +177,7 @@ def docker_services(request, test_log_file):
                 log.write(stderr_output)
                 pytest.fail(f"Failed to start Docker services. See logs at {test_log_file}")
 
-            print("✓ Docker services are up and healthy.")
+            console.print("✓ Docker services are up and healthy.")
             log.write("✓ Docker services are up and healthy.\n")
 
             # --- Ensure Weaviate database is populated for tests ---
@@ -105,6 +193,7 @@ def docker_services(request, test_log_file):
 
                 # After the standard readiness check, ensure the collection is *not* empty for tests.
                 from urllib.parse import urlparse
+
                 import weaviate
                 from config import COLLECTION_NAME, WEAVIATE_URL
                 from ingest import ingest
@@ -130,18 +219,18 @@ def docker_services(request, test_log_file):
                         # Ingest the bundled example data *without* deleting it afterwards
                         data_dir = project_root / "example_data"
                         ingest(str(data_dir))
-                        print("✓ Example data ingested for tests.", flush=True)
+                        console.print("✓ Example data ingested for tests.")
                         log.write("✓ Example data ingested for tests.\n")
                     else:
-                        print("✓ Weaviate collection already populated.", flush=True)
+                        console.print("✓ Weaviate collection already populated.")
                         log.write("✓ Weaviate collection already populated.\n")
                 finally:
                     client.close()
 
-                print("✓ Weaviate database ready for tests.", flush=True)
+                console.print("✓ Weaviate database ready for tests.")
                 log.write("✓ Weaviate database ready for tests.\n")
             except Exception as e:
-                print(f"✗ Failed to verify/populate Weaviate: {e}", flush=True)
+                console.print(f"✗ Failed to verify/populate Weaviate: {e}")
                 log.write(f"✗ Failed to verify/populate Weaviate: {e}\\n")
 
         except subprocess.TimeoutExpired:
@@ -154,7 +243,7 @@ def docker_services(request, test_log_file):
 
     # Teardown is now disabled as per user instruction.
     # Containers will be left running after tests.
-    print("\n--- Docker services left running for manual inspection ---")
+    console.print("\n--- Docker services left running for manual inspection ---")
 
 
 @pytest.fixture(scope="session")
@@ -163,22 +252,10 @@ def project_root():
     return Path(__file__).parent.parent
 
 
+# Lightweight default for docker-based tests outside specialized suites.
+# Suites can override this fixture in a closer-scope conftest (e.g. tests/e2e/conftest.py)
+# to perform heavier readiness checks.
 @pytest.fixture(scope="session")
-def cli_script_path(project_root):
-    """Provides the absolute path to the main CLI script."""
-    return project_root / "scripts" / "cli.sh"
-
-
-# Automatically apply the docker_services fixture to all tests marked with 'docker'
-@pytest.hookimpl(tryfirst=True)
-def pytest_collection_modifyitems(config, items):
-    """
-    A pytest hook to dynamically apply fixtures to marked tests.
-    """
-    if config.getoption("-m") and "not docker" in config.getoption("-m"):
-        return  # Don't apply if we're explicitly skipping docker tests
-
-    docker_marker = "docker"
-    for item in items:
-        if docker_marker in item.keywords:
-            item.fixturenames.insert(0, "docker_services")
+def docker_services_ready():  # noqa: D401
+    """No-op readiness fixture for generic docker-marked tests."""
+    yield

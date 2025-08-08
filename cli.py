@@ -4,19 +4,24 @@ Main CLI entry point for the RAG system.
 Follows Python best practices for command-line interfaces.
 """
 
-import argparse
-import sys
+import logging
 import os
-from pathlib import Path
+import sys
 
-# Add backend to path for imports
-sys.path.insert(0, str(Path(__file__).parent / "backend"))
+import backend.qa_loop as qa
+from backend.console import console, get_logger
 
-from qa_loop import answer, ensure_weaviate_ready_and_populated
+logger = get_logger(__name__)
+
+
+from backend.config import OLLAMA_MODEL
+from backend.ollama_client import ensure_model_available
 
 
 def main():
     """Main CLI entry point."""
+    import argparse
+
     parser = argparse.ArgumentParser(
         description="RAG System CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -30,59 +35,91 @@ Examples:
     )
 
     parser.add_argument("--question", "-q", help="Ask a single question and exit")
-
     parser.add_argument("--debug", "-d", action="store_true", help="Enable debug logging")
-
     parser.add_argument("--k", "-k", type=int, default=3, help="Number of context chunks to retrieve (default: 3)")
-
     parser.add_argument("--version", "-v", action="version", version="RAG CLI v1.0.0")
 
     args = parser.parse_args()
 
     # Set debug logging if requested
     if args.debug:
-        os.environ["LOG_LEVEL"] = "DEBUG"
+        logging.getLogger().setLevel(logging.DEBUG)
 
     try:
-        # Ensure Weaviate is ready
-        ensure_weaviate_ready_and_populated()
+        # Test hooks
+        verbose_test = os.getenv("RAG_VERBOSE_TEST", "0").lower() in ("1", "true", "yes")
+        fake_answer = os.getenv("RAG_FAKE_ANSWER")
+
+        if verbose_test:
+            console.print("PHASE: startup")
+        # Allow tests or offline runs to skip slow startup checks
+        skip_startup_checks = (
+            os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes")
+            or os.getenv("PYTEST_CURRENT_TEST") is not None
+        )
+
+        if not skip_startup_checks:
+            # Ensure Weaviate is ready
+            qa.ensure_weaviate_ready_and_populated()
+
+            # Ensure the required Ollama model is available
+            if not ensure_model_available(OLLAMA_MODEL):
+                logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
+                sys.exit(1)
+        else:
+            if verbose_test:
+                console.print("PHASE: startup skipped")
 
         if args.question:
             # Single question mode
-            print(f"Question: {args.question}")
-            print("-" * 50)
-            response = answer(args.question, k=args.k)
-            print(f"Answer: {response}")
+            if verbose_test:
+                console.print("PHASE: single_question")
+            console.print(f"Question: {args.question}")
+            console.print("-" * 50)
+            if fake_answer is not None:
+                response = fake_answer
+                console.print(f"Answer: {response}")
+            else:
+                # Real path streams tokens to stdout; no extra final print to avoid duplication
+                qa.answer(args.question, k=args.k)
         else:
             # Interactive mode
-            print("RAG System CLI - Interactive Mode")
-            print("Type 'quit' or 'exit' to leave")
-            print("=" * 50)
+            if verbose_test:
+                console.print("PHASE: interactive")
+            console.print("RAG System CLI - Interactive Mode")
+            console.print("Type 'quit' or 'exit' to leave")
+            console.print("=" * 50)
 
             while True:
                 try:
                     question = input("\nQuestion: ").strip()
 
                     if question.lower() in ["quit", "exit", "q"]:
-                        print("Goodbye!")
+                        console.print("Goodbye!")
                         break
 
                     if not question:
                         continue
 
-                    print("-" * 30)
-                    response = answer(question, k=args.k)
-                    print(f"Answer: {response}")
-
+                    console.print("-" * 30)
+                    if fake_answer is not None:
+                        # Deterministic test path: print fake answer once
+                        console.print(fake_answer)
+                    else:
+                        # Real path streams tokens to stdout via qa.answer
+                        qa.answer(question, k=args.k)
                 except KeyboardInterrupt:
-                    print("\nGoodbye!")
+                    console.print("\nGoodbye!")
                     break
                 except EOFError:
-                    print("\nGoodbye!")
+                    console.print("\nGoodbye!")
                     break
 
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        from rich.console import Console
+
+        console_stderr = Console(file=sys.stderr)
+        console_stderr.print(f"[bold red]Error:[/] {e}")
         sys.exit(1)
 
 

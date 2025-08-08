@@ -1,0 +1,77 @@
+{
+	// The "folders" array is the key for a multi-root workspace.
+	// Each entry here will become a top-level folder in your VS Code Explorer.
+	"folders": [
+		{
+			// The main project files, like your readme and .gitignore
+			"path": ".",
+			"name": "ROOT"
+		},
+		{
+			// Give each sub-project a descriptive name for clarity in the UI.
+			"path": "backend",
+			"name": "backend"
+		},
+		{
+			"path": "frontend",
+			"name": "frontend"
+		},
+		{
+			"path": "dewpointApp",
+			"name": "dewpointApp"
+		},
+
+		{
+			"path": "data",
+			"name": "data"
+		},
+		{
+			"path": "docker",
+			"name": "docker"
+		}
+	],
+
+	// "settings" here will apply across all folders in this workspace,
+	// overriding your global user settings but can be overridden by
+	// a folder's specific .vscode/settings.json.
+	"settings": {
+		// --- Python Configuration ---
+		// Set a default Python interpreter for the entire project.
+		// Best practice: Point this to your project's virtual environment.
+		"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+
+		// --- Editor & Formatting Consistency ---
+		// Ensure all Python files are formatted with the Black Formatter.
+		"[python]": {
+			"editor.defaultFormatter": "ms-python.black-formatter",
+			"editor.formatOnSave": true
+		},
+
+		// --- File Explorer Cleanup ---
+		// Hide clutter from the file explorer to keep it clean.
+		// This does NOT affect Git; it's just a visual setting.
+		"files.exclude": {
+			"**/.git": true,
+			"**/.svn": true,
+			"**/.hg": true,
+			"**/CVS": true,
+			"**/.DS_Store": true,
+			"**/Thumbs.db": true,
+			"**/__pycache__": true,
+			"**/.pytest_cache": true,
+			"**/.venv": true // Hides the virtual environment folder
+		}
+	},
+
+	// "extensions" lets you recommend tools for anyone who clones your project.
+	"extensions": {
+		"recommendations": [
+			"ms-python.python",         // Core Python support
+			"ms-python.vscode-pylance", // Language server
+			"ms-python.black-formatter",// The formatter you chose
+			"ms-vscode-remote.remote-wsl", // Essential for your WSL setup
+			"eamodio.gitlens"          // Powerful Git integration
+
+		]
+	}
+}
