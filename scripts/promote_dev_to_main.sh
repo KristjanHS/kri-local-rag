@@ -74,7 +74,7 @@ on_error() {
   local exit_code=$?
   _red "⛔ Failure (exit $exit_code). See $LOG_FILE for details." | tee -a "$LOG_FILE"
   # If a merge is in progress, give a hint
-  if [[ -d .git/MERGE_HEAD ]]; then
+  if [[ -f .git/MERGE_HEAD ]]; then
     _yellow "A merge is in progress. Resolve conflicts or run: git merge --abort" | tee -a "$LOG_FILE"
   fi
   rollback_branch
@@ -105,6 +105,49 @@ ensure_clean_worktree() {
   fi
 }
 
+ensure_no_pending_git_ops() {
+  # Prevent running during ongoing merge/rebase/cherry-pick/bisect
+  if [[ -f .git/MERGE_HEAD ]] || [[ -f .git/REBASE_HEAD ]] || [[ -d .git/rebase-apply ]] || [[ -d .git/rebase-merge ]] || [[ -f .git/CHERRY_PICK_HEAD ]] || [[ -f .git/BISECT_LOG ]]; then
+    _red "ERROR: A Git operation is in progress (merge/rebase/cherry-pick/bisect). Please complete or abort it before running this script." | tee -a "$LOG_FILE"
+    exit 1
+  fi
+}
+
+ensure_git_identity() {
+  local name email
+  name=$(git config --get user.name || true)
+  email=$(git config --get user.email || true)
+  if [[ -z "$name" || -z "$email" ]]; then
+    _red "ERROR: Git user identity not configured (user.name/user.email)." | tee -a "$LOG_FILE"
+    _yellow "Hint: git config --global user.name 'Your Name'; git config --global user.email 'you@example.com'" | tee -a "$LOG_FILE"
+    exit 1
+  fi
+}
+
+ensure_origin_and_branches() {
+  if ! git remote get-url origin >/dev/null 2>&1; then
+    _red "ERROR: Remote 'origin' is not configured." | tee -a "$LOG_FILE"
+    exit 1
+  fi
+  # Check that main/dev exist remotely to give early feedback
+  if ! git ls-remote --exit-code --heads origin main >/dev/null 2>&1; then
+    _red "ERROR: Remote branch 'main' not found on origin." | tee -a "$LOG_FILE"
+    exit 1
+  fi
+  if ! git ls-remote --exit-code --heads origin dev >/dev/null 2>&1; then
+    _red "ERROR: Remote branch 'dev' not found on origin." | tee -a "$LOG_FILE"
+    exit 1
+  fi
+}
+
+sync_submodules_if_any() {
+  if [[ -f .gitmodules ]]; then
+    log_step "Syncing and updating git submodules (recursive)…"
+    git submodule sync --recursive | tee -a "$LOG_FILE"
+    git submodule update --init --recursive | tee -a "$LOG_FILE"
+  fi
+}
+
 fast_checks() {
   log_step "Running Ruff (lint)…"
   ruff check . | tee -a "$LOG_FILE"
@@ -118,7 +161,7 @@ auto_resolve_conflicts() {
   # Returns 0 if all conflicts were resolved, 1 to abort
   local prefer_all="$1"  # 1 or 0
   local conflicts
-  mapfile -t conflicts < <(git status --porcelain | awk '$1=="UU"{print $2}')
+  mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
 
   if [[ ${#conflicts[@]} -eq 0 ]]; then
     return 0
@@ -169,9 +212,14 @@ auto_resolve_conflicts() {
 }
 
 ensure_clean_worktree
+ensure_no_pending_git_ops
+ensure_git_identity
+ensure_origin_and_branches
 
 log_step "Fetching remotes…"
 git fetch --all --prune | tee -a "$LOG_FILE"
+
+sync_submodules_if_any
 
 log_step "Checking out dev and pulling (ff-only)…"
 git checkout dev | tee -a "$LOG_FILE"
@@ -196,9 +244,22 @@ else
     :
   else
     _yellow "Merge reported conflicts; attempting auto-resolution…" | tee -a "$LOG_FILE"
-    auto_resolve_conflicts "$PREFER_DEV_ALL"
+    auto_resolve_conflicts "$PREFER_DEV_ALL" || exit 1
   fi
 fi
+
+  # Safety: verify that dev is ancestor of main after merge
+  if ! git merge-base --is-ancestor dev main; then
+    _red "ERROR: Post-merge validation failed: 'dev' is not an ancestor of 'main'." | tee -a "$LOG_FILE"
+    exit 1
+  fi
+
+  # Safety: scan for unresolved conflict markers in the latest tree
+  if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' HEAD -- . >/dev/null 2>&1; then
+    _red "ERROR: Conflict markers detected in committed files after merge. Aborting push." | tee -a "$LOG_FILE"
+    _yellow "Hint: run 'git grep -nE "^(<<<<<<<|=======|>>>>>>>)" HEAD' to locate markers." | tee -a "$LOG_FILE"
+    exit 1
+  fi
 
 # Final checks on main
 fast_checks
