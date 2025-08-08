@@ -1,7 +1,4 @@
 name: Python Lint, Fast Tests, and Slow Tests
-
-env:
-  ACT: ""
 # NOTE FOR LOCAL CI (act):
 # - The pre-push Git hook (.git/hooks/pre-push) runs:
 #     act pull_request -j lint_and_fast_tests --pull=false --log-prefix-job-id
@@ -40,10 +37,13 @@ jobs:
         run: |
           # This command runs all tests NOT marked as 'slow'
           # based on the configuration in pytest.ini
+          # In both GitHub and act (local), generate HTML & JUnit under reports/
           python -m pytest --html=reports/report.html --self-contained-html --junitxml=reports/junit.xml
 
       - name: Upload fast test reports
-        if: always()
+        # Skip under act (local GitHub Actions emulator) because ACTIONS_RUNTIME_TOKEN is not available.
+        # On real GitHub runners, this will upload the reports/ directory as a build artifact.
+        if: ${{ always() && !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-fast
@@ -85,7 +85,8 @@ jobs:
             exit $EXIT_CODE
           fi
       - name: Upload slow test reports
-        if: always()
+        # Same: upload only on GitHub (not in act) due to missing ACTIONS_RUNTIME_TOKEN locally.
+        if: ${{ always() && !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-slow
