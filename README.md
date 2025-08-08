@@ -226,7 +226,7 @@ This project uses `act` to run GitHub Actions locally.
   act pull_request -j lint_and_fast_tests
   ```
 
-Notes
+Notes:
 - Act runner images pinned in `.actrc`.
 - Full workflow file: `.github/workflows/python-lint-test.yml`.
 
