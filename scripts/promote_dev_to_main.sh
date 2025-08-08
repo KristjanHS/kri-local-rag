@@ -49,6 +49,10 @@ done
 setup_logging "$SCRIPT_NAME"
 
 PY=".venv/bin/python"
+RUFF_BIN=".venv/bin/ruff"
+if [[ ! -x "$RUFF_BIN" ]]; then
+  RUFF_BIN="ruff"
+fi
 if [[ ! -x "$PY" ]]; then
   _red "ERROR: $PY not found or not executable. Create the venv and install deps first." | tee -a "$LOG_FILE"
   exit 1
@@ -62,7 +66,7 @@ need() {
 }
 
 need git
-need ruff
+need "$RUFF_BIN"
 
 ensure_min_versions() {
   # Require Git >= 2.20.0
@@ -76,7 +80,7 @@ ensure_min_versions() {
   fi
   # Require Ruff >= 0.5.0
   local ruff_ver
-  ruff_ver=$(ruff --version 2>/dev/null | awk '{print $2}')
+  ruff_ver=$($RUFF_BIN --version 2>/dev/null | awk '{print $2}')
   if [[ -n "$ruff_ver" ]]; then
     if [[ "$(printf '%s\n%s\n' "$ruff_ver" "0.5.0" | sort -V | head -n1)" != "0.5.0" ]]; then
       _red "ERROR: Ruff version $ruff_ver is too old; require >= 0.5.0" | tee -a "$LOG_FILE"
@@ -175,9 +179,9 @@ sync_submodules_if_any() {
 
 fast_checks() {
   log_step "Running Ruff (lint)…"
-  ruff check . 2>&1 | tee -a "$LOG_FILE"
+  "$RUFF_BIN" check . 2>&1 | tee -a "$LOG_FILE"
   log_step "Running Ruff format --check…"
-  ruff format --check . 2>&1 | tee -a "$LOG_FILE"
+  "$RUFF_BIN" format --check . 2>&1 | tee -a "$LOG_FILE"
   log_step "Running pytest (fast suite)…"
   "$PY" -m pytest -q tests/ 2>&1 | tee -a "$LOG_FILE"
 }
