@@ -32,8 +32,8 @@
         "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
-            "source.organizeImports": true,
-            "source.fixAll": true
+            "source.fixAll.ruff": "always",
+            "source.organizeImports.ruff": "always"
         }
     },
     "ruff.lint.enable": true,
