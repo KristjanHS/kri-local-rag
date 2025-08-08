@@ -10,38 +10,38 @@
 |---------|---------|------|
 | **weaviate** | Vector database | 8080 |
 | **ollama** | LLM server | 11434 |
-| **t2v-transformers** | Embedding generation | 8081 |
-| **rag-backend** | RAG application | - |
+| **app** | Streamlit UI + backend | 8501 |
+| **ingester** (profile: ingest) | One-off ingestion utility | - |
 
 ## Service Details
 
 ### Weaviate (Vector Database)
 - **Purpose**: Stores document embeddings
-- **Data**: Persisted in `./.data` volume
+- **Data**: Persisted in named volume `weaviate_db`
 
 ### Ollama (LLM Server)
 - **Purpose**: Local LLM inference
-- **Models**: Stored in `ollama_models` volume
+- **Models**: Stored in named volume `ollama_models`
 
-### t2v-transformers (Embedding Service)
-- **Purpose**: Generates text embeddings
-- **GPU**: CUDA support
+### app (Application + UI)
+- **Purpose**: Main RAG application (Streamlit UI + backend)
+- **Port**: 8501
+- **Depends on**: weaviate, ollama
 
-### rag-backend (Application)
-- **Purpose**: Main RAG application
-- **Dependencies**: weaviate, ollama
-- **Volume**: Live-mounted project directory
+### ingester (One-off ingestion)
+- **Purpose**: Batch ingest documents
+- **Profile**: `ingest`
 
 ## Service Operations
 
 ```bash
-# Code changes (live volume mounting)
-docker compose restart rag-backend
+# Pick up code changes (live mounts)
+docker compose restart app
 
-# Service management
-docker compose logs -f
+# Logs
+docker compose logs -f app | cat
 
-# Rebuilding
+# Rebuild images
 docker compose build
 ```
 
@@ -73,10 +73,12 @@ sudo systemctl restart docker
 
 ### Service Health
 ```bash
-# Check service health
-curl http://localhost:8080/v1/meta  # Weaviate
-curl http://localhost:11434/api/tags  # Ollama - is service up, what models are available
-curl http://localhost:8081/health  # Transformers
+# Weaviate
+curl http://localhost:8080/v1/meta
+# Ollama (service up, list models)
+curl http://localhost:11434/api/tags
+# App (basic reachability)
+curl -fsS http://localhost:8501 >/dev/null && echo ok
 ```
 
 ### Service Issues
@@ -94,14 +96,14 @@ docker ps -a
 ```bash
 docker compose exec weaviate sh
 docker compose exec ollama sh
-docker compose exec rag-backend bash
+docker compose exec app bash
 ```
 
 ## Volumes & Data Management
 
-This project uses two types of volumes:
-- **Named volumes** (`ollama_models`): Managed by Docker, stored outside the project.
-- **Bind mounts** (`docker/.data`): Stored inside the project directory.
+Persistent data uses named volumes:
+- **weaviate_db**: Weaviate database
+- **ollama_models**: Ollama model cache
 
 ### Common Commands (Work in WSL2 & Linux)
 
@@ -113,32 +115,32 @@ docker volume ls | grep kri-local-rag
 # (Refer to README.md for canonical reset instructions)
 ```
 
-### Universal Backup/Restore Method (via Docker Container)
+### Backup/Restore Weaviate (via Docker Container)
 
 ```bash
-# Backup Weaviate data:
-docker run --rm -v kri-local-rag_weaviate_data:/data -v $(pwd):/backup alpine tar czf /backup/weaviate_backup.tar.gz -C /data .
+# Backup Weaviate data (volume name usually prefixed):
+docker run --rm -v kri-local-rag_weaviate_db:/data -v $(pwd):/backup alpine tar czf /backup/weaviate_backup.tar.gz -C /data .
 # Restore Weaviate data:
-docker run --rm -v kri-local-rag_weaviate_data:/data -v $(pwd):/backup alpine tar xzf /backup/weaviate_backup.tar.gz -C /data .
+docker run --rm -v kri-local-rag_weaviate_db:/data -v $(pwd):/backup alpine tar xzf /backup/weaviate_backup.tar.gz -C /data .
 ```
 
 ### Environment-Specific Differences
 
-On native Linux, you can directly access the filesystem path of a named volume. This is NOT the standard or recommended way on WSL2, where Docker Desktop manages data within its own virtual disk, making direct filesystem access complex.
+On native Linux you can directly access named volume paths. On WSL2 (Docker Desktop), data lives inside Docker’s VM and direct access is not recommended.
 
 ```bash
 # Example (Linux Only): Direct filesystem access
-sudo ls -la /var/lib/docker/volumes/kri-local-rag_weaviate_data/_data
+sudo ls -la /var/lib/docker/volumes/kri-local-rag_weaviate_db/_data
 
 # Example (Linux Only): Direct filesystem backup
-sudo tar czf /backup/weaviate_backup.tar.gz -C /var/lib/docker/volumes/kri-local-rag_weaviate_data/_data .
+sudo tar czf /backup/weaviate_backup.tar.gz -C /var/lib/docker/volumes/kri-local-rag_weaviate_db/_data .
 ```
 
 ## Data Locations
 
-- **Weaviate data**: `.weaviate_db` directory at the project root (visible in WSL/Linux as <project-root>/.weaviate_db)
-- **Ollama models**: `.ollama_models` directory at the project root (visible in WSL/Linux as <project-root>/.ollama_models)
-- **Source documents**: Local `data/` directory
+- **Weaviate data**: named volume `weaviate_db` (prefixed to `kri-local-rag_weaviate_db`)
+- **Ollama models**: named volume `ollama_models` (prefixed to `kri-local-rag_ollama_models`)
+- **Source documents**: Local `data/` directory (bind-mounted)
 
 ## Cleaning Up Containers & Images (Keep All Data)
 
@@ -178,5 +180,5 @@ After running the cleanup, your persistent data remains safe. The following volu
 
 ## Next Steps
 
-- [Getting Started Guide](GETTING_STARTED.md)
-- [Document Processing Guide](document-processing.md) 
+- [Development Guide](DEVELOPMENT.md)
+- [Document Processing Guide](document-processing.md)
