@@ -4,7 +4,7 @@
 
 # Exit immediately if a command exits with a non-zero status.
 # The -o pipefail ensures that a pipeline command is treated as failed if any of its components fail.
-set -e -o pipefail
+set -Eeuo pipefail
 
 # --- ANSI Color Codes for beautiful output ---
 GREEN='\033[0;32m'
@@ -58,37 +58,39 @@ echo -e "${BOLD}Starting the automatic setup for the RAG project...${NC}"
 # Source centralized configuration
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
-# Setup logging
+# Setup logging (timestamped file + stable symlink) and traps
 SCRIPT_NAME=$(get_script_name "${BASH_SOURCE[0]}")
-LOG_FILE=$(get_log_file "$SCRIPT_NAME")
-setup_logging "$SCRIPT_NAME"
+LOG_FILE=$(init_script_logging "$SCRIPT_NAME")
+enable_error_trap "$LOG_FILE" "$SCRIPT_NAME"
+enable_debug_trace "$LOG_FILE"
+log INFO "Starting $SCRIPT_NAME" | tee -a "$LOG_FILE"
 
 # Ensure helper scripts are executable
 chmod +x scripts/cli.sh scripts/ingest.sh scripts/docker-reset.sh || true
 
 # --- Step 1: Build Docker Images ---
 echo ""
-log_message "INFO" "Starting Docker image build process"
+log INFO "Starting Docker image build process" | tee -a "$LOG_FILE"
 echo -e "${BOLD}--- Step 1: Building custom Docker images... ---${NC}"
 echo "This may take a few minutes. Detailed output is being saved to '$LOG_FILE'."
-docker compose --file "$DOCKER_COMPOSE_FILE" build --progress=plain "${SERVICES_BUILD[@]}" 2>&1 | tee -a "$LOG_FILE"
+run_step "Build app image" "$LOG_FILE" ./scripts/build_app.sh
 echo -e "${GREEN}✓ Build complete.${NC}"
 
 
 # --- Step 2: Start Services ---
 echo ""
-log_message "INFO" "Starting Docker services"
+log INFO "Starting Docker services" | tee -a "$LOG_FILE"
 echo -e "${BOLD}--- Step 2: Starting all Docker services... ---${NC}"
 echo "This can take a long time on the first run as models are downloaded."
 echo "The script will wait for all services to report a 'healthy' status."
 echo "Detailed output is being saved to '$LOG_FILE'."
-docker compose --file "$DOCKER_COMPOSE_FILE" up --detach --wait "${SERVICES_UP[@]}" 2>&1 | tee -a "$LOG_FILE"
+run_step "Compose up services: ${SERVICES_UP[*]}" "$LOG_FILE" docker compose --file "$DOCKER_COMPOSE_FILE" up --detach --wait "${SERVICES_UP[@]}"
 echo -e "${GREEN}✓ All services are up and healthy.${NC}"
 
 
 # --- Step 3: Verify Final Status ---
 echo ""
-log_message "INFO" "Verifying final service status"
+log INFO "Verifying final service status" | tee -a "$LOG_FILE"
 echo -e "${BOLD}--- Step 3: Verifying final service status... ---${NC}"
 docker compose --file "$DOCKER_COMPOSE_FILE" ps 2>&1 | tee -a "$LOG_FILE"
 

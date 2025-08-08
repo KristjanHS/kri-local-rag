@@ -1,0 +1,43 @@
+name: Docker Integration Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-in-docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build and run Docker services
+        run: docker compose -f docker/docker-compose.ci.yml up -d --build
+
+      - name: Wait for Weaviate to be healthy
+        run: |
+          echo "Waiting for Weaviate to be ready..."
+          until [ "$(docker compose -f docker/docker-compose.ci.yml exec weaviate wget -q --spider -O - http://localhost:8080/v1/.well-known/ready)" == "" ]; do
+            sleep 1
+          done
+          echo "Weaviate is ready."
+
+      - name: Pull production model and wait for Ollama
+        run: |
+          echo "Pulling CI model and waiting for Ollama to be ready..."
+          docker compose -f docker/docker-compose.ci.yml exec ollama ollama pull cas/mistral-7b-instruct-v0.3
+          until [ "$(docker compose -f docker/docker-compose.ci.yml exec ollama ollama list)" ]; do
+            sleep 1
+          done
+          echo "Ollama is ready."
+      
+
+      - name: Run test suite in app container
+        run: docker compose -f docker/docker-compose.ci.yml exec -e PYTHONPATH=/app app pytest -m docker
+
+      - name: Shutdown Docker services
+        if: always()
+        run: docker compose -f docker/docker-compose.ci.yml down

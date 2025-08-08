@@ -7,8 +7,10 @@ and returns it.
 In WSL, the windows host IP is typically the default gateway.
 """
 
-import subprocess
 import re
+import subprocess
+
+from backend.console import console
 
 
 def get_windows_host_ip() -> str | None:
@@ -58,6 +60,6 @@ if __name__ == "__main__":
     # Example usage when the script is run directly.
     windows_ip = get_windows_host_ip()
     if windows_ip:
-        print(f"Windows Host IP: {windows_ip}")
+        console.print(f"Windows Host IP: {windows_ip}")
     else:
-        print("Failed to find a valid private IP for the Windows host.")
+        console.print("Failed to find a valid private IP for the Windows host.")
