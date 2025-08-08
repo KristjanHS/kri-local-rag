@@ -66,6 +66,7 @@ This project includes a suite of scripts in the `scripts/` directory to automate
 -   **`cli.sh`**: Provides CLI access to the running `app` container. It clears the Python cache and restarts the container to ensure live code changes are applied before executing a command. Starts an interactive RAG console by default.
 -   **`ingest.sh`**: A convenience wrapper to ingest PDFs from a host path into Weaviate using a temporary `app` container.
 -   **`monitor_gpu.sh`**: Monitors NVIDIA GPU usage, useful for observing the `ollama` service if you have a GPU.
+-   **`cleanup_docker_and_ci_cache.sh`**: Cleans unused Docker data and the local `act` cache. Use when local CI pre-push runs flake due to Docker issues.
 
 ---
 
@@ -228,6 +229,16 @@ This project uses `act` to run GitHub Actions locally.
 Notes
 - Act runner images pinned in `.actrc`.
 - Full workflow file: `.github/workflows/python-lint-test.yml`.
+
+Troubleshooting flaky local CI
+- If the pre-push run fails with errors like exitcode 137 or "RWLayer ... is unexpectedly nil", it's a Docker/act hiccup, not a code failure.
+  - Quick fix:
+    ```bash
+    ./scripts/cleanup_docker_and_ci_cache.sh
+    # optionally, for aggressive cleanup/restart
+    ./scripts/cleanup_docker_and_ci_cache.sh --restart-docker --builder-prune
+    ```
+  - If needed on WSL2, restart Docker Desktop and/or run `wsl --shutdown`.
 
 ## License
 

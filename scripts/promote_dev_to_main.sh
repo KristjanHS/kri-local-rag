@@ -13,6 +13,7 @@
 #   ./scripts/promote_dev_to_main.sh                   # normal run
 #   ./scripts/promote_dev_to_main.sh --dry-run         # skip push
 #   ./scripts/promote_dev_to_main.sh --prefer-dev-all  # auto-resolve ALL conflicts preferring dev
+#   ./scripts/promote_dev_to_main.sh --create-pr       # if push to protected 'main' is blocked, auto-create PR dev → main
 #
 set -euo pipefail
 
@@ -31,11 +32,13 @@ _yellow(){ printf "\e[33m%s\e[0m\n" "$*"; }
 
 DRY_RUN=0
 PREFER_DEV_ALL=0
+CREATE_PR=0
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
     --prefer-dev-all) PREFER_DEV_ALL=1 ;;
+    --create-pr) CREATE_PR=1 ;;
     *) _red "Unknown argument: $arg"; exit 2 ;;
   esac
 done
@@ -208,7 +211,74 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
 fi
 
 log_step "Pushing main to origin (pre-push hooks may run)…"
-git push origin main | tee -a "$LOG_FILE"
+
+# Push with one retry on transient local CI/act failures. If remote rejects due to
+# branch protection (PRs required), guide the user to open a PR instead of forcing.
+push_main_once() {
+  local output
+  set +e
+  output=$(git push origin main 2>&1)
+  local rc=$?
+  set -e
+  printf "%s\n" "$output" | tee -a "$LOG_FILE"
+  return $rc
+}
+
+attempt=1
+if push_main_once; then
+  :
+else
+  # Detect protected-branch/PR-required server-side policy
+  if grep -qiE "(must be made through a pull request|protected branch|hooks.*rejected|pre-receive hook declined)" "$LOG_FILE"; then
+    _red "Push to protected 'main' blocked by server policy." | tee -a "$LOG_FILE"
+    if [[ "$CREATE_PR" -eq 1 ]]; then
+      if command -v gh >/dev/null 2>&1; then
+        _yellow "Attempting to create PR dev → main via GitHub CLI…" | tee -a "$LOG_FILE"
+        # Ensure dev is pushed
+        git checkout dev >/dev/null 2>&1 || true
+        git merge --ff-only main >/dev/null 2>&1 || true
+        git push origin dev | tee -a "$LOG_FILE"
+        # Create PR if one does not exist; otherwise, show existing
+        set +e
+        gh pr view --head dev --base main >/dev/null 2>&1
+        has_pr=$?
+        set -e
+        if [[ $has_pr -ne 0 ]]; then
+          gh pr create --base main --head dev --title "Promote dev to main" --body "Automated PR created by promote script." | tee -a "$LOG_FILE"
+        else
+          _yellow "A PR from dev to main already exists. Opening details…" | tee -a "$LOG_FILE"
+          gh pr view --head dev --base main | tee -a "$LOG_FILE"
+        fi
+        switch_to_dev
+        exit 2
+      else
+        _yellow "GitHub CLI (gh) not found. Install gh or run without --create-pr." | tee -a "$LOG_FILE"
+      fi
+    fi
+    _yellow "Create a PR from 'dev' to 'main' instead." | tee -a "$LOG_FILE"
+    _yellow "Hint: git checkout dev && git merge --ff-only main && git push origin dev; then open PR dev → main." | tee -a "$LOG_FILE"
+    switch_to_dev
+    exit 1
+  fi
+
+  # Detect common local act/docker flake signatures and retry once
+  if grep -qiE "(Job 'Lint and Fast Tests' failed|exitcode '137'|unexpectedly nil|RWLayer)" "$LOG_FILE"; then
+    _yellow "Pre-push CI appears flaky (act/Docker). Retrying push once…" | tee -a "$LOG_FILE"
+    sleep 2
+    if push_main_once; then
+      :
+    else
+      _red "Push failed again. Consider running: ./scripts/cleanup_docker_and_ci_cache.sh and retrying." | tee -a "$LOG_FILE"
+      _yellow "You can also bypass locally with --no-verify if tests already passed: git push --no-verify origin main" | tee -a "$LOG_FILE"
+      switch_to_dev
+      exit 1
+    fi
+  else
+    _red "Push failed. See $LOG_FILE for details." | tee -a "$LOG_FILE"
+    switch_to_dev
+    exit 1
+  fi
+fi
 
 switch_to_dev
 _green "✅ Promotion complete. main is up to date with dev."
