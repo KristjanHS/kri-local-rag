@@ -20,7 +20,8 @@ langchain==0.3.27
 langchain-community==0.3.27
 
 # Vector Database Client
-weaviate-client
+# Constrain to 4.x (we use the v4 API: weaviate.classes.*)
+weaviate-client>=4.6,<5
 
 # Data Processing and File Parsing
 unstructured[pdf]==0.14.8
@@ -38,6 +39,9 @@ protobuf==5.29.0
 grpcio==1.63.0
 grpcio-health-checking==1.63.0
 grpcio-status==1.63.0
+
+# CLI and logging
+rich>=13,<14
 
 # for Windows (but doesn't hurt on Linux)
 # https://github.com/Unstructured-IO/unstructured/issues/2237

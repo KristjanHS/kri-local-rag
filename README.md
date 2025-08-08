@@ -88,7 +88,12 @@ If you want to run the scripts locally for development, you'll need to install t
 
 ### Subsequent Launches
 
-To restart the services after they have been stopped (e.g., with `docker compose down`):
+To rebuild the app image and capture build logs (recommended):
+```bash
+./scripts/build_app.sh
+```
+
+Then restart the services after they have been stopped (e.g., with `docker compose down`):
 ```bash
 docker compose -f docker/docker-compose.yml up -d --no-build
 ```

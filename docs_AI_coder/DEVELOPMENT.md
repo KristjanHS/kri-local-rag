@@ -152,7 +152,8 @@ When you make changes to `docker/app.Dockerfile` or want to ensure a fresh build
 
 1.  **Build the image without using the cache:**
     ```bash
-    docker compose -f docker/docker-compose.yml build --no-cache app
+    # Build app image and always capture logs in logs/build.log
+    ./scripts/build_app.sh --no-cache
     ```
 
 2.  **Restart the container to use the new image:**

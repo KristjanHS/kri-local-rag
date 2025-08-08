@@ -63,6 +63,7 @@ assets/
 *.log
 wget-log
 faiss_index/
+deptry*.*
 
 # Test reports and artifacts
 reports/

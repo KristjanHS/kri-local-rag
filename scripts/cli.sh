@@ -1,27 +1,29 @@
 #!/bin/bash
 # CLI wrapper for the RAG backend - uses APP container
 
-set -e
+set -Eeuo pipefail
 
 # Source centralized configuration
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
-# Setup logging
+# Setup logging (timestamped file + stable symlink) and traps
 SCRIPT_NAME=$(get_script_name "${BASH_SOURCE[0]}")
-LOG_FILE=$(get_log_file "$SCRIPT_NAME")
-setup_logging "$SCRIPT_NAME"
+LOG_FILE=$(init_script_logging "$SCRIPT_NAME")
+enable_error_trap "$LOG_FILE" "$SCRIPT_NAME"
+enable_debug_trace "$LOG_FILE"
+log INFO "Starting $SCRIPT_NAME" | tee -a "$LOG_FILE"
 
 # Ensure the app container is running (needed for cache clearing)
-log_message "INFO" "Ensuring APP container is running"
+log INFO "Ensuring APP container is running" | tee -a "$LOG_FILE"
 docker compose -f "$DOCKER_COMPOSE_FILE" up -d "$APP_SERVICE" 2>&1 | tee -a "$LOG_FILE"
 
 # Clear Python cache inside the container to ensure latest code is used
-log_message "INFO" "Clearing Python bytecode cache and restarting to apply code changes"
+log INFO "Clearing Python bytecode cache and restarting to apply code changes" | tee -a "$LOG_FILE"
 docker compose -f "$DOCKER_COMPOSE_FILE" exec "$APP_SERVICE" find /app -name '*.pyc' -delete 2>&1 | tee -a "$LOG_FILE"
 docker compose -f "$DOCKER_COMPOSE_FILE" restart "$APP_SERVICE" 2>&1 | tee -a "$LOG_FILE"
 
 # Wait for the app container to be ready again
-log_message "INFO" "Waiting for APP container to be ready"
+log INFO "Waiting for APP container to be ready" | tee -a "$LOG_FILE"
 # Simple readiness check - if it fails, the main command will catch the error
 docker compose -f "$DOCKER_COMPOSE_FILE" exec "$APP_SERVICE" python -c "print('Container ready')" > /dev/null 2>&1
 
@@ -34,7 +36,7 @@ fi
 
 # If no arguments provided, start qa_loop.py by default
 if [ $# -eq 0 ]; then
-    log_message "INFO" "Starting interactive CLI session in APP container"
+    log INFO "Starting interactive CLI session in APP container" | tee -a "$LOG_FILE"
     
     if [ "$DEBUG_MODE" = true ]; then
         echo "DEBUG MODE ENABLED - You will see detailed streaming logs"
@@ -56,6 +58,6 @@ if [ $# -eq 0 ]; then
     fi
 else
     # Run the provided command in the APP container
-    log_message "INFO" "Running command in APP container: $*"
+    log INFO "Running command in APP container: $*" | tee -a "$LOG_FILE"
     docker compose -f "$DOCKER_COMPOSE_FILE" exec "$APP_SERVICE" "$@" 2>&1 | tee -a "$LOG_FILE"
 fi
