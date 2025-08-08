@@ -64,6 +64,10 @@ assets/
 wget-log
 faiss_index/
 
+# Test reports and artifacts
+reports/
+!reports/.gitkeep
+
 # Third-party libraries you've vendored/included
 vendor/
 third_party/

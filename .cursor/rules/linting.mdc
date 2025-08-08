@@ -1,5 +1,5 @@
 ---
-description: "Rules for linting and formatting Python code with ruff"
+description: "Rules for linting, formatting, printing and user output in Python code with ruff"
 type: agent-select
 globs:
   - "**/*.py"
@@ -11,3 +11,8 @@ alwaysApply: false
 - Do not manually run Ruff after each edit; rely on the editor and pre-commit. If working headless or fixing CI, use:
   - `ruff check . --fix`
   - `ruff format .`
+
+# Printing and user output
+- Avoid using `print` (Ruff rule T201). Prefer:
+  - `logging` for application and tests
+  - `rich.console.Console.print` for user-facing CLI messages

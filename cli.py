@@ -78,9 +78,10 @@ Examples:
             console.print("-" * 50)
             if fake_answer is not None:
                 response = fake_answer
+                console.print(f"Answer: {response}")
             else:
-                response = qa.answer(args.question, k=args.k)
-            console.print(f"Answer: {response}")
+                # Real path streams tokens to stdout; no extra final print to avoid duplication
+                qa.answer(args.question, k=args.k)
         else:
             # Interactive mode
             if verbose_test:
@@ -102,12 +103,11 @@ Examples:
 
                     console.print("-" * 30)
                     if fake_answer is not None:
-                        response = fake_answer
+                        # Deterministic test path: print fake answer once
+                        console.print(fake_answer)
                     else:
-                        response = qa.answer(question, k=args.k)
-                    # Ensure the (possibly mocked) answer is visible in tests
-                    if response:
-                        console.print(response)
+                        # Real path streams tokens to stdout via qa.answer
+                        qa.answer(question, k=args.k)
                 except KeyboardInterrupt:
                     console.print("\nGoodbye!")
                     break

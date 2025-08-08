@@ -266,6 +266,10 @@ PY
   .venv/bin/python -m pytest -q -m e2e
   ```
 
+  Note: To narrow the scope during debugging, you can run subsets without adding new steps:
+  - Streamlit smoke only: `.venv/bin/python -m pytest -q tests/e2e_streamlit/test_app_smoke.py -q`
+  - CLI smoke only: `.venv/bin/python -m pytest -q tests/e2e/test_cli_script_e2e.py -q`
+
 5) Build validation
 - [ ] Action: Build app image. Verify build finishes without errors:
   ```bash
@@ -299,6 +303,10 @@ PY
   ```bash
   test -f logs/rag_system.log && grep -Ei "(error|traceback)" logs/rag_system.log || true
   ```
+ - [ ] Test artifacts present: session and per-test logs under `reports/`:
+   ```bash
+   test -f reports/test_session.log && test -d reports/logs && echo OK || echo MISSING
+   ```
 
 Post-MVP (defer)
 - [ ] Add app healthcheck/readiness for Streamlit

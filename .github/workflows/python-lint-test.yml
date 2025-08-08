@@ -40,7 +40,14 @@ jobs:
         run: |
           # This command runs all tests NOT marked as 'slow'
           # based on the configuration in pytest.ini
-          python -m pytest
+          python -m pytest --html=reports/report.html --self-contained-html --junitxml=reports/junit.xml
+
+      - name: Upload fast test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-fast
+          path: reports/
 
   slow_tests:
     name: Slow Integration Tests
@@ -67,7 +74,8 @@ jobs:
         run: |
           set -o pipefail
           # This command runs ONLY tests marked as 'slow'
-          docker compose -f docker/docker-compose.yml exec -T app pytest -sv -m slow | tee pytest.log
+          docker compose -f docker/docker-compose.yml exec -T app pytest -sv -m slow \
+            --html=reports/report_slow.html --self-contained-html --junitxml=reports/junit_slow.xml | tee pytest.log
           EXIT_CODE=${PIPESTATUS[0]}
           if [ $EXIT_CODE -ne 0 ]; then
             echo -e "\n🔴 Pytest failed — showing container logs for debugging:\n"
@@ -76,6 +84,12 @@ jobs:
             docker compose -f docker/docker-compose.yml logs ollama || true
             exit $EXIT_CODE
           fi
+      - name: Upload slow test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-slow
+          path: reports/
       - name: Tear down stack
         if: always()
         run: |

@@ -181,3 +181,17 @@ Notes
 ## License
 
 MIT License - see [LICENSE](LICENSE) file.
+
+---
+
+## Logs and Test Reports
+
+- **logs/**: Runtime and script logs. Ignored by Git. Auto-created by the app and scripts. Safe to delete anytime; they are recreated on next run. A cleanup script prunes files older than 7 days.
+- **reports/**: Pytest artifacts (HTML/JUnit reports, session log, per-test logs). Ignored by Git and auto-created by tests. Safe to delete; regenerated on next test run.
+
+Utilities
+- Clean artifacts quickly:
+  ```bash
+  ./scripts/clean_artifacts.sh
+  ```
+- CI uploads reports as artifacts from the `reports/` directory for both fast and slow test jobs.
