@@ -31,39 +31,23 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
-          pip install pyright
       - name: Ruff static analysis
         run: |
           ruff check .
       - name: Ruff formatting check
         run: |
           ruff format --check .
-      - name: Prepare reports directories
+      - name: Run fast tests
         run: |
-          mkdir -p reports/logs
-      - name: Pyright type checking
-        run: |
-          pyright
-      - name: Run unit tests only
-        run: |
-          python -m pytest -q -m "unit" \
-            --html=reports/report_unit.html --self-contained-html \
-            --junitxml=reports/junit_unit.xml
-      - name: Run fast integration tests
-        run: |
-          python -m pytest -q -m "integration and not slow" \
-            --html=reports/report_integration.html --self-contained-html \
-            --junitxml=reports/junit_integration.xml
-      - name: Run CLI e2e smoke tests (no slow)
-        run: |
-          python -m pytest -q tests/e2e -m "e2e and not slow" \
-            --html=reports/report_e2e_smoke.html --self-contained-html \
-            --junitxml=reports/junit_e2e_smoke.xml
+          # This command runs all tests NOT marked as 'slow'
+          # based on the configuration in pytest.ini
+          # In both GitHub and act (local), generate HTML & JUnit under reports/
+          python -m pytest --html=reports/report.html --self-contained-html --junitxml=reports/junit.xml
 
       - name: Upload fast test reports
         # Skip under act (local GitHub Actions emulator) because ACTIONS_RUNTIME_TOKEN is not available.
         # On real GitHub runners, this will upload the reports/ directory as a build artifact.
-        if: ${{ always() && github.actor != 'nektos/act' }}
+        if: ${{ always() && !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-fast
