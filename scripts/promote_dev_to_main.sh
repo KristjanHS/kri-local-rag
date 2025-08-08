@@ -329,21 +329,6 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   exit 0
 fi
 
-if [[ $CONFIRM -eq 1 ]]; then
-  if [[ $ASSUME_YES -eq 1 || "${PROMOTE_CONFIRM:-}" = "1" ]]; then
-    : # proceed
-  elif [ -t 0 ]; then
-    read -r -p "Promote ${FROM_BRANCH} → ${TO_BRANCH}? This will push to origin/${TO_BRANCH}. Proceed? (y/N) " reply
-    case "$reply" in
-      y|Y|yes|YES) : ;;
-      *) _red "Aborting by user choice." | tee -a "$LOG_FILE"; switch_to_branch "$FROM_BRANCH"; exit 1 ;;
-    esac
-  else
-    _red "ERROR: Confirmation required (use --yes or set PROMOTE_CONFIRM=1)." | tee -a "$LOG_FILE"
-    exit 1
-  fi
-fi
-
 log_step "Pushing ${TO_BRANCH} to origin (pre-push hooks may run)…"
 
 # Push with one retry on transient local CI/act failures. If remote rejects due to
