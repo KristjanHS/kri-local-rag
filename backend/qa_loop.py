@@ -60,9 +60,10 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
         try:
             _cross_encoder = CrossEncoder(model_name)
             # Apply PyTorch CPU optimizations (skip in testing environments)
-            skip_optimization = (
-                "pytest" in sys.modules or os.getenv("SKIP_TORCH_OPTIMIZATION", "false").lower() == "true"
-            )
+            # New preferred flag: RERANKER_CROSS_ENCODER_OPTIMIZATIONS (true enables opts)
+            enable_opts_str = os.getenv("RERANKER_CROSS_ENCODER_OPTIMIZATIONS", "true").lower()
+            enable_opts = enable_opts_str == "true"
+            skip_optimization = ("pytest" in sys.modules) or (not enable_opts)
 
             if not skip_optimization:
                 # Set optimal threading for current environment
@@ -169,8 +170,20 @@ def answer(
 
     global _ollama_context
 
+    # Test hook: deterministic fake answer (used by CLI/UI e2e tests)
+    fake_answer = os.getenv("RAG_FAKE_ANSWER")
+    if fake_answer is not None:
+        # Stream tokens if a callback is provided to emulate real-time output
+        if on_token is not None:
+            for ch in fake_answer:
+                if stop_event is not None and stop_event.is_set():
+                    break
+                on_token(ch)
+        return fake_answer
+
     # ---------- 1) Retrieve -----------------------------------------------------
-    initial_k = max(k * 20, 100)  # ask vector DB for more than we eventually keep
+    # Ask vector DB for more than we eventually keep to improve re-ranking quality
+    initial_k = k * 20
     candidates = get_top_k(question, k=initial_k, metadata_filter=metadata_filter)
     if not candidates:
         return "I found no relevant context to answer that question. The database may be empty. Ingest a PDF first."
@@ -261,10 +274,12 @@ def ensure_weaviate_ready_and_populated():
     logger.info("--- Checking Weaviate status and collection ---")
     try:
         parsed_url = urlparse(WEAVIATE_URL)
+        http_host = parsed_url.hostname or "localhost"
+        grpc_host = parsed_url.hostname or "localhost"
         client = weaviate.connect_to_custom(
-            http_host=parsed_url.hostname,
+            http_host=http_host,
             http_port=parsed_url.port or 80,
-            grpc_host=parsed_url.hostname,
+            grpc_host=grpc_host,
             grpc_port=50051,
             http_secure=parsed_url.scheme == "https",
             grpc_secure=parsed_url.scheme == "https",
@@ -278,7 +293,7 @@ def ensure_weaviate_ready_and_populated():
         if not client.collections.exists(COLLECTION_NAME):
             # First-time setup: create the collection, ingest examples, then clean up.
             logger.info("   → Collection does not exist. Running one-time initialization...")
-            create_collection_if_not_exists(client)
+            create_collection_if_not_exists(client, COLLECTION_NAME)
 
             # Ingest example data to ensure all modules are warm, then remove it.
             # Get the absolute path to the project root, which is the parent of the 'backend' directory
@@ -314,7 +329,7 @@ def ensure_weaviate_ready_and_populated():
     except Exception as e:
         raise Exception(f"An unexpected error occurred during Weaviate check: {e}") from e
     finally:
-        if "client" in locals() and client.is_connected():
+        if "client" in locals() and hasattr(client, "is_connected") and client.is_connected():
             client.close()
     logger.info("--- Weaviate check complete ---")
 

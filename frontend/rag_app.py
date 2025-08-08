@@ -1,12 +1,14 @@
 # run locally: ~/projects/kri-local-rag$ streamlit run frontend/rag_app.py
+import contextlib
+import io
 import os
 import threading
-import streamlit as st
-import io, contextlib
 
-from backend.qa_loop import answer, ensure_weaviate_ready_and_populated
+import streamlit as st
+
 from backend.config import OLLAMA_CONTEXT_TOKENS, get_logger
 from backend.ingest import ingest
+from backend.qa_loop import answer, ensure_weaviate_ready_and_populated
 
 # Set up logging for this module
 logger = get_logger(__name__)
@@ -75,7 +77,10 @@ if "init_done" not in st.session_state:
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
         try:
-            ensure_weaviate_ready_and_populated()
+            if os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes"):
+                logger.info("Startup checks skipped via RAG_SKIP_STARTUP_CHECKS")
+            else:
+                ensure_weaviate_ready_and_populated()
         except Exception as e:
             logger.error("Backend initialization failed: %s", e)
     st.session_state["init_logs"] = buf.getvalue()

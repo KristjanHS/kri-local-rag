@@ -4,8 +4,8 @@ services:
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.25.1
     ports:
-      - "8080:8080"
-      - "50051:50051"
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:50051:50051"
     volumes:
       - weaviate_db:/var/lib/weaviate
     environment:
@@ -34,7 +34,7 @@ services:
     volumes:
       - ollama_models:/root/.ollama
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s

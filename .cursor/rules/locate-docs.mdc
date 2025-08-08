@@ -1,0 +1,13 @@
+---
+description: "Instruct agents to find key context files in the docs_AI_coder folder"
+type: agent-select
+alwaysApply: false
+globs: []
+---
+- All project context files, for example **instructions.md**, **roadmap.md**, and **plan.md** and others, live under the `docs_AI_coder` directory at the project root.
+- For example, when you see a reference to `@instructions.md`, `@roadmap.md`, or `@plan.md`, resolve it as: 
+@docs_AI_coder/instructions.md
+@docs_AI_coder/roadmap.md
+@docs_AI_coder/plan.md
+- If asked to generate or update **plan.md**, write it to `docs_AI_coder/plan.md`.
+- Use the `@` syntax with the full relative path so that tools like `mcp-search` and file reads target the correct folder.

@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
-# scripts/ci_local.sh – quick offline CI loop for developers
+# scripts/local_fast_checks.sh – lightweight, offline developer checks
 #
-# This script reproduces the most important parts of the GitHub CI pipeline
-# (lint & tests) but runs entirely against the already-created local virtual
-# environment. It is intentionally dependency-free (no docker, no network) so
-# that you can iterate rapidly even when offline.
+# Purpose
+# - Fast feedback loop (no Docker, no act): Ruff + pytest via local .venv
+# - Complements act/GitHub CI by being dependency-light and offline-friendly
+# - Mirrors CI’s default pytest addopts (excludes environment/e2e/slow)
+#
+# When to use which
+# - Use this script for quick local iteration and offline work
+# - Use scripts/ci_act.sh (act) to emulate GitHub Actions (Docker-based)
+# - Git hook .git/hooks/pre-push runs act for PR checks automatically
 #
 # USAGE
-#   ./scripts/ci_local.sh          # run all default checks
-#   CI_STRICT=1 ./scripts/ci_local.sh   # fail instead of warn on missing tools
+#   ./scripts/local_fast_checks.sh              # run all default checks
+#   CI_STRICT=1 ./scripts/local_fast_checks.sh  # fail instead of warn on missing tools
 #
-# The script assumes the project-level .venv already exists and that all
-# dependencies are installed – e.g.:
+# Prereq: the project-level .venv exists and deps installed:
 #   python -m venv .venv
 #   .venv/bin/pip install -r requirements.txt
 #
@@ -58,7 +62,7 @@ if [[ ! -x "$PY" ]]; then
   _red "ERROR: $PY does not exist or is not executable. Create the venv first." && exit 1
 fi
 
-_green "Running pytest …"
+_green "Running pytest (fast suite – default addopts) …"
 "$PY" -m pytest -q tests/
 
-_green "All checks passed!"
+_green "All local fast checks passed!"

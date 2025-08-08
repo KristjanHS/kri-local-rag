@@ -1,7 +1,10 @@
 name: Python Lint, Fast Tests, and Slow Tests
-
-env:
-  ACT: ""
+# NOTE FOR LOCAL CI (act):
+# - The pre-push Git hook (.git/hooks/pre-push) runs:
+#     act pull_request -j lint_and_fast_tests --pull=false --log-prefix-job-id
+#   so local pushes mimic the 'lint_and_fast_tests' job for PRs.
+# - To run this workflow manually with act:
+#     act pull_request -j lint_and_fast_tests
 
 on:
   pull_request:
@@ -34,7 +37,17 @@ jobs:
         run: |
           # This command runs all tests NOT marked as 'slow'
           # based on the configuration in pytest.ini
-          python -m pytest
+          # In both GitHub and act (local), generate HTML & JUnit under reports/
+          python -m pytest --html=reports/report.html --self-contained-html --junitxml=reports/junit.xml
+
+      - name: Upload fast test reports
+        # Skip under act (local GitHub Actions emulator) because ACTIONS_RUNTIME_TOKEN is not available.
+        # On real GitHub runners, this will upload the reports/ directory as a build artifact.
+        if: ${{ always() && !env.ACT }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-fast
+          path: reports/
 
   slow_tests:
     name: Slow Integration Tests
@@ -61,7 +74,8 @@ jobs:
         run: |
           set -o pipefail
           # This command runs ONLY tests marked as 'slow'
-          docker compose -f docker/docker-compose.yml exec -T app pytest -sv -m slow | tee pytest.log
+          docker compose -f docker/docker-compose.yml exec -T app pytest -sv -m slow \
+            --html=reports/report_slow.html --self-contained-html --junitxml=reports/junit_slow.xml | tee pytest.log
           EXIT_CODE=${PIPESTATUS[0]}
           if [ $EXIT_CODE -ne 0 ]; then
             echo -e "\n🔴 Pytest failed — showing container logs for debugging:\n"
@@ -70,6 +84,13 @@ jobs:
             docker compose -f docker/docker-compose.yml logs ollama || true
             exit $EXIT_CODE
           fi
+      - name: Upload slow test reports
+        # Same: upload only on GitHub (not in act) due to missing ACTIONS_RUNTIME_TOKEN locally.
+        if: ${{ always() && !env.ACT }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-slow
+          path: reports/
       - name: Tear down stack
         if: always()
         run: |

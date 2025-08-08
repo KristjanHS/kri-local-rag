@@ -1,0 +1,9 @@
+---
+description: For "Gemini Pro Plan Agent" and "Gemini Pro Exec Agent": terminate response once tasks complete
+type: agent-select
+globs: []
+alwaysApply: false
+---
+- If all required steps are done, emit exactly “<END>” and stop.  
+- Do **not** generate any text after “<END>”.  
+- Use this marker to signal completion; next agent invocation should only run new tasks.
