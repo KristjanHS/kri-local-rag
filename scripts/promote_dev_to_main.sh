@@ -257,7 +257,7 @@ fi
   # Safety: scan for unresolved conflict markers in the latest tree
   if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' HEAD -- . >/dev/null 2>&1; then
     _red "ERROR: Conflict markers detected in committed files after merge. Aborting push." | tee -a "$LOG_FILE"
-    _yellow "Hint: run 'git grep -nE "^(<<<<<<<|=======|>>>>>>>)" HEAD' to locate markers." | tee -a "$LOG_FILE"
+    _yellow "Hint: run: git grep -nE '^(<<<<<<<|=======|>>>>>>>)' HEAD" | tee -a "$LOG_FILE"
     exit 1
   fi
 
