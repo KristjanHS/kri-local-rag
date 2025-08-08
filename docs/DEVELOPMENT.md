@@ -55,6 +55,28 @@ For logs, rebuilds, service ops, and troubleshooting, see `docs/docker-managemen
 - `scripts/ingest.sh`: ingest local documents into the system.
 - `scripts/config.sh`: shared config sourced by the other scripts.
 
+## Promote dev → main
+
+Run all checks locally without pushing:
+```bash
+./scripts/promote_dev_to_main.sh --dry-run
+```
+
+Promote (push), or create PR if main is protected:
+```bash
+./scripts/promote_dev_to_main.sh
+./scripts/promote_dev_to_main.sh --create-pr
+```
+
+Optional allow-list file for auto conflict resolution (`.promotion-rules.conf`):
+```text
+# Lines are path prefixes or file names that can be auto-resolved by
+# preferring the source branch during conflict resolution
+README.md
+docs/
+docs_AI_coder/
+```
+
  - ## Ingest documents
 
 - Streamlit UI: open `http://localhost:8501` and upload PDFs (ensure services are running; see `docs/docker-management.md`):
