@@ -10,16 +10,9 @@
 # - Pushes main and shows live progress; logs to logs/promote_dev_to_main.log
 #
 # Usage
-#   ./scripts/promote_dev_to_main.sh                             # normal run
-#   ./scripts/promote_dev_to_main.sh --dry-run                   # skip push
-#   ./scripts/promote_dev_to_main.sh --prefer-dev-all            # auto-resolve ALL conflicts preferring source branch
-#   ./scripts/promote_dev_to_main.sh --create-pr                 # if push to protected target is blocked, auto-create PR source → target
-#   ./scripts/promote_dev_to_main.sh --from <branch> --to <branch>
-#   PROMOTE_FROM_BRANCH=develop PROMOTE_TO_BRANCH=release ./scripts/promote_dev_to_main.sh
-#   ./scripts/promote_dev_to_main.sh --allowlist .promotion-rules.conf  # file patterns to auto-resolve by preferring source branch
-#   ./scripts/promote_dev_to_main.sh --auto-venv                  # create .venv and install deps if missing
-#   ./scripts/promote_dev_to_main.sh --confirm                    # prompt before push; use PROMOTE_CONFIRM=1 or --yes in CI
-#   ./scripts/promote_dev_to_main.sh --verbose|--quiet            # control log verbosity
+#   ./scripts/promote_dev_to_main.sh                 # normal run (dev → main)
+#   ./scripts/promote_dev_to_main.sh --dry-run       # run all checks; skip push
+#   ./scripts/promote_dev_to_main.sh --create-pr     # if push to protected 'main' is blocked, auto-create PR dev → main
 #
 set -euo pipefail
 
@@ -39,59 +32,26 @@ _yellow(){ printf "\e[33m%s\e[0m\n" "$*"; }
 DRY_RUN=0
 PREFER_DEV_ALL=0
 CREATE_PR=0
-AUTO_VENV=0
-CONFIRM=0
-ASSUME_YES=0
-VERBOSE=0
-QUIET=0
 
-# Branch configuration (defaults)
-FROM_BRANCH="${PROMOTE_FROM_BRANCH:-dev}"
-TO_BRANCH="${PROMOTE_TO_BRANCH:-main}"
-ALLOWLIST_FILE=""
+# Branch configuration (fixed defaults; intentionally not configurable to keep usage simple)
+FROM_BRANCH="dev"
+TO_BRANCH="main"
 
-for arg in "$@"; do
-  case "$arg" in
-    --dry-run) DRY_RUN=1 ;;
-    --prefer-dev-all) PREFER_DEV_ALL=1 ;;
-    --create-pr) CREATE_PR=1 ;;
-    --auto-venv) AUTO_VENV=1 ;;
-    --confirm) CONFIRM=1 ;;
-    --yes|--assume-yes) ASSUME_YES=1 ;;
-    --verbose) VERBOSE=1 ;;
-    --quiet) QUIET=1 ;;
-    --from) shift; FROM_BRANCH="$1" ;;
-    --to) shift; TO_BRANCH="$1" ;;
-    --from=*) FROM_BRANCH="${arg#*=}" ;;
-    --to=*) TO_BRANCH="${arg#*=}" ;;
-    --allowlist) shift; ALLOWLIST_FILE="$1" ;;
-    --allowlist=*) ALLOWLIST_FILE="${arg#*=}" ;;
-    *) _red "Unknown argument: $arg"; exit 2 ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    --prefer-dev-all) PREFER_DEV_ALL=1; shift ;;
+    --create-pr) CREATE_PR=1; shift ;;
+    *) _red "Unknown argument: $1"; exit 2 ;;
   esac
 done
-
-# Adjust log level if requested (config.sh computes _LOG_THRESHOLD at source time)
-if [[ $VERBOSE -eq 1 ]]; then
-  export LOG_LEVEL=DEBUG
-  _LOG_THRESHOLD=$(_log_level_to_num "$LOG_LEVEL")
-elif [[ $QUIET -eq 1 ]]; then
-  export LOG_LEVEL=WARN
-  _LOG_THRESHOLD=$(_log_level_to_num "$LOG_LEVEL")
-fi
 
 setup_logging "$SCRIPT_NAME"
 
 PY=".venv/bin/python"
 if [[ ! -x "$PY" ]]; then
-  if [[ $AUTO_VENV -eq 1 ]]; then
-    log_step "Creating virtual environment (.venv)…"
-    python3 -m venv .venv 2>&1 | tee -a "$LOG_FILE"
-    .venv/bin/pip install --upgrade pip 2>&1 | tee -a "$LOG_FILE"
-    .venv/bin/pip install -r requirements-dev.txt --disable-pip-version-check --no-input 2>&1 | tee -a "$LOG_FILE"
-  else
-    _red "ERROR: $PY not found or not executable. Create the venv and install deps first (or use --auto-venv)." | tee -a "$LOG_FILE"
-    exit 1
-  fi
+  _red "ERROR: $PY not found or not executable. Create the venv and install deps first." | tee -a "$LOG_FILE"
+  exit 1
 fi
 
 need() {
@@ -245,7 +205,7 @@ auto_resolve_conflicts() {
   # Allow-list of files we auto-resolve by preferring the source branch
   local allow=()
   local rules_file
-  rules_file="${ALLOWLIST_FILE:-.promotion-rules.conf}"
+  rules_file=".promotion-rules.conf"
   if [[ -f "$rules_file" ]]; then
     while IFS= read -r line; do
       # skip comments and empty lines
