@@ -250,3 +250,12 @@ def docker_services(request, test_log_file):
 def project_root():
     """Provides the absolute path to the project root directory."""
     return Path(__file__).parent.parent
+
+
+# Lightweight default for docker-based tests outside specialized suites.
+# Suites can override this fixture in a closer-scope conftest (e.g. tests/e2e/conftest.py)
+# to perform heavier readiness checks.
+@pytest.fixture(scope="session")
+def docker_services_ready():  # noqa: D401
+    """No-op readiness fixture for generic docker-marked tests."""
+    yield

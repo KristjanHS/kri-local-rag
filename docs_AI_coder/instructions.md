@@ -97,15 +97,7 @@ To set up the project, you will need Docker and Python installed on your system.
 
 ## Testing and Automation
 
-### Testing Strategy
-
-The project includes a comprehensive test suite to ensure code quality and stability.
-
--   **Test Types**:
-    -   **Unit Tests**: Fast, isolated tests for individual components.
-    -   **Integration Tests**: Tests that verify the interaction between different services (e.g., backend and Weaviate).
-    -   **End-to-End (E2E) Tests**: Tests that simulate a full user workflow.
--   **Running Tests**: The test suite can be run using `pytest`. Different test types can be selected using markers (e.g., `pytest -m "not e2e"`).
+For full testing guidance (suites, markers, examples), see `docs_AI_coder/testing.md`.
 
 ### Automation Scripts
 
@@ -117,3 +109,59 @@ The `scripts/` directory contains several scripts to automate common development
 -   `ingest.sh`: A helper script for ingesting documents into the system.
 -   `config.sh`: A central configuration file for the other shell scripts (not meant to be run directly).
 
+
+## AI Agent Hints: Docker startup and E2E tests
+
+Use these minimal, reliable commands when automating tasks.
+
+### Start services (Docker)
+
+Paths and ports:
+- Compose: `docker/docker-compose.yml`
+- App (Streamlit): `http://localhost:8501`
+- Weaviate: `http://localhost:8080`
+- Ollama: `http://localhost:11434`
+
+Commands:
+
+```bash
+docker compose -f docker/docker-compose.yml up -d --build
+
+# Wait for the app to be reachable
+for i in {1..60}; do
+  if curl -fsS http://localhost:8501 >/dev/null 2>&1; then echo ready; break; fi
+  sleep 1
+done
+
+# Tail app logs if needed
+docker compose -f docker/docker-compose.yml logs -f app | cat
+```
+
+### Run end-to-end (E2E) tests
+
+Notes:
+- Pytest default in `pytest.ini` excludes `slow`; selecting `-m e2e` overrides this.
+- Tests use env hooks to stay fast/deterministic:
+  - `RAG_SKIP_STARTUP_CHECKS=1`
+  - `RAG_FAKE_ANSWER=...`
+  - `RAG_VERBOSE_TEST=1`
+
+Command (from project root):
+
+```bash
+.venv/bin/python -m pytest -q -m e2e --disable-warnings --maxfail=1
+```
+
+All-in-one (start + wait + tests):
+
+```bash
+docker compose -f docker/docker-compose.yml up -d --build && \
+for i in {1..60}; do curl -fsS http://localhost:8501 >/dev/null 2>&1 && echo ready && break || sleep 1; done && \
+.venv/bin/python -m pytest -q -m e2e --disable-warnings --maxfail=1
+```
+
+Stop services:
+
+```bash
+docker compose -f docker/docker-compose.yml down
+```

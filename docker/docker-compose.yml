@@ -15,7 +15,7 @@ services:
       ENABLE_MODULES: 'text2vec-huggingface,reranker-huggingface' # Still needed for reranker
       CLUSTER_HOSTNAME: 'node1'
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1"]
+      test: [ "CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,13 +30,13 @@ services:
           devices:
             - driver: nvidia
               count: all
-              capabilities: [gpu]
+              capabilities: [ gpu ]
     volumes:
       - ollama_models:/root/.ollama
     ports:
       - "127.0.0.1:11434:11434"
     healthcheck:
-      test: ["CMD", "ollama", "list"]
+      test: [ "CMD", "ollama", "list" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,22 +44,23 @@ services:
 
   # ---------- RAG App Container (supports both web app and CLI) -----------------------------------------
   app:
+    image: kri-local-rag-app # single canonical image tag for the app
     build:
-      context: ..  # project root
+      context: .. # project root
       dockerfile: docker/app.Dockerfile
     ports:
       - "8501:8501"
     volumes:
-      - ../backend:/app/backend  # Live backend code
-      - ../frontend:/app/frontend  # Live frontend code
-      - ../tests:/app/tests        # Live tests
-      - ../data:/app/data  # Live data access
-      - ../logs:/app/logs  # Live log access
-      - ../tests:/app/tests      # Mount tests for in-container testing
+      - ../backend:/app/backend # Live backend code
+      - ../frontend:/app/frontend # Live frontend code
+      - ../tests:/app/tests # Live tests
+      - ../data:/app/data # Live data access
+      - ../logs:/app/logs # Live log access
+      - ../tests:/app/tests # Mount tests for in-container testing
       - hf_cache:/root/.cache/huggingface
     working_dir: /app
     # Auto-start Streamlit when container starts
-    command: ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    command: [ "streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0" ]
     environment:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
@@ -67,18 +68,18 @@ services:
 
   # ---------- One-off Ingestion Utility -----------------------------------------
   ingester:
-    profiles: ["ingest"]
-    image: kri-local-rag-app   # reuse the APP image
+    profiles: [ "ingest" ]
+    image: kri-local-rag-app # reuse the APP image
     depends_on:
       - weaviate
       - ollama
     volumes:
-      - ../backend:/app/backend  # Live backend code
-      - ../data:/app/data  # Live data access
-      - ../logs:/app/logs  # Live log access
-      - ../tests:/app/tests      # Mount tests for in-container testing
+      - ../backend:/app/backend # Live backend code
+      - ../data:/app/data # Live data access
+      - ../logs:/app/logs # Live log access
+      - ../tests:/app/tests # Mount tests for in-container testing
       - hf_cache:/root/.cache/huggingface
-    command: ["python", "backend/ingest.py", "/app/data"]
+    command: [ "python", "backend/ingest.py", "/app/data" ]
 
 volumes:
   weaviate_db:

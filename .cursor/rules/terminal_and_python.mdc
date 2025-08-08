@@ -8,3 +8,8 @@ alwaysApply: false
 - **Use the `python` alias,** as the shell is configured to use the correct virtual environment.
 - **Run Pytest as a module:** `python -m pytest tests/` to avoid `ImportError` issues.
 - **NEVER use PYTHONPATH.** It can break virtual environment detection.
+
+- If a command may invoke a pager or hide output in non-interactive mode (e.g., `git log`, `git diff`), append `| cat` to force full output to the chat/logs.
+- When piping to `cat`, prefer preserving the original exit code by running with pipefail, for example:
+  - `bash -o pipefail -c 'YOUR_COMMAND | cat'`
+  - or `set -o pipefail; YOUR_COMMAND | cat`

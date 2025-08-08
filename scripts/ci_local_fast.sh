@@ -19,9 +19,17 @@
 #   python -m venv .venv
 #   .venv/bin/pip install -r requirements.txt
 #
-set -euo pipefail
+set -Eeuo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/config.sh"
+
+SCRIPT_NAME="ci_local_fast"
+LOG_FILE=$(init_script_logging "$SCRIPT_NAME")
+enable_error_trap "$LOG_FILE" "$SCRIPT_NAME"
+enable_debug_trace "$LOG_FILE"
+
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PY="$ROOT_DIR/.venv/bin/python"
 
 _red()   { printf "\e[31m%s\e[0m\n" "$*"; }
@@ -42,8 +50,8 @@ need() {
 # 1. Ruff – static analysis & formatting (fast)
 # ---------------------------------------------------------------------------
 if need ruff; then
-  _green "Running ruff (lint & format check)…"
-  ruff check "$ROOT_DIR"
+  _green "Running ruff (lint & format check)…" | tee -a "$LOG_FILE"
+  ruff check "$ROOT_DIR" | tee -a "$LOG_FILE"
   # Ruff can also auto-fix, but CI should only verify
 fi
 
@@ -51,18 +59,18 @@ fi
 # 2. Ruff formatting enforcement
 # ---------------------------------------------------------------------------
 if need ruff; then
-  _green "Running ruff format --check …"
-  ruff format --check "$ROOT_DIR"
+  _green "Running ruff format --check …" | tee -a "$LOG_FILE"
+  ruff format --check "$ROOT_DIR" | tee -a "$LOG_FILE"
 fi
 
 # ---------------------------------------------------------------------------
 # 3. Pytest – unit & integration tests
 # ---------------------------------------------------------------------------
 if [[ ! -x "$PY" ]]; then
-  _red "ERROR: $PY does not exist or is not executable. Create the venv first." && exit 1
+  _red "ERROR: $PY does not exist or is not executable. Create the venv first." | tee -a "$LOG_FILE" && exit 1
 fi
 
-_green "Running pytest (fast suite – default addopts) …"
-"$PY" -m pytest -q tests/
+_green "Running pytest (fast suite – default addopts) …" | tee -a "$LOG_FILE"
+"$PY" -m pytest -q tests/ | tee -a "$LOG_FILE"
 
-_green "All local fast checks passed!"
+_green "All local fast checks passed!" | tee -a "$LOG_FILE"

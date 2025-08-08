@@ -7,7 +7,7 @@ This guide outlines the testing strategy for the local RAG application, which is
 The test suite is divided into several distinct categories, each serving a specific purpose. This separation allows for targeted testing, faster feedback loops, and clearer intent.
 
 -   **Unit Tests** (`@pytest.mark.unit`): These are fast, isolated tests that verify the correctness of individual functions or classes. They use mocking extensively to remove external dependencies, ensuring they run in seconds.
--   **Integration Tests** (`@pytest.g.integration`): These tests verify the interaction between different components of the application. Some may use `Testcontainers` to spin up real services, providing a realistic testing environment.
+-   **Integration Tests** (`@pytest.mark.integration`): These tests verify the interaction between different components of the application. Some may use `Testcontainers` to spin up real services, providing a realistic testing environment.
 -   **End-to-End (E2E) Tests** (`@pytest.mark.e2e`): These tests validate the entire application workflow from start to finish. They are slow and require a fully configured Docker environment.
 -   **Docker-Dependent Tests** (`@pytest.mark.docker`): A subset of tests that specifically require a running Docker daemon.
 -   **Slow Tests** (`@pytest.mark.slow`): Marks tests that have a significant runtime.

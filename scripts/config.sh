@@ -1,6 +1,6 @@
 #!/bin/bash
 # Centralized configuration for all shell scripts
-# This file defines all important paths and can be sourced by other scripts
+# This file defines all important paths and common logging utilities.
 
 # Get the project root directory (one level up from scripts/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -73,38 +73,118 @@ resolve_path() {
     fi
 }
 
-# Global logging function
-log_message() {
-    local level="$1"
-    shift
-    local message="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "[$timestamp] [$level] $message"
+# --------------------------- Logging utilities ------------------------------
+
+# LOG_LEVEL controls verbosity (DEBUG, INFO, WARN, ERROR). Default: INFO
+export LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+_log_level_to_num() {
+    case "$1" in
+        DEBUG) echo 10 ;;
+        INFO)  echo 20 ;;
+        WARN)  echo 30 ;;
+        ERROR) echo 40 ;;
+        *)     echo 20 ;;
+    esac
 }
 
-# Function to get log file path for a script
-get_log_file() {
+_LOG_THRESHOLD=$(_log_level_to_num "$LOG_LEVEL")
+
+_is_tty() {
+    [ -t 1 ] && echo 1 || echo 0
+}
+
+# Print a single log line to stdout with optional color if TTY
+log() {
+    local level="$1"; shift
+    local msg="$*"
+    local ts
+    ts=$(date -Is)
+    local nlevel=$(_log_level_to_num "$level")
+    if [ "$nlevel" -lt "$_LOG_THRESHOLD" ]; then
+        return 0
+    fi
+    if [ "$(_is_tty)" -eq 1 ]; then
+        case "$level" in
+            DEBUG) printf "%s [\033[36m%s\033[0m] %s\n" "$ts" "$level" "$msg" ;;
+            INFO)  printf "%s [\033[32m%s\033[0m] %s\n" "$ts" "$level" "$msg" ;;
+            WARN)  printf "%s [\033[33m%s\033[0m] %s\n" "$ts" "$level" "$msg" ;;
+            ERROR) printf "%s [\033[31m%s\033[0m] %s\n" "$ts" "$level" "$msg" ;;
+            *)     printf "%s [%s] %s\n" "$ts" "$level" "$msg" ;;
+        esac
+    else
+        printf "%s [%s] %s\n" "$ts" "$level" "$msg"
+    fi
+}
+
+# Backwards-compatible helper
+log_message() {
+    log "$@"
+}
+
+# Create a timestamped log file and a stable symlink <name>.log → <name>-<ts>.log
+init_script_logging() {
     local script_name="$1"
-    local log_file="$LOGS_DIR/${script_name}.log"
-    
-    # Ensure logs directory exists
     mkdir -p "$LOGS_DIR"
-    
-    # Return the log file path
+    local ts
+    ts=$(date +%Y%m%d-%H%M%S)
+    local log_file="$LOGS_DIR/${script_name}-${ts}.log"
+    ln -sf "$(basename "$log_file")" "$LOGS_DIR/${script_name}.log"
     echo "$log_file"
 }
 
-# Function to setup logging for shell scripts
+# Error trap: logs failing command and line number to both stdout and log file
+enable_error_trap() {
+    local log_file="$1"
+    local script_name="$2"
+    trap 'rc=$?; line=${BASH_LINENO[0]:-?}; cmd=${BASH_COMMAND:-?}; msg="${script_name}: line ${line}: ${cmd} (exit ${rc})"; log ERROR "$msg" | tee -a "$log_file"; exit $rc' ERR
+}
+
+# Optional debug trace to the log file only (export DEBUG=1 to enable)
+enable_debug_trace() {
+    local log_file="$1"
+    exec 3>>"$log_file"
+    export BASH_XTRACEFD=3
+    export PS4='+ $(date -Is) ${BASH_SOURCE##*/}:${LINENO}: '
+    if [ "${DEBUG:-}" = "1" ]; then
+        set -x
+    fi
+}
+
+# Run a step with timing and status logging
+run_step() {
+    local title="$1"; shift
+    local log_file="$1"; shift
+    local t0=$(date +%s)
+    log INFO "▶ ${title}" | tee -a "$log_file"
+    if "$@"; then
+        local dt=$(( $(date +%s) - t0 ))
+        log INFO "✔ ${title} (${dt}s)" | tee -a "$log_file"
+    else
+        local rc=$?
+        log ERROR "✖ ${title} failed (exit ${rc})" | tee -a "$log_file"
+        return $rc
+    fi
+}
+
+# --------------------- Backward-compat logging wrappers ---------------------
+
+# Return the stable symlink path for a script's log
+get_log_file() {
+    local script_name="$1"
+    mkdir -p "$LOGS_DIR"
+    echo "$LOGS_DIR/${script_name}.log"
+}
+
+# Ensure a timestamped log exists and the symlink points to it, then log start
 setup_logging() {
     local script_name="$1"
-    local log_file="$LOGS_DIR/${script_name}.log"
-    
-    # Ensure logs directory exists
-    mkdir -p "$LOGS_DIR"
-    
-    # Log script start
-    log_message "INFO" "Starting $script_name" | tee -a "$log_file"
+    local ts_log
+    ts_log=$(init_script_logging "$script_name")
+    log INFO "Starting $script_name" | tee -a "$ts_log"
 }
+
+# ------------------------ Misc. utility functions ---------------------------
 
 # Function to get script name without extension
 get_script_name() {

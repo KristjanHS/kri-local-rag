@@ -24,23 +24,18 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # necessary here.
 
 
-# ---- rest of your deps ----
+# ---- production dependencies ----
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements.txt
-    
-# ---- dev deps ----
-COPY requirements-dev.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements-dev.txt
-    
+
+# ---- install project package (no dev tooling in final image) ----
+# Copy metadata and backend source, then install the package
 COPY pyproject.toml .
+COPY backend/ /app/backend/
 RUN pip install -e .
 
 # --- Copy Application Code ---
-# Copy the backend code so the app can import from it
-COPY backend/ /app/backend/
-
 # Copy the frontend app code
 COPY frontend/ /app/frontend/
 
