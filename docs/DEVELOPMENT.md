@@ -73,11 +73,20 @@ Pre-push hook (runs automatically if installed):
 act pull_request -j lint_and_fast_tests --pull=false --log-prefix-job-id
 ```
 
-Manual run:
+Manually simulate pull_reqest + run CI job locally
 ```bash
 ./scripts/ci_act.sh
-# or
-act pull_request -j lint_and_fast_tests
+
+```
+
+Manual fast tests only:
+```bash
+act workflow_dispatch -j lint_and_fast_tests
+```
+
+Manual Pyright only:
+```bash
+act workflow_dispatch -j pyright
 ```
 
 Troubleshooting flaky local CI:
