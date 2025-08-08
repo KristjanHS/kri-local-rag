@@ -37,6 +37,9 @@ jobs:
       - name: Ruff formatting check
         run: |
           ruff format --check .
+      - name: Prepare reports directories
+        run: |
+          mkdir -p reports
       - name: Run fast tests
         run: |
           # This command runs all tests NOT marked as 'slow'
