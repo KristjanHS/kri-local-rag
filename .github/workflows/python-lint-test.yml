@@ -1,4 +1,4 @@
-name: Python Lint, Fast Tests, Docker Smoke, and Slow Tests
+name: CI
 # NOTE FOR LOCAL CI (act):
 # - The pre-push Git hook (.git/hooks/pre-push) runs:
 #     act pull_request -j lint_and_fast_tests --pull=false --log-prefix-job-id
@@ -52,11 +52,30 @@ jobs:
       - name: Upload fast test reports
         # Skip under act (local GitHub Actions emulator) because ACTIONS_RUNTIME_TOKEN is not available.
         # On real GitHub runners, this will upload the reports/ directory as a build artifact.
-        if: ${{ always() && !env.ACT }}
+        if: ${{ always() && github.actor != 'nektos/act' }}
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-fast
           path: reports/
+
+  pyright:
+    name: Pyright
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "requirements-dev.txt"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Pyright type checking
+        run: pyright
 
   docker_smoke_tests:
     name: Docker Packaging Smoke Tests
@@ -86,7 +105,7 @@ jobs:
             --html=reports/report_docker.html --self-contained-html \
             --junitxml=reports/junit_docker.xml
       - name: Upload docker smoke test reports
-        if: ${{ always() && !env.ACT }}
+        if: ${{ always() && github.actor != 'nektos/act' }}
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-docker
@@ -198,7 +217,7 @@ jobs:
           fi
       - name: Upload slow test reports
         # Same: upload only on GitHub (not in act) due to missing ACTIONS_RUNTIME_TOKEN locally.
-        if: ${{ always() && !env.ACT }}
+        if: ${{ always() && github.actor != 'nektos/act' }}
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-slow
