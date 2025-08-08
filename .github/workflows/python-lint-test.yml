@@ -1,4 +1,4 @@
-name: Python Lint, Fast Tests, and Slow Tests
+name: Python Lint, Fast Tests, Docker Smoke, and Slow Tests
 # NOTE FOR LOCAL CI (act):
 # - The pre-push Git hook (.git/hooks/pre-push) runs:
 #     act pull_request -j lint_and_fast_tests --pull=false --log-prefix-job-id
@@ -8,10 +8,14 @@ name: Python Lint, Fast Tests, and Slow Tests
 
 on:
   pull_request:
-    branches: [main, dev]
+    branches: [ main, dev ]
   workflow_dispatch: # Allows manual triggering for slow tests
   schedule:
     - cron: "0 2 * * 0" # Weekly on Sunday at 2 AM for slow tests
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint_and_fast_tests:
@@ -27,18 +31,34 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
+          pip install pyright
       - name: Ruff static analysis
         run: |
           ruff check .
       - name: Ruff formatting check
         run: |
           ruff format --check .
-      - name: Run fast tests
+      - name: Prepare reports directories
         run: |
-          # This command runs all tests NOT marked as 'slow'
-          # based on the configuration in pytest.ini
-          # In both GitHub and act (local), generate HTML & JUnit under reports/
-          python -m pytest --html=reports/report.html --self-contained-html --junitxml=reports/junit.xml
+          mkdir -p reports/logs
+      - name: Pyright type checking
+        run: |
+          pyright
+      - name: Run unit tests only
+        run: |
+          python -m pytest -q -m "unit" \
+            --html=reports/report_unit.html --self-contained-html \
+            --junitxml=reports/junit_unit.xml
+      - name: Run fast integration tests
+        run: |
+          python -m pytest -q -m "integration and not slow" \
+            --html=reports/report_integration.html --self-contained-html \
+            --junitxml=reports/junit_integration.xml
+      - name: Run CLI e2e smoke tests (no slow)
+        run: |
+          python -m pytest -q tests/e2e -m "e2e and not slow" \
+            --html=reports/report_e2e_smoke.html --self-contained-html \
+            --junitxml=reports/junit_e2e_smoke.xml
 
       - name: Upload fast test reports
         # Skip under act (local GitHub Actions emulator) because ACTIONS_RUNTIME_TOKEN is not available.
@@ -49,11 +69,101 @@ jobs:
           name: test-reports-fast
           path: reports/
 
-  slow_tests:
-    name: Slow Integration Tests
-    # This job runs only on schedule or when manually dispatched.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+  docker_smoke_tests:
+    name: Docker Packaging Smoke Tests
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dev test dependencies on host
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Build app image (docker-compose)
+        run: |
+          docker compose -f docker/docker-compose.yml build app
+      - name: Prepare reports directories
+        run: |
+          mkdir -p reports/logs
+      - name: Run docker-marked tests on host
+        run: |
+          python -m pytest -q -m docker \
+            --html=reports/report_docker.html --self-contained-html \
+            --junitxml=reports/junit_docker.xml
+      - name: Upload docker smoke test reports
+        if: ${{ always() && !env.ACT }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-docker
+          path: reports/
+
+  # Local-only via act; manual dispatch; runs tests not covered by other jobs
+  gpu_docker_ollama_act:
+    name: act manual: remaining tests (env + streamlit)
+    if: env.ACT && github.event_name == 'workflow_dispatch'
     needs: lint_and_fast_tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dev test dependencies on host
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Build and start local stack (GPU-capable compose)
+        run: |
+          docker compose -f docker/docker-compose.yml up -d --build
+      - name: Wait for Weaviate readiness
+        run: |
+          timeout=180; until curl -s http://localhost:8080/v1/.well-known/ready >/dev/null 2>&1; do \
+            echo "Waiting for Weaviate..."; sleep 5; timeout=$((timeout-5)); \
+            if [ $timeout -le 0 ]; then echo "Weaviate not ready"; docker compose -f docker/docker-compose.yml logs weaviate; exit 1; fi; done
+      - name: Wait for Ollama readiness
+        run: |
+          timeout=180; until docker compose -f docker/docker-compose.yml exec -T ollama ollama list >/dev/null 2>&1; do \
+            echo "Waiting for Ollama..."; sleep 5; timeout=$((timeout-5)); \
+            if [ $timeout -le 0 ]; then echo "Ollama not ready"; docker compose -f docker/docker-compose.yml logs ollama; exit 1; fi; done
+      - name: Ensure Ollama model present (skip if exists)
+        env:
+          OLLAMA_MODEL: cas/mistral-7b-instruct-v0.3
+        run: |
+          set -e
+          if docker compose -f docker/docker-compose.yml exec -T ollama ollama show "$OLLAMA_MODEL" >/dev/null 2>&1; then
+            echo "Model $OLLAMA_MODEL already present; skipping pull."
+          else
+            echo "Pulling model $OLLAMA_MODEL ..."
+            docker compose -f docker/docker-compose.yml exec -T ollama ollama pull "$OLLAMA_MODEL"
+          fi
+      - name: Prepare reports directories
+        run: |
+          mkdir -p reports/logs
+      - name: Run e2e_streamlit smoke tests (no slow)
+        run: |
+          python -m pytest -q tests/e2e_streamlit -m "e2e and not slow" \
+            --html=reports/report_e2e_streamlit.html --self-contained-html \
+            --junitxml=reports/junit_e2e_streamlit.xml
+      - name: Run environment tests
+        run: |
+          python -m pytest -q -m environment \
+            --html=reports/report_environment.html --self-contained-html \
+            --junitxml=reports/junit_environment.xml
+      - name: Tear down local stack
+        if: always()
+        run: |
+          docker compose -f docker/docker-compose.yml down -v
+
+  # Local-only via act; manual dispatch; runs pytest -m slow against full stack
+  slow_tests:
+    name: act manual: slow tests (full stack)
+    # Run only when launched manually via act (not on GitHub UI)
+    if: env.ACT && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -62,12 +172,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install dev test dependencies on host
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
-
       - name: Build and start container stack
         run: |
           docker compose -f docker/docker-compose.yml up -d --build
@@ -75,6 +183,9 @@ jobs:
         run: |
           timeout=120; until curl -s http://localhost:8080/v1/.well-known/ready >/dev/null 2>&1; do \
             echo "Waiting for Weaviate..."; sleep 5; timeout=$((timeout-5)); if [ $timeout -le 0 ]; then echo "Weaviate not ready"; docker compose -f docker/docker-compose.yml logs weaviate; exit 1; fi; done
+      - name: Prepare reports directories
+        run: |
+          mkdir -p reports/logs
       - name: Run slow tests on host
         run: |
           set -o pipefail
