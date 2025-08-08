@@ -170,6 +170,17 @@ def answer(
 
     global _ollama_context
 
+    # Test hook: deterministic fake answer (used by CLI/UI e2e tests)
+    fake_answer = os.getenv("RAG_FAKE_ANSWER")
+    if fake_answer is not None:
+        # Stream tokens if a callback is provided to emulate real-time output
+        if on_token is not None:
+            for ch in fake_answer:
+                if stop_event is not None and stop_event.is_set():
+                    break
+                on_token(ch)
+        return fake_answer
+
     # ---------- 1) Retrieve -----------------------------------------------------
     # Ask vector DB for more than we eventually keep to improve re-ranking quality
     initial_k = k * 20

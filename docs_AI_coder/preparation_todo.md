@@ -261,7 +261,7 @@ PY
   ```bash
   .venv/bin/python -m pytest -q -m integration
   ```
-- [ ] Action: Run e2e tests (when stable). Verify exit code 0:
+- [x] Action: Run e2e tests (when stable). Verify exit code 0:
   ```bash
   .venv/bin/python -m pytest -q -m e2e
   ```

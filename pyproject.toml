@@ -98,6 +98,7 @@ test = [
     "pytest-mock",
     "pytest-docker",
     "pytest-html",
+    "pytest-playwright",
     "testcontainers[weaviate]",
     "ruff==0.5.3",
     "protobuf>=5.26,<7",
