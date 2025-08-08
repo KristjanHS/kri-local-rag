@@ -1,5 +1,9 @@
 ## Preparation TODO (for AI agent / developers)
 
+See also:
+- Quick run and E2E commands: `docs_AI_coder/instructions.md` (section: "AI Agent Hints: Docker startup and E2E tests").
+- Detailed testing guidance and markers: `docs_AI_coder/testing.md`.
+
 Context
 - App: Local RAG using Weaviate (8080), Ollama (11434), Streamlit UI (8501).
 - Only Streamlit should be user-visible. Other services should be local-only (loopback or compose-internal).

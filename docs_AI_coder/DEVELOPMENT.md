@@ -109,6 +109,10 @@ To run the test suite, ensure you have installed the full development and testin
 
 ---
 
+## AI Agent Hints
+
+For a single source of truth on Docker startup, readiness checks, and E2E test commands, see `docs_AI_coder/instructions.md` (section: "AI Agent Hints: Docker startup and E2E tests").
+
 ## Troubleshooting
 
 ### ModuleNotFoundError

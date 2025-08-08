@@ -4,6 +4,28 @@ Local RAG system using Weaviate, Ollama, and a CPU-optimized Python backend.
 
 ---
 
+## Quick Start (Docker)
+
+```bash
+# Start services (build if needed)
+docker compose -f docker/docker-compose.yml up -d --build
+
+# Wait for Streamlit app readiness (http://localhost:8501)
+for i in {1..60}; do \
+  curl -fsS http://localhost:8501 >/dev/null 2>&1 && echo ready && break || sleep 1; \
+done
+```
+
+Run end-to-end tests (optional):
+
+```bash
+.venv/bin/python -m pytest -q -m e2e --disable-warnings --maxfail=1
+```
+
+See `docs/docker-management.md` for service health checks and troubleshooting.
+
+---
+
 ## Prerequisites
 - Docker & Docker Compose
 - 8GB+ RAM
@@ -88,15 +110,15 @@ If you want to run the scripts locally for development, you'll need to install t
 
 ### Subsequent Launches
 
-To rebuild the app image and capture build logs (recommended):
-```bash
-./scripts/build_app.sh
-```
+- Rebuild the app image and capture build logs:
+  ```bash
+  ./scripts/build_app.sh
+  ```
 
-Then restart the services after they have been stopped (e.g., with `docker compose down`):
-```bash
-docker compose -f docker/docker-compose.yml up -d --no-build
-```
+- Start (without rebuilding):
+  ```bash
+  docker compose -f docker/docker-compose.yml up -d --no-build
+  ```
 
 ---
 
@@ -120,6 +142,25 @@ Once documents are ingested, you can ask questions via the Streamlit app at **[h
 ```bash
 ./scripts/cli.sh
 ```
+
+---
+
+## Testing
+
+- Fast default tests:
+  ```bash
+  .venv/bin/python -m pytest -v
+  ```
+- E2E tests only:
+  ```bash
+  .venv/bin/python -m pytest -v -m "e2e"
+  ```
+- All tests (including slow):
+  ```bash
+  .venv/bin/python -m pytest -v -m "not environment"
+  ```
+
+See `docs_AI_coder/testing.md` for markers and guidance.
 
 ---
 
@@ -162,6 +203,11 @@ This project contains additional documentation in the `docs/` directory:
 - [Embedding Model Selection](docs/embedding-model-selection.md) – Guide for evaluating and choosing different embedding models.
 - [Cursor Terminal Fix](docs/cursor_terminal_fix.md) – Notes on fixing and improving the integrated terminal experience.
 - [Reorganization Summary](docs/REORGANIZATION_SUMMARY.md) – Summary of the project's code and file structure reorganization.
+
+AI-coder docs (automation hints):
+- `docs_AI_coder/instructions.md` – Docker startup, readiness checks, and E2E run commands.
+- `docs_AI_coder/DEVELOPMENT.md` – Development workflows and import strategy.
+- `docs_AI_coder/testing.md` – Test suite organization and marker usage.
 
 ## Local CI with `act`
 
