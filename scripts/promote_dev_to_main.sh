@@ -10,10 +10,16 @@
 # - Pushes main and shows live progress; logs to logs/promote_dev_to_main.log
 #
 # Usage
-#   ./scripts/promote_dev_to_main.sh                   # normal run
-#   ./scripts/promote_dev_to_main.sh --dry-run         # skip push
-#   ./scripts/promote_dev_to_main.sh --prefer-dev-all  # auto-resolve ALL conflicts preferring dev
-#   ./scripts/promote_dev_to_main.sh --create-pr       # if push to protected 'main' is blocked, auto-create PR dev → main
+#   ./scripts/promote_dev_to_main.sh                             # normal run
+#   ./scripts/promote_dev_to_main.sh --dry-run                   # skip push
+#   ./scripts/promote_dev_to_main.sh --prefer-dev-all            # auto-resolve ALL conflicts preferring source branch
+#   ./scripts/promote_dev_to_main.sh --create-pr                 # if push to protected target is blocked, auto-create PR source → target
+#   ./scripts/promote_dev_to_main.sh --from <branch> --to <branch>
+#   PROMOTE_FROM_BRANCH=develop PROMOTE_TO_BRANCH=release ./scripts/promote_dev_to_main.sh
+#   ./scripts/promote_dev_to_main.sh --allowlist .promotion-rules.conf  # file patterns to auto-resolve by preferring source branch
+#   ./scripts/promote_dev_to_main.sh --auto-venv                  # create .venv and install deps if missing
+#   ./scripts/promote_dev_to_main.sh --confirm                    # prompt before push; use PROMOTE_CONFIRM=1 or --yes in CI
+#   ./scripts/promote_dev_to_main.sh --verbose|--quiet            # control log verbosity
 #
 set -euo pipefail
 
@@ -33,22 +39,59 @@ _yellow(){ printf "\e[33m%s\e[0m\n" "$*"; }
 DRY_RUN=0
 PREFER_DEV_ALL=0
 CREATE_PR=0
+AUTO_VENV=0
+CONFIRM=0
+ASSUME_YES=0
+VERBOSE=0
+QUIET=0
+
+# Branch configuration (defaults)
+FROM_BRANCH="${PROMOTE_FROM_BRANCH:-dev}"
+TO_BRANCH="${PROMOTE_TO_BRANCH:-main}"
+ALLOWLIST_FILE=""
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
     --prefer-dev-all) PREFER_DEV_ALL=1 ;;
     --create-pr) CREATE_PR=1 ;;
+    --auto-venv) AUTO_VENV=1 ;;
+    --confirm) CONFIRM=1 ;;
+    --yes|--assume-yes) ASSUME_YES=1 ;;
+    --verbose) VERBOSE=1 ;;
+    --quiet) QUIET=1 ;;
+    --from) shift; FROM_BRANCH="$1" ;;
+    --to) shift; TO_BRANCH="$1" ;;
+    --from=*) FROM_BRANCH="${arg#*=}" ;;
+    --to=*) TO_BRANCH="${arg#*=}" ;;
+    --allowlist) shift; ALLOWLIST_FILE="$1" ;;
+    --allowlist=*) ALLOWLIST_FILE="${arg#*=}" ;;
     *) _red "Unknown argument: $arg"; exit 2 ;;
   esac
 done
+
+# Adjust log level if requested (config.sh computes _LOG_THRESHOLD at source time)
+if [[ $VERBOSE -eq 1 ]]; then
+  export LOG_LEVEL=DEBUG
+  _LOG_THRESHOLD=$(_log_level_to_num "$LOG_LEVEL")
+elif [[ $QUIET -eq 1 ]]; then
+  export LOG_LEVEL=WARN
+  _LOG_THRESHOLD=$(_log_level_to_num "$LOG_LEVEL")
+fi
 
 setup_logging "$SCRIPT_NAME"
 
 PY=".venv/bin/python"
 if [[ ! -x "$PY" ]]; then
-  _red "ERROR: $PY not found or not executable. Create the venv and install deps first." | tee -a "$LOG_FILE"
-  exit 1
+  if [[ $AUTO_VENV -eq 1 ]]; then
+    log_step "Creating virtual environment (.venv)…"
+    python3 -m venv .venv 2>&1 | tee -a "$LOG_FILE"
+    .venv/bin/pip install --upgrade pip 2>&1 | tee -a "$LOG_FILE"
+    .venv/bin/pip install -r requirements-dev.txt --disable-pip-version-check --no-input 2>&1 | tee -a "$LOG_FILE"
+  else
+    _red "ERROR: $PY not found or not executable. Create the venv and install deps first (or use --auto-venv)." | tee -a "$LOG_FILE"
+    exit 1
+  fi
 fi
 
 need() {
@@ -60,6 +103,27 @@ need() {
 
 need git
 need ruff
+
+ensure_min_versions() {
+  # Require Git >= 2.20.0
+  local git_ver
+  git_ver=$(git --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+  if [[ -n "$git_ver" ]]; then
+    if [[ "$(printf '%s\n%s\n' "$git_ver" "2.20.0" | sort -V | head -n1)" != "2.20.0" ]]; then
+      _red "ERROR: Git version $git_ver is too old; require >= 2.20.0" | tee -a "$LOG_FILE"
+      exit 1
+    fi
+  fi
+  # Require Ruff >= 0.5.0
+  local ruff_ver
+  ruff_ver=$(ruff --version 2>/dev/null | awk '{print $2}')
+  if [[ -n "$ruff_ver" ]]; then
+    if [[ "$(printf '%s\n%s\n' "$ruff_ver" "0.5.0" | sort -V | head -n1)" != "0.5.0" ]]; then
+      _red "ERROR: Ruff version $ruff_ver is too old; require >= 0.5.0" | tee -a "$LOG_FILE"
+      exit 1
+    fi
+  fi
+}
 
 # Track current branch to restore on exit
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")"
@@ -86,15 +150,16 @@ log_step() {
   log_message "INFO" "$*" | tee -a "$LOG_FILE"
 }
 
-switch_to_dev() {
-  if git show-ref --verify --quiet refs/heads/dev; then
-    git checkout dev >/dev/null 2>&1 || {
-      _yellow "Could not switch back to dev automatically; staying on $(git rev-parse --abbrev-ref HEAD)." | tee -a "$LOG_FILE"
+switch_to_branch() {
+  local target_branch="$1"
+  if git show-ref --verify --quiet "refs/heads/${target_branch}"; then
+    git checkout "$target_branch" >/dev/null 2>&1 || {
+      _yellow "Could not switch back to ${target_branch} automatically; staying on $(git rev-parse --abbrev-ref HEAD)." | tee -a "$LOG_FILE"
       return
     }
-    log_step "Switched back to dev for next changes."
+    log_step "Switched back to ${target_branch} for next changes."
   else
-    _yellow "Local branch 'dev' not found; staying on $(git rev-parse --abbrev-ref HEAD)." | tee -a "$LOG_FILE"
+    _yellow "Local branch '${target_branch}' not found; staying on $(git rev-parse --abbrev-ref HEAD)." | tee -a "$LOG_FILE"
   fi
 }
 
@@ -130,12 +195,12 @@ ensure_origin_and_branches() {
     exit 1
   fi
   # Check that main/dev exist remotely to give early feedback
-  if ! git ls-remote --exit-code --heads origin main >/dev/null 2>&1; then
-    _red "ERROR: Remote branch 'main' not found on origin." | tee -a "$LOG_FILE"
+  if ! git ls-remote --exit-code --heads origin "$TO_BRANCH" >/dev/null 2>&1; then
+    _red "ERROR: Remote branch '${TO_BRANCH}' not found on origin." | tee -a "$LOG_FILE"
     exit 1
   fi
-  if ! git ls-remote --exit-code --heads origin dev >/dev/null 2>&1; then
-    _red "ERROR: Remote branch 'dev' not found on origin." | tee -a "$LOG_FILE"
+  if ! git ls-remote --exit-code --heads origin "$FROM_BRANCH" >/dev/null 2>&1; then
+    _red "ERROR: Remote branch '${FROM_BRANCH}' not found on origin." | tee -a "$LOG_FILE"
     exit 1
   fi
 }
@@ -143,18 +208,18 @@ ensure_origin_and_branches() {
 sync_submodules_if_any() {
   if [[ -f .gitmodules ]]; then
     log_step "Syncing and updating git submodules (recursive)…"
-    git submodule sync --recursive | tee -a "$LOG_FILE"
-    git submodule update --init --recursive | tee -a "$LOG_FILE"
+    git submodule sync --recursive 2>&1 | tee -a "$LOG_FILE"
+    git submodule update --init --recursive 2>&1 | tee -a "$LOG_FILE"
   fi
 }
 
 fast_checks() {
   log_step "Running Ruff (lint)…"
-  ruff check . | tee -a "$LOG_FILE"
+  ruff check . 2>&1 | tee -a "$LOG_FILE"
   log_step "Running Ruff format --check…"
-  ruff format --check . | tee -a "$LOG_FILE"
+  ruff format --check . 2>&1 | tee -a "$LOG_FILE"
   log_step "Running pytest (fast suite)…"
-  "$PY" -m pytest -q tests/ | tee -a "$LOG_FILE"
+  "$PY" -m pytest -q tests/ 2>&1 | tee -a "$LOG_FILE"
 }
 
 auto_resolve_conflicts() {
@@ -168,21 +233,29 @@ auto_resolve_conflicts() {
   fi
 
   if [[ "$prefer_all" -eq 1 ]]; then
-    _yellow "Auto-resolving ALL conflicts by preferring dev (theirs)…" | tee -a "$LOG_FILE"
+    _yellow "Auto-resolving ALL conflicts by preferring ${FROM_BRANCH} (theirs)…" | tee -a "$LOG_FILE"
     for f in "${conflicts[@]}"; do
       git checkout --theirs -- "$f"
       git add -- "$f"
     done
-    git commit -m "chore: resolve merge conflicts by preferring dev" | tee -a "$LOG_FILE"
+    git commit -m "chore: resolve merge conflicts by preferring ${FROM_BRANCH}" 2>&1 | tee -a "$LOG_FILE"
     return 0
   fi
 
-  # Allow-list of files we auto-resolve by preferring dev
-  local allow=(
-    "README.md"
-    "docs/"
-    "docs_AI_coder/"
-  )
+  # Allow-list of files we auto-resolve by preferring the source branch
+  local allow=()
+  local rules_file
+  rules_file="${ALLOWLIST_FILE:-.promotion-rules.conf}"
+  if [[ -f "$rules_file" ]]; then
+    while IFS= read -r line; do
+      # skip comments and empty lines
+      [[ -z "$line" || "$line" =~ ^# ]] && continue
+      allow+=("$line")
+    done < "$rules_file"
+    log_step "Loaded ${#allow[@]} auto-resolve patterns from ${rules_file}."
+  else
+    allow+=("README.md" "docs/" "docs_AI_coder/")
+  fi
 
   local unresolved=()
   for f in "${conflicts[@]}"; do
@@ -193,14 +266,14 @@ auto_resolve_conflicts() {
     if [[ $ok -eq 1 ]]; then
       git checkout --theirs -- "$f"
       git add -- "$f"
-      log_step "Auto-resolved $f by preferring dev"
+      log_step "Auto-resolved $f by preferring ${FROM_BRANCH}"
     else
       unresolved+=("$f")
     fi
   done
 
   if [[ ${#unresolved[@]} -eq 0 ]]; then
-    git commit -m "chore: resolve selected conflicts by preferring dev" | tee -a "$LOG_FILE"
+    git commit -m "chore: resolve selected conflicts by preferring ${FROM_BRANCH}" 2>&1 | tee -a "$LOG_FILE"
     return 0
   fi
 
@@ -215,32 +288,53 @@ ensure_clean_worktree
 ensure_no_pending_git_ops
 ensure_git_identity
 ensure_origin_and_branches
+ensure_min_versions
 
 log_step "Fetching remotes…"
-git fetch --all --prune | tee -a "$LOG_FILE"
+git fetch --all --prune 2>&1 | tee -a "$LOG_FILE"
 
 sync_submodules_if_any
 
-log_step "Checking out dev and pulling (ff-only)…"
-git checkout dev | tee -a "$LOG_FILE"
-git pull --ff-only | tee -a "$LOG_FILE"
+log_step "Checking out ${FROM_BRANCH} and pulling (ff-only)…"
+git checkout "$FROM_BRANCH" 2>&1 | tee -a "$LOG_FILE"
+git pull --ff-only 2>&1 | tee -a "$LOG_FILE"
+
+# Informational: show divergence from origin for source branch
+set +e
+div_source=$(git rev-list --left-right --count "origin/${FROM_BRANCH}...${FROM_BRANCH}" 2>/dev/null)
+set -e
+if [[ -n "${div_source:-}" ]]; then
+  behind_src=$(awk '{print $1}' <<<"$div_source")
+  ahead_src=$(awk '{print $2}' <<<"$div_source")
+  log_step "Source ${FROM_BRANCH}: behind origin by ${behind_src}, ahead by ${ahead_src}."
+fi
 
 log_step "Installing dev dependencies (if needed)…"
-"$PY" -m pip install -r requirements-dev.txt --disable-pip-version-check --no-input | tee -a "$LOG_FILE"
+"$PY" -m pip install -r requirements-dev.txt --disable-pip-version-check --no-input 2>&1 | tee -a "$LOG_FILE"
 
 fast_checks
 
-log_step "Checking out main and pulling (ff-only)…"
-git checkout main | tee -a "$LOG_FILE"
-git pull --ff-only | tee -a "$LOG_FILE"
+log_step "Checking out ${TO_BRANCH} and pulling (ff-only)…"
+git checkout "$TO_BRANCH" 2>&1 | tee -a "$LOG_FILE"
+git pull --ff-only 2>&1 | tee -a "$LOG_FILE"
+
+# Informational: show divergence from origin for target branch
+set +e
+div_target=$(git rev-list --left-right --count "origin/${TO_BRANCH}...${TO_BRANCH}" 2>/dev/null)
+set -e
+if [[ -n "${div_target:-}" ]]; then
+  behind_tgt=$(awk '{print $1}' <<<"$div_target")
+  ahead_tgt=$(awk '{print $2}' <<<"$div_target")
+  log_step "Target ${TO_BRANCH}: behind origin by ${behind_tgt}, ahead by ${ahead_tgt}."
+fi
 
 # Try a fast-forward first. Use an if-guard to avoid triggering ERR trap on non-zero.
-if git merge --ff-only dev >/dev/null 2>&1; then
+if git merge --ff-only "$FROM_BRANCH" >/dev/null 2>&1; then
   _green "Fast-forward succeeded." | tee -a "$LOG_FILE"
 else
   _yellow "Fast-forward not possible; performing a merge…" | tee -a "$LOG_FILE"
   # Perform merge (may create conflicts). Pipeline guarded by if to avoid ERR trap.
-  if git merge dev -m "chore: merge dev into main" | tee -a "$LOG_FILE"; then
+  if git merge "$FROM_BRANCH" -m "chore: merge ${FROM_BRANCH} into ${TO_BRANCH}" 2>&1 | tee -a "$LOG_FILE"; then
     :
   else
     _yellow "Merge reported conflicts; attempting auto-resolution…" | tee -a "$LOG_FILE"
@@ -248,16 +342,16 @@ else
   fi
 fi
 
-  # Safety: verify that dev is ancestor of main after merge
-  if ! git merge-base --is-ancestor dev main; then
-    _red "ERROR: Post-merge validation failed: 'dev' is not an ancestor of 'main'." | tee -a "$LOG_FILE"
+  # Safety: verify that source is ancestor of target after merge
+  if ! git merge-base --is-ancestor "$FROM_BRANCH" "$TO_BRANCH"; then
+    _red "ERROR: Post-merge validation failed: '${FROM_BRANCH}' is not an ancestor of '${TO_BRANCH}'." | tee -a "$LOG_FILE"
     exit 1
   fi
 
   # Safety: scan for unresolved conflict markers in the latest tree
   if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' HEAD -- . >/dev/null 2>&1; then
     _red "ERROR: Conflict markers detected in committed files after merge. Aborting push." | tee -a "$LOG_FILE"
-    _yellow "Hint: run 'git grep -nE "^(<<<<<<<|=======|>>>>>>>)" HEAD' to locate markers." | tee -a "$LOG_FILE"
+    _yellow "Hint: run: git grep -nE '^(<<<<<<<|=======|>>>>>>>)' HEAD" | tee -a "$LOG_FILE"
     exit 1
   fi
 
@@ -266,19 +360,34 @@ fast_checks
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
   _yellow "Dry run: skipping push to origin/main." | tee -a "$LOG_FILE"
-  switch_to_dev
+  switch_to_branch "$FROM_BRANCH"
   _green "Done (dry run)."
   exit 0
 fi
 
-log_step "Pushing main to origin (pre-push hooks may run)…"
+if [[ $CONFIRM -eq 1 ]]; then
+  if [[ $ASSUME_YES -eq 1 || "${PROMOTE_CONFIRM:-}" = "1" ]]; then
+    : # proceed
+  elif [ -t 0 ]; then
+    read -r -p "Promote ${FROM_BRANCH} → ${TO_BRANCH}? This will push to origin/${TO_BRANCH}. Proceed? (y/N) " reply
+    case "$reply" in
+      y|Y|yes|YES) : ;;
+      *) _red "Aborting by user choice." | tee -a "$LOG_FILE"; switch_to_branch "$FROM_BRANCH"; exit 1 ;;
+    esac
+  else
+    _red "ERROR: Confirmation required (use --yes or set PROMOTE_CONFIRM=1)." | tee -a "$LOG_FILE"
+    exit 1
+  fi
+fi
+
+log_step "Pushing ${TO_BRANCH} to origin (pre-push hooks may run)…"
 
 # Push with one retry on transient local CI/act failures. If remote rejects due to
 # branch protection (PRs required), guide the user to open a PR instead of forcing.
 push_main_once() {
   local output
   set +e
-  output=$(git push origin main 2>&1)
+  output=$(git push origin "$TO_BRANCH" 2>&1)
   local rc=$?
   set -e
   printf "%s\n" "$output" | tee -a "$LOG_FILE"
@@ -291,34 +400,34 @@ if push_main_once; then
 else
   # Detect protected-branch/PR-required server-side policy
   if grep -qiE "(must be made through a pull request|protected branch|hooks.*rejected|pre-receive hook declined)" "$LOG_FILE"; then
-    _red "Push to protected 'main' blocked by server policy." | tee -a "$LOG_FILE"
+    _red "Push to protected '${TO_BRANCH}' blocked by server policy." | tee -a "$LOG_FILE"
     if [[ "$CREATE_PR" -eq 1 ]]; then
       if command -v gh >/dev/null 2>&1; then
-        _yellow "Attempting to create PR dev → main via GitHub CLI…" | tee -a "$LOG_FILE"
+        _yellow "Attempting to create PR ${FROM_BRANCH} → ${TO_BRANCH} via GitHub CLI…" | tee -a "$LOG_FILE"
         # Ensure dev is pushed
-        git checkout dev >/dev/null 2>&1 || true
-        git merge --ff-only main >/dev/null 2>&1 || true
-        git push origin dev | tee -a "$LOG_FILE"
+        git checkout "$FROM_BRANCH" >/dev/null 2>&1 || true
+        git merge --ff-only "$TO_BRANCH" >/dev/null 2>&1 || true
+        git push origin "$FROM_BRANCH" 2>&1 | tee -a "$LOG_FILE"
         # Create PR if one does not exist; otherwise, show existing
         set +e
-        gh pr view --head dev --base main >/dev/null 2>&1
+        gh pr view --head "$FROM_BRANCH" --base "$TO_BRANCH" >/dev/null 2>&1
         has_pr=$?
         set -e
         if [[ $has_pr -ne 0 ]]; then
-          gh pr create --base main --head dev --title "Promote dev to main" --body "Automated PR created by promote script." | tee -a "$LOG_FILE"
+          gh pr create --base "$TO_BRANCH" --head "$FROM_BRANCH" --title "Promote ${FROM_BRANCH} to ${TO_BRANCH}" --body "Automated PR created by promote script." 2>&1 | tee -a "$LOG_FILE"
         else
-          _yellow "A PR from dev to main already exists. Opening details…" | tee -a "$LOG_FILE"
-          gh pr view --head dev --base main | tee -a "$LOG_FILE"
+          _yellow "A PR from ${FROM_BRANCH} to ${TO_BRANCH} already exists. Opening details…" | tee -a "$LOG_FILE"
+          gh pr view --head "$FROM_BRANCH" --base "$TO_BRANCH" 2>&1 | tee -a "$LOG_FILE"
         fi
-        switch_to_dev
+        switch_to_branch "$FROM_BRANCH"
         exit 2
       else
         _yellow "GitHub CLI (gh) not found. Install gh or run without --create-pr." | tee -a "$LOG_FILE"
       fi
     fi
-    _yellow "Create a PR from 'dev' to 'main' instead." | tee -a "$LOG_FILE"
-    _yellow "Hint: git checkout dev && git merge --ff-only main && git push origin dev; then open PR dev → main." | tee -a "$LOG_FILE"
-    switch_to_dev
+    _yellow "Create a PR from '${FROM_BRANCH}' to '${TO_BRANCH}' instead." | tee -a "$LOG_FILE"
+    _yellow "Hint: git checkout ${FROM_BRANCH} && git merge --ff-only ${TO_BRANCH} && git push origin ${FROM_BRANCH}; then open PR ${FROM_BRANCH} → ${TO_BRANCH}." | tee -a "$LOG_FILE"
+    switch_to_branch "$FROM_BRANCH"
     exit 1
   fi
 
@@ -330,17 +439,17 @@ else
       :
     else
       _red "Push failed again. Consider running: ./scripts/cleanup_docker_and_ci_cache.sh and retrying." | tee -a "$LOG_FILE"
-      _yellow "You can also bypass locally with --no-verify if tests already passed: git push --no-verify origin main" | tee -a "$LOG_FILE"
-      switch_to_dev
+      _yellow "You can also bypass locally with --no-verify if tests already passed: git push --no-verify origin ${TO_BRANCH}" | tee -a "$LOG_FILE"
+      switch_to_branch "$FROM_BRANCH"
       exit 1
     fi
   else
     _red "Push failed. See $LOG_FILE for details." | tee -a "$LOG_FILE"
-    switch_to_dev
+    switch_to_branch "$FROM_BRANCH"
     exit 1
   fi
 fi
 
-switch_to_dev
-_green "✅ Promotion complete. main is up to date with dev."
+switch_to_branch "$FROM_BRANCH"
+_green "✅ Promotion complete. ${TO_BRANCH} is up to date with ${FROM_BRANCH}."
 
