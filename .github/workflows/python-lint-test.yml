@@ -94,7 +94,7 @@ jobs:
 
   gpu_docker_ollama_act:
     name: act manual - remaining tests (env + streamlit)
-    if: github.actor == 'nektos/act' && github.event_name == 'workflow_dispatch'
+    if: ${{ github.actor == 'nektos/act' && github.event_name == 'workflow_dispatch' }}
     needs: lint_and_fast_tests
     runs-on: ubuntu-latest
     steps:
@@ -155,7 +155,7 @@ jobs:
   slow_tests:
     name: act manual - slow tests (full stack)
     # Run only when launched manually via act (not on GitHub UI)
-    if: github.actor == 'nektos/act' && github.event_name == 'workflow_dispatch'
+    if: ${{ github.actor == 'nektos/act' && github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
