@@ -1,4 +1,4 @@
-name: CodeQL Analysis
+name: CodeQL
 
 on:
   push:
@@ -54,3 +54,5 @@ jobs:
         with:
           category: "/language:${{ matrix.language }}"
           upload: true
+        # Continue on error for local testing (Act can't access GitHub API)
+        continue-on-error: ${{ github.actor == 'nektos/act' }}
