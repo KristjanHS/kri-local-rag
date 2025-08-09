@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Ollama client utilities for model management and inference."""
 
-import httpx
 import json
 import os
 from typing import Optional
 
-from backend.config import OLLAMA_MODEL, OLLAMA_URL, OLLAMA_CONTEXT_TOKENS, get_logger
+import httpx
+
+from backend.config import OLLAMA_CONTEXT_TOKENS, OLLAMA_MODEL, OLLAMA_URL, get_logger
 from backend.windows_ip_in_wsl import get_windows_host_ip
 
 # Set up logging for this module
@@ -202,7 +203,7 @@ def test_ollama_connection() -> bool:
         with test_resp as resp:
             resp.raise_for_status()
             # Just read a few lines to confirm it's working
-            for i, line in enumerate(resp.iter_lines()):
+            for i, _ in enumerate(resp.iter_lines()):
                 if i >= 3:  # Only read first 3 lines
                     break
 

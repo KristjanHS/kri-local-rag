@@ -21,7 +21,7 @@ from backend.config import (
 
 # For manual vectorization – import type only for type-checkers
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from sentence_transformers import SentenceTransformer as SentenceTransformerType
+    from sentence_transformers import SentenceTransformer as SentenceTransformerType  # type: ignore
 else:
     SentenceTransformerType = object  # runtime fallback for type checkers only
 

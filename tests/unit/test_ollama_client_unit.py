@@ -49,7 +49,7 @@ def test_generate_response_handles_empty_and_exception(monkeypatch):
         def __enter__(self):
             return self
 
-        def __exit__(self, exc_type, exc, tb):  # noqa: D401
+        def __exit__(self, exc_type, exc, tb):  # noqa: D401, ARG001
             return False
 
         def raise_for_status(self):
@@ -64,7 +64,7 @@ def test_generate_response_handles_empty_and_exception(monkeypatch):
 
     monkeypatch.setattr(httpx, "stream", fake_stream)
 
-    text, ctx = oc.generate_response("hi", on_token=None, on_debug=None, stop_event=None, context_tokens=64)
+    text, _ = oc.generate_response("hi", on_token=None, on_debug=None, stop_event=None, context_tokens=64)
     assert "hello" in text
 
     # Now simulate exception path
@@ -72,5 +72,5 @@ def test_generate_response_handles_empty_and_exception(monkeypatch):
         raise httpx.ConnectError("boom", request=None)
 
     monkeypatch.setattr(httpx, "stream", fake_stream_err)
-    text, ctx = oc.generate_response("hi", on_token=None, on_debug=None, stop_event=None, context_tokens=64)
+    text, _ = oc.generate_response("hi", on_token=None, on_debug=None, stop_event=None, context_tokens=64)
     assert "Error generating response" in text

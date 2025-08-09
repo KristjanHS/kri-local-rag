@@ -21,7 +21,6 @@ def test_cross_encoder_is_loaded_and_used_for_reranking():
     os.environ["RERANKER_CROSS_ENCODER_OPTIMIZATIONS"] = "false"
 
     # Make sure sentence_transformers is actually imported and present in sys.modules
-    import sentence_transformers as _st  # noqa: F401
 
     # Reload qa_loop with sentence_transformers present so its snapshot allows loading
     if "backend.qa_loop" in sys.modules:

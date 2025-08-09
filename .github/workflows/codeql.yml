@@ -1,0 +1,68 @@
+name: CodeQL Analysis
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 2 * * 1"  # weekly, Mon 02:00 UTC
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    
+    # Add timeout to prevent hanging jobs
+    timeout-minutes: 360
+    
+    # Use concurrency to cancel in-progress jobs on new commits
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      pull-requests: read
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python']
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch at least the immediate parents so that if this is
+          # a pull request then we can checkout the head.
+          fetch-depth: 2
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # Add custom queries if needed
+          # queries: security-extended,security-and-quality
+          # Add source root if needed
+          # source-root: src/
+      
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+        # If the build fails, the workflow will stop, and the code scanning
+        # API will use the pre-built source code downloaded in the init step
+        with:
+          # Add build command if needed
+          # command: pip install -r requirements.txt && python setup.py build
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          # Add upload options for better debugging
+          upload: true
+          # Add memory settings for large codebases
+          # memory: 6144
