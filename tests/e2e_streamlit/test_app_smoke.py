@@ -16,7 +16,7 @@ from contextlib import closing
 
 import pytest
 import requests
-
+from playwright.sync_api import Page, expect
 
 pytestmark = pytest.mark.e2e
 
@@ -78,7 +78,16 @@ def test_root_health(streamlit_server):
     assert "streamlit" in resp.text.lower()
 
 
-@pytest.mark.skip(reason="Minimal smoke does not cover UI automation without browser; add playwright-based tests next.")
-def test_interaction_placeholder(streamlit_server):
-    # Placeholder for future Playwright interaction test
-    assert True
+def test_interaction_basic(streamlit_server, page: Page):
+    # Navigate to the app
+    page.goto("http://localhost:8501", wait_until="domcontentloaded")
+
+    # Streamlit renders a textarea for the question input
+    page.get_by_role("textbox").first.fill("hello")
+
+    # Click the submit button
+    page.get_by_role("button", name="Get Answer").click()
+
+    # Expect the Answer section and the fake answer injected via env
+    expect(page.locator("text=Answer")).to_be_visible(timeout=10000)
+    expect(page.locator("text=TEST_ANSWER")).to_be_visible(timeout=10000)

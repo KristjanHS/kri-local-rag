@@ -1,8 +1,10 @@
 ## Preparation TODO (for AI agent / developers)
 
 See also:
-- Quick run and E2E commands: `docs_AI_coder/instructions.md` (section: "AI Agent Hints: Docker startup and E2E tests").
-- Detailed testing guidance and markers: `docs_AI_coder/testing.md`.
+- AI agent cheatsheet and E2E commands: `docs_AI_coder/AI_instructions.md` (sections: "Golden commands" and "AI Agent Hints: Docker startup and E2E tests").
+- Test suites and markers: `docs_AI_coder/AI_instructions.md` (section: "Testing").
+- Human dev quickstart: `docs/DEVELOPMENT.md`.
+- MVP runbook: `docs_AI_coder/mvp_deployment.md`.
 
 Context
 - App: Local RAG using Weaviate (8080), Ollama (11434), Streamlit UI (8501).
@@ -53,7 +55,7 @@ Repository preparation tasks
   ```
   Expect `-rwx` permissions on key scripts, or plan to run equivalent commands directly.
 
-- 1) Environment
+1) Environment
 - [x] Action: Ensure `.env.example` exists with minimal keys and copy to `.env` (use values appropriate for your setup). Example contents:
   ```
   LOG_LEVEL=INFO
@@ -123,14 +125,44 @@ Repository preparation tasks
   .venv/bin/python -m pytest -q -k "<substring>"
   ```
 
-3.1) Lint & unit-only smoke
+3.1) Lint & basic fast checks
 - [x] Action: Run linter. Verify no errors:
   ```bash
   .venv/bin/python -m ruff check .
   ```
+
+3.1a) Environment tests (validate local Python/ML setup)
+- [x] Action: Run environment tests. Verify exit code 0:
+  ```bash
+  .venv/bin/python -m pytest -q -m environment
+  ```
+- [ ] If any fail, fix the specific environment issue (Python version, packages, optional ML libs), then re-run the same verify.
+
+3.1b) Unit tests (fast, no external services)
 - [x] Action: Run unit tests only. Verify exit code 0:
   ```bash
   .venv/bin/python -m pytest -q -m unit
+  ```
+
+3.1c) Coverage (fast signal; optional threshold)
+- [x] Action: Run fast suite with coverage. Verify report is generated under `reports/coverage/` and total coverage prints:
+  ```bash
+  .venv/bin/python -m pytest -q \
+    --cov=backend --cov=frontend --cov-report=term-missing \
+    --cov-report=html:reports/coverage \
+    -m "not environment and not e2e and not slow"
+  ```
+- [ ] (Optional) Enforce a minimal threshold locally (tune as needed). Verify pytest exits 0 when threshold met:
+  ```bash
+  .venv/bin/python -m pytest -q \
+    --cov=backend --cov=frontend --cov-fail-under=60 \
+    -m "not environment and not e2e and not slow"
+  ```
+
+3.1d) Slow tests – unit-level only (optional, lighter)
+- [ ] Action: Run slow unit tests only (easier, no external services). Verify exit code 0:
+  ```bash
+  .venv/bin/python -m pytest -q tests/unit/test_startup_validation.py -m slow
   ```
 
 3.2) Validate external services standalone
@@ -260,10 +292,25 @@ PY
   docker compose -f docker/docker-compose.yml logs --tail=200 app | cat
   ```
 
+  [BLOCKED: optional; current tests assume backend path relative to `tests/` (e.g. `tests/unit/../backend/config.py`) which is incorrect for project layout. Consider fixing test paths. 2025-08-09]
+
 4) Broader tests
 - [x] Action: Run integration tests. Verify exit code 0:
   ```bash
   .venv/bin/python -m pytest -q -m integration
+  ```
+- [x] Action: Run Docker-marked tests (container packaging/import checks). Verify exit code 0:
+  ```bash
+  .venv/bin/python -m pytest -q -m docker
+  ```
+  If failing, inspect Docker status/logs and retry the same verify:
+  ```bash
+  docker info | sed -n '1,40p' | cat
+  docker compose -f docker/docker-compose.yml ps | cat
+  ```
+- [x] Action: Run slow integration tests (use testcontainers; heavier). Verify exit code 0:
+  ```bash
+  .venv/bin/python -m pytest -q tests/integration/test_weaviate_integration.py -m slow
   ```
 - [x] Action: Run e2e tests (when stable). Verify exit code 0:
   ```bash
@@ -272,6 +319,15 @@ PY
   Note: To narrow the scope during debugging, you can run subsets without adding new steps:
   - Streamlit smoke only: `.venv/bin/python -m pytest -q tests/e2e_streamlit/test_app_smoke.py -q`
   - CLI smoke only: `.venv/bin/python -m pytest -q tests/e2e/test_cli_script_e2e.py -q`
+
+ - [x] Action: Add a basic Playwright UI test for Streamlit (after installing browsers). Verify it can locate the input box and submit:
+   ```bash
+   # one-time (may require dependencies on your OS)
+   .venv/bin/python -m playwright install --with-deps
+   # run playwright tests
+   .venv/bin/python -m pytest -q tests/e2e_streamlit/test_app_smoke.py -q
+   ```
+   If the placeholder test is skipped, implement a minimal interaction test and remove the skip.
 
 5) Build validation
 - [x] Action: Build app image. Verify build finishes without errors:
