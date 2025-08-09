@@ -10,11 +10,13 @@ This project uses GitHub Actions for CI/CD and security scanning, with automated
 - **Purpose**: Static code analysis for security vulnerabilities
 - **Triggers**: Push to main, PR to main, weekly schedule, manual
 - **Duration**: Up to 6 hours
+- **Environment**: GitHub CI only (skipped locally)
 
 ### 2. Semgrep Security Analysis (`semgrep.yml`)
 - **Purpose**: Pattern-based security scanning
 - **Triggers**: Push to main, PR to main, manual
 - **Duration**: Up to 30 minutes
+- **Environment**: GitHub CI only (skipped locally)
 
 ### 3. CI Pipeline (`python-lint-test.yml`)
 - **Purpose**: Linting, testing, and type checking
@@ -100,9 +102,11 @@ act workflow_dispatch -j pyright
 
 ### Manual Testing
 1. GitHub UI: Actions tab → Select workflow → "Run workflow"
-2. Act CLI: `act workflow_dispatch -W .github/workflows/[workflow].yml`
+2. Act CLI: `act workflow_dispatch -W .github/workflows/[workflow].yml` (CI workflows only)
 3. Push to main: `git push origin main`
 4. Create test PR: `git checkout -b test-workflows && git push origin test-workflows`
+
+**Note**: Security workflows (CodeQL and Semgrep) run only on GitHub CI, not locally with Act.
 
 ### Automated Testing
 - **Pre-push hooks**: Automatically run CI on push
