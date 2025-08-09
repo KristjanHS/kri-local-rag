@@ -187,7 +187,7 @@ def docker_services(request, test_log_file):
                 backend_path = project_root / "backend"
                 if str(backend_path) not in sys.path:
                     sys.path.insert(0, str(backend_path))
-                from qa_loop import ensure_weaviate_ready_and_populated
+                from backend.qa_loop import ensure_weaviate_ready_and_populated
 
                 ensure_weaviate_ready_and_populated()
 
@@ -195,8 +195,8 @@ def docker_services(request, test_log_file):
                 from urllib.parse import urlparse
 
                 import weaviate
-                from config import COLLECTION_NAME, WEAVIATE_URL
-                from ingest import ingest
+                from backend.config import COLLECTION_NAME, WEAVIATE_URL
+                from backend.ingest import ingest
 
                 parsed = urlparse(WEAVIATE_URL)
                 client = weaviate.connect_to_custom(
