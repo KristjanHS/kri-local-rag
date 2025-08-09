@@ -274,39 +274,39 @@ PY
   - CLI smoke only: `.venv/bin/python -m pytest -q tests/e2e/test_cli_script_e2e.py -q`
 
 5) Build validation
-- [ ] Action: Build app image. Verify build finishes without errors:
+- [x] Action: Build app image. Verify build finishes without errors:
   ```bash
   docker compose -f docker/docker-compose.yml build app | cat
   ```
 
 6) Persistence
-- [ ] Action: Restart Weaviate and app. Verify they return healthy and previously ingested data still answers:
+- [x] Action: Restart Weaviate and app. Verify they return healthy and previously ingested data still answers:
   ```bash
   docker compose -f docker/docker-compose.yml restart weaviate app
   ./scripts/cli.sh --question "hello"
   ```
 
 7) Handover bundle
-- [ ] Action: Ensure `docs_AI_coder/mvp_deployment.md` is up to date. Verify a recent edit timestamp in git:
+- [x] Action: Ensure `docs_AI_coder/mvp_deployment.md` is up to date. Verify a recent edit timestamp in git:
   ```bash
   git log -1 --format=%ci -- docs_AI_coder/mvp_deployment.md | cat
   ```
-- [ ] Action: Confirm `.env.example` exists and contains model/tag pins. Verify:
+- [x] Action: Confirm `.env.example` exists and contains model/tag pins. Verify:
   ```bash
   test -f .env.example && grep -E "^(OLLAMA_MODEL|OLLAMA_CONTEXT_TOKENS)=" .env.example | cat
   ```
 
 8) Done criteria (all must pass)
-- [ ] Services healthy; UI loads (`curl 8501` returns 200)
-- [ ] CLI single-shot works for a trivial question
-- [ ] First answer latency acceptable (< ~2 min on fresh model)
-- [ ] Ingestion succeeds; answers are grounded and coherent
-- [ ] Data persists after restart
-- [ ] Logs present; no critical errors in `logs/rag_system.log` (grep should be empty):
+- [x] Services healthy; UI loads (`curl 8501` returns 200)
+- [x] CLI single-shot works for a trivial question
+- [x] First answer latency acceptable (< ~2 min on fresh model)
+- [x] Ingestion succeeds; answers are grounded and coherent
+- [x] Data persists after restart
+- [x] Logs present; no critical errors in `logs/rag_system.log` (grep should be empty):
   ```bash
   test -f logs/rag_system.log && grep -Ei "(error|traceback)" logs/rag_system.log || true
   ```
- - [ ] Test artifacts present: session and per-test logs under `reports/`:
+  - [x] Test artifacts present: session and per-test logs under `reports/`:
    ```bash
    test -f reports/test_session.log && test -d reports/logs && echo OK || echo MISSING
    ```
