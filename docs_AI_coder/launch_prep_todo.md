@@ -144,6 +144,10 @@ Repository preparation tasks
   .venv/bin/python -m pytest -q -m environment
   ```
 - [ ] If any fail, fix the specific environment issue (Python version, packages, optional ML libs), then re-run the same verify.
+  - [ ] Optional (heavier): Verify real CrossEncoder loads and is used for reranking. Requires internet/cache for first run. Verify exit code 0:
+    ```bash
+    .venv/bin/python -m pytest -q tests/environment/test_cross_encoder_environment.py -m environment
+    ```
 
 3.1b) Unit tests (fast, no external services)
 - [x] Action: Run unit tests only. Verify exit code 0:
@@ -159,7 +163,7 @@ Repository preparation tasks
     --cov-report=html:reports/coverage \
     -m "not environment and not e2e and not slow"
   ```
-- [ ] (Optional) Enforce a minimal threshold locally (tune as needed). Verify pytest exits 0 when threshold met:
+- [ ] Enforce a minimal threshold locally (tune as needed). Verify pytest exits 0 when threshold met:
   ```bash
   .venv/bin/python -m pytest -q \
     --cov=backend --cov=frontend --cov-fail-under=60 \
@@ -167,7 +171,7 @@ Repository preparation tasks
   ```
 
 3.1d) Slow tests – unit-level only (optional, lighter)
-- [ ] Action: Run slow unit tests only (easier, no external services). Verify exit code 0:
+- [x] Action: Run slow unit tests only (easier, no external services). Verify exit code 0:
   ```bash
   .venv/bin/python -m pytest -q tests/unit/test_startup_validation.py -m slow
   ```
@@ -299,7 +303,7 @@ PY
   docker compose -f docker/docker-compose.yml logs --tail=200 app | cat
   ```
 
-  [BLOCKED: optional; current tests assume backend path relative to `tests/` (e.g. `tests/unit/../backend/config.py`) which is incorrect for project layout. Consider fixing test paths. 2025-08-09]
+  
 
 4) Broader tests
 - [x] Action: Run integration tests. Verify exit code 0:
