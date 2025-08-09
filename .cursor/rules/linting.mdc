@@ -1,5 +1,5 @@
 ---
-description: "Rules for linting, formatting, printing and user output in Python code with ruff"
+description: "Python linting/formatting (Ruff) and type checking (Pyright)"
 type: agent-select
 globs:
   - "**/*.py"
@@ -16,3 +16,8 @@ alwaysApply: false
 - Avoid using `print` (Ruff rule T201). Prefer:
   - `logging` for application and tests
   - `rich.console.Console.print` for user-facing CLI messages
+
+## Type checking (Pyright)
+- Use Pyright/BasedPyright for static type checking.
+- Pyright runs automatically in-editor (Cursor/VS Code) via the Pyright/BasedPyright extension, using `[tool.pyright]` in `pyproject.toml`.
+- Use `# type: ignore[...]` sparingly with a brief justification.
