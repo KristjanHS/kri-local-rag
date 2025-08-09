@@ -67,7 +67,7 @@ def ingest_documents(
     try:
         _ = weaviate_client.collections.create(  # type: ignore[attr-defined]
             name=collection_name,
-            vector_config=[weaviate.classes.config.Configure.Vectors.self_provided()],
+            vector_config=weaviate.classes.config.Configure.Vectors.self_provided(),
         )
     except (AttributeError, TypeError):
         _ = weaviate_client.collections.create(  # type: ignore[attr-defined]

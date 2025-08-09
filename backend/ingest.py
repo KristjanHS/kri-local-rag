@@ -118,7 +118,7 @@ def create_collection_if_not_exists(client: weaviate.WeaviateClient, collection_
     if not client.collections.exists(collection_name):
         client.collections.create(
             name=collection_name,
-            vector_config=[weaviate.classes.config.Configure.Vectors.self_provided()],
+            vector_config=weaviate.classes.config.Configure.Vectors.self_provided(),
         )
         logger.info(f"→ Collection '{collection_name}' created for manual vectorization.")
     else:
