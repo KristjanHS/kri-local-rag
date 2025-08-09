@@ -169,6 +169,7 @@ Repository preparation tasks
     --cov=backend --cov=frontend --cov-fail-under=60 \
     -m "not environment and not e2e and not slow"
   ```
+  - [BLOCKED: 2025-08-09] Current total coverage is ~44.5% locally. Do not lower the threshold. Plan: improve tests on critical paths and/or configure `.coveragerc` to omit non-critical files; re-run the same verify when coverage ≥ 60%.
 
 3.1d) Slow tests – unit-level only (optional, lighter)
 - [x] Action: Run slow unit tests only (easier, no external services). Verify exit code 0:
