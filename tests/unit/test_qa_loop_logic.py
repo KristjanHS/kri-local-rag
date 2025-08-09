@@ -1,7 +1,11 @@
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from backend.qa_loop import _rerank, _score_chunks, answer
+
+pytestmark = pytest.mark.unit
 
 
 @contextmanager

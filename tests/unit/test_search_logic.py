@@ -9,6 +9,7 @@ import pytest
 # Disable torch.compile during these mocked tests to avoid unnecessary compile overhead
 os.environ["RETRIEVER_EMBEDDING_TORCH_COMPILE"] = "false"
 
+pytestmark = pytest.mark.unit
 
 # Note: The main 'from retriever import ...' is moved inside the test functions
 # to prevent hanging during pytest collection.
