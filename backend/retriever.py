@@ -16,15 +16,18 @@ from backend.config import (
     get_logger,
 )
 
+# Optional dependency note: If sentence-transformers is not installed, we handle
+# ImportError: gracefully inside the lazy loader (_get_embedding_model).
+
 # For manual vectorization – import type only for type-checkers
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from sentence_transformers import SentenceTransformer as SentenceTransformerType
 else:
-    SentenceTransformerType = object  # fallback at runtime
-try:
-    from sentence_transformers import SentenceTransformer  # type: ignore
-except ImportError:  # pragma: no cover – optional dep
-    SentenceTransformer = None  # type: ignore
+    SentenceTransformerType = object  # runtime fallback for type checkers only
+
+# Provide a module-level hook for tests to patch without importing heavy deps.
+# Tests can patch `backend.retriever.SentenceTransformer` directly.
+SentenceTransformer: Any | None = None
 
 # Cache the embedding model instance after first load
 _embedding_model: Any = None
@@ -43,12 +46,21 @@ def _get_embedding_model(model_name: str = EMBEDDING_MODEL):
     Uses the same model as specified in ingest.py to ensure consistency.
     """
     global _embedding_model
-    if SentenceTransformer is None:
-        return None
     if _embedding_model is None:
         try:
+            # Determine constructor: prefer patched module-level `SentenceTransformer` if provided
+            ctor = SentenceTransformer
+            if ctor is None:
+                # Import lazily to avoid heavy dependency at module import time
+                from sentence_transformers import SentenceTransformer as _ST  # type: ignore
+
+                ctor = _ST
+        except Exception as e:
+            logger.warning("SentenceTransformer not available: %s", e)
+            return None
+        try:
             # Use the same model as ingestion to ensure vector compatibility
-            _embedding_model = SentenceTransformer(model_name)
+            _embedding_model = ctor(model_name)
 
             # Apply PyTorch CPU optimizations
             # Set optimal threading for current environment
