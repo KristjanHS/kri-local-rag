@@ -329,8 +329,11 @@ def ensure_weaviate_ready_and_populated():
     except Exception as e:
         raise Exception(f"An unexpected error occurred during Weaviate check: {e}") from e
     finally:
-        if "client" in locals() and hasattr(client, "is_connected") and client.is_connected():
-            client.close()
+        try:
+            if "client" in locals() and hasattr(client, "is_connected") and client.is_connected():
+                client.close()
+        except Exception:
+            pass
     logger.info("--- Weaviate check complete ---")
 
 

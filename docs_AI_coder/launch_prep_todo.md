@@ -131,6 +131,13 @@ Repository preparation tasks
   .venv/bin/python -m ruff check .
   ```
 
+3.1e) Type checking (Pyright)
+- [x] Action: Run Pyright type checking. Verify exit code 0 and no errors reported:
+  ```bash
+  .venv/bin/python -m pip install pyright
+  .venv/bin/pyright
+  ```
+
 3.1a) Environment tests (validate local Python/ML setup)
 - [x] Action: Run environment tests. Verify exit code 0:
   ```bash
