@@ -41,6 +41,7 @@ For logs, rebuilds, service ops, and troubleshooting, see `docs/docker-managemen
 
 ## Notes
 - Avoid setting `PYTHONPATH`. Use editable installs (`pip install -e .`) and module execution with `-m`.
+ - `kri_local_rag.egg-info/` provides package metadata that enables editable installs, dependency resolution, and discovery of modules/entry points by tooling.
 
 ## More docs
 - Detailed guidance used mostly by AI coder: `docs_AI_coder/AI_instructions.md`
