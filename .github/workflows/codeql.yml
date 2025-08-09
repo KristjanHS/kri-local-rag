@@ -45,24 +45,12 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          # Add custom queries if needed
-          # queries: security-extended,security-and-quality
-          # Add source root if needed
-          # source-root: src/
       
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
-        # If the build fails, the workflow will stop, and the code scanning
-        # API will use the pre-built source code downloaded in the init step
-        with:
-          # Add build command if needed
-          # command: pip install -r requirements.txt && python setup.py build
       
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
-          # Add upload options for better debugging
           upload: true
-          # Add memory settings for large codebases
-          # memory: 6144
