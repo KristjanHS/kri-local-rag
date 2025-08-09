@@ -12,6 +12,9 @@ jobs:
     name: Sec Scan
     runs-on: ubuntu-latest
     
+    # Skip local execution with Act
+    if: ${{ github.actor != 'nektos/act' }}
+    
     # Add timeout to prevent hanging jobs
     timeout-minutes: 30
     
