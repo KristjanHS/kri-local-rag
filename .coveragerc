@@ -1,0 +1,17 @@
+[run]
+branch = True
+omit =
+    backend/delete_collection.py
+    backend/windows_ip_in_wsl.py
+    scripts/*
+    docker/*
+    tests/*
+    */__init__.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.: 
+    raise NotImplementedError
+    pass
+
