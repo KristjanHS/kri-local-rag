@@ -82,6 +82,18 @@ include = ["backend", "tests"]
 exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
 venvPath = "."
 venv = ".venv"
+# Type checking mode - standard provides good balance of safety and usability
+typeCheckingMode = "standard"
+# Python version for proper feature detection and type checking
+pythonVersion = "3.12"
+# Platform-specific type checking
+pythonPlatform = "Linux"
+# Additional paths for import resolution
+extraPaths = ["backend"]
+# Diagnostic overrides for better development experience
+reportMissingTypeStubs = false
+reportUnusedImport = "warning"
+reportUnusedVariable = "warning"
 
 [tool.deptry]
 # --- Where to read declared dependencies ------------------------------
