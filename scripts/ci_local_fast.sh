@@ -71,6 +71,6 @@ if [[ ! -x "$PY" ]]; then
 fi
 
 _green "Running pytest (fast suite – default addopts) …" | tee -a "$LOG_FILE"
-"$PY" -m pytest -q tests/ | tee -a "$LOG_FILE"
+"$PY" -m pytest -q tests/ | tee -a "$LOG_FILE" || exit $?
 
 _green "All local fast checks passed!" | tee -a "$LOG_FILE"

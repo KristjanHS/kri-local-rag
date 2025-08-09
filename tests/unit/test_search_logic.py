@@ -68,8 +68,8 @@ class TestHybridSearchFix:
 
     @patch("backend.retriever.weaviate.connect_to_custom")
     @patch("backend.retriever._get_embedding_model")
-    def test_hybrid_search_with_manual_vectorization(self, mock_get_model, mock_connect):
-        """Test hybrid search with manual vectorization."""
+    def test_retrieval_uses_local_embedding_model(self, mock_get_model, mock_connect):
+        """Test that the retriever uses the local embedding model to create a query vector."""
         from backend.retriever import get_top_k
 
         # Setup mocks
