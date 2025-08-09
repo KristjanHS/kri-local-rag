@@ -19,7 +19,7 @@ import hashlib
 import os
 import time
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, cast
 
 import torch
 import weaviate
@@ -143,10 +143,12 @@ def process_and_upload_chunks(
         for doc in docs:
             uuid = deterministic_uuid(doc)
             vector_tensor = model.encode(doc.page_content)
+            # Normalize to a plain Python list of floats for the Weaviate client
+            vector: list[float]
             try:
-                vector = vector_tensor.tolist()
+                vector = list(vector_tensor.tolist())  # type: ignore[call-arg]
             except AttributeError:
-                vector = list(vector_tensor)
+                vector = list(vector_tensor)  # type: ignore[arg-type]
 
             properties = {
                 "content": doc.page_content,
@@ -211,7 +213,8 @@ def ingest(
         model = SentenceTransformer(EMBEDDING_MODEL)
         try:
             logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
-            model = torch.compile(model, backend="inductor", mode="max-autotune")  # type: ignore[attr-defined]
+            compiled_model = torch.compile(model, backend="inductor", mode="max-autotune")  # type: ignore[attr-defined]
+            model = cast(SentenceTransformer, compiled_model)
             logger.info("torch.compile optimization completed.")
         except Exception as e:
             logger.warning(f"Could not apply torch.compile: {e}")
