@@ -163,16 +163,17 @@ def docker_services(request, test_log_file):
             )
 
             # Stream stdout
-            for line in process.stdout:
-                log.write(line)
-                logger.info(line.strip())  # Also log to terminal for visibility
+            if process.stdout is not None:
+                for line in process.stdout:
+                    log.write(line)
+                    logger.info(line.strip())  # Also log to terminal for visibility
 
             # Wait for the process to complete and get the return code
             process.wait(timeout=300)
 
             if process.returncode != 0:
                 # Capture and log any remaining stderr
-                stderr_output = process.stderr.read()
+                stderr_output = process.stderr.read() if process.stderr is not None else ""
                 log.write("\n--- Docker Error Logs ---\n")
                 log.write(stderr_output)
                 pytest.fail(f"Failed to start Docker services. See logs at {test_log_file}")
@@ -195,14 +196,15 @@ def docker_services(request, test_log_file):
                 from urllib.parse import urlparse
 
                 import weaviate
+
                 from backend.config import COLLECTION_NAME, WEAVIATE_URL
                 from backend.ingest import ingest
 
                 parsed = urlparse(WEAVIATE_URL)
                 client = weaviate.connect_to_custom(
-                    http_host=parsed.hostname,
+                    http_host=parsed.hostname or "localhost",
                     http_port=parsed.port or 80,
-                    grpc_host=parsed.hostname,
+                    grpc_host=parsed.hostname or "localhost",
                     grpc_port=50051,
                     http_secure=parsed.scheme == "https",
                     grpc_secure=parsed.scheme == "https",
