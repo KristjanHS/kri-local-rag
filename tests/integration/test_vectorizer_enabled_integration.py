@@ -25,7 +25,7 @@ from weaviate.classes.config import Configure, DataType, Property
 import backend.retriever as retriever
 from backend.config import EMBEDDING_MODEL
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 
 def _connect_client(headers: dict[str, str] | None = None) -> weaviate.WeaviateClient:
@@ -63,7 +63,7 @@ def test_manual_vectorization_uses_local_embedding(docker_services, tmp_path):
                     Property(name="content", data_type=DataType.TEXT),
                     Property(name="category", data_type=DataType.TEXT),
                 ],
-                vector_config=[Configure.Vectors.self_provided()],
+                vector_config=Configure.Vectors.self_provided(),
             )
 
         coll = client.collections.get(coll_name)

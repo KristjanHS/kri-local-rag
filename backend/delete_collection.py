@@ -31,7 +31,7 @@ def ensure_collection(client: weaviate.WeaviateClient):
                     Property(name="created_at", data_type=DataType.DATE),
                     Property(name="language", data_type=DataType.TEXT),
                 ],
-                vector_config=[Configure.Vectors.self_provided()],
+                vector_config=Configure.Vectors.self_provided(),
             )
         except (AttributeError, TypeError):
             client.collections.create(
