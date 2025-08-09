@@ -31,11 +31,12 @@ class ScoredChunk:
     score: float
 
 
-# Try to import a cross-encoder model for re-ranking retrieved chunks
-try:
-    from sentence_transformers import CrossEncoder  # type: ignore
-except ImportError:  # pragma: no cover – optional dependency
-    CrossEncoder = None  # type: ignore
+# Record whether sentence_transformers was initially unavailable at module import time.
+_ST_INITIALLY_MISSING = sys.modules.get("sentence_transformers", "__MISSING__") in (None, "__MISSING__")
+
+# Cross-encoder is optional and heavy; import lazily inside the getter.
+# Provide a patch seam for tests.
+CrossEncoder = None  # type: ignore
 
 # Cache the cross-encoder instance after first load to avoid re-loading on every question
 _cross_encoder: "CrossEncoder | None" = None  # type: ignore
@@ -54,11 +55,22 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
     calling code can gracefully fall back to vector-search ordering.
     """
     global _cross_encoder
-    if CrossEncoder is None:
+    # Respect explicit absence/mocking (snapshot at import time) to avoid importing heavy deps during tests
+    if _ST_INITIALLY_MISSING:
         return None
+
+    # Determine constructor: prefer patched module-level `CrossEncoder` if provided
+    ctor = CrossEncoder
+    if ctor is None:
+        try:
+            from sentence_transformers import CrossEncoder as _CE  # type: ignore
+
+            ctor = _CE
+        except Exception:
+            return None
     if _cross_encoder is None:
         try:
-            _cross_encoder = CrossEncoder(model_name)
+            _cross_encoder = ctor(model_name)
             # Apply PyTorch CPU optimizations (skip in testing environments)
             # New preferred flag: RERANKER_CROSS_ENCODER_OPTIMIZATIONS (true enables opts)
             enable_opts_str = os.getenv("RERANKER_CROSS_ENCODER_OPTIMIZATIONS", "true").lower()
