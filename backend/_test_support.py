@@ -63,10 +63,17 @@ def ingest_documents(
         raise ValueError("Embedding model not available")
 
     # Ensure collection exists (tests expect 'create' to be invoked)
-    _ = weaviate_client.collections.create(  # type: ignore[attr-defined]
-        name=collection_name,
-        vectorizer_config=weaviate.classes.config.Configure.Vectorizer.none(),
-    )
+    # Support newer v4 client API first, fall back if needed for older minor versions
+    try:
+        _ = weaviate_client.collections.create(  # type: ignore[attr-defined]
+            name=collection_name,
+            vector_config=[weaviate.classes.config.Configure.Vectors.self_provided()],
+        )
+    except (AttributeError, TypeError):
+        _ = weaviate_client.collections.create(  # type: ignore[attr-defined]
+            name=collection_name,
+            vectorizer_config=weaviate.classes.config.Configure.Vectorizer.none(),
+        )
 
     # In some tests, the provided object is a mocked collection._client; prefer the
     # parent mock so that assertions on collection.data.insert_many are observed.

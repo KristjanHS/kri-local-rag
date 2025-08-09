@@ -9,6 +9,9 @@ from __future__ import annotations
 import sys
 from types import ModuleType
 from typing import Any
+from unittest.mock import patch
+
+import pytest
 
 
 class _StubSidebar:
@@ -90,10 +93,25 @@ class _StubSessionState:
             self._data[name] = value
 
 
+@pytest.mark.unit
 def test_frontend_module_imports_with_stub(monkeypatch) -> None:
+    """Test that frontend module can be imported without making real connections."""
     # Inject stubbed streamlit before importing the app
     stub = _StubStreamlit()
     sys.modules["streamlit"] = stub
 
-    mod = __import__("frontend.rag_app", fromlist=["*"])
-    assert mod is not None
+    # Mock backend initialization to prevent real connections
+    with patch("backend.qa_loop.ensure_weaviate_ready_and_populated") as mock_weaviate:
+        with patch("backend.ollama_client.ensure_model_available") as mock_ollama:
+            # Mock successful initialization
+            mock_weaviate.return_value = True
+            mock_ollama.return_value = True
+
+            # Import should not trigger any real connections
+            mod = __import__("frontend.rag_app", fromlist=["*"])
+            assert mod is not None
+
+            # The frontend module calls ensure_weaviate_ready_and_populated during import
+            # so we expect it to be called once, but with our mock
+            mock_weaviate.assert_called_once()
+            mock_ollama.assert_not_called()
