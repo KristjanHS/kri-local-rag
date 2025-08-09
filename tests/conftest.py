@@ -257,6 +257,9 @@ def project_root():
 # Lightweight default for docker-based tests outside specialized suites.
 # Suites can override this fixture in a closer-scope conftest (e.g. tests/e2e/conftest.py)
 # to perform heavier readiness checks.
+# Removed global auto-use fixture - individual tests should handle their own mocking
+
+
 @pytest.fixture(scope="session")
 def docker_services_ready():  # noqa: D401
     """No-op readiness fixture for generic docker-marked tests."""

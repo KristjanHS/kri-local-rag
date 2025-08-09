@@ -315,7 +315,10 @@ def ensure_weaviate_ready_and_populated():
 
             # Clean up the example data now that the schema is created.
             # This check is important in case the example_data folder was empty.
-            collection = client.collections.get(COLLECTION_NAME)
+            try:
+                collection = client.collections.use(COLLECTION_NAME)
+            except Exception:
+                collection = client.collections.get(COLLECTION_NAME)
             # Use the robust iterator method to check for objects
             try:
                 next(collection.iterator())

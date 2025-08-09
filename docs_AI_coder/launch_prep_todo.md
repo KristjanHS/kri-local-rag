@@ -1,15 +1,23 @@
 ## Preparation TODO (for AI agent / developers)
 
+Purpose
+- A step-by-step bring-up and recovery guide for the AI agent/developers when the RAG CLI or Streamlit app may be broken after refactors.
+- Drives minimal, incremental fixes using trusted fast checks (ruff + pytest) and container readiness probes.
+- Emphasizes “one change → one verify” loops to regain an MVP-ready, deployable state.
+- Complements the admin runbook in `docs_AI_coder/mvp_deployment.md` (this file is for preparing the repo before handover).
+
 See also:
 - AI agent cheatsheet and E2E commands: `docs_AI_coder/AI_instructions.md` (sections: "Golden commands" and "AI Agent Hints: Docker startup and E2E tests").
 - Test suites and markers: `docs_AI_coder/AI_instructions.md` (section: "Testing").
 - Human dev quickstart: `docs/DEVELOPMENT.md`.
-- MVP runbook: `docs_AI_coder/mvp_deployment.md`.
+
 
 Context
 - App: Local RAG using Weaviate (8080), Ollama (11434), Streamlit UI (8501).
 - Only Streamlit should be user-visible. Other services should be local-only (loopback or compose-internal).
  - Python execution: avoid `PYTHONPATH`; run modules with `python -m` from project root to ensure imports work.
+ - **Vectorization**: Uses a local `SentenceTransformer` model for client-side embeddings. Weaviate is configured for manually provided vectors.
+ - **Reranking**: A separate, local `CrossEncoder` model is used to re-score initial search results for relevance.
 
 Conventions
 - Each step has Action and Verify. Aim for one change per step to allow quick fix-and-retry.

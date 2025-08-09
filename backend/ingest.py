@@ -114,15 +114,11 @@ def deterministic_uuid(doc: Document) -> str:
 
 
 def create_collection_if_not_exists(client: weaviate.WeaviateClient, collection_name: str):
-    """Create the collection in Weaviate if it doesn't exist."""
+    """Create a collection if it doesn't exist, configured for manual vectorization."""
     if not client.collections.exists(collection_name):
         client.collections.create(
             name=collection_name,
-            # The vectorizer is set to "none" because we are providing our own vectors.
-            # Weaviate will not generate vectors for us.
-            vectorizer_config=weaviate.classes.config.Configure.Vectorizer.none(),
-            # The generative module is set to "none" as we are using a separate LLM.
-            # generative_config=weaviate.classes.config.Configure.Generative.none(),
+            vector_config=[weaviate.classes.config.Configure.Vectors.self_provided()],
         )
         logger.info(f"→ Collection '{collection_name}' created for manual vectorization.")
     else:
@@ -136,6 +132,7 @@ def process_and_upload_chunks(
     collection_name: str,
 ):
     """Process each document chunk and upload it to Weaviate."""
+    # Access collection (standard accessor for our tests/mocks)
     collection = client.collections.get(collection_name)
     stats = {"inserts": 0, "updates": 0, "skipped": 0}
 

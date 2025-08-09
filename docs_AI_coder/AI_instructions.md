@@ -78,6 +78,15 @@ See below for Testing and Docker. For human-oriented docs, see `docs/DEVELOPMENT
 - Backend: `qa_loop.py` (RAG loop), `weaviate_client.py` (DB), `ollama_client.py` (LLM).
 - Ingestion: Streamlit upload, `scripts/ingest.sh`, or compose `ingest` profile.
 
+### Vectorization and Reranking Strategy
+
+This project uses a client-side approach for both embedding and reranking, using local models.
+
+- **Vectorization**: A `SentenceTransformer` (bi-encoder) model creates vectors locally. Data is then ingested into Weaviate with manually provided vectors (`vectorizer: 'none'`).
+- **Reranking**: A `CrossEncoder` model re-scores the top search results locally for better relevance.
+
+Server-side Weaviate modules like `text2vec-huggingface` or `reranker-huggingface` are not used.
+
 ## Testing
 
 ### Test Suites
