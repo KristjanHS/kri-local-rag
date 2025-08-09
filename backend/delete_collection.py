@@ -6,9 +6,9 @@ from backend.config import COLLECTION_NAME, WEAVIATE_URL
 
 parsed_url = urlparse(WEAVIATE_URL)
 client = weaviate.connect_to_custom(
-    http_host=parsed_url.hostname,
+    http_host=parsed_url.hostname or "localhost",
     http_port=parsed_url.port or 80,
-    grpc_host=parsed_url.hostname,
+    grpc_host=parsed_url.hostname or "localhost",
     grpc_port=50051,
     http_secure=parsed_url.scheme == "https",
     grpc_secure=parsed_url.scheme == "https",

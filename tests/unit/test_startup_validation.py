@@ -22,7 +22,8 @@ class TestStartupPerformance:
         """Test that core backend files exist without importing them."""
         logger.info("\n=== TESTING FILE EXISTENCE ===")
 
-        backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+        backend_dir = os.path.join(project_root, "backend")
 
         files_to_check = ["config.py", "qa_loop.py", "retriever.py", "ollama_client.py"]
 
@@ -38,7 +39,8 @@ class TestStartupPerformance:
         """Test import structure by reading files as text without executing them."""
         logger.info("\n=== TESTING IMPORT STRUCTURE ===")
 
-        backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+        backend_dir = os.path.join(project_root, "backend")
 
         # Test config.py has expected variables
         logger.info("Analyzing config.py...")
@@ -66,7 +68,8 @@ class TestStartupPerformance:
         """Test that all Python files have valid syntax without importing."""
         import ast
 
-        backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+        backend_dir = os.path.join(project_root, "backend")
 
         python_files = ["config.py", "qa_loop.py", "retriever.py", "ollama_client.py"]
 
@@ -84,7 +87,7 @@ class TestStartupPerformance:
         logger.info("\n=== TESTING FOR INTERACTIVE PROMPTS ===")
         import subprocess
 
-        project_root = os.path.join(os.path.dirname(__file__), "..")
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
         logger.info("Testing config.py import in subprocess...")
         try:
@@ -175,6 +178,9 @@ class TestStartupPerformance:
                 # Clear any cached module
                 if "backend.qa_loop" in sys.modules:
                     del sys.modules["backend.qa_loop"]
+                # Ensure any previously imported sentence_transformers is removed
+                if "sentence_transformers" in sys.modules:
+                    del sys.modules["sentence_transformers"]
 
                 # Now test the fallback
                 from backend import qa_loop

@@ -37,7 +37,7 @@ def test_pytorch_is_cpu_only():
     """
     Verifies that the installed PyTorch wheel does not have CUDA support compiled in.
     """
-    assert torch.version.cuda is None, (  # noqa: SLF001
+    assert getattr(torch.version, "cuda", None) is None, (
         "Test failed: PyTorch was built with CUDA support (torch.version.cuda is not None), "
         "but a CPU-only build is expected. Please reinstall PyTorch from the CPU wheel."
     )
