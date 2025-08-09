@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
 import httpx
+import pytest
 
 from backend import ollama_client as oc
+
+pytestmark = pytest.mark.unit
 
 
 class DummyResp:

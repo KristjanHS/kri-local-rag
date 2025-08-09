@@ -9,6 +9,8 @@ from backend.ingest import (
     process_and_upload_chunks,
 )
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture
 def mock_docs():
