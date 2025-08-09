@@ -14,6 +14,9 @@ jobs:
     name: Analyze
     runs-on: ubuntu-latest
     
+    # Skip local execution with Act
+    if: ${{ github.actor != 'nektos/act' }}
+    
     # Add timeout to prevent hanging jobs
     timeout-minutes: 360
     
@@ -54,5 +57,3 @@ jobs:
         with:
           category: "/language:${{ matrix.language }}"
           upload: true
-        # Continue on error for local testing (Act can't access GitHub API)
-        continue-on-error: ${{ github.actor == 'nektos/act' }}
