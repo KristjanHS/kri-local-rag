@@ -35,17 +35,9 @@ This file tracks outstanding tasks and planned improvements for the project.
 - **Test suites and markers**: [`docs_AI_coder/AI_instructions.md`](AI_instructions.md) (section: "Testing")
 - **Human dev quickstart**: [`docs/DEVELOPMENT.md`](../docs/DEVELOPMENT.md)
 - **MVP runbook**: [`docs_AI_coder/mvp_deployment.md`](mvp_deployment.md)
+- **Archived tasks**: [`docs_AI_coder/archived-tasks.md`](archived-tasks.md)
 
-## Test Refactoring Status
-
-**Test Refactoring Complete**: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for details on completed test isolation and classification improvements.
-
-**Current Status**: 
-- [x] Unit tests properly isolated (17 tests, ~9s runtime)
-- [x] Integration tests properly categorized (13 tests, ~33s runtime)  
-- [x] All tests run by default (59 tests, ~21s runtime)
-- [x] 58.68% test coverage achieved
-- [x] Python testing best practices implemented
+ 
 
 ## Prioritized Backlog
 
@@ -53,53 +45,72 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
 
 ### P0 — Must do now (stability, forward-compat, fast feedback)
 
-#### P0.1 — Weaviate API Migration
-**Phase 1: Current State Assessment** 🔄 IN PROGRESS
-- [x] Check current Weaviate server version in docker-compose — Found: local compose `1.32.0` in `docker/docker-compose.yml`; CI compose `1.25.4` in `docker/docker-compose.ci.yml`
-- [x] Verify current client version and any existing issues — `weaviate-client==4.16.6` pinned in `requirements.txt`; known v4.16.0–4.16.3 "Invalid properties" bugs avoided; some code still contains deprecated fallbacks to `vectorizer_config` (to be handled in migration tasks)
-- [x] Test current API patterns to understand what's working vs. deprecated — Modern API paths validated via `tests/integration/test_vectorizer_enabled_integration.py`; ingestion (`backend/ingest.py`) uses `vector_config=Configure.Vectors.self_provided()`; deprecated fallbacks still exist in `_test_support.py` and `backend/delete_collection.py` (to be removed in migration tasks)
+#### P0.1 — Test Suite Architecture Refactor (align with best practices)
 
-**Phase 2: Incremental Migration** 🔄 IN PROGRESS
-- [x] Pin to specific stable version (v4.16.6) in requirements.txt — Confirmed in `requirements.txt`
-- [x] Update collection creation to use modern API in backend/ingest.py — Uses `vector_config=Configure.Vectors.self_provided()`
-- [x] Update integration test to use modern API without fallbacks — Confirmed in `tests/integration/test_vectorizer_enabled_integration.py`
-- [x] Test each change before proceeding — Targeted integration test passed locally
+- [ ] P0.1.1 — Split test suites and defaults (unit/integration with coverage vs. UI/E2E without coverage)
+  - Action: Adjust default addopts to exclude UI/E2E by default (e.g., `-m "not ui and not e2e and not docker and not environment"`) so the fast core suite runs with coverage. Add dedicated commands:
+    - `test-core`: `pytest -q -m "not ui and not e2e and not docker and not environment"`
+    - `test-ui`: `pytest -q tests/e2e_streamlit --no-cov -m "ui or e2e"`
+  - Verify: Running `test-core` generates coverage and completes green; running `test-ui` runs only Playwright/Streamlit tests and completes green without coverage.
 
-**Phase 3: Server Compatibility** 🔄 IN PROGRESS  
-- [x] Upgrade Weaviate server from v1.25.1 to v1.32.0 for client compatibility — Local compose already at `1.32.0`; CI compose upgraded to `1.32.0`
+- [ ] P0.1.2 — Prefer marker selection over runtime skip hooks
+  - Action: Keep minimal guard in `tests/e2e_streamlit/conftest.py` to error-fast if UI tests are run with coverage; otherwise rely on markers to exclude them by default. Mark Playwright tests as `@pytest.mark.ui`.
+  - Verify: With coverage on and UI selected, fail early with a helpful message to re-run with `--no-cov`. Default runs exclude UI tests.
+  - Subtask: Replace current skip in `tests/e2e_streamlit/conftest.py` with a `pytest.UsageError` (or `pytest.skip` removed) when coverage is detected and UI tests are collected.
 
-**Migration Tasks:**
- - [x] **Weaviate API Migration: Server Upgrade** - Upgrade Weaviate server from v1.25.1 to v1.32.0 in `docker/docker-compose.yml` and CI compose. **Context**: Current server version is incompatible with weaviate-client v4.16+ (requires v1.23.7+). **Result**: Local compose already at `1.32.0`; CI compose upgraded to `1.32.0`.
-- [x] **Weaviate API Migration: Client Version Pinning** - `weaviate-client==4.16.6` pinned in `requirements.txt`. **Context**: Avoids v4.16.0–4.16.3 "Invalid properties" bugs and version drift.
-- [x] **Weaviate API Migration: Remove Deprecated Fallbacks** - Removed `vectorizer_config` fallbacks from `backend/_test_support.py` and `backend/delete_collection.py`; `backend/ingest.py` already uses modern `vector_config` API.
-- [x] **Weaviate API Migration: Update Integration Test** - Confirmed `tests/integration/test_vectorizer_enabled_integration.py` uses modern API without fallbacks.
- - [BLOCKED: Streamlit E2E depends on Playwright browser launch — 2025-08-10] **Weaviate API Migration: Verify Full System** - Test complete system after migration to ensure no regressions. **Context**: Major version changes could introduce subtle compatibility issues. **Approach**: Run full test suite and verify core functionality (ingestion, retrieval, search).
+- [ ] P0.1.3 — Simplify logging; drop per-test file handlers
+  - Action: Remove `pytest_runtest_setup/teardown/logreport` hooks in `tests/conftest.py`. Use `log_cli`/`log_file` from `pyproject.toml` and `caplog` for assertions.
+  - Verify: Logs still go to `reports/test_session.log`; tests can assert logs with `caplog` without file-handler overhead.
+
+- [ ] P0.1.4 — Standardize Docker management via pytest-docker
+  - Action: Replace custom `docker_services` management with `pytest-docker` defaults; move Weaviate seeding into scoped fixtures in `tests/integration`.
+  - Verify: `pytest -m integration` brings services up via plugin and tests pass.
+
+- [ ] P0.1.5 — Normalize markers and directories
+  - Action: Ensure consistent use of `unit`, `integration`, `e2e`, `ui`, `docker`, `environment`, `slow`. Consider renaming `tests/e2e_streamlit` to `tests/ui_streamlit` (optional) and add `ui` marker.
+  - Verify: `pytest -m ui` selects only Playwright tests; `pytest -m "unit or integration"` excludes them.
+
+- [ ] P0.1.6 — Coverage configuration hardening
+  - Action: Keep `.coveragerc` omits for tests and UI paths; document that UI suite must run with `--no-cov`.
+  - Verify: Core coverage excludes tests and UI; UI suite does not attempt coverage.
+
+- [ ] P0.1.7 — CI pipeline separation
+  - Action: Split CI into two jobs: `tests-core` (coverage) and `tests-ui` (no coverage). Publish coverage from core job only.
+  - Verify: CI runs green; core job uploads coverage HTML; Playwright browsers cached for UI job.
+
+- [ ] P0.1.8 — Developer docs and DX commands
+  - Action: Update `docs/DEVELOPMENT.md` and `docs_AI_coder/AI_instructions.md` with new commands/markers; add `make test`, `make test-core`, `make test-ui` or scripts equivalents.
+  - Verify: Fresh checkout can run both suites as documented.
+
 
 #### P0.2 — E2E Tasks (CLI and Streamlit)
 
-- [x] CLI E2E: Interactive mode times out — FIXED
-  - Action: Make interactive mode robust to piped stdin and non-TTY. Ensure prompts and phase banners flush immediately; handle EOF by printing `Goodbye!` and exiting. If needed, guard test path with `RAG_TEST_MODE=1` to process one Q then exit.
-  - Verify: `.venv/bin/python -m pytest -q tests/e2e/test_cli_script_e2e.py::test_cli_interactive_mode --disable-warnings` passes; `reports/logs/e2e_cli_interactive.out` contains: `PHASE: interactive`, `RAG System CLI - Interactive Mode`, `Mocked answer.`, `Goodbye!`.
+  - [ ] Streamlit E2E: Improve locator resilience (only if still flaky)
+    - Action: Switch input selection to `get_by_label("Ask a question:")`, keep `[data-testid]` for answers, and if needed add `page.wait_for_function` to await `TEST_ANSWER` text.
+    - Verify: Re-run the single test; expect pass without diagnostic waits.
 
-- [x] CLI E2E: Single-question mode times out — FIXED
-  - Action: Ensure single-question path prints promptly (unbuffered) and exits with code 0. In fake-answer path, print once and exit; avoid waiting for extra input.
-  - Verify: `.venv/bin/python -m pytest -q tests/e2e/test_cli_script_e2e.py::test_cli_single_question_mode --disable-warnings` passes; `reports/logs/e2e_cli_single.out` contains: `PHASE: single_question`, `Question: ...`, `Answer: Mocked answer for a single question.`
+  - [ ] **Task 1: Isolate and Reproduce the Failure Reliably.**
+    - **Goal:** Create a minimal, fast command that reliably demonstrates the failure, so we don't have to run the full 1-minute test suite to verify our fix.
+    - **Action:** Use the simplest Playwright test we have (`test_browser_launch_only.py`) and run it with `pytest-cov` enabled.
+    - **Verify:** Confirm this single test fails with the known `AttributeError`. Then, run it with `--no-cov` and confirm it passes. This gives us a clear baseline.
 
-- [BLOCKED: Playwright browser launch error — 2025-08-10] Streamlit E2E: Fake answer not visible after click
-  - Action (app-side): Implemented stable locator (`data-testid='answer'`) and immediate fake-answer render when `RAG_FAKE_ANSWER` is set. `RAG_SKIP_STARTUP_CHECKS=1` honored.
-  - Current status: App renders correctly; test now fails earlier due to Playwright browser `launch()` error (inspect/endswith). Environment/tooling issue, not app logic.
-  - Verify: After unblocking the Playwright launcher, `.venv/bin/python -m pytest -q tests/e2e_streamlit/test_app_smoke.py::test_interaction_basic --disable-warnings` should find `Answer` and `TEST_ANSWER` within 10s.
+  - [ ] **Task 2: Implement a Conditional Skip.**
+    - **Goal:** Since telling coverage to *ignore* the Playwright tests isn't working, we will instead tell `pytest` to *not run* the Playwright tests if and only if the coverage plugin is active.
+    - **Action:** I will create a `conftest.py` file within the `tests/e2e_streamlit` directory. Inside this file, I will add a `pytest_collection_modifyitems` hook that programmatically adds a "skip" marker to all Playwright tests if it detects that `pytest-cov` is running.
+    - **Verify:** Re-run the failing command from Task 1. The test should now report as `SKIPPED` instead of `ERROR`.
 
-  ##### Next steps to unblock Streamlit E2E (Playwright)
-  - [x] Ensure Playwright browsers are installed and up-to-date in the test environment; run `python -m playwright install --with-deps` in CI bootstrap.
-  - [x] Force headless minimal launch via plugin config or env (e.g., `PLAYWRIGHT_HEADLESS=1`), and disable coverage for Playwright sessions if coverage hooks interfere.
-  - [ ] If the inspect-related error persists, pin `pytest-playwright` to a known-good version and/or upgrade `playwright` to the latest compatible.
-  - [x] Add a retry wrapper or increase launch timeout for the browser fixture.
+  - [ ] **Task 3: Achieve a "Green" Full Suite Run.**
+    - **Goal:** Ensure the main test suite can now run to completion and generate a coverage report without any errors.
+    - **Action:** Run the full test suite command (`pytest -m "not environment"`).
+    - **Verify:** The command should complete with all tests either passing or being skipped (specifically the Playwright tests). There should be zero errors, and a coverage report should be generated for the rest of the codebase.
+
+  - [ ] **Task 4: Create a Separate, Coverage-Free E2E Test Run.**
+    - **Goal:** Make sure our important Playwright E2E tests are still executed somewhere.
+    - **Action:** Define a new, separate command that runs *only* the Playwright tests and explicitly disables coverage (`--no-cov`). This command will be used in our CI pipeline and for local E2E checks.
+    - **Verify:** Run this new command and confirm that all Playwright tests pass.
 
 #### P0.3 — Stabilization and Finalization
- - [x] Deflake: modest timeout bump after fixes
-  - Action: If still flaky under CI load, bump timeouts: CLI tests from 10s → 20s; Playwright `to_be_visible` from 10s → 15s.
-  - Verify: All three tests pass reliably across two consecutive runs.
+  
 
 - [ ] Finalize P0: Full suite green
   - Action: Run the full suite locally; then update CI if needed.
@@ -107,9 +118,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
 
 
 ### P1.1 other tasks
-- [x] Add CI environment validation (e.g., `pip check`) to prevent dependency conflicts.
-- [ ] Add unit test for CLI error handling (assert messages go to `stderr` and exit code is correct).
-- [ ] Add unit test verifying startup calls `ensure_model_available`.
+- (archived) See `docs_AI_coder/archived-tasks.md`
 
 ### P1.2 — Next up (maintainability, observability)
 - [ ] Refactor Weaviate connection logic into a single reusable function.
@@ -134,4 +143,3 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
 - [ ] Create testing standards document.
 - [ ] Add test templates for consistency and performance benchmarking.
 - [ ] Improve test documentation and add test quality metrics tracking over time.
-

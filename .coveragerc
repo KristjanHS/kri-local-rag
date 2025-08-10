@@ -6,6 +6,7 @@ omit =
     scripts/*
     docker/*
     tests/*
+    tests/e2e_streamlit/*
     */__init__.py
 
 [report]
