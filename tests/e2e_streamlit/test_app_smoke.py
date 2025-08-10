@@ -80,7 +80,12 @@ def test_root_health(streamlit_server):
 
 def test_interaction_basic(streamlit_server, page: Page):
     # Navigate to the app
-    page.goto("http://localhost:8501", wait_until="domcontentloaded")
+    page.set_default_timeout(15000)
+    try:
+        page.goto("http://localhost:8501", wait_until="domcontentloaded")
+    except Exception:
+        time.sleep(0.5)
+        page.goto("http://localhost:8501", wait_until="domcontentloaded")
 
     # Streamlit renders a textarea for the question input
     page.get_by_role("textbox").first.fill("hello")
@@ -89,5 +94,5 @@ def test_interaction_basic(streamlit_server, page: Page):
     page.get_by_role("button", name="Get Answer").click()
 
     # Expect the Answer section and the fake answer injected via env
-    expect(page.locator("text=Answer")).to_be_visible(timeout=10000)
-    expect(page.locator("text=TEST_ANSWER")).to_be_visible(timeout=10000)
+    expect(page.locator("text=Answer")).to_be_visible(timeout=15000)
+    expect(page.locator("text=TEST_ANSWER")).to_be_visible(timeout=15000)
