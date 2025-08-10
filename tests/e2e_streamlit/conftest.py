@@ -4,22 +4,19 @@ import pytest
 
 
 def _is_coverage_enabled(config: pytest.Config) -> bool:
-    """Best-effort detection of active pytest-cov coverage collection.
+    """Detect active pytest-cov coverage collection.
 
-    We only want to skip when coverage collection is actually enabled, not merely
+    We only want to guard when coverage collection is actually enabled, not merely
     when the plugin is installed. This allows separate E2E runs with --no-cov.
     """
     if not config.pluginmanager.hasplugin("cov"):
         return False
-    # Prefer checking parsed options on config.option for robustness
     option = getattr(config, "option", None)
     if option is not None:
-        # Explicit opt-out
         if getattr(option, "no_cov", False):
             return False
-        # Any of these imply coverage is active
         if (
-            getattr(option, "cov", None)  # list of --cov targets
+            getattr(option, "cov", None)
             or getattr(option, "cov_source", None)
             or getattr(option, "cov_report", None)
             or getattr(option, "cov_branch", False)
@@ -28,7 +25,6 @@ def _is_coverage_enabled(config: pytest.Config) -> bool:
             or getattr(option, "cov_config", None)
         ):
             return True
-    # Fallback to getoption lookups
     try:
         if config.getoption("--no-cov"):
             return False
@@ -50,8 +46,16 @@ def _is_coverage_enabled(config: pytest.Config) -> bool:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Skip Playwright tests when coverage is enabled to avoid launch errors."""
-    if _is_coverage_enabled(config):
-        skip_marker = pytest.mark.skip(reason="Skipped because pytest-cov interferes with Playwright browser launch.")
-        for item in items:
-            item.add_marker(skip_marker)
+    """Error-fast when UI tests are selected while coverage is enabled."""
+    if not items:
+        return
+
+    # When --test-ui is used, it selects this directory. If --no-cov is NOT
+    # specified, then coverage IS active due to pyproject.toml addopts.
+    # The _is_coverage_enabled helper isn't quite robust enough for the
+    # interplay of all the flags, so we do a simpler, more direct check here.
+    is_ui_suite = bool(getattr(config.option, "test_ui", False))
+    is_coverage_disabled = bool(getattr(config.option, "no_cov", False))
+
+    if is_ui_suite and not is_coverage_disabled:
+        raise pytest.UsageError("The --test-ui suite cannot be run with coverage. Please run with --no-cov.")

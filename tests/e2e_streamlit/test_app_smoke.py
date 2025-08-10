@@ -20,7 +20,7 @@ import pytest
 import requests
 from playwright.sync_api import Page, expect
 
-pytestmark = [pytest.mark.e2e, pytest.mark.slow]
+pytestmark = [pytest.mark.e2e, pytest.mark.ui, pytest.mark.slow]
 
 
 def _wait_http_ready(url: str, timeout_s: float = 20.0) -> None:

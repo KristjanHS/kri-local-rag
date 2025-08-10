@@ -70,7 +70,7 @@ deptry*.*
 reports/
 !reports/.gitkeep
 # Coverage artifacts
-.coverage
+.coverage*
 
 # Third-party libraries you've vendored/included
 vendor/
