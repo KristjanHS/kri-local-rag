@@ -8,7 +8,7 @@ import pytest
 pytestmark = pytest.mark.unit
 
 
-def test_startup_ensures_model_and_exits_when_missing(monkeypatch, capsys):
+def test_startup_ensures_model_and_exits_when_missing(monkeypatch, capsys, caplog):
     # Force startup checks to run: ensure both skip flags are unset
     monkeypatch.delenv("RAG_SKIP_STARTUP_CHECKS", raising=False)
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
@@ -24,6 +24,10 @@ def test_startup_ensures_model_and_exits_when_missing(monkeypatch, capsys):
 
     fake_qa_module.ensure_weaviate_ready_and_populated = _noop_ready  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "backend.qa_loop", fake_qa_module)
+    # Ensure parent package attribute also points to fake module
+    import backend  # noqa: WPS433
+
+    monkeypatch.setattr(backend, "qa_loop", fake_qa_module, raising=False)
 
     # Mock ensure_model_available to return False (model missing) via a fake module
     fake_ollama_module = ModuleType("backend.ollama_client")
@@ -33,6 +37,7 @@ def test_startup_ensures_model_and_exits_when_missing(monkeypatch, capsys):
 
     fake_ollama_module.ensure_model_available = _ensure_model_available  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "backend.ollama_client", fake_ollama_module)
+    monkeypatch.setattr(backend, "ollama_client", fake_ollama_module, raising=False)
 
     # Ensure OLLAMA_MODEL is something stable
     monkeypatch.setenv("OLLAMA_MODEL", "fake/model")
@@ -51,4 +56,8 @@ def test_startup_ensures_model_and_exits_when_missing(monkeypatch, capsys):
 
     # Assert
     assert exc.value.code == 1
-    assert "Required Ollama model" in capsys.readouterr().err
+    out_err = capsys.readouterr()
+    # Message is logged via logger; check both stderr or caplog entries
+    text = out_err.err or out_err.out
+    if "Required Ollama model" not in text:
+        assert any("Required Ollama model" in rec.message for rec in caplog.records)

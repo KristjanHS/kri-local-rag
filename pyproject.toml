@@ -142,3 +142,6 @@ pep621_dev_dependency_groups = ["tests", "docs", "cli"]
 
 [tool.deptry.per_rule_ignores]
 DEP002 = ["boto3"]       # AWS libs pulled in indirectly
+
+[tool.coverage.run]
+omit = ["tests/e2e_streamlit/*"]
