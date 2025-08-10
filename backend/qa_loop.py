@@ -10,8 +10,6 @@ import sys
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-import torch
-
 # Local .py imports
 from backend.config import OLLAMA_MODEL
 from backend.console import console, get_logger
@@ -79,9 +77,16 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
 
             if not skip_optimization:
                 # Set optimal threading for current environment
-                torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
+                try:
+                    import torch  # defer heavy import
+
+                    torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
+                except Exception as _threads_e:  # noqa: F841
+                    pass
                 # Apply torch.compile with max-autotune for 5-25% speed-ups on CPU GEMM-heavy models
                 try:
+                    import torch  # defer heavy import
+
                     logger.info("torch.compile: optimizing cross-encoder – first run may take ~1 min…")
                     _cross_encoder = torch.compile(_cross_encoder, backend="inductor", mode="max-autotune")
                     logger.info("torch.compile optimization completed for cross-encoder")
@@ -279,7 +284,6 @@ from weaviate.classes.query import Filter
 from weaviate.exceptions import WeaviateConnectionError
 
 from backend.config import COLLECTION_NAME, WEAVIATE_URL
-from backend.ingest import create_collection_if_not_exists, ingest
 
 
 def ensure_weaviate_ready_and_populated():
@@ -305,6 +309,9 @@ def ensure_weaviate_ready_and_populated():
         if not client.collections.exists(COLLECTION_NAME):
             # First-time setup: create the collection, ingest examples, then clean up.
             logger.info("   → Collection does not exist. Running one-time initialization...")
+            # Defer heavy import to avoid torch initialization during module import
+            from backend.ingest import create_collection_if_not_exists, ingest
+
             create_collection_if_not_exists(client, COLLECTION_NAME)
 
             # Ingest example data to ensure all modules are warm, then remove it.
