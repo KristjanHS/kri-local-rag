@@ -2,7 +2,7 @@ name: kri-local-rag-ci
 
 services:
   weaviate:
-    image: cr.weaviate.io/semitechnologies/weaviate:1.25.4
+    image: cr.weaviate.io/semitechnologies/weaviate:1.32.0
     ports:
       - "8080:8080"
       - "50051:50051"
@@ -13,7 +13,7 @@ services:
       ENABLE_MODULES: 'text2vec-huggingface,reranker-huggingface'
       CLUSTER_HOSTNAME: 'node1'
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1"]
+      test: [ "CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,7 +24,7 @@ services:
     ports:
       - "11434:11434"
     healthcheck:
-      test: ["CMD", "ollama", "list"]
+      test: [ "CMD", "ollama", "list" ]
       interval: 10s
       timeout: 5s
       retries: 5

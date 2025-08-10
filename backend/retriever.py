@@ -4,7 +4,7 @@ import os
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-import torch
+# Defer torch import to runtime to avoid heavy import-time side effects
 import weaviate
 from weaviate.exceptions import WeaviateQueryError
 
@@ -64,7 +64,12 @@ def _get_embedding_model(model_name: str = EMBEDDING_MODEL):
 
             # Apply PyTorch CPU optimizations
             # Set optimal threading for current environment
-            torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
+            try:
+                import torch  # defer heavy import
+
+                torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
+            except Exception as _threads_e:  # noqa: F841
+                pass
 
             # Apply torch.compile for production performance, but allow skipping for tests
             from unittest.mock import MagicMock  # type: ignore
@@ -73,6 +78,8 @@ def _get_embedding_model(model_name: str = EMBEDDING_MODEL):
 
             if enable_compile_str.lower() == "true" and not isinstance(_embedding_model, MagicMock):
                 try:
+                    import torch  # defer heavy import
+
                     logger.info("torch.compile: optimizing embedding model – first run may take up to a minute…")
                     _embedding_model = torch.compile(_embedding_model, backend="inductor", mode="max-autotune")
                     logger.debug("Applied torch.compile optimization to embedding model")

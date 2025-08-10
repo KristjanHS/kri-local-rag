@@ -8,14 +8,13 @@ import logging
 import os
 import sys
 
-import backend.qa_loop as qa
 from backend.console import console, get_logger
 
 logger = get_logger(__name__)
 
 
-from backend.config import OLLAMA_MODEL
-from backend.ollama_client import ensure_model_available
+# Defer heavy imports (qa_loop, ollama) until needed to keep CLI startup fast,
+# especially in test paths that use fake answers and skip startup checks.
 
 
 def main():
@@ -60,6 +59,10 @@ Examples:
 
         if not skip_startup_checks:
             # Ensure Weaviate is ready
+            import backend.qa_loop as qa
+            from backend.config import OLLAMA_MODEL
+            from backend.ollama_client import ensure_model_available
+
             qa.ensure_weaviate_ready_and_populated()
 
             # Ensure the required Ollama model is available
@@ -79,9 +82,22 @@ Examples:
             if fake_answer is not None:
                 response = fake_answer
                 console.print(f"Answer: {response}")
+                # Ensure output is flushed promptly in test environments
+                try:
+                    sys.stdout.flush()
+                except Exception:
+                    pass
+                return 0
             else:
                 # Real path streams tokens to stdout; no extra final print to avoid duplication
+                import backend.qa_loop as qa
+
                 qa.answer(args.question, k=args.k)
+                try:
+                    sys.stdout.flush()
+                except Exception:
+                    pass
+                return 0
         else:
             # Interactive mode
             if verbose_test:
@@ -92,7 +108,13 @@ Examples:
 
             while True:
                 try:
-                    question = input("\nQuestion: ").strip()
+                    # Use stdout write + flush to support non-tty/piped stdin (avoid print per lint rules)
+                    try:
+                        sys.stdout.write("\nQuestion: ")
+                        sys.stdout.flush()
+                    except Exception:
+                        pass
+                    question = input().strip()
 
                     if question.lower() in ["quit", "exit", "q"]:
                         console.print("Goodbye!")
@@ -105,9 +127,19 @@ Examples:
                     if fake_answer is not None:
                         # Deterministic test path: print fake answer once
                         console.print(fake_answer)
+                        try:
+                            sys.stdout.flush()
+                        except Exception:
+                            pass
                     else:
                         # Real path streams tokens to stdout via qa.answer
+                        import backend.qa_loop as qa
+
                         qa.answer(question, k=args.k)
+                        try:
+                            sys.stdout.flush()
+                        except Exception:
+                            pass
                 except KeyboardInterrupt:
                     console.print("\nGoodbye!")
                     break
@@ -115,6 +147,7 @@ Examples:
                     console.print("\nGoodbye!")
                     break
 
+        return 0
     except Exception as e:
         from rich.console import Console
 
@@ -124,4 +157,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
