@@ -1,0 +1,9 @@
+---
+description: "Rules when AI agent is stuck with solving an error or problem"
+type: agent-select
+globs: [] 
+alwaysApply: true
+---
+- When trying to solve an error or problem has failed for 3 times (the tests still fail):
+  1. Check all the code changes made in this chat session, search for the best practices for cases that were solved here, validate all code changes against these best practices (explaining why you think they were right, or admitting the problem), and make a simplest possible plan to only correct the code changes that went in the wrong direction. Add the plan as tasks to product_todo.md, then execute the plan. 
+  2. Take a step back, focus only on one top problem, search for best practice solution option for this, then make a plan how to debug and solve it in small incremental steps. Add the plan as tasks to product_todo.md, then execute the correction plan. 
