@@ -50,7 +50,7 @@ jobs:
           # This command runs all tests NOT marked as 'slow'
           # based on the configuration in pytest.ini
           # In both GitHub and act (local), generate HTML & JUnit under reports/
-          python -m pytest -m "not slow and not integration" --html=reports/report.html --self-contained-html --junitxml=reports/junit.xml
+          python -m pytest -m "not slow and not integration and not e2e and not environment and not ui and not docker" --html=reports/report.html --self-contained-html --junitxml=reports/junit.xml
 
       - name: Upload fast test reports
         # Skip under act (local GitHub Actions emulator) because ACTIONS_RUNTIME_TOKEN is not available.
