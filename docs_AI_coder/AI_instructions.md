@@ -102,19 +102,23 @@ The test suite is organized with markers to control scope and speed:
 
 ### Running Tests
 
-- Default (fast tests):
+- **Core test suite** (fast, with coverage):
+  - Runs unit and integration tests. Excludes UI/E2E tests.
+  - Generates a coverage report.
 
 ```bash
-.venv/bin/python -m pytest -v
+.venv/bin/python -m pytest --test-core
 ```
 
-- Unit only (fastest):
+- **UI test suite** (Playwright/Streamlit, no coverage):
+  - Runs only the UI and Playwright browser tests.
+  - Must be run with `--no-cov`.
 
 ```bash
-.venv/bin/python -m pytest -v -m "unit"
+.venv/bin/python -m pytest --test-ui --no-cov
 ```
 
-- All tests (including slow and E2E):
+- Run all tests (including slow and E2E):
 
 ```bash
 .venv/bin/python -m pytest -v -m "not environment"

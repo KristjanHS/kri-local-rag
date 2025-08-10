@@ -22,14 +22,14 @@ pip install -e .
 
 ## Run tests
 
-- Quick/quiet fast tests (recommended for local iteration):
+- **Core test suite** (fast, with coverage):
 ```bash
-.venv/bin/python -m pytest -q tests/
+.venv/bin/python -m pytest --test-core
 ```
 
-- Full verbose test output:
+- **UI test suite** (Playwright/Streamlit, no coverage):
 ```bash
-.venv/bin/python -m pytest -v
+.venv/bin/python -m pytest --test-ui --no-cov
 ```
 
 ## Docker (optional)

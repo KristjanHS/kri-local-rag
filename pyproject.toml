@@ -36,7 +36,7 @@ addopts = [
     "-v",
     "--tb=short",
     "-m",
-    "not slow",  # Run all tests except slow ones by default
+    "not ui and not e2e and not docker and not environment",  # Core suite by default
     "--cov=backend",
     "--cov=frontend",
     "--cov-report=term-missing",
@@ -47,6 +47,7 @@ markers = [
     "unit: Fast unit tests with mocked dependencies (should run in <1s)",
     "integration: Integration tests with real services (may take 5-30s)",
     "e2e: End-to-end tests requiring full Docker stack (may take 1-5min)",
+    "ui: UI tests using Playwright/Streamlit (runs without coverage)",
     "docker: Tests requiring a running Docker daemon",
     "environment: Environment and setup validation tests",
     "slow: Tests that take longer to run (>30s)",
@@ -145,3 +146,4 @@ DEP002 = ["boto3"]       # AWS libs pulled in indirectly
 
 [tool.coverage.run]
 omit = ["tests/e2e_streamlit/*"]
+data_file = "reports/coverage/.coverage"

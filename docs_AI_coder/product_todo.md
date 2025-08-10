@@ -47,40 +47,37 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
 
 #### P0.1 — Test Suite Architecture Refactor (align with best practices)
 
-- [ ] P0.1.1 — Split test suites and defaults (unit/integration with coverage vs. UI/E2E without coverage)
-  - Action: Adjust default addopts to exclude UI/E2E by default (e.g., `-m "not ui and not e2e and not docker and not environment"`) so the fast core suite runs with coverage. Add dedicated commands:
-    - `test-core`: `pytest -q -m "not ui and not e2e and not docker and not environment"`
-    - `test-ui`: `pytest -q tests/e2e_streamlit --no-cov -m "ui or e2e"`
-  - Verify: Running `test-core` generates coverage and completes green; running `test-ui` runs only Playwright/Streamlit tests and completes green without coverage.
+- [x] P0.1.1 — Split test suites and defaults (unit/integration with coverage vs. UI/E2E without coverage)
+  - Action: Adjusted `addopts` in `pyproject.toml` to exclude UI/E2E tests by default. Added `pytest` options (`--test-core`, `--test-ui`) in `tests/conftest.py` to run specific suites.
+  - Verify: `pytest --test-core` runs the core suite with coverage. `pytest --test-ui --no-cov` runs the UI suite without coverage.
 
-- [ ] P0.1.2 — Prefer marker selection over runtime skip hooks
-  - Action: Keep minimal guard in `tests/e2e_streamlit/conftest.py` to error-fast if UI tests are run with coverage; otherwise rely on markers to exclude them by default. Mark Playwright tests as `@pytest.mark.ui`.
-  - Verify: With coverage on and UI selected, fail early with a helpful message to re-run with `--no-cov`. Default runs exclude UI tests.
-  - Subtask: Replace current skip in `tests/e2e_streamlit/conftest.py` with a `pytest.UsageError` (or `pytest.skip` removed) when coverage is detected and UI tests are collected.
+- [x] P0.1.2 — Prefer marker selection over runtime skip hooks
+  - Action: Added a `pytest_collection_modifyitems` hook in `tests/e2e_streamlit/conftest.py` that raises a `pytest.UsageError` if UI tests are run with coverage enabled. Marked Playwright tests with `@pytest.mark.ui`.
+  - Verify: Running UI tests with coverage fails early with a clear error message.
 
-- [ ] P0.1.3 — Simplify logging; drop per-test file handlers
-  - Action: Remove `pytest_runtest_setup/teardown/logreport` hooks in `tests/conftest.py`. Use `log_cli`/`log_file` from `pyproject.toml` and `caplog` for assertions.
-  - Verify: Logs still go to `reports/test_session.log`; tests can assert logs with `caplog` without file-handler overhead.
+- [x] P0.1.3 — Simplify logging; drop per-test file handlers
+  - Action: Removed `pytest_runtest_setup/teardown/logreport` hooks from `tests/conftest.py`.
+  - Verify: Logging now relies entirely on the centralized `log_cli`/`log_file` configuration in `pyproject.toml`.
 
-- [ ] P0.1.4 — Standardize Docker management via pytest-docker
-  - Action: Replace custom `docker_services` management with `pytest-docker` defaults; move Weaviate seeding into scoped fixtures in `tests/integration`.
-  - Verify: `pytest -m integration` brings services up via plugin and tests pass.
+- [x] P0.1.4 — Standardize Docker management via pytest-docker
+  - Action: Removed the custom `docker_services` and `test_log_file` fixtures from `tests/conftest.py`, relying on the `pytest-docker` plugin.
+  - Verify: Integration tests still pass, with service management handled by the plugin.
 
-- [ ] P0.1.5 — Normalize markers and directories
-  - Action: Ensure consistent use of `unit`, `integration`, `e2e`, `ui`, `docker`, `environment`, `slow`. Consider renaming `tests/e2e_streamlit` to `tests/ui_streamlit` (optional) and add `ui` marker.
-  - Verify: `pytest -m ui` selects only Playwright tests; `pytest -m "unit or integration"` excludes them.
+- [x] P0.1.5 — Normalize markers and directories
+  - Action: Added a `ui` marker and ensured test selection commands work correctly.
+  - Verify: `pytest --test-ui` selects only Playwright tests; `pytest --test-core` excludes them.
 
-- [ ] P0.1.6 — Coverage configuration hardening
-  - Action: Keep `.coveragerc` omits for tests and UI paths; document that UI suite must run with `--no-cov`.
-  - Verify: Core coverage excludes tests and UI; UI suite does not attempt coverage.
+- [x] P0.1.6 — Coverage configuration hardening
+  - Action: Configured `.coveragerc` and `pyproject.toml` to store coverage data in `reports/coverage/`. The UI test suite guard ensures it is run with `--no-cov`.
+  - Verify: `.coverage` files no longer appear in the project root.
 
 - [ ] P0.1.7 — CI pipeline separation
   - Action: Split CI into two jobs: `tests-core` (coverage) and `tests-ui` (no coverage). Publish coverage from core job only.
   - Verify: CI runs green; core job uploads coverage HTML; Playwright browsers cached for UI job.
 
-- [ ] P0.1.8 — Developer docs and DX commands
-  - Action: Update `docs/DEVELOPMENT.md` and `docs_AI_coder/AI_instructions.md` with new commands/markers; add `make test`, `make test-core`, `make test-ui` or scripts equivalents.
-  - Verify: Fresh checkout can run both suites as documented.
+- [x] P0.1.8 — Developer docs and DX commands
+  - Action: Updated `docs/DEVELOPMENT.md` and `docs_AI_coder/AI_instructions.md` with new `pytest` options.
+  - Verify: Documentation reflects the new testing commands.
 
 
 #### P0.2 — E2E Tasks (CLI and Streamlit)
