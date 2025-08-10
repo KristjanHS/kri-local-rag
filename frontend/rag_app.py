@@ -78,7 +78,14 @@ if "init_done" not in st.session_state:
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
         try:
-            if os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes"):
+            skip_checks = os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes")
+            fake_answer_present = bool(os.getenv("RAG_FAKE_ANSWER"))
+            logger.info(
+                "App startup env: RAG_SKIP_STARTUP_CHECKS=%s, RAG_FAKE_ANSWER=%s",
+                str(skip_checks),
+                str(fake_answer_present),
+            )
+            if skip_checks:
                 logger.info("Startup checks skipped via RAG_SKIP_STARTUP_CHECKS")
             else:
                 # Lazy import to avoid heavy deps during module import
@@ -132,6 +139,8 @@ if submitted and question.strip():
             "</div>"
         )
         answer_placeholder.markdown(final_html, unsafe_allow_html=True)
+        # Explicit marker for fake-mode to help E2E tests verify bypassed backend
+        st.markdown("<div data-testid='fake-mode'></div>", unsafe_allow_html=True)
     else:
         with st.spinner("Thinking..."):
             # Lazy import to avoid heavy deps during module import
