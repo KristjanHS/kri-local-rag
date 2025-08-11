@@ -54,4 +54,6 @@ ENV DNNL_PRIMITIVE_CACHE_CAPACITY=1024
 EXPOSE 8501
 
 # The command to run when the container starts
-CMD ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"] 
+RUN useradd -ms /bin/bash appuser && chown -R appuser:appuser /app /example_data
+USER appuser
+CMD ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]

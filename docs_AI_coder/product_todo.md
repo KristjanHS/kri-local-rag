@@ -45,6 +45,39 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
 
 ### P0 — Must do now (stability, forward-compat, fast feedback)
 
+#### P0.0 — Top problem: Semgrep blocking findings visibility and triage (local)
+
+- Objective: Make blocking findings clearly visible locally and fix at least the top one.
+- Plan (small, incremental steps)
+   1) Ensure findings are shown even when the scan fails locally
+      - [x] Update Semgrep workflow to run the summary step unconditionally (always) while keeping PRs failing on findings in CI
+  2) Surface findings in terminal during pre-push
+     - [ ] Run the pre-push hook and verify the Semgrep findings summary shows rule, file:line, and message
+  3) Triage and fix the top finding
+     - [ ] Identify the most critical/simple-to-fix finding from the summary
+     - [ ] Implement a minimal, safe fix in code
+     - [ ] Add/adjust a unit test if applicable
+  4) Verify locally
+     - [ ] Re-run pre-push; confirm Semgrep has no blocking findings
+
+#### P0.0b — Apply best practices to recent CI/SAST changes
+
+- CodeQL workflow
+  - [x] Disable Default CodeQL setup in GitHub repo settings (to avoid advanced-config conflict)
+  - [ ] Broaden PR trigger (run on all PRs): remove `branches: ["main"]` under `on.pull_request`
+  - [ ] Validate `analyze@v3` inputs against official docs; if `output` is unsupported, remove it and adjust the local summary step accordingly
+  - [ ] Keep uploads enabled only on GitHub (skip on forks and under Act), and enforce via branch protection rather than hard-fail
+- Semgrep workflow
+  - [ ] Ensure robust baseline: add a step to unshallow history before scan (`git fetch --prune --unshallow || true`), or fetch base commit for PRs
+  - [ ] Pin Semgrep version (e.g., `pip install semgrep==<minor>`) to reduce surprise breakages; revisit quarterly to bump
+  - [ ] Keep SARIF upload skipped for forked PRs; consider two-job upload pattern if uploads are needed for forks
+- Pre-push (local)
+  - [ ] Make pre-push resilient if `act` is missing: detect and skip with a clear message
+  - [ ] Add `SKIP_LOCAL_SEC_SCANS=1` guard to optionally skip Semgrep/CodeQL locally when needed
+  - [ ] Document the guard and prerequisites in `docs/DEVELOPMENT.md`
+- Repo protection
+  - [ ] Configure branch protection to require "Code scanning results / CodeQL" and Semgrep check on PRs
+
 #### P0.1 — Test Suite Architecture Refactor (align with best practices)
 
 - [x] P0.1.1 — Split test suites and defaults (unit/integration with coverage vs. UI/E2E without coverage)
