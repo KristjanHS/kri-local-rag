@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import Iterator
 
@@ -28,50 +27,13 @@ def _ensure_logs_dir() -> Iterator[None]:
     yield
 
 
-@pytest.hookimpl(tryfirst=True)
-def pytest_runtest_setup(item: pytest.Item) -> None:
-    """Attach a per-test file handler to the root logger."""
-    nodeid_sanitized = item.nodeid.replace(os.sep, "_").replace("::", "__")
-    logfile = LOGS_DIR / f"{nodeid_sanitized}.log"
-    logfile.parent.mkdir(parents=True, exist_ok=True)
-
-    handler = logging.FileHandler(logfile, encoding="utf-8")
-    handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter(
-        fmt="%(asctime)s %(levelname)s %(name)s - %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S",
-    )
-    handler.setFormatter(formatter)
-
-    # Store a reference so we can remove it later
-    item._log_file_handler = handler  # type: ignore[attr-defined]
-
-    root = logging.getLogger()
-    root.addHandler(handler)
+## Removed per-test file handler hooks; rely on log_cli/log_file from pyproject.
 
 
-@pytest.hookimpl(tryfirst=True)
-def pytest_runtest_teardown(item: pytest.Item) -> None:
-    """Detach the per-test file handler."""
-    handler: logging.Handler | None = getattr(item, "_log_file_handler", None)  # type: ignore[attr-defined]
-    if handler is not None:
-        root = logging.getLogger()
-        root.removeHandler(handler)
-        handler.close()
-        delattr(item, "_log_file_handler")  # type: ignore[attr-defined]
+## Removed per-test teardown for file handler.
 
 
-@pytest.hookimpl(tryfirst=True)
-def pytest_runtest_logreport(report: pytest.TestReport) -> None:  # noqa: D401
-    """On failure, emit path to the per-test logfile for quick discovery."""
-    if report.when == "call" and report.failed:
-        try:
-            nodeid_sanitized = report.nodeid.replace(os.sep, "_").replace("::", "__")
-            logfile = LOGS_DIR / f"{nodeid_sanitized}.log"
-            logging.getLogger(__name__).warning("Per-test log: %s", logfile)
-        except Exception:
-            # best-effort; don't break test reporting
-            pass
+## Removed per-test failure log path emission.
 
 
 #!/usr/bin/env python3
@@ -86,6 +48,70 @@ from rich.console import Console
 # Set up a logger for this module
 logger = logging.getLogger(__name__)
 console = Console()
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Add convenience options to select common suites without shell scripts."""
+    group = parser.getgroup("test-suites")
+    group.addoption(
+        "--test-core",
+        action="store_true",
+        default=False,
+        help="Run fast core suite with coverage (excludes ui, e2e, docker, environment)",
+    )
+    group.addoption(
+        "--test-ui",
+        action="store_true",
+        default=False,
+        help="Run only UI/Playwright tests without coverage",
+    )
+
+
+def _apply_suite_shortcuts(config: pytest.Config) -> None:
+    core: bool = bool(getattr(config.option, "test_core", False))
+    ui: bool = bool(getattr(config.option, "test_ui", False))
+    if core and ui:
+        raise pytest.UsageError("Cannot use --test-core and --test-ui together")
+
+    # quiet output to mimic -q
+    if core or ui:
+        try:
+            current_quiet = int(getattr(config.option, "quiet", 0) or 0)
+        except Exception:
+            current_quiet = 0
+        if current_quiet < 1:
+            config.option.quiet = 1
+
+    if core:
+        # exclude slow/infra suites, keep coverage enabled (default via addopts)
+        config.option.markexpr = "not ui and not e2e and not docker and not environment"
+
+    if ui:
+        # select UI tests; user must run with --no-cov
+        config.option.markexpr = "ui or e2e"
+
+
+def pytest_configure(config: pytest.Config) -> None:  # noqa: D401
+    """Apply suite shortcut flags early in configuration."""
+    _apply_suite_shortcuts(config)
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Narrow to Streamlit UI directory when --test-ui is used."""
+    if not items:
+        return
+    if bool(getattr(config.option, "test_ui", False)):
+        keep: list[pytest.Item] = []
+        deselect: list[pytest.Item] = []
+        for item in items:
+            # Keep only tests under tests/e2e_streamlit
+            if "tests/e2e_streamlit/" in str(item.fspath):
+                keep.append(item)
+            else:
+                deselect.append(item)
+        if deselect:
+            config.hook.pytest_deselected(items=deselect)
+            items[:] = keep
 
 
 @pytest.fixture(scope="session")
@@ -163,16 +189,17 @@ def docker_services(request, test_log_file):
             )
 
             # Stream stdout
-            for line in process.stdout:
-                log.write(line)
-                logger.info(line.strip())  # Also log to terminal for visibility
+            if process.stdout is not None:
+                for line in process.stdout:
+                    log.write(line)
+                    logger.info(line.strip())  # Also log to terminal for visibility
 
             # Wait for the process to complete and get the return code
             process.wait(timeout=300)
 
             if process.returncode != 0:
                 # Capture and log any remaining stderr
-                stderr_output = process.stderr.read()
+                stderr_output = process.stderr.read() if process.stderr is not None else ""
                 log.write("\n--- Docker Error Logs ---\n")
                 log.write(stderr_output)
                 pytest.fail(f"Failed to start Docker services. See logs at {test_log_file}")
@@ -187,7 +214,7 @@ def docker_services(request, test_log_file):
                 backend_path = project_root / "backend"
                 if str(backend_path) not in sys.path:
                     sys.path.insert(0, str(backend_path))
-                from qa_loop import ensure_weaviate_ready_and_populated
+                from backend.qa_loop import ensure_weaviate_ready_and_populated
 
                 ensure_weaviate_ready_and_populated()
 
@@ -195,14 +222,15 @@ def docker_services(request, test_log_file):
                 from urllib.parse import urlparse
 
                 import weaviate
-                from config import COLLECTION_NAME, WEAVIATE_URL
-                from ingest import ingest
+
+                from backend.config import COLLECTION_NAME, WEAVIATE_URL
+                from backend.ingest import ingest
 
                 parsed = urlparse(WEAVIATE_URL)
                 client = weaviate.connect_to_custom(
-                    http_host=parsed.hostname,
+                    http_host=parsed.hostname or "localhost",
                     http_port=parsed.port or 80,
-                    grpc_host=parsed.hostname,
+                    grpc_host=parsed.hostname or "localhost",
                     grpc_port=50051,
                     http_secure=parsed.scheme == "https",
                     grpc_secure=parsed.scheme == "https",
@@ -255,6 +283,9 @@ def project_root():
 # Lightweight default for docker-based tests outside specialized suites.
 # Suites can override this fixture in a closer-scope conftest (e.g. tests/e2e/conftest.py)
 # to perform heavier readiness checks.
+# Removed global auto-use fixture - individual tests should handle their own mocking
+
+
 @pytest.fixture(scope="session")
 def docker_services_ready():  # noqa: D401
     """No-op readiness fixture for generic docker-marked tests."""

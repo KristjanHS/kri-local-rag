@@ -19,7 +19,7 @@ import hashlib
 import os
 import time
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, cast
 
 import torch
 import weaviate
@@ -83,9 +83,9 @@ def connect_to_weaviate() -> weaviate.WeaviateClient:
     logger.info(f"Connecting to Weaviate at {WEAVIATE_URL}...")
     parsed_url = urlparse(WEAVIATE_URL)
     client = weaviate.connect_to_custom(
-        http_host=parsed_url.hostname,
+        http_host=parsed_url.hostname or "localhost",
         http_port=parsed_url.port or 80,
-        grpc_host=parsed_url.hostname,
+        grpc_host=parsed_url.hostname or "localhost",
         grpc_port=50051,
         http_secure=parsed_url.scheme == "https",
         grpc_secure=parsed_url.scheme == "https",
@@ -114,15 +114,11 @@ def deterministic_uuid(doc: Document) -> str:
 
 
 def create_collection_if_not_exists(client: weaviate.WeaviateClient, collection_name: str):
-    """Create the collection in Weaviate if it doesn't exist."""
+    """Create a collection if it doesn't exist, configured for manual vectorization."""
     if not client.collections.exists(collection_name):
         client.collections.create(
             name=collection_name,
-            # The vectorizer is set to "none" because we are providing our own vectors.
-            # Weaviate will not generate vectors for us.
-            vectorizer_config=weaviate.classes.config.Configure.Vectorizer.none(),
-            # The generative module is set to "none" as we are using a separate LLM.
-            # generative_config=weaviate.classes.config.Configure.Generative.none(),
+            vector_config=weaviate.classes.config.Configure.Vectors.self_provided(),
         )
         logger.info(f"→ Collection '{collection_name}' created for manual vectorization.")
     else:
@@ -136,13 +132,20 @@ def process_and_upload_chunks(
     collection_name: str,
 ):
     """Process each document chunk and upload it to Weaviate."""
+    # Access collection (standard accessor for our tests/mocks)
     collection = client.collections.get(collection_name)
     stats = {"inserts": 0, "updates": 0, "skipped": 0}
 
     with collection.batch.dynamic() as batch:
         for doc in docs:
             uuid = deterministic_uuid(doc)
-            vector = model.encode(doc.page_content)
+            vector_tensor = model.encode(doc.page_content)
+            # Normalize to a plain Python list of floats for the Weaviate client
+            vector: list[float]
+            try:
+                vector = list(vector_tensor.tolist())  # type: ignore[call-arg]
+            except AttributeError:
+                vector = list(vector_tensor)  # type: ignore[arg-type]
 
             properties = {
                 "content": doc.page_content,
@@ -207,7 +210,8 @@ def ingest(
         model = SentenceTransformer(EMBEDDING_MODEL)
         try:
             logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
-            model = torch.compile(model, backend="inductor", mode="max-autotune")  # type: ignore[attr-defined]
+            compiled_model = torch.compile(model, backend="inductor", mode="max-autotune")  # type: ignore[attr-defined]
+            model = cast(SentenceTransformer, compiled_model)
             logger.info("torch.compile optimization completed.")
         except Exception as e:
             logger.warning(f"Could not apply torch.compile: {e}")

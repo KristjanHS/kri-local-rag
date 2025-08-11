@@ -54,7 +54,7 @@ def weaviate_collection_mock():
 
 @pytest.mark.integration
 def test_ingest_pipeline_with_real_weaviate(weaviate_client):
-    """Test the full ingestion pipeline with a real Weaviate instance."""
+    """Test the full ingestion pipeline with a real Weaviate instance, using a local model."""
     # Run the ingestion process on the 'test_data' directory
     ingest.ingest(directory="test_data/", collection_name=COLLECTION_NAME)
 
@@ -67,7 +67,7 @@ def test_ingest_pipeline_with_real_weaviate(weaviate_client):
 
 @pytest.mark.integration
 def test_ingest_pipeline_loads_and_embeds_data(weaviate_collection_mock, sample_documents_path):
-    """Test the full ingestion pipeline from loading docs to inserting into Weaviate."""
+    """Test the full ingestion pipeline from loading docs to inserting into Weaviate with a local model."""
     # Provide a real embedding model for this integration test
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
 
@@ -104,7 +104,7 @@ def test_ingest_pipeline_loads_and_embeds_data(weaviate_collection_mock, sample_
 @pytest.mark.integration
 @patch("backend.ingest.get_embedding_model", return_value=None)
 def test_ingest_pipeline_handles_no_embedding_model(mock_get_model, weaviate_collection_mock, sample_documents_path):
-    """Test that the ingestion pipeline exits gracefully if no embedding model is available."""
+    """Test that the ingestion pipeline exits gracefully if no local embedding model is available."""
     with pytest.raises(ValueError, match="Embedding model not available"):
         ingest.ingest_documents(
             collection_name=COLLECTION_NAME,
@@ -115,7 +115,7 @@ def test_ingest_pipeline_handles_no_embedding_model(mock_get_model, weaviate_col
 
 @pytest.mark.integration
 def test_ingest_pipeline_is_idempotent(weaviate_collection_mock, sample_documents_path):
-    """Test that running ingestion multiple times doesn't create duplicate data."""
+    """Test that running ingestion multiple times doesn't create duplicate data, using a local model."""
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
     with patch("backend.ingest.get_embedding_model", return_value=embedding_model):
         # Run ingestion once

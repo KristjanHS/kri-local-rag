@@ -69,6 +69,8 @@ deptry*.*
 # Test reports and artifacts
 reports/
 !reports/.gitkeep
+# Coverage artifacts
+.coverage*
 
 # Third-party libraries you've vendored/included
 vendor/

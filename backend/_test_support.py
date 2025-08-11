@@ -62,10 +62,10 @@ def ingest_documents(
     if model is None:
         raise ValueError("Embedding model not available")
 
-    # Ensure collection exists (tests expect 'create' to be invoked)
+    # Ensure collection exists (tests expect 'create' to be invoked) using modern API
     _ = weaviate_client.collections.create(  # type: ignore[attr-defined]
         name=collection_name,
-        vectorizer_config=weaviate.classes.config.Configure.Vectorizer.none(),
+        vector_config=weaviate.classes.config.Configure.Vectors.self_provided(),
     )
 
     # In some tests, the provided object is a mocked collection._client; prefer the

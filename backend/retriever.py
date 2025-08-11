@@ -4,7 +4,7 @@ import os
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-import torch
+# Defer torch import to runtime to avoid heavy import-time side effects
 import weaviate
 from weaviate.exceptions import WeaviateQueryError
 
@@ -16,15 +16,18 @@ from backend.config import (
     get_logger,
 )
 
+# Optional dependency note: If sentence-transformers is not installed, we handle
+# ImportError: gracefully inside the lazy loader (_get_embedding_model).
+
 # For manual vectorization – import type only for type-checkers
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from sentence_transformers import SentenceTransformer as SentenceTransformerType
+    from sentence_transformers import SentenceTransformer as SentenceTransformerType  # type: ignore
 else:
-    SentenceTransformerType = object  # fallback at runtime
-try:
-    from sentence_transformers import SentenceTransformer  # type: ignore
-except ImportError:  # pragma: no cover – optional dep
-    SentenceTransformer = None  # type: ignore
+    SentenceTransformerType = object  # runtime fallback for type checkers only
+
+# Provide a module-level hook for tests to patch without importing heavy deps.
+# Tests can patch `backend.retriever.SentenceTransformer` directly.
+SentenceTransformer: Any | None = None
 
 # Cache the embedding model instance after first load
 _embedding_model: Any = None
@@ -43,16 +46,30 @@ def _get_embedding_model(model_name: str = EMBEDDING_MODEL):
     Uses the same model as specified in ingest.py to ensure consistency.
     """
     global _embedding_model
-    if SentenceTransformer is None:
-        return None
     if _embedding_model is None:
         try:
+            # Determine constructor: prefer patched module-level `SentenceTransformer` if provided
+            ctor = SentenceTransformer
+            if ctor is None:
+                # Import lazily to avoid heavy dependency at module import time
+                from sentence_transformers import SentenceTransformer as _ST  # type: ignore
+
+                ctor = _ST
+        except Exception as e:
+            logger.warning("SentenceTransformer not available: %s", e)
+            return None
+        try:
             # Use the same model as ingestion to ensure vector compatibility
-            _embedding_model = SentenceTransformer(model_name)
+            _embedding_model = ctor(model_name)
 
             # Apply PyTorch CPU optimizations
             # Set optimal threading for current environment
-            torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
+            try:
+                import torch  # defer heavy import
+
+                torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
+            except Exception as _threads_e:  # noqa: F841
+                pass
 
             # Apply torch.compile for production performance, but allow skipping for tests
             from unittest.mock import MagicMock  # type: ignore
@@ -61,6 +78,8 @@ def _get_embedding_model(model_name: str = EMBEDDING_MODEL):
 
             if enable_compile_str.lower() == "true" and not isinstance(_embedding_model, MagicMock):
                 try:
+                    import torch  # defer heavy import
+
                     logger.info("torch.compile: optimizing embedding model – first run may take up to a minute…")
                     _embedding_model = torch.compile(_embedding_model, backend="inductor", mode="max-autotune")
                     logger.debug("Applied torch.compile optimization to embedding model")

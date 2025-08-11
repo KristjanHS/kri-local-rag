@@ -3,13 +3,14 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.environment
+
 # --- Constants for Environment Validation ---
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 VENV_PYTHON_PATH = PROJECT_ROOT / ".venv" / "bin" / "python"
 BACKEND_CONFIG_PATH = PROJECT_ROOT / "backend" / "config.py"
 
 
-@pytest.mark.environment
 @pytest.mark.skipif(Path("/.dockerenv").exists(), reason="Test not applicable in Docker container")
 def test_python_executable_is_from_venv():
     """
@@ -32,7 +33,6 @@ def test_python_executable_is_from_venv():
     )
 
 
-@pytest.mark.environment
 def test_working_directory_is_project_root():
     """
     Verifies that the tests are being executed from the project root directory.
@@ -46,7 +46,6 @@ def test_working_directory_is_project_root():
         )
 
 
-@pytest.mark.environment
 def test_config_module_import_and_path():
     """
     Tests two things:
