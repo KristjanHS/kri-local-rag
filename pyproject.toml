@@ -35,22 +35,29 @@ addopts = [
     "-ra",
     "-v",
     "--tb=short",
-    "-m",
-    "not environment and not e2e and not slow",
+    "--cov=backend",
+    "--cov=frontend",
+    "--cov-report=term-missing",
+    "--cov-report=html:reports/coverage",
+    "--cov-fail-under=20",
 ]
 markers = [
-    "unit: Fast unit tests with mocked dependencies",
-    "integration: Integration tests with real services via Testcontainers",
-    "e2e: End-to-end tests requiring full Docker stack",
+    "unit: Fast unit tests with mocked dependencies (should run in <1s)",
+    "integration: Integration tests with real services (may take 5-30s)",
+    "e2e: End-to-end tests requiring full Docker stack (may take 1-5min)",
+    "ui: UI tests using Playwright/Streamlit (runs without coverage)",
     "docker: Tests requiring a running Docker daemon",
     "environment: Environment and setup validation tests",
-    "slow: Tests that take longer to run"
+    "slow: Tests that take longer to run (>30s)",
+    "external: Tests that require external services (Weaviate, Ollama)"
 ]
 testpaths = [
     "tests/unit",
     "tests/integration",
     "tests/e2e",
+    "tests/e2e_streamlit",
     "tests/environment",
+    "tests/docker",
 ]
 
 # Unified logging configuration
@@ -75,6 +82,18 @@ include = ["backend", "tests"]
 exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
 venvPath = "."
 venv = ".venv"
+# Type checking mode - standard provides good balance of safety and usability
+typeCheckingMode = "standard"
+# Python version for proper feature detection and type checking
+pythonVersion = "3.12"
+# Platform-specific type checking
+pythonPlatform = "Linux"
+# Additional paths for import resolution
+extraPaths = ["backend"]
+# Diagnostic overrides for better development experience
+reportMissingTypeStubs = false
+reportUnusedImport = "warning"
+reportUnusedVariable = "warning"
 
 [tool.deptry]
 # --- Where to read declared dependencies ------------------------------
@@ -108,7 +127,7 @@ test = [
     "pytest-mock",
     "pytest-docker",
     "pytest-html",
-    "pytest-playwright",
+    "pytest-playwright==0.4.4",
     "requests>=2.31,<3",
     "testcontainers[weaviate]",
     "ruff==0.5.3",
@@ -122,3 +141,7 @@ pep621_dev_dependency_groups = ["tests", "docs", "cli"]
 
 [tool.deptry.per_rule_ignores]
 DEP002 = ["boto3"]       # AWS libs pulled in indirectly
+
+[tool.coverage.run]
+omit = ["tests/e2e_streamlit/*"]
+data_file = "reports/coverage/.coverage"

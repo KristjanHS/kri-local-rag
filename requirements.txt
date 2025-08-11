@@ -20,8 +20,8 @@ langchain==0.3.27
 langchain-community==0.3.27
 
 # Vector Database Client
-# Constrain to 4.x (we use the v4 API: weaviate.classes.*)
-weaviate-client>=4.6,<5
+# Pin to stable version to avoid v4.16.0-4.16.3 bugs
+weaviate-client==4.16.6
 
 # Data Processing and File Parsing
 unstructured[pdf]==0.14.8

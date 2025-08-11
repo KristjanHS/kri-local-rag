@@ -22,14 +22,14 @@ pip install -e .
 
 ## Run tests
 
-- Quick/quiet fast tests (recommended for local iteration):
+- **Core test suite** (fast, with coverage):
 ```bash
-.venv/bin/python -m pytest -q tests/
+.venv/bin/python -m pytest --test-core
 ```
 
-- Full verbose test output:
+- **UI test suite** (Playwright/Streamlit, no coverage):
 ```bash
-.venv/bin/python -m pytest -v
+.venv/bin/python -m pytest --test-ui --no-cov
 ```
 
 ## Docker (optional)
@@ -41,6 +41,7 @@ For logs, rebuilds, service ops, and troubleshooting, see `docs/docker-managemen
 
 ## Notes
 - Avoid setting `PYTHONPATH`. Use editable installs (`pip install -e .`) and module execution with `-m`.
+ - `kri_local_rag.egg-info/` provides package metadata that enables editable installs, dependency resolution, and discovery of modules/entry points by tooling.
 
 ## More docs
 - Detailed guidance used mostly by AI coder: `docs_AI_coder/AI_instructions.md`
@@ -92,36 +93,13 @@ docs_AI_coder/
   docker compose -f docker/docker-compose.yml --profile ingest up
   ```
 
-## CI: GitHub Actions and Act Cli for local CI
+## CI: GitHub Actions and Act CLI for local CI
 
+For comprehensive information about GitHub Actions, Act CLI, and local CI testing, see [GitHub Workflows Documentation](github-workflows.md).
+
+**Quick reference:**
 - Workflow file: `.github/workflows/python-lint-test.yml`
 - Act runner images pinned in `.actrc`
-
-Pre-push hook (runs automatically if installed):
-```bash
-act pull_request -j lint_and_fast_tests --pull=false --log-prefix-job-id
-```
-
-Manually simulate pull_reqest + run CI job locally
-```bash
-./scripts/ci_act.sh
-
-```
-
-Manual fast tests only:
-```bash
-act workflow_dispatch -j lint_and_fast_tests
-```
-
-Manual Pyright only:
-```bash
-act workflow_dispatch -j pyright
-```
-
-Troubleshooting flaky local CI:
-```bash
-./scripts/cleanup_docker_and_ci_cache.sh
-# optional aggressive cleanup/restart
-./scripts/cleanup_docker_and_ci_cache.sh --restart-docker --builder-prune
-```
-On WSL2, you may also need to restart Docker Desktop and/or run `wsl --shutdown`.
+- Pre-push hook runs automatically: `act pull_request -j lint_and_fast_tests --pull=false --log-prefix-job-id`
+- Manual CI: `./scripts/ci_act.sh`
+- Cleanup: `./scripts/cleanup_docker_and_ci_cache.sh`
