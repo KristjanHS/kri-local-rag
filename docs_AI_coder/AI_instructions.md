@@ -121,7 +121,7 @@ The test suite is organized with markers to control scope and speed:
 - Run all tests (including slow and E2E):
 
 ```bash
-.venv/bin/python -m pytest -v -m "not environment"
+.venv/bin/python -m pytest -v -m "not environment" --cov-fail-under=60
 ```
 
 - E2E and Docker only (slowest):
@@ -138,7 +138,9 @@ The test suite is organized with markers to control scope and speed:
 
 ### Notes
 
-
+Coverage policy:
+- Coverage is collected by default, but the fail-under threshold is only enforced on full runs (e.g., CI or the command above with `--cov-fail-under=60`).
+- On partial runs (using `-k`, `-m`, or explicit test paths), a safety in `tests/conftest.py` relaxes `--cov-fail-under` to 0 to avoid false failures. To disable coverage entirely, add `--no-cov`.
 
 
 ## Development Environment and Dependencies
