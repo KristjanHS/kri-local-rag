@@ -19,6 +19,7 @@ from contextlib import closing
 import pytest
 import requests
 from playwright.sync_api import Page, expect
+import urllib.parse
 
 pytestmark = [pytest.mark.e2e, pytest.mark.ui, pytest.mark.slow]
 
@@ -102,6 +103,8 @@ def streamlit_server():
 
 def test_root_health(streamlit_server):
     base_url = os.environ.get("RAG_E2E_BASE_URL", "http://localhost:8501")
+    parsed_url = urllib.parse.urlparse(base_url)
+    assert parsed_url.hostname in ("localhost", "127.0.0.1"), f"Unsafe base_url: {base_url}"
     resp = requests.get(base_url)
     assert resp.status_code == 200
     assert "streamlit" in resp.text.lower()
