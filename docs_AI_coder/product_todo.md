@@ -23,7 +23,7 @@ This file tracks outstanding tasks and planned improvements for the project.
    - Summarize expected vs. actual behavior and include the exact command/output/exit code.
    - Gather quick signals (only the minimum needed): relevant service logs, port bindings, container status, environment variables, and config diffs.
    - Re-check key assumptions (host vs container URLs, credentials, network bindings, versions, availability of external services).
-   - Consider that the step description might be wrong; cross-check code, `README.md`, and `docker/` for the source of truth.
+   - Consider that the step description might be wrong; cross-check code, `DEVELOPMENT.md`, and `docker/` for the source of truth.
    - Propose 1–3 small, reversible next actions with a clear Verify for each. Apply the smallest change first.
    - After a change, re-run the same Verify command from the failed step. Only then continue.
    - If blocked, mark the step as `[BLOCKED: <short reason/date>]` in this todo file and proceed to the smallest independent next step if any; otherwise stop and request help.
