@@ -78,6 +78,6 @@ For comprehensive information about GitHub Actions, Act CLI, and local CI testin
 **Quick reference:**
 - Workflow file: `.github/workflows/python-lint-test.yml`
 - Act runner images pinned in `.actrc`
-- Pre-push hook runs automatically: `act pull_request -j lint_and_fast_tests --pull=false --log-prefix-job-id`
+- Pre-push hook runs automatically: first `lint`, then `fast_tests`
 - Manual CI: `./scripts/ci_act.sh`
 - Cleanup: `./scripts/cleanup_docker_and_ci_cache.sh`
