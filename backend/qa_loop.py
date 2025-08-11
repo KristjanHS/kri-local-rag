@@ -10,8 +10,6 @@ import sys
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-import torch
-
 # Local .py imports
 from backend.config import OLLAMA_MODEL
 from backend.console import console, get_logger
@@ -31,11 +29,12 @@ class ScoredChunk:
     score: float
 
 
-# Try to import a cross-encoder model for re-ranking retrieved chunks
-try:
-    from sentence_transformers import CrossEncoder  # type: ignore
-except ImportError:  # pragma: no cover – optional dependency
-    CrossEncoder = None  # type: ignore
+# Record whether sentence_transformers was initially unavailable at module import time.
+_ST_INITIALLY_MISSING = sys.modules.get("sentence_transformers", "__MISSING__") in (None, "__MISSING__")
+
+# Cross-encoder is optional and heavy; import lazily inside the getter.
+# Provide a patch seam for tests.
+CrossEncoder = None  # type: ignore
 
 # Cache the cross-encoder instance after first load to avoid re-loading on every question
 _cross_encoder: "CrossEncoder | None" = None  # type: ignore
@@ -54,11 +53,22 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
     calling code can gracefully fall back to vector-search ordering.
     """
     global _cross_encoder
-    if CrossEncoder is None:
+    # Respect explicit absence/mocking (snapshot at import time) to avoid importing heavy deps during tests
+    if _ST_INITIALLY_MISSING:
         return None
+
+    # Determine constructor: prefer patched module-level `CrossEncoder` if provided
+    ctor = CrossEncoder
+    if ctor is None:
+        try:
+            from sentence_transformers import CrossEncoder as _CE  # type: ignore
+
+            ctor = _CE
+        except Exception:
+            return None
     if _cross_encoder is None:
         try:
-            _cross_encoder = CrossEncoder(model_name)
+            _cross_encoder = ctor(model_name)
             # Apply PyTorch CPU optimizations (skip in testing environments)
             # New preferred flag: RERANKER_CROSS_ENCODER_OPTIMIZATIONS (true enables opts)
             enable_opts_str = os.getenv("RERANKER_CROSS_ENCODER_OPTIMIZATIONS", "true").lower()
@@ -67,9 +77,16 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
 
             if not skip_optimization:
                 # Set optimal threading for current environment
-                torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
+                try:
+                    import torch  # defer heavy import
+
+                    torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
+                except Exception as _threads_e:  # noqa: F841
+                    pass
                 # Apply torch.compile with max-autotune for 5-25% speed-ups on CPU GEMM-heavy models
                 try:
+                    import torch  # defer heavy import
+
                     logger.info("torch.compile: optimizing cross-encoder – first run may take ~1 min…")
                     _cross_encoder = torch.compile(_cross_encoder, backend="inductor", mode="max-autotune")
                     logger.info("torch.compile optimization completed for cross-encoder")
@@ -267,7 +284,6 @@ from weaviate.classes.query import Filter
 from weaviate.exceptions import WeaviateConnectionError
 
 from backend.config import COLLECTION_NAME, WEAVIATE_URL
-from backend.ingest import create_collection_if_not_exists, ingest
 
 
 def ensure_weaviate_ready_and_populated():
@@ -293,6 +309,9 @@ def ensure_weaviate_ready_and_populated():
         if not client.collections.exists(COLLECTION_NAME):
             # First-time setup: create the collection, ingest examples, then clean up.
             logger.info("   → Collection does not exist. Running one-time initialization...")
+            # Defer heavy import to avoid torch initialization during module import
+            from backend.ingest import create_collection_if_not_exists, ingest
+
             create_collection_if_not_exists(client, COLLECTION_NAME)
 
             # Ingest example data to ensure all modules are warm, then remove it.
@@ -303,7 +322,10 @@ def ensure_weaviate_ready_and_populated():
 
             # Clean up the example data now that the schema is created.
             # This check is important in case the example_data folder was empty.
-            collection = client.collections.get(COLLECTION_NAME)
+            try:
+                collection = client.collections.use(COLLECTION_NAME)
+            except Exception:
+                collection = client.collections.get(COLLECTION_NAME)
             # Use the robust iterator method to check for objects
             try:
                 next(collection.iterator())
@@ -329,8 +351,12 @@ def ensure_weaviate_ready_and_populated():
     except Exception as e:
         raise Exception(f"An unexpected error occurred during Weaviate check: {e}") from e
     finally:
-        if "client" in locals() and hasattr(client, "is_connected") and client.is_connected():
-            client.close()
+        try:
+            client_ref = locals().get("client", None)
+            if client_ref is not None and hasattr(client_ref, "is_connected") and client_ref.is_connected():
+                client_ref.close()
+        except Exception:
+            pass
     logger.info("--- Weaviate check complete ---")
 
 

@@ -1,0 +1,59 @@
+name: CodeQL
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 2 * * 1"  # weekly, Mon 02:00 UTC
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    
+    # Skip local execution with Act
+    if: ${{ github.actor != 'nektos/act' }}
+    
+    # Add timeout to prevent hanging jobs
+    timeout-minutes: 360
+    
+    # Use concurrency to cancel in-progress jobs on new commits
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      pull-requests: read
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python']
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch at least the immediate parents so that if this is
+          # a pull request then we can checkout the head.
+          fetch-depth: 2
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+      
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          upload: true

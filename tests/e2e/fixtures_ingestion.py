@@ -31,9 +31,9 @@ def docker_services_ready(docker_services):
 
         parsed = urlparse(WEAVIATE_URL)
         client = weaviate.connect_to_custom(
-            http_host=parsed.hostname,
+            http_host=parsed.hostname or "localhost",
             http_port=parsed.port or 80,
-            grpc_host=parsed.hostname,
+            grpc_host=parsed.hostname or "localhost",
             grpc_port=50051,
             http_secure=parsed.scheme == "https",
             grpc_secure=parsed.scheme == "https",
