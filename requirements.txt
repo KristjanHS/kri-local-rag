@@ -35,7 +35,7 @@ httpx
 streamlit==1.47.0
 
 # Utilities
-protobuf==5.29.0
+protobuf==5.29.5
 grpcio==1.63.0
 grpcio-health-checking==1.63.0
 grpcio-status==1.63.0
