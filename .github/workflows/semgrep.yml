@@ -12,8 +12,7 @@ jobs:
     name: Sec Scan
     runs-on: ubuntu-latest
     
-    # Skip local execution with Act
-    if: ${{ github.actor != 'nektos/act' }}
+    
     
     # Add timeout to prevent hanging jobs
     timeout-minutes: 30
@@ -37,9 +36,9 @@ jobs:
           fetch-depth: 2
       
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
       
       - name: Install Semgrep
@@ -71,7 +70,40 @@ jobs:
               --metrics off
           fi
       
+      - name: Summarize Semgrep findings to logs
+        if: ${{ always() }}
+        run: |
+          python - << 'PY'
+          import json
+          import os
+          import sys
+
+          path = "semgrep.sarif"
+          if not os.path.exists(path):
+              print("Semgrep findings: 0 (no semgrep.sarif found)")
+              sys.exit(0)
+
+          try:
+              with open(path, "r", encoding="utf-8") as f:
+                  sarif = json.load(f)
+              runs = sarif.get("runs") or []
+              results = (runs[0].get("results") if runs else []) or []
+              print(f"\nSemgrep findings: {len(results)}")
+              for i, r in enumerate(results, start=1):
+                  rule_id = r.get("ruleId") or (r.get("rule") or {}).get("id") or "unknown-rule"
+                  level = r.get("level") or (r.get("properties") or {}).get("severity") or "note"
+                  message = (r.get("message") or {}).get("text") or "(no message)"
+                  loc = ((r.get("locations") or [None])[0] or {}).get("physicalLocation") or {}
+                  file = (loc.get("artifactLocation") or {}).get("uri") or "unknown-file"
+                  line = (loc.get("region") or {}).get("startLine") or 1
+                  print(f"{i}. [{level}] {rule_id} at {file}:{line} - {message}")
+          except Exception as e:
+              print(f"Could not parse semgrep.sarif: {e}")
+          PY
+      
       - name: Upload SARIF to code scanning
+        # Always try to upload, but skip on forked PRs and under act
+        if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) && github.actor != 'nektos/act' }}
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: semgrep.sarif
@@ -85,20 +117,22 @@ jobs:
             const fs = require('fs');
             const sarif = JSON.parse(fs.readFileSync('semgrep.sarif', 'utf8'));
             
-            let findings = 0;
-            if (sarif.runs && sarif.runs[0] && sarif.runs[0].results) {
-              findings = sarif.runs[0].results.length;
-            }
+            const results = sarif?.runs?.[0]?.results || [];
+            const findings = results.length;
+            const listItems = results.slice(0, 10).map((r, i) => {
+              const ruleId = r.ruleId || r?.rule?.id || 'unknown-rule';
+              const level = r.level || r?.properties?.severity || 'note';
+              const message = r?.message?.text || '(no message)';
+              const loc = r?.locations?.[0]?.physicalLocation || {};
+              const file = loc?.artifactLocation?.uri || 'unknown-file';
+              const line = loc?.region?.startLine || 1;
+              return `- ${i+1}. [${level}] ${ruleId} at ${file}:${line}\n  ${message}`;
+            }).join('\n');
             
-            const comment = `## Semgrep Security Scan Results
-            
-            🔍 **${findings} security findings** detected
-            
-            ${findings > 0 
-              ? '⚠️ Please review the findings in the Security tab above.' 
-              : '✅ No security issues found!'}
-            
-            _This scan was performed by Semgrep with auto-configuration._`;
+            const comment = `## Semgrep Security Scan Results\n\n` +
+            `🔍 **${findings} security findings** detected` +
+            (findings > 0 ? `\n\nTop findings (max 10):\n${listItems}\n\n` : `\n\n✅ No security issues found!\n\n`) +
+            `_Full details: Security → Code scanning alerts (filter by tool: Semgrep)._`;
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,

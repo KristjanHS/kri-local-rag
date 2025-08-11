@@ -1,10 +1,11 @@
 name: CI
 # NOTE FOR LOCAL CI (act):
-# - The pre-push Git hook (.git/hooks/pre-push) runs:
-#     act pull_request -j lint_and_fast_tests --pull=false --log-prefix-job-id
-#   so local pushes mimic the 'lint_and_fast_tests' job for PRs.
+# - The pre-push Git hook (.git/hooks/pre-push) runs these in order:
+#     act pull_request -j lint --pull=false --log-prefix-job-id
+#     act pull_request -j fast_tests --pull=false --log-prefix-job-id
 # - To run this workflow manually with act:
-#     act pull_request -j lint_and_fast_tests
+#     act pull_request -j lint
+#     act pull_request -j fast_tests
 
 on:
   pull_request:
@@ -18,8 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint_and_fast_tests:
-    name: Lint and Fast Tests
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,6 +43,23 @@ jobs:
       - name: Ruff formatting check
         run: |
           ruff format --check .
+
+  fast_tests:
+    name: Fast Tests
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "requirements-dev.txt"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
       - name: Prepare reports directories
         run: |
           mkdir -p reports
@@ -82,7 +100,8 @@ jobs:
 
   docker_smoke_tests:
     name: Docker Packaging Smoke Tests
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    # Run only under local act to avoid GitHub runner RAM limits
+    if: ${{ github.actor == 'nektos/act' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -117,7 +136,7 @@ jobs:
   gpu_docker_ollama_act:
     name: act manual - remaining tests (env + streamlit)
     if: ${{ github.actor == 'nektos/act' && github.event_name == 'workflow_dispatch' }}
-    needs: lint_and_fast_tests
+    needs: fast_tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -179,6 +198,43 @@ jobs:
         if: always()
         run: |
           docker compose -f docker/docker-compose.yml down -v
+
+  full_suite:
+    name: Full Test Suite (manual/scheduled)
+    # Heavy: enforce coverage threshold; only under local act (GitHub runners lack RAM for Dockerized tests)
+    if: ${{ github.actor == 'nektos/act' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "requirements-dev.txt"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Install Playwright browsers (for UI/E2E if selected)
+        run: |
+          python -m playwright install --with-deps
+          python -m playwright --version
+      - name: Prepare reports directories
+        run: |
+          mkdir -p reports
+      - name: Run full test suite (exclude only environment)
+        # Enforce coverage threshold for full suite
+        run: |
+          python -m pytest -v -m "not environment" --cov-fail-under=60 \
+            --html=reports/report_full.html --self-contained-html \
+            --junitxml=reports/junit_full.xml
+      - name: Upload full suite reports
+        if: ${{ always() && github.actor != 'nektos/act' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-full
+          path: reports/
 
   # Local-only via act; manual dispatch; runs pytest -m slow against full stack
   slow_tests:
