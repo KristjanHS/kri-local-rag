@@ -14,8 +14,7 @@ jobs:
     name: Analyze
     runs-on: ubuntu-latest
     
-    # Skip local execution with Act
-    if: ${{ github.actor != 'nektos/act' }}
+    
     
     # Add timeout to prevent hanging jobs
     timeout-minutes: 360
@@ -56,4 +55,32 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
-          upload: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
+          # Skip upload under Act and forked PRs; still produce SARIF locally
+          upload: ${{ github.actor != 'nektos/act' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
+          output: codeql-results.sarif
+
+      - name: Summarize CodeQL findings (local only)
+        if: ${{ env.ACT == 'true' || github.actor == 'nektos/act' }}
+        run: |
+          python - <<'PY'
+import json, sys, os
+path = 'codeql-results.sarif'
+if not os.path.exists(path):
+    print('No SARIF file produced by CodeQL (codeql-results.sarif). Assuming no findings for local gate.')
+    sys.exit(0)
+with open(path, 'r', encoding='utf-8') as f:
+    sarif = json.load(f)
+results = (sarif.get('runs') or [{}])[0].get('results') or []
+count = len(results)
+print(f'CodeQL findings: {count}')
+if count > 0:
+    # Print top 20 findings concisely
+    for i, r in enumerate(results[:20], 1):
+        msg = (r.get('message') or {}).get('text') or ''
+        loc = ((r.get('locations') or [{}])[0].get('physicalLocation') or {})
+        file = (loc.get('artifactLocation') or {}).get('uri') or 'unknown-file'
+        line = (loc.get('region') or {}).get('startLine') or 1
+        rule = r.get('ruleId') or 'unknown-rule'
+        print(f"{i}. {rule} at {file}:{line} - {msg}")
+    print('Note: Local run under Act is informational. Review the findings above and the Security tab in GitHub when uploaded.')
+PY

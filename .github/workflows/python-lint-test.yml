@@ -1,10 +1,11 @@
 name: CI
 # NOTE FOR LOCAL CI (act):
-# - The pre-push Git hook (.git/hooks/pre-push) runs:
-#     act pull_request -j lint_and_fast_tests --pull=false --log-prefix-job-id
-#   so local pushes mimic the 'lint_and_fast_tests' job for PRs.
+# - The pre-push Git hook (.git/hooks/pre-push) runs these in order:
+#     act pull_request -j lint --pull=false --log-prefix-job-id
+#     act pull_request -j fast_tests --pull=false --log-prefix-job-id
 # - To run this workflow manually with act:
-#     act pull_request -j lint_and_fast_tests
+#     act pull_request -j lint
+#     act pull_request -j fast_tests
 
 on:
   pull_request:
@@ -18,8 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint_and_fast_tests:
-    name: Lint and Fast Tests
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,6 +43,23 @@ jobs:
       - name: Ruff formatting check
         run: |
           ruff format --check .
+
+  fast_tests:
+    name: Fast Tests
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "requirements-dev.txt"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
       - name: Prepare reports directories
         run: |
           mkdir -p reports
@@ -118,7 +136,7 @@ jobs:
   gpu_docker_ollama_act:
     name: act manual - remaining tests (env + streamlit)
     if: ${{ github.actor == 'nektos/act' && github.event_name == 'workflow_dispatch' }}
-    needs: lint_and_fast_tests
+    needs: fast_tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
