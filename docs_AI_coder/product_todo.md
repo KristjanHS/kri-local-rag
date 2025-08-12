@@ -45,21 +45,11 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
 
 #### P0 — Must do now (stability, forward-compat, fast feedback)
 
-Proposed execution order for P0 (aligned with Python best practices: stabilize tests first, shape CI structure, fix findings, then enforce gates):
-1) P1 — Stabilization and Finalization (full suite green)
-2) P2 — CI pipeline separation and test architecture tasks
-3) P3 — Semgrep blocking findings triage (finish and verify)
-4) P4 — CI/SAST enforcement (branch protection)
-5) P5 — Pre-push performance optimizations (local DX)
-6) P6 — E2E Tasks (CLI and Streamlit)
-7) P7 — Compatibility monitors and guardrails
-8) P8 - Next Up
-9) P9 - Soon 
-10) P10 - Later
+No tasks here at the moment
 
 #### P1 — Stabilization and Finalization
  
-- [ ] Finalize P0: Full suite green
+- [ ] Finalize: Full suite green
   - Action: Run the full suite locally; then update CI if needed.
   - Verify: `.venv/bin/python -m pytest -q -m "not environment" --disable-warnings` passes with 0 failures.
 
@@ -186,9 +176,14 @@ Proposed execution order for P0 (aligned with Python best practices: stabilize t
     - **Verify:** Confirm this single test fails with the known `AttributeError`. Then, run it with `--no-cov` and confirm it passes. This gives us a clear baseline.
 
   - [ ] **Task 2: Implement a Conditional Skip.**
-    - **Goal:** Since telling coverage to *ignore* the Playwright tests isn't working, we will instead tell `pytest` to *not run* the Playwright tests if and only if the coverage plugin is active.
-    - **Action:** I will create a `conftest.py` file within the `tests/e2e_streamlit` directory. Inside this file, I will add a `pytest_collection_modifyitems` hook that programmatically adds a "skip" marker to all Playwright tests if it detects that `pytest-cov` is running.
-    - **Verify:** Re-run the failing command from Task 1. The test should now report as `SKIPPED` instead of `ERROR`.
+    - **Goal:** Ensure the default, coverage-enabled full suite runs green by not executing Playwright tests.
+    - **Action:** In `tests/e2e_streamlit/conftest.py`, add a `pytest_collection_modifyitems` hook that unconditionally skips all tests in this directory whenever `--no-cov` is not present (i.e., default coverage runs). Keep a guard that raises if `--test-ui` is used without `--no-cov`.
+    - **Verify:** Re-run the failing command from Task 1. All UI tests should now report as `SKIPPED` instead of `ERROR`.
+
+  - [ ] Correction plan: Make UI skip unconditional under coverage
+    - [ ] Simplify detection to: if not `--no-cov`, fully deselect items in `tests/e2e_streamlit` to avoid fixture setup
+    - [ ] Re-run full suite: `.venv/bin/python -m pytest -q -m "not environment" --disable-warnings` should pass with 0 errors
+    - [ ] Run UI-only suite without coverage: `.venv/bin/python -m pytest --test-ui --no-cov -q` should pass or at least run without coverage-related errors
 
   - [ ] **Task 3: Achieve a "Green" Full Suite Run.**
     - **Goal:** Ensure the main test suite can now run to completion and generate a coverage report without any errors.
