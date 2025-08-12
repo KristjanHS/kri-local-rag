@@ -40,6 +40,7 @@ from backend.config import (
     WEAVIATE_URL,
     get_logger,
 )
+from backend.vector_utils import to_float_list
 
 # --- Logging Setup ---
 logger = get_logger(__name__)
@@ -141,11 +142,7 @@ def process_and_upload_chunks(
             uuid = deterministic_uuid(doc)
             vector_tensor = model.encode(doc.page_content)
             # Normalize to a plain Python list of floats for the Weaviate client
-            vector: list[float]
-            try:
-                vector = list(vector_tensor.tolist())  # type: ignore[call-arg]
-            except AttributeError:
-                vector = list(vector_tensor)  # type: ignore[arg-type]
+            vector: list[float] = to_float_list(vector_tensor)
 
             properties = {
                 "content": doc.page_content,

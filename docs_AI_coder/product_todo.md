@@ -180,7 +180,13 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
   - [ ] Configure branch protection to require "Code scanning results / CodeQL" and Semgrep check on PRs
 
 #### P0.0d — ignoring call-arg ?
-     - [ ] in all my code, go through the lines containing # type: ignore[call-arg] and check if the code follows best practices. if not, add tasks to correct the code and test it, into product_todo
+     - [x] Replace `# type: ignore[call-arg]` in `backend/ingest.py` with a typed helper
+       - Change: Introduced `backend/vector_utils.py` with `to_float_list()` and updated `backend/ingest.py` to use it.
+       - Verify: Lints clean; embedding conversion uses explicit typing without ignores.
+     - [x] Audit remaining vector conversions and remove ignores where possible
+       - Targets:
+         - `backend/retriever.py`: Refactored to use `to_float_list` and removed ignore.
+         - Tests under `tests/integration/test_vectorizer_enabled_integration.py` use `# type: ignore[attr-defined]` for `.tolist()`; consider using `to_float_list` or dedicated test helpers for clarity.
 
 #### P0.0c — Semgrep blocking findings visibility and triage (local)
 
