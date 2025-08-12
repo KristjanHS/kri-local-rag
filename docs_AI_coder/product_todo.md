@@ -323,3 +323,10 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
 - [x] Make wheels guidance concise
   - Action: Replace verbose wheel instructions with short, variable-based snippets for Docker and local venv.
   - Status: Done in `docs/DEVELOPMENT.md`.
+ 
+- [x] Vector conversion helper clarity and robustness
+  - Action: Refine `backend/vector_utils.py::to_float_list` to:
+    - Prefer straightforward `torch is not None and isinstance(x, torch.Tensor)`/`isinstance(x, np.ndarray)` checks over `locals()` tricks
+    - Exclude `str`/`bytes`/`bytearray` from generic `Sequence` handling
+    - Handle numeric scalars via `numbers.Real`
+  - Verify: Lints clean; `.venv/bin/python -m pytest --test-core` passes.
