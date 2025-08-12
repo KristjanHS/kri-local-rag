@@ -6,8 +6,8 @@ plain Python lists of floats suitable for clients like Weaviate.
 
 from __future__ import annotations
 
-from typing import Any, Sequence
 import numbers
+from typing import Any, Sequence
 
 
 def to_float_list(vector_like: Any) -> list[float]:

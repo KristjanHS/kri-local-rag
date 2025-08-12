@@ -53,27 +53,29 @@ if ! command -v act >/dev/null 2>&1; then
 fi
 
 # Honor optional guard to skip local security scans (CodeQL/Semgrep)
-SKIP_LOCAL_SEC_SCANS=${SKIP_LOCAL_SEC_SCANS:-0}
+# Default to skipping heavy security scans locally for faster pushes.
+# Opt-in by setting SKIP_LOCAL_SEC_SCANS=0 when you want to run them.
+SKIP_LOCAL_SEC_SCANS=${SKIP_LOCAL_SEC_SCANS:-1}
 if [[ "$SKIP_LOCAL_SEC_SCANS" == "1" ]]; then
   log INFO "SKIP_LOCAL_SEC_SCANS=1 — security scans will be skipped" | tee -a "$LOG_FILE"
 fi
 
 # Run pyright (type checking). This job is configured to run under workflow_dispatch only.
 log INFO "Running pyright via act (workflow_dispatch) …" | tee -a "$LOG_FILE"
-act workflow_dispatch -j pyright --pull=false --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
+act workflow_dispatch -j pyright --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
 
 # Run lint job
 log INFO "Running lint via act (pull_request) …" | tee -a "$LOG_FILE"
-act pull_request -j lint --pull=false --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
+act pull_request -j lint --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
 
 # Run fast tests
 log INFO "Running fast_tests via act (pull_request) …" | tee -a "$LOG_FILE"
-act pull_request -j fast_tests --pull=false --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
+act pull_request -j fast_tests --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
 
 # Optional: run CodeQL locally (informational)
 if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
   log INFO "Running CodeQL (informational) via act …" | tee -a "$LOG_FILE"
-  act pull_request -W .github/workflows/codeql.yml --pull=false --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
+  act pull_request -W .github/workflows/codeql.yml --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
 else
   log INFO "Skipping CodeQL due to SKIP_LOCAL_SEC_SCANS=1" | tee -a "$LOG_FILE"
 fi
