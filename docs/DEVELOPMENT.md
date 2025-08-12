@@ -3,7 +3,7 @@
 Concise setup for human developers. For detailed, AI-automation-focused guidance, see `docs_AI_coder/AI_instructions.md`.
 
 ## Prerequisites
-- Python 3.11+ recommended
+- Python 3.12+ recommended (matches project requirement)
 - Docker (optional, for running full stack)
 
 ## Setup Dev Env
@@ -96,7 +96,7 @@ Guardrails:
 
 ## More docs
 - Detailed guidance used mostly by AI coder: `docs_AI_coder/AI_instructions.md`
- - Docker management and troubleshooting: `docs/docker-management.md`
+- Docker management and troubleshooting: `docs/docker-management.md`
 
 ## Helper scripts
 
@@ -107,7 +107,7 @@ Guardrails:
 - `scripts/ingest.sh`: ingest local documents into the system.
 - `scripts/config.sh`: shared config sourced by the other scripts.
 
- - ## Ingest documents
+## Ingest documents
 
 - Streamlit UI: open `http://localhost:8501` and upload PDFs (ensure services are running; see `docs/docker-management.md`):
   ```bash
