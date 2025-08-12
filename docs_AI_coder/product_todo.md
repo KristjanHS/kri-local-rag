@@ -110,10 +110,10 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
 2.  **Pin propagation from UV sandbox to pip requirements**
     - [x] Analyze the `uv.lock` and `uv tree` output from the sandbox run. Identify the exact versions for all direct and transitive dependencies that resulted in a clean `pip check` and a coherent dependency graph.
       - Notes: protobuf=5.29.5, grpcio=1.63.0, torch=2.7.1 (CPU), sentence-transformers=5.0.0, weaviate-client=4.16.6, langchain=0.3.27, streamlit=1.47.0
-    - [ ] Explicitly address compatibility findings:
-        - If Protobuf 5.x is confirmed compatible with sentence-transformers 5.x and torch 2.x, but requires specific gRPC versions or leads to conflicts with specific opentelemetry versions, document these findings.
-        - Decision Point: If opentelemetry is required for the application and cannot be made compatible with Protobuf 5.x in the sandbox, the plan must state that opentelemetry will be excluded from the application environment until upstream compatibility is resolved.
-        - Verify that `weaviate-client` versions are compatible with the chosen gRPC/Protobuf versions.
+    - [x] Explicitly address compatibility findings:
+        - Findings: Protobuf 5.29.5 with gRPC 1.63.0 resolves cleanly alongside torch 2.7.1 and sentence-transformers 5.0.0; `uv pip check` reports compatibility.
+        - Decision: Opentelemetry is excluded from the app environment for now to avoid protobuf lane conflicts; revisit when upstream confirms Protobuf ≥5 support.
+        - Verification: `weaviate-client==4.16.6` installs and tests pass in integration suite with the chosen gRPC/Protobuf versions.
     - [ ] Update `requirements.txt` and `requirements-dev.txt` by manually pinning the resolved versions from the `uv.lock` for direct dependencies. Ensure `requirements.txt` contains the runtime dependencies, and `requirements-dev.txt` includes development tools.
     - [ ] Ensure the PyTorch CPU wheel index (`PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`) is explicitly mentioned as required for installation contexts that involve PyTorch. Document this in `docs/DEVELOPMENT.md`.
     - [ ] Document the pip-only policy and the necessity of running `.venv/bin/python -m pip check` after any dependency changes in `docs/DEVELOPMENT.md`.
