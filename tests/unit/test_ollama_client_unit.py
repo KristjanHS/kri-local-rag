@@ -40,7 +40,7 @@ def test_detect_model_uses_tags_endpoint(monkeypatch):
     assert isinstance(model, str) and model
 
 
-def test_generate_response_handles_empty_and_exception(monkeypatch):
+def test_generate_response_handles_empty_and_exception(monkeypatch, caplog):
     # Force base url
     monkeypatch.setenv("DOCKER_ENV", "0")
 
@@ -74,6 +74,12 @@ def test_generate_response_handles_empty_and_exception(monkeypatch):
     def fake_stream_err(method, url, json, timeout):  # noqa: ARG001
         raise httpx.ConnectError("boom", request=None)
 
+    import logging as _logging
+
+    caplog.set_level(_logging.ERROR, logger=oc.__name__)
+
     monkeypatch.setattr(httpx, "stream", fake_stream_err)
     text, _ = oc.generate_response("hi", on_token=None, on_debug=None, stop_event=None, context_tokens=64)
     assert "Error generating response" in text
+    msgs = [rec.getMessage() for rec in caplog.records]
+    assert any("Exception in generate_response" in m for m in msgs)
