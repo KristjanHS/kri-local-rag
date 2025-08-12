@@ -15,6 +15,7 @@ from backend.config import (
     WEAVIATE_URL,
     get_logger,
 )
+from backend.vector_utils import to_float_list
 
 # Optional dependency note: If sentence-transformers is not installed, we handle
 # ImportError: gracefully inside the lazy loader (_get_embedding_model).
@@ -147,11 +148,7 @@ def get_top_k(
                 # Vectorize the query using the same model as ingestion
                 query_vector_raw = embedding_model.encode(question)
                 # Normalize to a plain Python list of floats for Weaviate client
-                query_vector: List[float]
-                if hasattr(query_vector_raw, "tolist"):
-                    query_vector = list(query_vector_raw.tolist())  # type: ignore[assignment]
-                else:
-                    query_vector = list(query_vector_raw)  # type: ignore[arg-type]
+                query_vector: List[float] = to_float_list(query_vector_raw)
                 # Hybrid search with manually provided vector
                 res = q.hybrid(vector=query_vector, query=question, alpha=alpha, limit=k)
                 logger.info("hybrid search used with manual vectorization (alpha=%s)", alpha)
