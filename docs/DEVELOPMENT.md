@@ -92,6 +92,7 @@ Guardrails:
 - Do not add `uv` to application install paths or CI envs; it is a tooling-only sandbox.
 - Avoid `--locked --frozen` together; use `uv lock --check` + `uv sync --frozen`.
 - Keep `.venv` under `tools/uv_sandbox/` untracked; commit `pyproject.toml` and `uv.lock` when relevant.
+- You can delete `tools/uv_sandbox/.venv/` anytime; `run.sh` will recreate it. Keep `pyproject.toml` and `uv.lock` for reproducibility (delete `uv.lock` only if you want a fresh resolve).
 
 ## More docs
 - Detailed guidance used mostly by AI coder: `docs_AI_coder/AI_instructions.md`
