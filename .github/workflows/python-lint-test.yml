@@ -30,6 +30,19 @@ jobs:
           python-version: "3.12"
           cache: "pip"
           cache-dependency-path: "requirements-dev.txt"
+      # Reason: act runner images sometimes include preinstalled opentelemetry-proto (<5),
+      # which conflicts with our protobuf>=5 lane. This is not coming from repo deps;
+      # purge only under act to keep runs fast without affecting GitHub runners.
+      - name: Purge conflicting global packages under act (opentelemetry*)
+        if: ${{ github.actor == 'nektos/act' }}
+        run: |
+          python -m pip uninstall -y "opentelemetry-proto" || true
+          python -m pip uninstall -y "opentelemetry-api" || true
+          python -m pip uninstall -y "opentelemetry-sdk" || true
+          python -m pip uninstall -y "opentelemetry-instrumentation" || true
+          python -m pip uninstall -y "opentelemetry-instrumentation-requests" || true
+          python -m pip uninstall -y "opentelemetry-semantic-conventions" || true
+          python -m pip uninstall -y "opentelemetry-util-http" || true
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -64,6 +77,19 @@ jobs:
           python-version: "3.12"
           cache: "pip"
           cache-dependency-path: "requirements-dev.txt"
+      # Reason: act runner images sometimes include preinstalled opentelemetry-proto (<5),
+      # which conflicts with our protobuf>=5 lane. This is not coming from repo deps;
+      # purge only under act to keep runs fast without affecting GitHub runners.
+      - name: Purge conflicting global packages under act (opentelemetry*)
+        if: ${{ github.actor == 'nektos/act' }}
+        run: |
+          python -m pip uninstall -y "opentelemetry-proto" || true
+          python -m pip uninstall -y "opentelemetry-api" || true
+          python -m pip uninstall -y "opentelemetry-sdk" || true
+          python -m pip uninstall -y "opentelemetry-instrumentation" || true
+          python -m pip uninstall -y "opentelemetry-instrumentation-requests" || true
+          python -m pip uninstall -y "opentelemetry-semantic-conventions" || true
+          python -m pip uninstall -y "opentelemetry-util-http" || true
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

@@ -121,8 +121,8 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
     - [ ] Standardize all installs to use `pip install -r requirements-dev.txt` (for dev/CI environments) and `pip install -r requirements.txt` (for runtime in CI jobs).
     - [ ] Ensure the PyTorch CPU index URL is available for jobs that install PyTorch, either via environment variables or direct pip arguments.
     - [ ] Add caching keyed by a hash of `requirements.txt` and `requirements-dev.txt`, combined with the Python version and OS. This ensures efficient cache reuse.
-    - [ ] Isolate Semgrep: Continue using the official Semgrep Docker image for all Semgrep scans in CI. This inherently prevents any opentelemetry or other tooling dependencies from bleeding into the application's Python environment.
-    - [ ] Opentelemetry strategy: If opentelemetry is not required for the core application functionality and was identified as problematic with Protobuf 5.x, ensure it is not included in `requirements.txt` or `requirements-dev.txt` for the application's environment. If it's needed for specific dev tooling (e.g., logging in a dev script), that tooling should run in its own isolated environment.
+    - [x] Isolate Semgrep: Continue using the official Semgrep Docker image for all Semgrep scans in CI. This inherently prevents any opentelemetry or other tooling dependencies from bleeding into the application's Python environment.
+    - [x] Opentelemetry strategy: Exclude OTel from app/dev requirements until compatible with Protobuf ≥5. For local act runs, purge stray OTel packages before installation to avoid resolver bleed.
 4.  **Docker integration**
     - [ ] Utilize multi-stage builds. In the builder stage, use `pip install -r requirements.txt` (and ensure the PyTorch CPU index is provided if PyTorch is installed).
     - [ ] Copy only the necessary runtime artifacts (e.g., site-packages, executable scripts) from the builder stage to the final runtime image. This isolation guarantees the runtime environment uses the clean, pinned dependencies.
