@@ -18,9 +18,15 @@ fi
 export PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cpu"
 
 # Lock, create venv, sync, and validate dependency graph
-uv lock --frozen-lockfile || uv lock
-uv venv --frozen-lockfile || true
-uv sync --locked --frozen-lockfile
+if [ -f "uv.lock" ]; then
+  uv lock --frozen-lockfile
+  uv venv --frozen-lockfile
+  uv sync --locked --frozen-lockfile
+else
+  uv lock
+  uv venv
+  uv sync --locked
+fi
 uv run python -m pip check
 uv tree
 
