@@ -108,7 +108,8 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
         - OTel: Not included in sandbox; keep isolated to avoid protobuf lane conflicts until compatibility is confirmed
         - Wheels: CPU-only via `PIP_EXTRA_INDEX_URL`/`UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`
 2.  **Pin propagation from UV sandbox to pip requirements**
-    - [ ] Analyze the `uv.lock` and `uv tree` output from the sandbox run. Identify the exact versions for all direct and transitive dependencies that resulted in a clean `pip check` and a coherent dependency graph.
+    - [x] Analyze the `uv.lock` and `uv tree` output from the sandbox run. Identify the exact versions for all direct and transitive dependencies that resulted in a clean `pip check` and a coherent dependency graph.
+      - Notes: protobuf=5.29.5, grpcio=1.63.0, torch=2.7.1 (CPU), sentence-transformers=5.0.0, weaviate-client=4.16.6, langchain=0.3.27, streamlit=1.47.0
     - [ ] Explicitly address compatibility findings:
         - If Protobuf 5.x is confirmed compatible with sentence-transformers 5.x and torch 2.x, but requires specific gRPC versions or leads to conflicts with specific opentelemetry versions, document these findings.
         - Decision Point: If opentelemetry is required for the application and cannot be made compatible with Protobuf 5.x in the sandbox, the plan must state that opentelemetry will be excluded from the application environment until upstream compatibility is resolved.
