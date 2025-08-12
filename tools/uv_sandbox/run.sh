@@ -24,12 +24,12 @@ export UV_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cpu"
 # Lock, create venv, sync, and validate dependency graph
 if [ -f "uv.lock" ]; then
   uv lock --check
-  uv venv
-  uv sync --locked --frozen
+  uv venv --allow-existing
+  uv sync --frozen
 else
   uv lock
-  uv venv
-  uv sync --locked
+  uv venv --allow-existing
+  uv sync
 fi
 uv pip check
 uv tree

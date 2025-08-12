@@ -87,17 +87,17 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
         - [x] Keep `PIP_EXTRA_INDEX_URL` export at the top and propagate to all uv steps
 
     - Focused debug plan: UV sandbox script compatibility
-        - [ ] Capture current failure modes with exact messages:
+        - [x] Capture current failure modes with exact messages:
             - Invalid flags: `--frozen-lockfile` not recognized by `uv lock`/`uv venv`
             - `VIRTUAL_ENV` mismatch warning when root venv is active
             - `pip check` via `uv run` fails due to missing pip in sandbox venv
-        - [ ] Update `tools/uv_sandbox/run.sh`:
+        - [x] Update `tools/uv_sandbox/run.sh`:
             - Replace frozen-lockfile flags with: `uv lock --check` (if lock exists) and `uv sync --frozen`
             - Unset `VIRTUAL_ENV` before invoking uv to avoid mismatch
             - Use `uv pip check` for dependency validation
             - Export `UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu` for CPU-only wheels
-        - [ ] Re-run the script to produce a stable `uv.lock`; commit it
-        - [ ] Add `.gitignore` entries to ignore `tools/uv_sandbox/.venv/` (keep `pyproject.toml` and `uv.lock` tracked)
+        - [x] Re-run the script to produce a stable `uv.lock`; commit it
+        - [x] Add `.gitignore` entries to ignore `tools/uv_sandbox/.venv/` (keep `pyproject.toml` and `uv.lock` tracked)
     - [ ] Note: Use `--frozen-lockfile` to ensure `uv lock` doesn't try to update existing pins if they are present in a scratch `uv.lock`.
     - [ ] Add `.gitignore` entries for sandbox venv/artifacts. Keep `pyproject.toml` in VCS.
     - [ ] Commit `uv.lock` from a successful sandbox run. This `uv.lock` will represent the resolved, compatible set of versions. Document any version restrictions or specific package combinations that were necessary to achieve compatibility (e.g., "Protobuf 5.x requires gRPC X.Y and is incompatible with OTel Z.W").
