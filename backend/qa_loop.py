@@ -288,6 +288,7 @@ from backend.config import COLLECTION_NAME, WEAVIATE_URL
 
 def ensure_weaviate_ready_and_populated():
     logger.info("--- Checking Weaviate status and collection ---")
+    client = None  # explicit reference to avoid dynamic locals()/globals() access
     try:
         parsed_url = urlparse(WEAVIATE_URL)
         http_host = parsed_url.hostname or "localhost"
@@ -352,9 +353,8 @@ def ensure_weaviate_ready_and_populated():
         raise Exception(f"An unexpected error occurred during Weaviate check: {e}") from e
     finally:
         try:
-            client_ref = locals().get("client", None)
-            if client_ref is not None and hasattr(client_ref, "is_connected") and client_ref.is_connected():
-                client_ref.close()
+            if client is not None and hasattr(client, "is_connected") and client.is_connected():
+                client.close()
         except Exception:
             pass
     logger.info("--- Weaviate check complete ---")

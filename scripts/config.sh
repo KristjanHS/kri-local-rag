@@ -122,15 +122,50 @@ log_message() {
     log "$@"
 }
 
-# Create a timestamped log file and a stable symlink <name>.log → <name>-<ts>.log
+# Create/rotate/prune a set of logs for a script.
+# - Ensures logs/<name>.log is a symlink to the latest timestamped log.
+# - Rotates the previous log if it exceeds a size threshold (10MB).
+# - Prunes all old logs for <name>, keeping only the 5 most recent.
 init_script_logging() {
     local script_name="$1"
+    local stable_log_path="$LOGS_DIR/${script_name}.log"
+    local max_size_bytes=$((10 * 1024 * 1024)) # 10MB
+    local keep_count=5
+
     mkdir -p "$LOGS_DIR"
+
+    # 1. Rotate the previous log file if it's oversized.
+    # This checks the real file behind the symlink.
+    if [ -L "$stable_log_path" ]; then
+        current_size_bytes=$(wc -c < "$stable_log_path" 2>/dev/null || echo 0)
+        if [ "$current_size_bytes" -ge "$max_size_bytes" ]; then
+            ts="$(date -u +%Y%m%dT%H%M%SZ)"
+            real_target=$(readlink -f "$stable_log_path")
+            # Rename the oversized log to a consistent -rotated format.
+            mv "$real_target" "$LOGS_DIR/${script_name}-${ts}-rotated.log" || true
+        fi
+    fi
+
+    # 2. Prune all old log files for this script prefix before creating a new one.
+    # This keeps (keep_count - 1) of the most recent *actual log files*.
+    # It explicitly finds only files (-type f) to ignore the stable symlink.
+    find "$LOGS_DIR" -maxdepth 1 -type f -name "${script_name}[-_]*.log" -printf "%T@ %p\n" \
+      | sort -nr \
+      | tail -n +$keep_count \
+      | cut -d' ' -f2- \
+      | xargs -r rm --
+
+    # 3. Create a new, unique, timestamped log file for the current run.
     local ts
     ts=$(date +%Y%m%d-%H%M%S)
-    local log_file="$LOGS_DIR/${script_name}-${ts}.log"
-    ln -sf "$(basename "$log_file")" "$LOGS_DIR/${script_name}.log"
-    echo "$log_file"
+    local new_log_file="$LOGS_DIR/${script_name}-${ts}.log"
+    touch "$new_log_file"
+
+    # 4. Update the stable symlink to point to our new log file.
+    ln -sf "$(basename "$new_log_file")" "$stable_log_path"
+
+    # 5. Return the full path to the new log file for the script to use.
+    echo "$new_log_file"
 }
 
 # Error trap: logs failing command and line number to both stdout and log file
