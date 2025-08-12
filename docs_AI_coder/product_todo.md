@@ -45,26 +45,88 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
 
 ### P0 — Must do now (stability, forward-compat, fast feedback)
 
-#### P0.0 — Top problem: Semgrep blocking findings visibility and triage (local)
+#### P0.0a — Validating the Dependency Compatibility and Versions
 
-- Objective: Make blocking findings clearly visible locally and fix at least the top one.
-- Plan (small, incremental steps)
-   1) Ensure findings are shown even when the scan fails locally
-      - [x] Update Semgrep workflow to run the summary step unconditionally (always) while keeping PRs failing on findings in CI
-  2) Surface findings in terminal during pre-push
-     - [ ] Run the pre-push hook and verify the Semgrep findings summary shows rule, file:line, and message
-  3) Triage and fix the top finding
-     - [ ] Identify the most critical/simple-to-fix finding from the summary
-     - [ ] Implement a minimal, safe fix in code
-     - [ ] Add/adjust a unit test if applicable
-  4) Verify locally
-     - [ ] Re-run pre-push; confirm Semgrep has no blocking findings
+- Goal: Stabilize on Protobuf 5.x lane, keep sentence-transformers 5.x, and address dependency compatibility to minimize future surprises.
+- Proposed Approach: Use `uv` as a diagnostic tool to find compatible pinned versions for `pip`, simplifying requirements management and isolating tooling.
+
+##### Skepticism checks (verify these before implementation)
+
+- [x] Verify that `torch==2.7.x` is officially supported by `sentence-transformers==5.x` on Python 3.12
+  - Finding: sentence-transformers 5.x requires Python >=3.9 and Torch >=1.11. Explicit support for `torch==2.7.x` is not yet documented.
+  - Action: Continue monitoring sentence-transformers release notes and dependency pins when `torch==2.7.x` becomes generally available. The `uv` sandbox will be crucial for testing this combination.
+- [x] Confirm plain pip installs work reliably under WSL2 + act
+  - Finding: `pip install -r requirements*.txt` is stable under WSL2/Act.
+- [x] Re-check whether Semgrep actually requires opentelemetry by default; prefer containerized Semgrep regardless
+  - Finding: opentelemetry dependencies are not strictly required by Semgrep by default.
+  - Action: Containerized Semgrep (or an isolated tool venv) is the preferred method to avoid any potential dependency bleed, regardless of whether opentelemetry is pulled directly or transitively.
+- [x] Validate whether a single pinned set of `requirements*.txt` suffices across CI, local dev, and Docker; otherwise adopt per-context requirements files
+  - Finding: A single pinned set is generally workable.
+  - Action: Maintain this approach, but be prepared to introduce context-specific requirements files if divergence becomes unmanageable, especially around compatibility issues.
+
+##### Modified plan steps
+
+The core strategy remains to leverage `uv` for diagnostics and pinning, but the implementation steps are refined to directly address the compatibility challenges, particularly concerning Protobuf, gRPC, and opentelemetry.
+
+1.  **UV diagnostic sandbox for compatibility resolution (primary focus)**
+    - [x] Create `tools/uv_sandbox/` with a minimal `pyproject.toml`.
+    - [ ] Populate `pyproject.toml` with target versions known to be problematic or desired, specifically including:
+        - `sentence-transformers==5.x`
+        - `torch==2.7.x`
+        - A target Protobuf version (>=5.0)
+        - A target gRPC version (latest compatible with Protobuf 5.x)
+        - If opentelemetry is intended now or later (or is a dependency of a tool like Semgrep), include a compatible version range or specific versions to test their integration with Protobuf 5.x
+        - Other direct dependencies (e.g., `langchain`, `weaviate-client`, `streamlit`)
+        - Set `requires-python = ">=3.12"`
+    - [ ] Add `tools/uv_sandbox/run.sh` that performs: `export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu && uv lock --frozen-lockfile && uv venv --frozen-lockfile && uv sync --locked --frozen-lockfile && uv run python -m pip check && uv tree`
+    - [ ] Note: Use `--frozen-lockfile` to ensure `uv lock` doesn't try to update existing pins if they are present in a scratch `uv.lock`.
+    - [ ] Add `.gitignore` entries for sandbox venv/artifacts. Keep `pyproject.toml` in VCS.
+    - [ ] Commit `uv.lock` from a successful sandbox run. This `uv.lock` will represent the resolved, compatible set of versions. Document any version restrictions or specific package combinations that were necessary to achieve compatibility (e.g., "Protobuf 5.x requires gRPC X.Y and is incompatible with OTel Z.W").
+2.  **Pin propagation from UV sandbox to pip requirements**
+    - [ ] Analyze the `uv.lock` and `uv tree` output from the sandbox run. Identify the exact versions for all direct and transitive dependencies that resulted in a clean `pip check` and a coherent dependency graph.
+    - [ ] Explicitly address compatibility findings:
+        - If Protobuf 5.x is confirmed compatible with sentence-transformers 5.x and torch 2.x, but requires specific gRPC versions or leads to conflicts with specific opentelemetry versions, document these findings.
+        - Decision Point: If opentelemetry is required for the application and cannot be made compatible with Protobuf 5.x in the sandbox, the plan must state that opentelemetry will be excluded from the application environment until upstream compatibility is resolved.
+        - Verify that `weaviate-client` versions are compatible with the chosen gRPC/Protobuf versions.
+    - [ ] Update `requirements.txt` and `requirements-dev.txt` by manually pinning the resolved versions from the `uv.lock` for direct dependencies. Ensure `requirements.txt` contains the runtime dependencies, and `requirements-dev.txt` includes development tools.
+    - [ ] Ensure the PyTorch CPU wheel index (`PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`) is explicitly mentioned as required for installation contexts that involve PyTorch. Document this in `docs/DEVELOPMENT.md`.
+    - [ ] Document the pip-only policy and the necessity of running `.venv/bin/python -m pip check` after any dependency changes in `docs/DEVELOPMENT.md`.
+3.  **CI integration (GitHub Actions + act)**
+    - [ ] Standardize all installs to use `pip install -r requirements-dev.txt` (for dev/CI environments) and `pip install -r requirements.txt` (for runtime in CI jobs).
+    - [ ] Ensure the PyTorch CPU index URL is available for jobs that install PyTorch, either via environment variables or direct pip arguments.
+    - [ ] Add caching keyed by a hash of `requirements.txt` and `requirements-dev.txt`, combined with the Python version and OS. This ensures efficient cache reuse.
+    - [ ] Isolate Semgrep: Continue using the official Semgrep Docker image for all Semgrep scans in CI. This inherently prevents any opentelemetry or other tooling dependencies from bleeding into the application's Python environment.
+    - [ ] Opentelemetry strategy: If opentelemetry is not required for the core application functionality and was identified as problematic with Protobuf 5.x, ensure it is not included in `requirements.txt` or `requirements-dev.txt` for the application's environment. If it's needed for specific dev tooling (e.g., logging in a dev script), that tooling should run in its own isolated environment.
+4.  **Docker integration**
+    - [ ] Utilize multi-stage builds. In the builder stage, use `pip install -r requirements.txt` (and ensure the PyTorch CPU index is provided if PyTorch is installed).
+    - [ ] Copy only the necessary runtime artifacts (e.g., site-packages, executable scripts) from the builder stage to the final runtime image. This isolation guarantees the runtime environment uses the clean, pinned dependencies.
+    - [ ] Validate image size and cold-start performance against the current approach.
+5.  **Validation and rollout**
+    - [ ] Comprehensive dry-run on a branch:
+        - Create a fresh virtual environment.
+        - Install dependencies using `pip install -r requirements.txt` and `pip install -r requirements-dev.txt`, ensuring the PyTorch CPU index is used.
+        - Run `.venv/bin/python -m pip check` to confirm no conflicts.
+        - Execute `pytest --test-core` and any other relevant application tests.
+        - Specific compatibility checks: Verify the Protobuf and gRPC versions in the installed environment (`pip freeze | grep protobuf`, `pip freeze | grep grpcio`). If opentelemetry was intended or included in dev, check its version and Protobuf/gRPC interaction.
+    - [ ] Validate Docker build: Build the Docker image and run a minimal end-to-end smoke test to ensure the application functions correctly within the container.
+    - [ ] Merge in stages:
+        - Stage 1: Documentation updates (`docs/DEVELOPMENT.md`).
+        - Stage 2: CI changes (caching, installation standardization, Semgrep isolation enforcement).
+        - Stage 3: Dockerfile changes.
+6.  **Automation and upgrades**
+    - [ ] Configure Renovate to manage `requirements*.txt`.
+    - [ ] For larger upgrades (e.g., major versions of Protobuf, gRPC, sentence-transformers, or if `torch==2.7.x` is released and needs integration): Re-run the `uv` diagnostic sandbox first. Explore compatible version sets within the sandbox before updating the pins in `requirements*.txt`.
+    - [ ] Ensure CI runs all tests on dependency bump PRs generated by Renovate, blocking merges on failures.
+7.  **Compatibility monitors and guardrails (integrate into workflow)**
+    - [ ] Active monitoring: Actively track the status of `opentelemetry-proto` support for Protobuf ≥5. If opentelemetry becomes a requirement later, and compatibility is confirmed, update the sandbox and re-pin. Until then, strictly avoid including opentelemetry in the application's main environment.
+    - [ ] Weaviate-client integration: Confirm the tested version range for gRPC compatibility with the current Weaviate server version used. Add specific integration tests that target gRPC paths within the application if not already present.
+    - [ ] Rollback strategy: Define clear rollback procedures. If updates introduced regressions, revert the pins in `requirements*.txt` and iterate in the `uv` sandbox to find a stable, compatible set before re-attempting the upgrade.
 
 #### P0.0b — Apply best practices to recent CI/SAST changes
 
 - CodeQL workflow
   - [x] Disable Default CodeQL setup in GitHub repo settings (to avoid advanced-config conflict)
-  - [ ] Broaden PR trigger (run on all PRs): remove `branches: ["main"]` under `on.pull_request`
+  - [x] Broaden PR trigger (run on all PRs): remove `branches: ["main"]` under `on.pull_request`
   - [ ] Validate `analyze@v3` inputs against official docs; if `output` is unsupported, remove it and adjust the local summary step accordingly
   - [ ] Keep uploads enabled only on GitHub (skip on forks and under Act), and enforce via branch protection rather than hard-fail
 - Semgrep workflow
@@ -77,6 +139,25 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - [ ] Document the guard and prerequisites in `docs/DEVELOPMENT.md`
 - Repo protection
   - [ ] Configure branch protection to require "Code scanning results / CodeQL" and Semgrep check on PRs
+
+#### P0.0d — ignoring call-arg ?
+     - [ ] in all my code, go through the lines containing # type: ignore[call-arg] and check if the code follows best practices. if not, add tasks to correct the code and test it, into product_todo
+
+#### P0.0c — Semgrep blocking findings visibility and triage (local)
+
+- Objective: Make blocking findings clearly visible locally and fix at least the top one.
+- Plan (small, incremental steps)
+   1) Ensure findings are shown even when the scan fails locally
+      - [x] Update Semgrep workflow to run the summary step unconditionally (always) while keeping PRs failing on findings in CI
+  2) Surface findings in terminal during pre-push
+     - [x] Run the pre-push hook and verify the Semgrep findings summary shows rule, file:line, and message
+  3) Triage and fix the top finding
+     - [x] Identify the most critical/simple-to-fix finding from the summary
+     - [x] Implement a minimal, safe fix in code
+     - [ ] Add/adjust a unit test if applicable
+  4) Verify locally
+     - [ ] Re-run pre-push; confirm Semgrep has no blocking findings
+       - [BLOCKED: pre-push stops at lint due to protobuf constraint mismatch; Semgrep job run directly reports 0 blocking findings]
 
 #### P0.1 — Test Suite Architecture Refactor (align with best practices)
 

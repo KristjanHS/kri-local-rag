@@ -33,16 +33,24 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -c constraints.txt -r requirements-dev.txt
       - name: Verify dependency health
         run: |
           python -m pip check
       - name: Ruff static analysis
         run: |
-          ruff check .
+          if [ "${{ github.actor }}" = "nektos/act" ]; then
+            ruff check . --fix
+          else
+            ruff check .
+          fi
       - name: Ruff formatting check
         run: |
-          ruff format --check .
+          if [ "${{ github.actor }}" = "nektos/act" ]; then
+            ruff format .
+          else
+            ruff format --check .
+          fi
 
   fast_tests:
     name: Fast Tests
@@ -59,7 +67,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -c constraints.txt -r requirements-dev.txt
       - name: Prepare reports directories
         run: |
           mkdir -p reports
@@ -94,7 +102,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -c constraints.txt -r requirements-dev.txt
       - name: Pyright type checking
         run: pyright
 
@@ -114,7 +122,7 @@ jobs:
       - name: Install dev test dependencies on host
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -c constraints.txt -r requirements-dev.txt
       - name: Build app image (docker-compose)
         run: |
           docker compose -f docker/docker-compose.yml build app
@@ -149,7 +157,7 @@ jobs:
       - name: Install dev test dependencies on host
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -c constraints.txt -r requirements-dev.txt
       - name: Install Playwright browsers
         run: |
           python -m playwright install --with-deps
@@ -215,7 +223,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -c constraints.txt -r requirements-dev.txt
       - name: Install Playwright browsers (for UI/E2E if selected)
         run: |
           python -m playwright install --with-deps
@@ -254,7 +262,7 @@ jobs:
       - name: Install dev test dependencies on host
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -c constraints.txt -r requirements-dev.txt
       - name: Install Playwright browsers
         run: |
           python -m playwright install --with-deps

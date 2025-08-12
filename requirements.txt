@@ -13,6 +13,7 @@ torch==2.7.1
 
 
 # Sentence Embeddings
+# Keep modern embedding stack
 sentence-transformers==5.0.0
 
 # Core RAG and LangChain Framework
@@ -35,10 +36,8 @@ httpx
 streamlit==1.47.0
 
 # Utilities
-protobuf==5.29.0
-grpcio==1.63.0
-grpcio-health-checking==1.63.0
-grpcio-status==1.63.0
+# Defer to constraints.txt for protobuf/grpc exact versions
+# (avoid conflicting hard pins here)
 
 # CLI and logging
 rich>=13,<14

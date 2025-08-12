@@ -1,0 +1,7 @@
+[project]
+name = "uv-sandbox"
+version = "0.0.0"
+description = "Temporary sandbox for dependency resolution via uv"
+requires-python = ">=3.12"
+
+

@@ -1,0 +1,12 @@
+# Central dependency constraints to ensure resolver stability across local and CI
+
+# Protobuf lane: move to 5.x to keep compatibility with modern libraries (e.g., sentence-transformers 5.x)
+protobuf>=5.26.1,<6.0.0
+
+# gRPC versions aligned with Protobuf 5.x (1.63.x series)
+grpcio==1.63.0
+grpcio-status==1.63.0
+grpcio-health-checking==1.63.0
+grpcio-tools==1.63.0
+
+
