@@ -100,7 +100,7 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
         - [x] Add `.gitignore` entries to ignore `tools/uv_sandbox/.venv/` (keep `pyproject.toml` and `uv.lock` tracked)
         - [x] Align with original instruction: also export `PIP_EXTRA_INDEX_URL` in `run.sh` (keep `UV_EXTRA_INDEX_URL` too)
     - [x] Prefer supported flags over deprecated patterns: use `uv lock --check` and `uv sync --frozen` (uv has no `--frozen-lockfile`).
-    - [ ] Add `.gitignore` entries for sandbox venv/artifacts. Keep `pyproject.toml` in VCS.
+    - [x] Add `.gitignore` entries for sandbox venv/artifacts. Keep `pyproject.toml` in VCS.
     - [x] Commit `uv.lock` from a successful sandbox run. This `uv.lock` will represent the resolved, compatible set of versions. Document any version restrictions or specific package combinations that were necessary to achieve compatibility (e.g., "Protobuf 5.x requires gRPC X.Y and is incompatible with OTel Z.W").
       - Notes:
         - Tooling: `uv 0.8.9`
