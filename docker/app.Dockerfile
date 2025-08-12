@@ -6,6 +6,8 @@
 FROM python:3.12.3-slim AS builder
 
 ENV VENV_PATH=/opt/venv
+# Use CPU-only PyTorch wheels in builds to avoid heavy CUDA deps and failures
+ENV PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
 WORKDIR /app
 
 # Create virtualenv and upgrade pip
