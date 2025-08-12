@@ -1,57 +1,70 @@
-# Use a slim Python base image
-FROM python:3.12.3-slim
+##########
+# Multi-stage build for smaller, production-focused image
+##########
 
-# Set the working directory inside the container
+# ---------- Builder stage: resolve and install Python deps + package into a venv ----------
+FROM python:3.12.3-slim AS builder
+
+ENV VENV_PATH=/opt/venv
+# Allow selecting PyTorch wheel channel (CPU by default). Examples:
+# - CPU:   https://download.pytorch.org/whl/cpu
+# - CUDA:  https://download.pytorch.org/whl/cu121
+# - ROCm:  https://download.pytorch.org/whl/rocm6.1
+ARG TORCH_WHEEL_INDEX=https://download.pytorch.org/whl/cpu
+ENV PIP_EXTRA_INDEX_URL=${TORCH_WHEEL_INDEX}
 WORKDIR /app
 
-# --- Install Dependencies ---
-# First, pull in latest security patches for the base image
-RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
-    apt-get install -y --no-install-recommends libmagic1 libmagic-dev && \
-    apt-get install -y --no-install-recommends poppler-utils && \
-    # Install tesseract for OCR (required by unstructured[pdf])
-    apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng && \
-    # Needed by OpenCV (dependency of unstructured)
-    apt-get install -y --no-install-recommends libgl1 libglib2.0-0 && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Create virtualenv and upgrade pip
+RUN python -m venv ${VENV_PATH} \
+    && ${VENV_PATH}/bin/pip install --upgrade pip
 
-# ---- upgrade pip ----
+# Install runtime dependencies into venv
+COPY requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip
+    ${VENV_PATH}/bin/pip install -r requirements.txt
 
-# PyTorch (CPU-only) and sentence-transformers are now installed via requirements.txt (which points
-# pip to the CPU wheels using an --extra-index-url directive), so no separate install command is
-# necessary here.
-
-
-# ---- production dependencies ----
-COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt
-
-# ---- install project package (no dev tooling in final image) ----
-# Copy metadata and backend source, then install the package
-COPY pyproject.toml .
+# Install our backend package (non-editable) into the venv
+COPY pyproject.toml ./
 COPY backend/ /app/backend/
-RUN pip install -e .
+RUN ${VENV_PATH}/bin/pip install .
 
-# --- Copy Application Code ---
-# Copy the frontend app code
+
+# ---------- Final stage: minimal runtime with only what we need ----------
+FROM python:3.12.3-slim
+
+ENV VENV_PATH=/opt/venv
+ENV PATH="${VENV_PATH}/bin:${PATH}"
+
+WORKDIR /app
+
+# OS runtime dependencies only (no dev/build tools)
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
+    libmagic1 \
+    poppler-utils \
+    tesseract-ocr tesseract-ocr-eng \
+    libgl1 libglib2.0-0 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Bring in the prebuilt virtualenv from the builder stage
+COPY --from=builder ${VENV_PATH} ${VENV_PATH}
+
+# Copy application assets that are not part of the Python package
 COPY frontend/ /app/frontend/
-
-# Copy example data for initial Weaviate warm-up
 COPY example_data/ /example_data/
 
-# Set CPU optimization environment variables
-# OMP_NUM_THREADS: one OpenMP thread per core for running many small models
+# Runtime tuning (safe defaults for CPU-only deployments)
 ENV OMP_NUM_THREADS=6
-# MKL threading for Intel CPU optimizations
 ENV MKL_NUM_THREADS=6
-# Enable oneDNN optimizations
 ENV DNNL_PRIMITIVE_CACHE_CAPACITY=1024
 
-# Expose the default Streamlit port
 EXPOSE 8501
 
-# The command to run when the container starts
-CMD ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"] 
+# Non-root user and permissions
+RUN useradd -ms /bin/bash appuser \
+    && chown -R appuser:appuser /app /example_data
+USER appuser
+
+CMD ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]

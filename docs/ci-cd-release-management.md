@@ -10,19 +10,34 @@ This project uses GitHub Actions for CI/CD and security scanning, with automated
 - **Purpose**: Static code analysis for security vulnerabilities
 - **Triggers**: Push to main, PR to main, weekly schedule, manual
 - **Duration**: Up to 6 hours
-- **Environment**: GitHub CI only (skipped locally)
+- **Environment**: Runs on GitHub and under Act. Under Act, upload is skipped and results are summarized (informational only).
 
 ### 2. Semgrep Security Analysis (`semgrep.yml`)
 - **Purpose**: Pattern-based security scanning
 - **Triggers**: Push to main, PR to main, manual
 - **Duration**: Up to 30 minutes
-- **Environment**: GitHub CI only (skipped locally)
+- **Environment**: Runs on GitHub and under Act. Under Act, SARIF upload is skipped; findings are still printed and saved.
 
 ### 3. CI Pipeline (`python-lint-test.yml`)
 - **Purpose**: Linting, testing, and type checking
 - **Triggers**: PR to main/dev, manual, weekly schedule
-- **Jobs**: `lint_and_fast_tests`, `pyright`, `docker_smoke_tests`
+- **Jobs**: `lint` → `fast_tests` (depends on `lint`), `pyright`, `docker_smoke_tests`
 - **Duration**: 5-15 minutes for fast tests
+
+#### Pre-push local sequence (Act-powered)
+- Order and behavior when you `git push` locally:
+  1) **Pyright**: type checking (blocking)
+  2) **Lint**: `ruff check` and `ruff format --check` (blocking)
+  3) **Fast tests**: pytest fast suite (blocking)
+  4) **Semgrep**: security scan (blocking)
+  5) **CodeQL**: security analysis (informational only locally; does not block)
+
+- Mapping to jobs/workflows:
+  - Pyright → `python-lint-test.yml` job `pyright` (invoked via workflow_dispatch under Act)
+  - Lint → `python-lint-test.yml` job `lint`
+  - Fast tests → `python-lint-test.yml` job `fast_tests` (needs `lint`)
+  - Semgrep → `semgrep.yml` job `semgrep`
+  - CodeQL → `codeql.yml` job `analyze`
 
 ## Local Development with Act CLI
 
@@ -49,7 +64,8 @@ act workflow_dispatch -W .github/workflows/codeql.yml
 act workflow_dispatch -W .github/workflows/semgrep.yml
 
 # Run specific jobs
-act workflow_dispatch -j lint_and_fast_tests
+act workflow_dispatch -j lint
+act workflow_dispatch -j fast_tests
 act workflow_dispatch -j pyright
 ```
 
