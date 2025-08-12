@@ -69,60 +69,23 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 - Avoid setting `PYTHONPATH`. Use editable installs (`pip install -e .`) and module execution with `-m`.
  - `kri_local_rag.egg-info/` provides package metadata that enables editable installs, dependency resolution, and discovery of modules/entry points by tooling.
 
-## Dependency resolution with uv (while keeping the app pip-only)
+## UV sandbox — ultra-short
 
-This project remains pip-only for application installs and CI. We use `tools/uv_sandbox/` as an isolated, reproducible sandbox to resolve tricky dependency sets and validate compatibility before updating `requirements*.txt`.
-
-When to use the sandbox:
-- Testing new pins or resolving conflicts (e.g., Protobuf 5.x + gRPC + torch + sentence-transformers).
-- Verifying a coherent graph without changing the main venv.
-
-Steps:
-1) Run the sandbox resolver
+- Policy: pip-only for app/CI. Use `tools/uv_sandbox/` only to validate pins for major upgrades or conflicts.
+- Run and verify:
 ```bash
 cd tools/uv_sandbox
 ./run.sh
+uv pip check && uv tree | head -200 | cat
 ```
-This will:
-- Create a local venv (`tools/uv_sandbox/.venv`)
-- Use CPU-only wheels via `PIP_EXTRA_INDEX_URL`/`UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`
-- Check lockfile state (`uv lock --check`), sync without mutation (`uv sync --frozen`)
-- Validate with `uv pip check` and display `uv tree`
-
-2) Inspect results
+- If clean, copy direct pins to `requirements.txt`/`requirements-dev.txt`, then verify locally (CPU wheels by default):
 ```bash
-uv tree | less
-```
-Key targets we monitor: `protobuf` (5.x), `grpcio` (1.63.x), `torch` (2.7.x CPU), `sentence-transformers` (5.x), `weaviate-client`, `langchain`, `streamlit`.
-
-3) Propagate pins to pip
-- Copy the confirmed versions for direct dependencies into `requirements.txt` (runtime) and `requirements-dev.txt` (tooling). Keep transitive pins in `constraints.txt` if needed.
-- Reinstall locally and re-check:
-```bash
+export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
 .venv/bin/python -m pip install -r requirements-dev.txt
 .venv/bin/python -m pip check
-.venv/bin/python -m pytest --test-core
+.venv/bin/python -m pytest --test-core -q
 ```
-
-4) CI and Docker
-- Torch wheels index (CPU vs GPU):
-  - Default (recommended for smaller images and faster builds): CPU wheels
-    - Set `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`
-    - Or pass `--extra-index-url https://download.pytorch.org/whl/cpu` to pip
-  - GPU (if you need CUDA-enabled Torch): choose the CUDA channel matching your system (example: CUDA 12.6)
-    - Set `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu121`
-    - See the official PyTorch wheel indices list at [PyTorch wheels index](https://download.pytorch.org/whl/) and the install selector at [PyTorch Get Started](https://pytorch.org/get-started/locally/).
-- Build the Docker image and verify runtime imports (CPU-only torch expected by default):
-```bash
-DOCKER_BUILDKIT=1 docker build -f docker/app.Dockerfile -t kri-local-rag:local .
-docker run --rm kri-local-rag:local python -c 'import torch,google.protobuf,grpc; print(torch.__version__, torch.cuda.is_available())'
-```
-
-Guardrails:
-- Do not add `uv` to application install paths or CI envs; it is a tooling-only sandbox.
-- Avoid `--locked --frozen` together; use `uv lock --check` + `uv sync --frozen`.
-- Keep `.venv` under `tools/uv_sandbox/` untracked; commit `pyproject.toml` and `uv.lock` when relevant.
-- You can delete `tools/uv_sandbox/.venv/` anytime; `run.sh` will recreate it. Keep `pyproject.toml` and `uv.lock` for reproducibility (delete `uv.lock` only if you want a fresh resolve).
+- Guardrails: no `uv` in app/CI; use `uv lock --check` + `uv sync --frozen`; do not track `tools/uv_sandbox/.venv/`; commit `pyproject.toml`/`uv.lock`; prefer CPU wheels unless CUDA/ROCm needed.
 
 ## More docs
 - Detailed guidance used mostly by AI coder: `docs_AI_coder/AI_instructions.md`
