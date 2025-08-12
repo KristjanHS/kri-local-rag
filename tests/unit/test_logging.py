@@ -86,11 +86,14 @@ def test_logger_creation():
     console.print("Logger creation test completed\n")
 
 
-def test_error_logging():
+def test_error_logging(caplog):
     """Test error logging and exception handling."""
     console.print("=== Testing Error Logging ===")
 
     logger = get_logger("test_error")
+    import logging as _logging
+
+    caplog.set_level(_logging.ERROR, logger="test_error")
 
     try:
         # Simulate an error
@@ -106,6 +109,11 @@ def test_error_logging():
         logger.error("Caught name error: %s", e)
 
     console.print("Error logging test completed\n")
+
+    messages = [rec.getMessage() for rec in caplog.records]
+    assert any("Caught division by zero error" in m for m in messages)
+    assert any("Full exception traceback:" in m for m in messages)
+    assert any("Caught name error:" in m for m in messages)
 
 
 def test_log_file_output():
