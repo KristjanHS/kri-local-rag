@@ -54,10 +54,19 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     """Add convenience options to select common suites without shell scripts."""
     group = parser.getgroup("test-suites")
     group.addoption(
+        "--test-fast",
+        action="store_true",
+        default=False,
+        help=(
+            "Run the fastest unit suite only (no external services): excludes ui, e2e, docker, "
+            "environment, integration, and slow"
+        ),
+    )
+    group.addoption(
         "--test-core",
         action="store_true",
         default=False,
-        help="Run fast core suite with coverage (excludes ui, e2e, docker, environment)",
+        help=("Run core suite (everything except UI): excludes only ui; may include integration/slow as selected"),
     )
     group.addoption(
         "--test-ui",
@@ -68,13 +77,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 def _apply_suite_shortcuts(config: pytest.Config) -> None:
+    fast: bool = bool(getattr(config.option, "test_fast", False))
     core: bool = bool(getattr(config.option, "test_core", False))
     ui: bool = bool(getattr(config.option, "test_ui", False))
-    if core and ui:
-        raise pytest.UsageError("Cannot use --test-core and --test-ui together")
+    if sum([fast, core, ui]) > 1:
+        raise pytest.UsageError("Choose only one of --test-fast, --test-core, or --test-ui")
 
     # quiet output to mimic -q
-    if core or ui:
+    if fast or core or ui:
         try:
             current_quiet = int(getattr(config.option, "quiet", 0) or 0)
         except Exception:
@@ -82,9 +92,15 @@ def _apply_suite_shortcuts(config: pytest.Config) -> None:
         if current_quiet < 1:
             config.option.quiet = 1
 
+    if fast:
+        # Fastest suite: strict excludes to avoid any external services
+        config.option.markexpr = (
+            "not ui and not e2e and not docker and not environment and not integration and not slow"
+        )
+
     if core:
-        # exclude slow/infra suites, keep coverage enabled (default via addopts)
-        config.option.markexpr = "not ui and not e2e and not docker and not environment"
+        # Core: everything except UI tests; may include integration/slow depending on selection
+        config.option.markexpr = "not ui"
 
     if ui:
         # select UI tests; user must run with --no-cov

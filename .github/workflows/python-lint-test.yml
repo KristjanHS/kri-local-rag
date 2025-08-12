@@ -14,6 +14,10 @@ on:
   schedule:
     - cron: "0 2 * * 0" # Weekly on Sunday at 2 AM for slow tests
 
+env:
+  # Default to CPU-only PyTorch wheels for smaller images and reliable installs
+  PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -24,54 +28,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-          cache-dependency-path: "requirements-dev.txt"
-      # Reason: act runner images sometimes include preinstalled opentelemetry-proto (<5),
-      # which conflicts with our protobuf>=5 lane. This is not coming from repo deps;
-      # purge only under act to keep runs fast without affecting GitHub runners.
-      - name: Purge conflicting global packages under act (opentelemetry*)
-        if: ${{ github.actor == 'nektos/act' }}
-        run: |
-          python -m pip uninstall -y "opentelemetry-proto" || true
-          python -m pip uninstall -y "opentelemetry-api" || true
-          python -m pip uninstall -y "opentelemetry-sdk" || true
-          python -m pip uninstall -y "opentelemetry-instrumentation" || true
-          python -m pip uninstall -y "opentelemetry-instrumentation-requests" || true
-          python -m pip uninstall -y "opentelemetry-semantic-conventions" || true
-          python -m pip uninstall -y "opentelemetry-util-http" || true
-          # Semgrep and OTLP exporters may be preinstalled in act images; remove to avoid pip check noise
-          python -m pip uninstall -y "semgrep" || true
-          python -m pip uninstall -y "opentelemetry-exporter-otlp-proto-http" || true
-          python -m pip uninstall -y "opentelemetry-exporter-otlp-proto-common" || true
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -c constraints.txt -r requirements-dev.txt
-      - name: Verify dependency health
-        run: |
-          python -m pip check
       - name: Ruff static analysis
-        run: |
-          if [ "${{ github.actor }}" = "nektos/act" ]; then
-            ruff check . --fix
-          else
-            ruff check .
-          fi
+        uses: astral-sh/ruff-action@v1
+        with:
+          version: "0.5.3"
+          args: check .
       - name: Ruff formatting check
-        run: |
-          if [ "${{ github.actor }}" = "nektos/act" ]; then
-            ruff format .
-          else
-            ruff format --check .
-          fi
+        uses: astral-sh/ruff-action@v1
+        with:
+          version: "0.5.3"
+          args: format --check .
 
   fast_tests:
     name: Fast Tests
-    needs: [lint]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,37 +49,23 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: "requirements-dev.txt"
-      # Reason: act runner images sometimes include preinstalled opentelemetry-proto (<5),
-      # which conflicts with our protobuf>=5 lane. This is not coming from repo deps;
-      # purge only under act to keep runs fast without affecting GitHub runners.
-      - name: Purge conflicting global packages under act (opentelemetry*)
-        if: ${{ github.actor == 'nektos/act' }}
-        run: |
-          python -m pip uninstall -y "opentelemetry-proto" || true
-          python -m pip uninstall -y "opentelemetry-api" || true
-          python -m pip uninstall -y "opentelemetry-sdk" || true
-          python -m pip uninstall -y "opentelemetry-instrumentation" || true
-          python -m pip uninstall -y "opentelemetry-instrumentation-requests" || true
-          python -m pip uninstall -y "opentelemetry-semantic-conventions" || true
-          python -m pip uninstall -y "opentelemetry-util-http" || true
-          # Semgrep and OTLP exporters may be preinstalled in act images; remove to avoid pip check noise
-          python -m pip uninstall -y "semgrep" || true
-          python -m pip uninstall -y "opentelemetry-exporter-otlp-proto-http" || true
-          python -m pip uninstall -y "opentelemetry-exporter-otlp-proto-common" || true
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -c constraints.txt -r requirements-dev.txt
+          pip install -r requirements-dev.txt
+      - name: Verify dependency health
+        run: |
+          python -m pip check
       - name: Prepare reports directories
         run: |
           mkdir -p reports
       - name: Run fast tests
         run: |
-          # This command runs all tests NOT marked as 'slow'
-          # based on the configuration in pytest.ini
-          # In both GitHub and act (local), generate HTML & JUnit under reports/
-          python -m pytest -m "not slow and not integration and not e2e and not environment and not ui and not docker" --html=reports/report.html --self-contained-html --junitxml=reports/junit.xml
+          # Fastest suite (no external services) via custom option defined in tests/conftest.py
+          python -m pytest --test-fast --junitxml=reports/junit.xml
 
       - name: Upload fast test reports
         # Skip under act (local GitHub Actions emulator) because ACTIONS_RUNTIME_TOKEN is not available.
@@ -132,11 +87,13 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: "requirements-dev.txt"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -c constraints.txt -r requirements-dev.txt
+          pip install -r requirements-dev.txt
       - name: Pyright type checking
         run: pyright
 
@@ -152,11 +109,13 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: "requirements-dev.txt"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
       - name: Install dev test dependencies on host
         run: |
           python -m pip install --upgrade pip
-          pip install -c constraints.txt -r requirements-dev.txt
+          pip install -r requirements-dev.txt
       - name: Build app image (docker-compose)
         run: |
           docker compose -f docker/docker-compose.yml build app
@@ -175,8 +134,8 @@ jobs:
           name: test-reports-docker
           path: reports/
 
-  gpu_docker_ollama_act:
-    name: act manual - remaining tests (env + streamlit)
+  ui_tests_act:
+    name: act manual - UI (Streamlit) tests
     if: ${{ github.actor == 'nektos/act' && github.event_name == 'workflow_dispatch' }}
     needs: fast_tests
     runs-on: ubuntu-latest
@@ -187,11 +146,13 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: "requirements-dev.txt"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
       - name: Install dev test dependencies on host
         run: |
           python -m pip install --upgrade pip
-          pip install -c constraints.txt -r requirements-dev.txt
+          pip install -r requirements-dev.txt
       - name: Install Playwright browsers
         run: |
           python -m playwright install --with-deps
@@ -223,28 +184,23 @@ jobs:
       - name: Prepare reports directories
         run: |
           mkdir -p reports/logs
-      - name: Run e2e_streamlit smoke tests (no slow)
+      - name: Run UI tests only (Streamlit)
         env:
           PLAYWRIGHT_HEADLESS: "1"
         run: |
-          python -m pytest -q tests/e2e_streamlit -m "e2e and not slow" \
-            --no-cov \
-            --html=reports/report_e2e_streamlit.html --self-contained-html \
-            --junitxml=reports/junit_e2e_streamlit.xml
-      - name: Run environment tests
-        run: |
-          python -m pytest -q -m environment \
-            --html=reports/report_environment.html --self-contained-html \
-            --junitxml=reports/junit_environment.xml
+          python -m pytest --test-ui --no-cov \
+            --html=reports/report_ui.html --self-contained-html \
+            --junitxml=reports/junit_ui.xml
       - name: Tear down local stack
         if: always()
         run: |
           docker compose -f docker/docker-compose.yml down -v
 
-  full_suite:
-    name: Full Test Suite (manual/scheduled)
+  core_suite:
+    name: Core Test Suite (manual/scheduled)
     # Heavy: enforce coverage threshold; only under local act (GitHub runners lack RAM for Dockerized tests)
     if: ${{ github.actor == 'nektos/act' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
+    needs: fast_tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -257,7 +213,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -c constraints.txt -r requirements-dev.txt
+          pip install -r requirements-dev.txt
       - name: Install Playwright browsers (for UI/E2E if selected)
         run: |
           python -m playwright install --with-deps
@@ -265,17 +221,17 @@ jobs:
       - name: Prepare reports directories
         run: |
           mkdir -p reports
-      - name: Run full test suite (exclude only environment)
-        # Enforce coverage threshold for full suite
+      - name: Run core test suite (everything except UI)
+        # Enforce coverage threshold for core suite
         run: |
-          python -m pytest -v -m "not environment" --cov-fail-under=60 \
-            --html=reports/report_full.html --self-contained-html \
-            --junitxml=reports/junit_full.xml
-      - name: Upload full suite reports
+          python -m pytest -v --test-core --cov-fail-under=60 \
+            --html=reports/report_core.html --self-contained-html \
+            --junitxml=reports/junit_core.xml
+      - name: Upload core suite reports
         if: ${{ always() && github.actor != 'nektos/act' }}
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports-full
+          name: test-reports-core
           path: reports/
 
   # Local-only via act; manual dispatch; runs pytest -m slow against full stack
@@ -283,6 +239,7 @@ jobs:
     name: act manual - slow tests (full stack)
     # Run only when launched manually via act (not on GitHub UI)
     if: ${{ github.actor == 'nektos/act' && github.event_name == 'workflow_dispatch' }}
+    needs: fast_tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -292,11 +249,13 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: "requirements-dev.txt"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
       - name: Install dev test dependencies on host
         run: |
           python -m pip install --upgrade pip
-          pip install -c constraints.txt -r requirements-dev.txt
+          pip install -r requirements-dev.txt
       - name: Install Playwright browsers
         run: |
           python -m playwright install --with-deps

@@ -79,10 +79,14 @@ Key targets we monitor: `protobuf` (5.x), `grpcio` (1.63.x), `torch` (2.7.x CPU)
 ```
 
 4) CI and Docker
-- Ensure CI jobs install with the CPU wheels index when torch is present:
-  - Either set `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`
-  - Or pass `--extra-index-url` to pip in the workflow steps
-- Build the Docker image and verify runtime imports (CPU-only torch expected):
+- Torch wheels index (CPU vs GPU):
+  - Default (recommended for smaller images and faster builds): CPU wheels
+    - Set `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`
+    - Or pass `--extra-index-url https://download.pytorch.org/whl/cpu` to pip
+  - GPU (if you need CUDA-enabled Torch): choose the CUDA channel matching your system (example: CUDA 12.6)
+    - Set `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu121`
+    - See the official PyTorch wheel indices list at [PyTorch wheels index](https://download.pytorch.org/whl/) and the install selector at [PyTorch Get Started](https://pytorch.org/get-started/locally/).
+- Build the Docker image and verify runtime imports (CPU-only torch expected by default):
 ```bash
 DOCKER_BUILDKIT=1 docker build -f docker/app.Dockerfile -t kri-local-rag:local .
 docker run --rm kri-local-rag:local python -c 'import torch,google.protobuf,grpc; print(torch.__version__, torch.cuda.is_available())'

@@ -114,13 +114,13 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
         - Findings: Protobuf 5.29.5 with gRPC 1.63.0 resolves cleanly alongside torch 2.7.1 and sentence-transformers 5.0.0; `uv pip check` reports compatibility.
         - Decision: Opentelemetry is excluded from the app environment for now to avoid protobuf lane conflicts; revisit when upstream confirms Protobuf ≥5 support.
         - Verification: `weaviate-client==4.16.6` installs and tests pass in integration suite with the chosen gRPC/Protobuf versions.
-    - [ ] Update `requirements.txt` and `requirements-dev.txt` by manually pinning the resolved versions from the `uv.lock` for direct dependencies. Ensure `requirements.txt` contains the runtime dependencies, and `requirements-dev.txt` includes development tools.
-    - [ ] Ensure the PyTorch CPU wheel index (`PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`) is explicitly mentioned as required for installation contexts that involve PyTorch. Document this in `docs/DEVELOPMENT.md`.
-    - [ ] Document the pip-only policy and the necessity of running `.venv/bin/python -m pip check` after any dependency changes in `docs/DEVELOPMENT.md`.
+    - [x] Update `requirements.txt` and `requirements-dev.txt` by manually pinning the resolved versions from the `uv.lock` for direct dependencies. Ensure `requirements.txt` contains the runtime dependencies, and `requirements-dev.txt` includes development tools.
+    - [x] Ensure the PyTorch wheel index options (CPU/GPU) are documented, defaulting to CPU for smaller Docker images. Include example env vars and pip flags in `docs/DEVELOPMENT.md`.
+    - [x] Document the pip-only policy and the necessity of running `.venv/bin/python -m pip check` after any dependency changes in `docs/DEVELOPMENT.md`.
 3.  **CI integration (GitHub Actions + act)**
-    - [ ] Standardize all installs to use `pip install -r requirements-dev.txt` (for dev/CI environments) and `pip install -r requirements.txt` (for runtime in CI jobs).
-    - [ ] Ensure the PyTorch CPU index URL is available for jobs that install PyTorch, either via environment variables or direct pip arguments.
-    - [ ] Add caching keyed by a hash of `requirements.txt` and `requirements-dev.txt`, combined with the Python version and OS. This ensures efficient cache reuse.
+    - [x] Standardize all installs to use `pip install -r requirements-dev.txt` (for dev/CI environments) and `pip install -r requirements.txt` (for runtime in CI jobs).
+    - [x] Ensure the PyTorch CPU index URL is available for jobs that install PyTorch, either via environment variables or direct pip arguments.
+    - [x] Add caching keyed by a hash of `requirements.txt` and `requirements-dev.txt`, combined with the Python version and OS. This ensures efficient cache reuse.
     - [x] Isolate Semgrep: Continue using the official Semgrep Docker image for all Semgrep scans in CI. This inherently prevents any opentelemetry or other tooling dependencies from bleeding into the application's Python environment.
     - [x] Opentelemetry strategy: Exclude OTel from app/dev requirements until compatible with Protobuf ≥5. For local act runs, purge stray OTel packages before installation to avoid resolver bleed.
 4.  **Docker integration**
@@ -219,6 +219,20 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
   - Action: Updated `docs/DEVELOPMENT.md` and `docs_AI_coder/AI_instructions.md` with new `pytest` options.
   - Verify: Documentation reflects the new testing commands.
 
+
+- [ ] P0.1.9 — Optional hardening for unit/fast test suites
+  - Enforce no-network in unit tests
+    - [ ] Add `pytest-socket` to `requirements-dev.txt` and document usage
+    - [ ] Add an `autouse=True` fixture scoped to unit tests to call `disable_socket()` (allow Unix sockets if needed)
+    - [ ] Verify: a unit test that attempts `httpx.get("http://example.com")` fails with a clear error
+  - Tighten fast selection
+    - [ ] Update `tests/conftest.py` so `--test-core` also excludes `slow` (in addition to `ui`, `e2e`, `docker`, `environment`, `integration`)
+    - [ ] Align `fast_tests` job to use `--test-core` (or equivalent `-m` expression) and verify it does not start Docker/services under `act`
+  - Speed up feedback
+    - [ ] Optionally add `pytest-xdist` and run fast tests with `-n auto` in CI for quicker PR feedback
+  - Guard against accidental real clients in unit tests
+    - [ ] Add a unit-scope fixture that monkeypatches `weaviate.connect_to_custom` to raise if called (unless explicitly patched in a test)
+    - [ ] Verify: a unit test calling real `connect_to_custom` fails; patched tests still pass
 
 #### P0.2 — E2E Tasks (CLI and Streamlit)
 

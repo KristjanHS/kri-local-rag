@@ -36,8 +36,12 @@ httpx
 streamlit==1.47.0
 
 # Utilities
-# Defer to constraints.txt for protobuf/grpc exact versions
-# (avoid conflicting hard pins here)
+
+# Protobuf and gRPC (pinned per UV sandbox resolution)
+protobuf==5.29.5
+grpcio==1.63.0
+grpcio-status==1.63.0
+grpcio-health-checking==1.63.0
 
 # CLI and logging
 rich>=13,<14
