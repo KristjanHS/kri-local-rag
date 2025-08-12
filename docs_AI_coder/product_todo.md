@@ -124,9 +124,10 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
     - [x] Isolate Semgrep: Continue using the official Semgrep Docker image for all Semgrep scans in CI. This inherently prevents any opentelemetry or other tooling dependencies from bleeding into the application's Python environment.
     - [x] Opentelemetry strategy: Exclude OTel from app/dev requirements until compatible with Protobuf ≥5. For local act runs, purge stray OTel packages before installation to avoid resolver bleed.
 4.  **Docker integration**
-    - [ ] Utilize multi-stage builds. In the builder stage, use `pip install -r requirements.txt` (and ensure the PyTorch CPU index is provided if PyTorch is installed).
-    - [ ] Copy only the necessary runtime artifacts (e.g., site-packages, executable scripts) from the builder stage to the final runtime image. This isolation guarantees the runtime environment uses the clean, pinned dependencies.
-    - [ ] Validate image size and cold-start performance against the current approach.
+    - [x] Utilize multi-stage builds. In the builder stage, use `pip install -r requirements.txt` (and ensure the PyTorch CPU index is provided if PyTorch is installed).
+    - [x] Copy only the necessary runtime artifacts (e.g., site-packages, executable scripts) from the builder stage to the final runtime image. This isolation guarantees the runtime environment uses the clean, pinned dependencies.
+    - [x] Validate image size and cold-start performance against the current approach.
+      - Notes: Image size ~814 MB (compressed size may differ). Streamlit available in runtime (`streamlit --version`), OCR/PDF tools present (`tesseract-ocr`, `poppler-utils`).
 5.  **Validation and rollout**
     - [ ] Comprehensive dry-run on a branch:
         - Create a fresh virtual environment.

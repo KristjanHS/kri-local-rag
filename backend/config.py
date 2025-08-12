@@ -15,14 +15,46 @@ LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 _logging_configured = False
 
 
+def _resolve_log_dir() -> Path:
+    """Return a writable log directory.
+    Order of preference:
+    1) APP_LOG_DIR env
+    2) LOG_DIR env
+    3) /app/logs (Docker runtime)
+    4) CWD/logs (dev)
+    5) /tmp/logs (always writable)
+    """
+    candidate_strings = [
+        os.getenv("APP_LOG_DIR"),
+        os.getenv("LOG_DIR"),
+        "/app/logs",
+        str(Path.cwd() / "logs"),
+        "/tmp/logs",
+    ]
+
+    for candidate in candidate_strings:
+        if not candidate:
+            continue
+        candidate_path = Path(candidate)
+        try:
+            candidate_path.mkdir(parents=True, exist_ok=True)
+            return candidate_path
+        except PermissionError:
+            continue
+
+    # Fallback that should always work
+    fallback = Path("/tmp/logs")
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
+
+
 def _setup_logging():
     """Configure the root logger. This should only be called once."""
     global _logging_configured
     if _logging_configured:
         return
 
-    log_dir = Path(__file__).resolve().parent.parent / "logs"
-    log_dir.mkdir(exist_ok=True)
+    log_dir = _resolve_log_dir()
     log_file = log_dir / "rag_system.log"
 
     # Use a rotating file handler to prevent log files from growing indefinitely
