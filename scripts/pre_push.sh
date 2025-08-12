@@ -13,11 +13,36 @@ while [ -L "$SOURCE" ]; do
   [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
-source "$SCRIPT_DIR/config.sh"
 
+# Provide both lowercase and uppercase names for compatibility with helper scripts
+script_name="pre-push"
 SCRIPT_NAME="pre-push"
-LOG_FILE=$(init_script_logging "$SCRIPT_NAME")
-enable_error_trap "$LOG_FILE" "$SCRIPT_NAME"
+
+# Try to load shared helpers if present; otherwise define minimal no-op/logging stubs
+if [[ -f "$SCRIPT_DIR/config.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/config.sh"
+else
+  mkdir -p logs
+  log() {
+    local level="$1"; shift || true
+    local msg="$*"
+    local ts
+    ts="$(date -Iseconds 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z')"
+    echo "$ts [$level] $msg"
+  }
+  init_script_logging() {
+    local name="$1"
+    local f="logs/${name}.log"
+    : >"$f"
+    echo "$f"
+  }
+  enable_error_trap() { :; }
+  enable_debug_trace() { :; }
+fi
+
+LOG_FILE=$(init_script_logging "$script_name")
+enable_error_trap "$LOG_FILE" "$script_name"
 enable_debug_trace "$LOG_FILE"
 
 log INFO "Starting pre-push checks" | tee -a "$LOG_FILE"
