@@ -4,9 +4,9 @@ type: agent-select
 alwaysApply: false
 globs: []
 ---
-- All project context files, for example **instructions.md**, **roadmap.md**, and **plan.md** and others, live under the `docs_AI_coder` directory at the project root.
+- All project context files, for example **AI_instructions.md**, and **product_todo.md** and others, live under the `docs_AI_coder` directory at the project root.
 - For example, when you see a reference to `@AI_instructions.md` or `@product_todo.md`, resolve it as: 
 @docs_AI_coder/AI_instructions.md
 @docs_AI_coder/product_todo.md
-- If asked to generate or update **product_todo.md**, write it to `docs_AI_coder/product_tod.md`.
+- If asked to generate or update **product_todo.md**, write it to `docs_AI_coder/product_todo.md`.
 - Use the `@` syntax with the full relative path so that tools like `mcp-search` and file reads target the correct folder.
