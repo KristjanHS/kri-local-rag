@@ -46,16 +46,23 @@ def _is_coverage_enabled(config: pytest.Config) -> bool:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Error-fast when UI tests are selected while coverage is enabled."""
+    """Skip UI tests when coverage is enabled; otherwise enforce --no-cov for explicit UI runs.
+
+    This makes the default, coverage-enabled full suite run green by skipping
+    Playwright tests. UI tests must be run separately with `--no-cov`.
+    """
     if not items:
         return
 
-    # When --test-ui is used, it selects this directory. If --no-cov is NOT
-    # specified, then coverage IS active due to pyproject.toml addopts.
-    # The _is_coverage_enabled helper isn't quite robust enough for the
-    # interplay of all the flags, so we do a simpler, more direct check here.
+    # If coverage collection is active, deselect all tests in this directory to avoid
+    # initializing Playwright fixtures during setup.
+    if _is_coverage_enabled(config):
+        config.hook.pytest_deselected(items=items[:])
+        items[:] = []
+        return
+
+    # Explicit UI suite must also be run with --no-cov
     is_ui_suite = bool(getattr(config.option, "test_ui", False))
     is_coverage_disabled = bool(getattr(config.option, "no_cov", False))
-
     if is_ui_suite and not is_coverage_disabled:
         raise pytest.UsageError("The --test-ui suite cannot be run with coverage. Please run with --no-cov.")
