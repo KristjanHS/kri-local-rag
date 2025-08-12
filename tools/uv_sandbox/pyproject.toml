@@ -3,5 +3,22 @@ name = "uv-sandbox"
 version = "0.0.0"
 description = "Temporary sandbox for dependency resolution via uv"
 requires-python = ">=3.12"
+dependencies = [
+    # Core ML stack (CPU only)
+    "torch==2.7.1",
+    # Embeddings
+    "sentence-transformers==5.0.0",
+    # Protobuf lane and gRPC (aligned for 5.x)
+    "protobuf>=5.26.1,<6.0.0",
+    "grpcio==1.63.0",
+    "grpcio-status==1.63.0",
+    "grpcio-health-checking==1.63.0",
+    "grpcio-tools==1.63.0",
+    # App deps to validate together in the sandbox
+    "langchain==0.3.27",
+    "langchain-community==0.3.27",
+    "weaviate-client==4.16.6",
+    "streamlit==1.47.0",
+]
 
 

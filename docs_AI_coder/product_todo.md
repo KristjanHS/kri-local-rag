@@ -70,7 +70,7 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
 
 1.  **UV diagnostic sandbox for compatibility resolution (primary focus)**
     - [x] Create `tools/uv_sandbox/` with a minimal `pyproject.toml`.
-    - [ ] Populate `pyproject.toml` with target versions known to be problematic or desired, specifically including:
+    - [x] Populate `pyproject.toml` with target versions known to be problematic or desired, specifically including:
         - `sentence-transformers==5.x`
         - `torch==2.7.x`
         - A target Protobuf version (>=5.0)
