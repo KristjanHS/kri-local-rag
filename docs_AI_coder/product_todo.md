@@ -101,7 +101,12 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
         - [x] Align with original instruction: also export `PIP_EXTRA_INDEX_URL` in `run.sh` (keep `UV_EXTRA_INDEX_URL` too)
     - [x] Prefer supported flags over deprecated patterns: use `uv lock --check` and `uv sync --frozen` (uv has no `--frozen-lockfile`).
     - [ ] Add `.gitignore` entries for sandbox venv/artifacts. Keep `pyproject.toml` in VCS.
-    - [ ] Commit `uv.lock` from a successful sandbox run. This `uv.lock` will represent the resolved, compatible set of versions. Document any version restrictions or specific package combinations that were necessary to achieve compatibility (e.g., "Protobuf 5.x requires gRPC X.Y and is incompatible with OTel Z.W").
+    - [x] Commit `uv.lock` from a successful sandbox run. This `uv.lock` will represent the resolved, compatible set of versions. Document any version restrictions or specific package combinations that were necessary to achieve compatibility (e.g., "Protobuf 5.x requires gRPC X.Y and is incompatible with OTel Z.W").
+      - Notes:
+        - Tooling: `uv 0.8.9`
+        - Key resolved versions: `protobuf==5.29.5`, `grpcio==1.63.0`, `torch==2.7.1` (CPU), `sentence-transformers==5.0.0`, `weaviate-client==4.16.6`, `langchain==0.3.27`
+        - OTel: Not included in sandbox; keep isolated to avoid protobuf lane conflicts until compatibility is confirmed
+        - Wheels: CPU-only via `PIP_EXTRA_INDEX_URL`/`UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`
 2.  **Pin propagation from UV sandbox to pip requirements**
     - [ ] Analyze the `uv.lock` and `uv tree` output from the sandbox run. Identify the exact versions for all direct and transitive dependencies that resulted in a clean `pip check` and a coherent dependency graph.
     - [ ] Explicitly address compatibility findings:
