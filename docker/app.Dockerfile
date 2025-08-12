@@ -6,8 +6,12 @@
 FROM python:3.12.3-slim AS builder
 
 ENV VENV_PATH=/opt/venv
-# Use CPU-only PyTorch wheels in builds to avoid heavy CUDA deps and failures
-ENV PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
+# Allow selecting PyTorch wheel channel (CPU by default). Examples:
+# - CPU:   https://download.pytorch.org/whl/cpu
+# - CUDA:  https://download.pytorch.org/whl/cu121
+# - ROCm:  https://download.pytorch.org/whl/rocm6.1
+ARG TORCH_WHEEL_INDEX=https://download.pytorch.org/whl/cpu
+ENV PIP_EXTRA_INDEX_URL=${TORCH_WHEEL_INDEX}
 WORKDIR /app
 
 # Create virtualenv and upgrade pip

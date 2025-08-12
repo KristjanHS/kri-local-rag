@@ -129,13 +129,23 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
     - [x] Validate image size and cold-start performance against the current approach.
       - Notes: Image size ~814 MB (compressed size may differ). Streamlit available in runtime (`streamlit --version`), OCR/PDF tools present (`tesseract-ocr`, `poppler-utils`).
 5.  **Validation and rollout**
-    - [ ] Comprehensive dry-run on a branch:
+    - [x] Comprehensive dry-run on a branch:
         - Create a fresh virtual environment.
         - Install dependencies using `pip install -r requirements.txt` and `pip install -r requirements-dev.txt`, ensuring the PyTorch CPU index is used.
-        - Run `.venv/bin/python -m pip check` to confirm no conflicts.
-        - Execute `pytest --test-core` and any other relevant application tests.
-        - Specific compatibility checks: Verify the Protobuf and gRPC versions in the installed environment (`pip freeze | grep protobuf`, `pip freeze | grep grpcio`). If opentelemetry was intended or included in dev, check its version and Protobuf/gRPC interaction.
-    - [ ] Validate Docker build: Build the Docker image and run a minimal end-to-end smoke test to ensure the application functions correctly within the container.
+         - Run `.venv/bin/python -m pip check` to confirm no conflicts.
+         - Execute `pytest --test-core` and any other relevant application tests.
+         - Specific compatibility checks: Verify the Protobuf and gRPC versions in the installed environment (`pip freeze | grep protobuf`, `pip freeze | grep grpcio`). If opentelemetry was intended or included in dev, check its version and Protobuf/gRPC interaction.
+        
+        Results (2025-08-12):
+         - pip check: OK (No broken requirements found)
+         - pytest core: 79 passed, 1 skipped, 9 deselected, 1 xpassed in ~52s
+         - Versions: `protobuf==5.29.5`, `grpcio==1.63.0`, `torch==2.7.1+cpu`, `sentence-transformers==5.0.0`
+
+    - [x] Validate Docker build: Build the Docker image and run a minimal end-to-end smoke test to ensure the application functions correctly within the container.
+        
+        Results (2025-08-12):
+         - Image built: `kri-local-rag:local`
+         - Smoke test inside container: `torch 2.7.1+cpu cuda False`, `protobuf 5.29.5`, `grpcio 1.63.0`
     - [ ] Merge in stages:
         - Stage 1: Documentation updates (`docs/DEVELOPMENT.md`).
         - Stage 2: CI changes (caching, installation standardization, Semgrep isolation enforcement).
@@ -295,3 +305,13 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
 - [ ] Create testing standards document.
 - [ ] Add test templates for consistency and performance benchmarking.
 - [ ] Improve test documentation and add test quality metrics tracking over time.
+
+### P0 — Corrections from best-practice review (this session)
+
+- [x] Docker wheel index scoping
+  - Action: Keep `TORCH_WHEEL_INDEX` only as a build-arg and avoid persisting `PIP_EXTRA_INDEX_URL` in the final image. Ensures build-only knobs do not leak to runtime.
+  - Status: Done (builder keeps `ARG TORCH_WHEEL_INDEX`; final stage no longer sets `PIP_EXTRA_INDEX_URL`).
+
+- [x] Make wheels guidance concise
+  - Action: Replace verbose wheel instructions with short, variable-based snippets for Docker and local venv.
+  - Status: Done in `docs/DEVELOPMENT.md`.

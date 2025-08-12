@@ -39,6 +39,32 @@ docker compose -f docker/docker-compose.yml up -d --build
 Then open `http://localhost:8501`.
 For logs, rebuilds, service ops, and troubleshooting, see `docs/docker-management.md`.
 
+## Wheels (CPU/GPU) — concise
+- Docker build (choose one channel):
+```bash
+export TORCH_WHEEL_INDEX=https://download.pytorch.org/whl/cpu      # default
+# export TORCH_WHEEL_INDEX=https://download.pytorch.org/whl/cu121   # CUDA 12.1
+# export TORCH_WHEEL_INDEX=https://download.pytorch.org/whl/rocm6.1 # ROCm 6.1
+
+DOCKER_BUILDKIT=1 docker build \
+  --build-arg TORCH_WHEEL_INDEX=$TORCH_WHEEL_INDEX \
+  -f docker/app.Dockerfile -t kri-local-rag:local .
+```
+
+- Local venv install (choose one channel):
+```bash
+export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu      # default
+# export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu121   # CUDA 12.1
+# export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/rocm6.1 # ROCm 6.1
+
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+- Quick smoke test of image:
+```bash
+docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as gp,grpc; print('torch', torch.__version__, 'cuda', torch.cuda.is_available()); print('protobuf', gp.__version__); print('grpcio', grpc.__version__)"
+```
+
 ## Notes
 - Avoid setting `PYTHONPATH`. Use editable installs (`pip install -e .`) and module execution with `-m`.
  - `kri_local_rag.egg-info/` provides package metadata that enables editable installs, dependency resolution, and discovery of modules/entry points by tooling.
