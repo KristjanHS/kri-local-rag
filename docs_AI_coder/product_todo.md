@@ -166,16 +166,16 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
 - CodeQL workflow
   - [x] Disable Default CodeQL setup in GitHub repo settings (to avoid advanced-config conflict)
   - [x] Broaden PR trigger (run on all PRs): remove `branches: ["main"]` under `on.pull_request`
-  - [ ] Validate `analyze@v3` inputs against official docs; if `output` is unsupported, remove it and adjust the local summary step accordingly
-  - [ ] Keep uploads enabled only on GitHub (skip on forks and under Act), and enforce via branch protection rather than hard-fail
+  - [x] Validate `analyze@v3` inputs against official docs; if `output` is unsupported, remove it and adjust the local summary step accordingly
+  - [x] Keep uploads enabled only on GitHub (skip on forks and under Act), and enforce via branch protection rather than hard-fail
 - Semgrep workflow
   - [x] Ensure robust baseline: add a step to unshallow history before scan (`git fetch --prune --unshallow || true`), or fetch base commit for PRs
   - [x] Switch to official Semgrep Docker action; do not run under local act
   - [x] Keep SARIF upload skipped for forked PRs; consider two-job upload pattern if uploads are needed for forks
 - Pre-push (local)
-  - [ ] Make pre-push resilient if `act` is missing: detect and skip with a clear message
-  - [ ] Add `SKIP_LOCAL_SEC_SCANS=1` guard to optionally skip Semgrep/CodeQL locally when needed
-  - [ ] Document the guard and prerequisites in `docs/DEVELOPMENT.md`
+  - [x] Make pre-push resilient if `act` is missing: detect and skip with a clear message
+  - [x] Add `SKIP_LOCAL_SEC_SCANS=1` guard to optionally skip Semgrep/CodeQL locally when needed
+  - [x] Document the guard and prerequisites in `docs/DEVELOPMENT.md`
 - Repo protection
   - [ ] Configure branch protection to require "Code scanning results / CodeQL" and Semgrep check on PRs
 
