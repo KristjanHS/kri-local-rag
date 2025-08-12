@@ -78,7 +78,7 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
         - If opentelemetry is intended now or later (or is a dependency of a tool like Semgrep), include a compatible version range or specific versions to test their integration with Protobuf 5.x
         - Other direct dependencies (e.g., `langchain`, `weaviate-client`, `streamlit`)
         - Set `requires-python = ">=3.12"`
-    - [ ] Add `tools/uv_sandbox/run.sh` that performs: `export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu && uv lock --frozen-lockfile && uv venv --frozen-lockfile && uv sync --locked --frozen-lockfile && uv run python -m pip check && uv tree`
+    - [x] Add `tools/uv_sandbox/run.sh` that performs: `export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu && uv lock --frozen-lockfile && uv venv --frozen-lockfile && uv sync --locked --frozen-lockfile && uv run python -m pip check && uv tree`
     - [ ] Note: Use `--frozen-lockfile` to ensure `uv lock` doesn't try to update existing pins if they are present in a scratch `uv.lock`.
     - [ ] Add `.gitignore` entries for sandbox venv/artifacts. Keep `pyproject.toml` in VCS.
     - [ ] Commit `uv.lock` from a successful sandbox run. This `uv.lock` will represent the resolved, compatible set of versions. Document any version restrictions or specific package combinations that were necessary to achieve compatibility (e.g., "Protobuf 5.x requires gRPC X.Y and is incompatible with OTel Z.W").
