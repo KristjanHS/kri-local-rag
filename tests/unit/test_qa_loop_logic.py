@@ -79,8 +79,11 @@ def test_rerank_fallback_when_encoder_is_unavailable():
         assert result[0].score > result[1].score
 
 
-def test_rerank_final_fallback_to_neutral_scores():
+def test_rerank_final_fallback_to_neutral_scores(caplog):
     """Test final fallback to neutral scores if all scoring strategies fail."""
+    import logging as _logging
+
+    caplog.set_level(_logging.ERROR, logger="backend.qa_loop")
     with mock_encoder_predict_failure():
         with patch("backend.qa_loop.re.findall", side_effect=Exception("Regex failure")):
             chunks = ["chunk1", "chunk2"]
@@ -90,6 +93,8 @@ def test_rerank_final_fallback_to_neutral_scores():
 
             assert len(result) == 2
             assert all(r.score == 0.0 for r in result)
+            msgs = [rec.getMessage() for rec in caplog.records]
+            assert any("Keyword overlap scoring failed" in m for m in msgs)
 
 
 def test_rerank_empty_chunks_list():
