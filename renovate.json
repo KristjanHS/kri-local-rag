@@ -135,7 +135,6 @@
                 "deps",
                 "ci"
             ],
-            "separateMajorMinor": false,
             "matchUpdateTypes": [
                 "minor",
                 "patch"
