@@ -34,6 +34,8 @@ quote-style = "double"
 addopts = [
     "-ra",
     "-v",
+    "-m",
+    "not ui",
     "--tb=short",
     "--cov=backend",
     "--cov=frontend",
