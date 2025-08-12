@@ -98,7 +98,8 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
             - Export `UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu` for CPU-only wheels
         - [x] Re-run the script to produce a stable `uv.lock`; commit it
         - [x] Add `.gitignore` entries to ignore `tools/uv_sandbox/.venv/` (keep `pyproject.toml` and `uv.lock` tracked)
-    - [ ] Note: Use `--frozen-lockfile` to ensure `uv lock` doesn't try to update existing pins if they are present in a scratch `uv.lock`.
+        - [x] Align with original instruction: also export `PIP_EXTRA_INDEX_URL` in `run.sh` (keep `UV_EXTRA_INDEX_URL` too)
+    - [ ] Use `--frozen-lockfile` to ensure `uv lock` doesn't try to update existing pins if they are present in a scratch `uv.lock`.
     - [ ] Add `.gitignore` entries for sandbox venv/artifacts. Keep `pyproject.toml` in VCS.
     - [ ] Commit `uv.lock` from a successful sandbox run. This `uv.lock` will represent the resolved, compatible set of versions. Document any version restrictions or specific package combinations that were necessary to achieve compatibility (e.g., "Protobuf 5.x requires gRPC X.Y and is incompatible with OTel Z.W").
 2.  **Pin propagation from UV sandbox to pip requirements**

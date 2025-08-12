@@ -18,7 +18,8 @@ fi
 # Avoid interference from the project's root venv
 unset VIRTUAL_ENV || true
 
-# Prefer uv index env vars instead of pip's for consistency
+# Export both for maximum compatibility with tooling/instructions
+export PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cpu"
 export UV_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cpu"
 
 # Lock, create venv, sync, and validate dependency graph
