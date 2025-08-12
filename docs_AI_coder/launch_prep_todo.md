@@ -151,8 +151,9 @@ Repository preparation tasks
   ```bash
   .venv/bin/python -m pytest -q -m environment
   ```
-- [ ] If any fail, fix the specific environment issue (Python version, packages, optional ML libs), then re-run the same verify.
-  - [ ] Optional (heavier): Verify real CrossEncoder loads and is used for reranking. Requires internet/cache for first run. Verify exit code 0:
+  - [ ] If any fail, fix the specific environment issue (Python version, packages, optional ML libs), then re-run the same verify.
+
+- [x] Verify real CrossEncoder loads and is used for reranking. Requires internet/cache for first run. Verify exit code 0:
     ```bash
     .venv/bin/python -m pytest -q tests/environment/test_cross_encoder_environment.py -m environment
     ```
@@ -258,7 +259,7 @@ PY
   test -f example_data/test.pdf && cp -n example_data/test.pdf data/ || true
   ls -1 data/*.pdf | head -n 1 | cat
   ```
- - [x] Action: Run ingestion (choose one). Verify exit code 0:
+- [x] Action: Run ingestion (choose one). Verify exit code 0:
    - Preferred (host, avoids container package drift):
      ```bash
      .venv/bin/python -m backend.ingest --data-dir data
@@ -299,7 +300,7 @@ PY
     ```bash
     docker compose -f docker/docker-compose.yml exec app python -m cli --question "hello"
     ```
-- [ ] If it fails, capture and fix the first error, then retry the same command.
+  - [ ] If it fails, capture and fix the first error, then retry the same command.
 
 3.7) Streamlit minimal
 - [x] Action: Start only `app`. Verify port 8501 returns 200:
@@ -307,7 +308,7 @@ PY
   docker compose -f docker/docker-compose.yml up -d app
   curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8501
   ```
-- [ ] If it fails, read logs and fix first error, then retry verify:
+  - [ ] If it fails, read logs and fix first error, then retry verify:
   ```bash
   docker compose -f docker/docker-compose.yml logs --tail=200 app | cat
   ```
@@ -316,7 +317,7 @@ PY
 
 4) Comprehensive test suite (ALL test types in tests/)
 4.1) Integration tests (real services via Testcontainers)
-- [ ] Action: Run integration tests. Verify exit code 0:
+- [x] Action: Run integration tests. Verify exit code 0:
   ```bash
   .venv/bin/python -m pytest -q -m integration
   ```

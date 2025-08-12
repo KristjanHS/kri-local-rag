@@ -1,0 +1,165 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:recommended",
+        "security:updates",
+        "docker:pinDigests"
+    ],
+    "dependencyDashboard": true,
+    "rebaseWhen": "behind-base-branch",
+    "timezone": "UTC",
+    "semanticCommits": "enabled",
+    "prHourlyLimit": 2,
+    "prConcurrentLimit": 10,
+    "minimumReleaseAge": "3 days",
+    "enabledManagers": [
+        "pip_requirements",
+        "github-actions",
+        "dockerfile"
+    ],
+    "pip_requirements": {
+        "fileMatch": [
+            "(^|/)requirements(-dev)?\\.txt$"
+        ],
+        "rangeStrategy": "replace"
+    },
+    "packageRules": [
+        {
+            "matchManagers": [
+                "pip_requirements"
+            ],
+            "labels": [
+                "deps",
+                "python"
+            ],
+            "separateMajorMinor": true,
+            "separateMultipleMajor": true
+        },
+        {
+            "matchManagers": [
+                "pip_requirements"
+            ],
+            "matchUpdateTypes": [
+                "major"
+            ],
+            "labels": [
+                "deps",
+                "python",
+                "major"
+            ],
+            "prPriority": -1,
+            "dependencyDashboardApproval": true
+        },
+        {
+            "matchManagers": [
+                "pip_requirements"
+            ],
+            "matchUpdateTypes": [
+                "patch"
+            ],
+            "labels": [
+                "deps",
+                "python",
+                "patch",
+                "automerge"
+            ],
+            "automerge": true,
+            "automergeType": "branch"
+        },
+        {
+            "matchManagers": [
+                "pip_requirements"
+            ],
+            "matchPackagePatterns": [
+                "^pytest($|-.+)"
+            ],
+            "groupName": "pytest ecosystem",
+            "labels": [
+                "deps",
+                "python",
+                "pytest"
+            ],
+            "prPriority": 1
+        },
+        {
+            "matchManagers": [
+                "pip_requirements"
+            ],
+            "matchPackagePatterns": [
+                "^ruff($|-.+)"
+            ],
+            "groupName": "ruff ecosystem",
+            "labels": [
+                "deps",
+                "python",
+                "ruff"
+            ],
+            "prPriority": 1
+        },
+        {
+            "matchManagers": [
+                "pip_requirements"
+            ],
+            "matchPackagePatterns": [
+                "^mypy($|-.+)"
+            ],
+            "groupName": "mypy ecosystem",
+            "labels": [
+                "deps",
+                "python",
+                "mypy"
+            ],
+            "prPriority": 1
+        },
+        {
+            "matchManagers": [
+                "pip_requirements"
+            ],
+            "matchPackagePatterns": [
+                "^sphinx($|-.+)"
+            ],
+            "groupName": "sphinx ecosystem",
+            "labels": [
+                "deps",
+                "python",
+                "sphinx"
+            ],
+            "prPriority": 0
+        },
+        {
+            "matchManagers": [
+                "github-actions"
+            ],
+            "groupName": "GitHub Actions",
+            "labels": [
+                "deps",
+                "ci"
+            ],
+            "separateMajorMinor": false,
+            "matchUpdateTypes": [
+                "minor",
+                "patch"
+            ],
+            "automerge": true,
+            "automergeType": "branch"
+        },
+        {
+            "matchManagers": [
+                "dockerfile"
+            ],
+            "labels": [
+                "deps",
+                "docker"
+            ],
+            "pinDigests": true,
+            "matchUpdateTypes": [
+                "digest"
+            ],
+            "automerge": true,
+            "automergeType": "branch"
+        }
+    ],
+    "schedule": [
+        "before 6am on monday"
+    ]
+}
