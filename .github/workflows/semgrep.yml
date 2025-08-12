@@ -10,6 +10,8 @@ on:
 jobs:
   semgrep:
     name: Sec Scan
+    # Do not run under local act; only on GitHub runners
+    if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-latest
     
     
@@ -32,43 +34,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Fetch at least the immediate parents for better context
           fetch-depth: 2
-      
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-      
-      - name: Install Semgrep
-        run: |
-          python -m pip install --upgrade pip
-          pip install semgrep
-      
-      - name: Semgrep scan
+
+      - name: Semgrep scan (official action)
+        uses: semgrep/semgrep-action@v1
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
-        run: |
-          # Run Semgrep with comprehensive configuration
-          # Only use baseline-commit if we have a valid commit hash
-          BASELINE_COMMIT="${{ github.event.pull_request.base.sha || github.event.before }}"
-          if [ -n "$BASELINE_COMMIT" ] && [ "$BASELINE_COMMIT" != "0000000000000000000000000000000000000000" ]; then
-            semgrep ci \
-              --config auto \
-              --sarif \
-              --output semgrep.sarif \
-              --baseline-commit "$BASELINE_COMMIT" \
-              --verbose \
-              --metrics off
-          else
-            semgrep ci \
-              --config auto \
-              --sarif \
-              --output semgrep.sarif \
-              --verbose \
-              --metrics off
-          fi
+        with:
+          config: auto
+          generateSarif: true
+          output: semgrep.sarif
+          publishToken: ${{ secrets.SEMGREP_APP_TOKEN }}
       
       - name: Summarize Semgrep findings to logs
         if: ${{ always() }}

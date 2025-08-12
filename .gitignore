@@ -1,3 +1,6 @@
+# UV sandbox artifacts
+tools/uv_sandbox/.venv/
+tools/uv_sandbox/.python-version
 # Compiled outputs
 bin/
 *.out
