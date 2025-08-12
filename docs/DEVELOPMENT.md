@@ -137,20 +137,28 @@ Guardrails:
 - `scripts/ingest.sh`: ingest local documents into the system.
 - `scripts/config.sh`: shared config sourced by the other scripts.
 
+
 ## Ingest documents
 
-- Streamlit UI: open `http://localhost:8501` and upload PDFs (ensure services are running; see `docs/docker-management.md`):
-  ```bash
-  docker compose -f docker/docker-compose.yml up -d --build
-  ```
-- Helper script (one-liner ingestion):
-  ```bash
-  ./scripts/ingest.sh <path-to-pdfs>
-  ```
-- Compose profile (batch ingestion):
-  ```bash
-  docker compose -f docker/docker-compose.yml --profile ingest up
-  ```
+Run all checks locally without pushing:
+```bash
+./scripts/promote_dev_to_main.sh --dry-run
+```
+
+Promote (push), or create PR if main is protected:
+```bash
+./scripts/promote_dev_to_main.sh
+./scripts/promote_dev_to_main.sh --create-pr
+```
+
+Optional allow-list file for auto conflict resolution (`.promotion-rules.conf`):
+```text
+# Lines are path prefixes or file names that can be auto-resolved by
+# preferring the source branch during conflict resolution
+README.md
+docs/
+docs_AI_coder/
+```
 
 ## CI: GitHub Actions and Act CLI for local CI
 
