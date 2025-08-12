@@ -43,6 +43,56 @@ For logs, rebuilds, service ops, and troubleshooting, see `docs/docker-managemen
 - Avoid setting `PYTHONPATH`. Use editable installs (`pip install -e .`) and module execution with `-m`.
  - `kri_local_rag.egg-info/` provides package metadata that enables editable installs, dependency resolution, and discovery of modules/entry points by tooling.
 
+## Dependency resolution with uv (while keeping the app pip-only)
+
+This project remains pip-only for application installs and CI. We use `tools/uv_sandbox/` as an isolated, reproducible sandbox to resolve tricky dependency sets and validate compatibility before updating `requirements*.txt`.
+
+When to use the sandbox:
+- Testing new pins or resolving conflicts (e.g., Protobuf 5.x + gRPC + torch + sentence-transformers).
+- Verifying a coherent graph without changing the main venv.
+
+Steps:
+1) Run the sandbox resolver
+```bash
+cd tools/uv_sandbox
+./run.sh
+```
+This will:
+- Create a local venv (`tools/uv_sandbox/.venv`)
+- Use CPU-only wheels via `PIP_EXTRA_INDEX_URL`/`UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`
+- Check lockfile state (`uv lock --check`), sync without mutation (`uv sync --frozen`)
+- Validate with `uv pip check` and display `uv tree`
+
+2) Inspect results
+```bash
+uv tree | less
+```
+Key targets we monitor: `protobuf` (5.x), `grpcio` (1.63.x), `torch` (2.7.x CPU), `sentence-transformers` (5.x), `weaviate-client`, `langchain`, `streamlit`.
+
+3) Propagate pins to pip
+- Copy the confirmed versions for direct dependencies into `requirements.txt` (runtime) and `requirements-dev.txt` (tooling). Keep transitive pins in `constraints.txt` if needed.
+- Reinstall locally and re-check:
+```bash
+.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pip check
+.venv/bin/python -m pytest --test-core
+```
+
+4) CI and Docker
+- Ensure CI jobs install with the CPU wheels index when torch is present:
+  - Either set `PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu`
+  - Or pass `--extra-index-url` to pip in the workflow steps
+- Build the Docker image and verify runtime imports (CPU-only torch expected):
+```bash
+DOCKER_BUILDKIT=1 docker build -f docker/app.Dockerfile -t kri-local-rag:local .
+docker run --rm kri-local-rag:local python -c 'import torch,google.protobuf,grpc; print(torch.__version__, torch.cuda.is_available())'
+```
+
+Guardrails:
+- Do not add `uv` to application install paths or CI envs; it is a tooling-only sandbox.
+- Avoid `--locked --frozen` together; use `uv lock --check` + `uv sync --frozen`.
+- Keep `.venv` under `tools/uv_sandbox/` untracked; commit `pyproject.toml` and `uv.lock` when relevant.
+
 ## More docs
 - Detailed guidance used mostly by AI coder: `docs_AI_coder/AI_instructions.md`
  - Docker management and troubleshooting: `docs/docker-management.md`
