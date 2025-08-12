@@ -43,6 +43,10 @@ jobs:
           python -m pip uninstall -y "opentelemetry-instrumentation-requests" || true
           python -m pip uninstall -y "opentelemetry-semantic-conventions" || true
           python -m pip uninstall -y "opentelemetry-util-http" || true
+          # Semgrep and OTLP exporters may be preinstalled in act images; remove to avoid pip check noise
+          python -m pip uninstall -y "semgrep" || true
+          python -m pip uninstall -y "opentelemetry-exporter-otlp-proto-http" || true
+          python -m pip uninstall -y "opentelemetry-exporter-otlp-proto-common" || true
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -90,6 +94,10 @@ jobs:
           python -m pip uninstall -y "opentelemetry-instrumentation-requests" || true
           python -m pip uninstall -y "opentelemetry-semantic-conventions" || true
           python -m pip uninstall -y "opentelemetry-util-http" || true
+          # Semgrep and OTLP exporters may be preinstalled in act images; remove to avoid pip check noise
+          python -m pip uninstall -y "semgrep" || true
+          python -m pip uninstall -y "opentelemetry-exporter-otlp-proto-http" || true
+          python -m pip uninstall -y "opentelemetry-exporter-otlp-proto-common" || true
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

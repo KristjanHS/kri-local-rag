@@ -156,9 +156,9 @@ The core strategy remains to leverage `uv` for diagnostics and pinning, but the 
   - [ ] Validate `analyze@v3` inputs against official docs; if `output` is unsupported, remove it and adjust the local summary step accordingly
   - [ ] Keep uploads enabled only on GitHub (skip on forks and under Act), and enforce via branch protection rather than hard-fail
 - Semgrep workflow
-  - [ ] Ensure robust baseline: add a step to unshallow history before scan (`git fetch --prune --unshallow || true`), or fetch base commit for PRs
-  - [ ] Pin Semgrep version (e.g., `pip install semgrep==<minor>`) to reduce surprise breakages; revisit quarterly to bump
-  - [ ] Keep SARIF upload skipped for forked PRs; consider two-job upload pattern if uploads are needed for forks
+  - [x] Ensure robust baseline: add a step to unshallow history before scan (`git fetch --prune --unshallow || true`), or fetch base commit for PRs
+  - [x] Switch to official Semgrep Docker action; do not run under local act
+  - [x] Keep SARIF upload skipped for forked PRs; consider two-job upload pattern if uploads are needed for forks
 - Pre-push (local)
   - [ ] Make pre-push resilient if `act` is missing: detect and skip with a clear message
   - [ ] Add `SKIP_LOCAL_SEC_SCANS=1` guard to optionally skip Semgrep/CodeQL locally when needed
