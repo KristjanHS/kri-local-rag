@@ -313,11 +313,27 @@ def ensure_weaviate_ready_and_populated():
 
             create_collection_if_not_exists(client, COLLECTION_NAME)
 
-            # Ingest example data to ensure all modules are warm, then remove it.
+            # Ingest example data to ensure all modules are warm; hard-fail if it's missing.
             # Get the absolute path to the project root, which is the parent of the 'backend' directory
             project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            logger.debug("Resolved project_root: %s", project_root)
+            # Only accept project-root example_data when running outside Docker
             example_data_path = os.path.join(project_root, "example_data")
-            ingest(example_data_path)
+            logger.debug(
+                "Checking example_data_path: %s (exists=%s)",
+                example_data_path,
+                os.path.isdir(example_data_path),
+            )
+            if not os.path.isdir(example_data_path):
+                raise FileNotFoundError(f"Directory not found: '{example_data_path}'")
+
+            # Prefer a minimal warmup using only the example PDF to avoid heavy markdown deps
+            test_pdf_path = os.path.join(example_data_path, "test.pdf")
+            if not os.path.isfile(test_pdf_path):
+                raise FileNotFoundError(f"File not found: '{test_pdf_path}'")
+
+            logger.info("   → Ingesting example test PDF from %s", test_pdf_path)
+            ingest(test_pdf_path, collection_name=COLLECTION_NAME)
 
             # Clean up the example data now that the schema is created.
             # This check is important in case the example_data folder was empty.

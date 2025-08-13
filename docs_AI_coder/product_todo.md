@@ -136,6 +136,42 @@ Reserved for new topic/tasks
   - Action: Keep `requirements.txt` stable and separate dev/runtime dependencies (`requirements-dev.txt` vs runtime). Ensure `docker/app.Dockerfile` installs only runtime deps to preserve cache.
   - Verify: Code-only changes do not invalidate the dependency install layer; rebuilds are fast.
 
+#### P5.2 — NLTK data setup - to make .md ingestion work (deterministic and reproducible)
+
+- [ ] Replace brittle inline NLTK downloads in Docker with official downloader CLI
+  - Action: In `docker/app.Dockerfile`, replace the current `python -c "import nltk; ..."` with:
+    ```Dockerfile
+    RUN mkdir -p /opt/venv/nltk_data \
+        && ${VENV_PATH}/bin/python -m nltk.downloader -d /opt/venv/nltk_data punkt punkt_tab
+    ```
+  - Action: Remove any `|| true` so the build fails fast if downloads fail.
+  - Verify: A fresh build succeeds and the layer contains `tokenizers/punkt` and `tokenizers/punkt_tab` under `/opt/venv/nltk_data`.
+
+- [ ] Establish a single data path via `NLTK_DATA`
+  - Action: Keep `ENV NLTK_DATA=/opt/venv/nltk_data` in Docker. For local dev, document using `export NLTK_DATA="$(pwd)/.venv/nltk_data"`.
+  - Verify: `python -c "import nltk.data; print(nltk.data.path)"` includes the expected path in both envs.
+
+- [ ] Local dev parity: documented bootstrap
+  - Action: In `docs/DEVELOPMENT.md`, add a snippet for devs:
+    ```bash
+    export NLTK_DATA="$(pwd)/.venv/nltk_data"
+    mkdir -p "$NLTK_DATA"
+    .venv/bin/python -m nltk.downloader -d "$NLTK_DATA" punkt punkt_tab
+    ```
+  - Verify: On a clean venv, the commands complete and `nltk.data.find('tokenizers/punkt')` succeeds.
+
+- [ ] Startup verification with clear error
+  - Action: Add a lightweight check at app startup (or first-use path) to assert NLTK resources exist, e.g. `nltk.data.find('tokenizers/punkt')`, and raise a helpful message if missing.
+  - Verify: When the data is removed/absent, the app fails fast with a clear remediation hint referencing the dev/Docker steps above.
+
+- [ ] Pin library version for stability
+  - Action: Pin `nltk` to a known-working version in `requirements.txt` (runtime) and `requirements-dev.txt` if needed.
+  - Verify: Rebuild/install resolves the pinned version; tokenization works as before.
+
+- [ ] Optional: Offline/CI artifacts for corpora
+  - Action: For fully offline or hermetic builds, package the required subset of `nltk_data` as a build artifact (e.g., tarball) and add a Docker build step to extract it to `/opt/venv/nltk_data` with checksum verification.
+  - Verify: Docker build succeeds without network when the artifact is provided; app runs and passes the startup verification.
+
 #### P6 — E2E testing Tasks (CLI and Streamlit)
 
   - [ ] Create dedicated UI dependency extra (isolate Playwright)

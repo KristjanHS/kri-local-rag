@@ -55,6 +55,7 @@ services:
       - ../frontend:/app/frontend # Live frontend code
       - ../tests:/app/tests # Live tests
       - ../data:/app/data # Live data access
+      - ../example_data:/app/example_data:ro # Ensure example_data matches project layout
       - ../logs:/app/logs # Live log access
       - ../tests:/app/tests # Mount tests for in-container testing
       - hf_cache:/root/.cache/huggingface

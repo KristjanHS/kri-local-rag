@@ -29,6 +29,7 @@ unstructured[pdf]==0.14.8
 PyMuPDF>=1.24.10
 pdfplumber>=0.11.0
 langdetect
+markdown>=3.6
 
 # Image processing
 pillow>=11.1.0

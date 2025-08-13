@@ -44,6 +44,10 @@ logger = get_logger(__name__)
 
 def load_and_split_documents(path: str) -> List[Document]:
     """Load documents from a directory or a single file, then split into chunks."""
+    # Fast path: if the path does not exist, skip gracefully
+    if not os.path.exists(path):
+        logger.warning(f"Path not found: '{path}'. Skipping ingestion.")
+        return []
     # Choose the most robust/accurate PDF loader available in this environment
     pdf_loader_cls = PyPDFLoader
     try:
