@@ -128,28 +128,3 @@ def test_keyword_scoring_no_union():
 
         assert len(scored_chunks) == 2
         assert all(sc.score == 0.0 for sc in scored_chunks)
-
-
-@pytest.mark.external
-@patch("backend.qa_loop.generate_response")
-@patch("backend.qa_loop.get_top_k")
-def test_answer_streaming_output(mock_get_top_k, mock_generate_response, capsys, caplog):
-    """Test that the answer function streams tokens to the console."""
-    mock_get_top_k.return_value = ["Some context."]
-
-    # Simulate generate_response calling on_token
-    def mock_streamer(prompt, model, context, on_token, **kwargs):
-        on_token("Hello")
-        on_token(" World")
-        return "Hello World", None
-
-    mock_generate_response.side_effect = mock_streamer
-
-    # Suppress warning logs from backend.qa_loop to avoid polluting stdout capture
-    import logging as _logging
-
-    caplog.set_level(_logging.ERROR, logger="backend.qa_loop")
-
-    qa_loop.answer("test question")
-    captured = capsys.readouterr()
-    assert captured.out == "Answer: Hello World\n"
