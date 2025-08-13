@@ -224,7 +224,7 @@ jobs:
       - name: Run core test suite (everything except UI)
         # Enforce coverage threshold for core suite
         run: |
-          python -m pytest -v --test-core --cov-fail-under=60 \
+          python -m pytest -v --test-core -n auto --cov-fail-under=60 \
             --html=reports/report_core.html --self-contained-html \
             --junitxml=reports/junit_core.xml
       - name: Upload core suite reports

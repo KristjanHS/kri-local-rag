@@ -72,6 +72,14 @@ act pull_request -j lint --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a 
 log INFO "Running fast_tests via act (pull_request) …" | tee -a "$LOG_FILE"
 act pull_request -j fast_tests --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
 
+# Run local Semgrep via pipx (isolated) unless skipped
+if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
+  log INFO "Running Semgrep (local) via pipx …" | tee -a "$LOG_FILE"
+  bash "$SCRIPT_DIR/semgrep_local.sh" 2>&1 | tee -a "$LOG_FILE" || true
+else
+  log INFO "Skipping Semgrep due to SKIP_LOCAL_SEC_SCANS=1" | tee -a "$LOG_FILE"
+fi
+
 # Optional: run CodeQL locally (informational)
 if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
   log INFO "Running CodeQL (informational) via act …" | tee -a "$LOG_FILE"

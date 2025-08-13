@@ -139,3 +139,60 @@ This file records tasks that have been completed and moved out of the active TOD
       - [x] Update unit tests to assert `pytest_socket.SocketBlockedError` explicitly instead of generic `Exception`
       - [x] Reduce `UnitNetGuard` diagnostic log level from WARNING to INFO to avoid noisy test output
 - Skeptic checks considered: ensured detection isn’t masked by OS errors; reviewed shared fixtures; verified serial vs. parallel behavior
+
+#### P1 — Stabilization and Finalization
+ 
+- [x] Finalize: Full suite green
+  - Action: Run the full suite locally; then update CI if needed.
+  - Verify: `.venv/bin/python -m pytest -q -m "not environment" --disable-warnings` passes with 0 failures.
+
+#### P2 — CI pipeline separation and test architecture tasks
+
+- [x] P2.1 — Split test suites and defaults (unit/integration with coverage vs. UI/E2E without coverage)
+  - Action: Adjusted `addopts` in `pyproject.toml` to exclude UI/E2E tests by default. Added `pytest` options (`--test-core`, `--test-ui`) in `tests/conftest.py` to run specific suites.
+  - Verify: `pytest --test-core` runs the core suite with coverage. `pytest --test-ui --no-cov` runs the UI suite without coverage.
+
+- [x] P2.2 — Prefer marker selection over runtime skip hooks
+  - Action: Added a `pytest_collection_modifyitems` hook in `tests/e2e_streamlit/conftest.py` that raises a `pytest.UsageError` if UI tests are run with coverage enabled. Marked Playwright tests with `@pytest.mark.ui`.
+  - Verify: Running UI tests with coverage fails early with a clear error message.
+
+- [x] P2.3 — Simplify logging; drop per-test file handlers
+  - Action: Removed `pytest_runtest_setup/teardown/logreport` hooks from `tests/conftest.py`.
+  - Verify: Logging now relies entirely on the centralized `log_cli`/`log_file` configuration in `pyproject.toml`.
+
+- [x] P2.4 — Standardize Docker management via pytest-docker
+  - Action: Removed the custom `docker_services` and `test_log_file` fixtures from `tests/conftest.py`, relying on the `pytest-docker` plugin.
+  - Verify: Integration tests still pass, with service management handled by the plugin.
+
+- [x] P2.5 — Normalize markers and directories
+  - Action: Added a `ui` marker and ensured test selection commands work correctly.
+  - Verify: `pytest --test-ui` selects only Playwright tests; `pytest --test-core` excludes them.
+
+- [x] P2.6 — Coverage configuration hardening
+  - Action: Configured `.coveragerc` and `pyproject.toml` to store coverage data in `reports/coverage/`. The UI test suite guard ensures it is run with `--no-cov`.
+  - Verify: `.coverage` files no longer appear in the project root.
+
+ - [x] P2.7 — CI pipeline separation
+  - Action: Split CI into two jobs: `tests-core` (coverage) and `tests-ui` (no coverage). Publish coverage from core job only.
+  - Verify: CI runs green; core job uploads coverage HTML; Playwright browsers cached for UI job.
+
+- [x] P2.8 — Developer docs and DX commands
+  - Action: Updated `docs/DEVELOPMENT.md` and `docs_AI_coder/AI_instructions.md` with new `pytest` options.
+  - Verify: Documentation reflects the new testing commands.
+
+ - [x] P2.9 — Optional hardening for unit/fast test suites
+    - Post-cleanup follow-ups (keep unit suite fast and deterministic)
+      - [x] Make per-test diagnostic fixture a no-op by default
+        - Action: Update `tests/unit/conftest.py::_log_socket_block_status` to return immediately unless `UNITNETGUARD_FAIL_FAST=1` is set; avoid doing any socket probe/logging on the default path.
+        - Verify: `.venv/bin/python -m pytest -q tests/unit` remains green; wall time improves vs current.
+      - [x] Keep fail-fast as an opt-in toggle only
+        - Action: Document in `docs_AI_coder/AI_instructions.md` that setting `UNITNETGUARD_FAIL_FAST=1` enables the per-test probe and immediate failure on first detection.
+        - Verify: With `UNITNETGUARD_FAIL_FAST=1`, the first victim is reported; without it, suite runs with no per-test probe.
+      - Rationale: Best practice with `pytest-socket` is to rely on a session-level block plus targeted opt-in allowances. A default per-test network probe adds overhead and can mask offenders; keeping it behind an env flag provides rapid diagnosis without slowing normal runs.
+    - Speed up feedback
+      - [x] Add `pytest-xdist` and run fast tests with `-n auto` in CI for quicker PR feedback
+        - [x] Add dependency to test extras and local env; verify `pytest -q -n auto tests/unit` passes
+        - [x] Update CI workflow to use `-n auto` for the fast/core job
+  - Guard against accidental real clients in unit tests
+    - [x] Add a unit-scope fixture that monkeypatches `weaviate.connect_to_custom` to raise if called (unless explicitly patched in a test)
+    - [x] Verify: a unit test calling real `connect_to_custom` fails; patched tests still pass

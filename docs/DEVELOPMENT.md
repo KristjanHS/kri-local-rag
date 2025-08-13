@@ -13,6 +13,11 @@ source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements-dev.txt
 pip install -e .
+# Install Semgrep in a separate, tool-managed environment (isolated from .venv)
+# pipx is recommended for best performance and isolation
+python -m pip install --user pipx || true
+python -m pipx ensurepath || true
+pipx install --force semgrep
 ```
 
 ## Run the app (CLI QA loop)
@@ -121,6 +126,11 @@ For comprehensive information about GitHub Actions, Act CLI, and local CI testin
 - Skip local security scans in pre-push when needed:
   ```bash
   SKIP_LOCAL_SEC_SCANS=1 git push
+  ```
+- Local Semgrep (isolated from .venv):
+  ```bash
+  # Using pipx-managed Semgrep
+  pipx run semgrep ci --config auto --metrics off --sarif --output semgrep_local.sarif
   ```
 - Manual CI: `./scripts/ci_act.sh`
 - Cleanup: `./scripts/cleanup_docker_and_ci_cache.sh`
