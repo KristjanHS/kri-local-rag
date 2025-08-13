@@ -45,39 +45,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
 
 #### P0 — Must do now (stability, forward-compat, fast feedback)
 
-- **Fix 5 failing tests (network blocking and heavyweight model downloads)**
-  - Plan (small, incremental steps)
-    - [x] Enable sockets per-test for all non-unit suites (integration, environment, e2e, docker)
-      - [x] Action: Add/update autouse fixtures in each suite's `conftest.py` to enable sockets at test start and restore blocking at test end. Update root guard in `tests/conftest.py` to also allow `e2e` (currently allows only integration/slow/docker).
-      - [x] Verify: Run a representative test from each suite; confirm no `SocketBlockedError` and real connections are attempted.
-    - [x] Use real models in non-unit tests where applicable
-      - [x] Action: Ensure integration/environment tests instantiate real `SentenceTransformer`/`CrossEncoder` as written; do not use dummy embedders.
-      - [x] Verify: `tests/integration/test_ingest_pipeline.py::{test_ingest_pipeline_loads_and_embeds_data,test_ingest_pipeline_is_idempotent}` now use the real model.
-    - [x] Do not skip non-unit tests on missing external components
-      - [x] Action: Remove graceful skips everywhere (fixtures and tests). Specifically:
-        - [x] Drop skip logic from `tests/integration/test_ingest_pipeline.py::weaviate_client`.
-        - [x] Remove Docker pre-check skip from `tests/integration/test_weaviate_integration.py`.
-      - [x] Verify: When external components are unavailable, these tests fail, surfacing the issue.
-    - [x] Use real external components in non-unit tests
-      - [x] Action: Ensure integration/env/e2e/docker tests target real services and models; no dummy stand-ins. Keep only mocks where a test explicitly verifies mocked behavior.
-      - [x] Verify: `tests/integration/test_vectorizer_enabled_integration.py` uses live Weaviate; ingestion tests use real `SentenceTransformer`; environment tests download required models. The container lifecycle test should pass when Docker is available; if not available, it should fail clearly.
-    - [x] Re-run the 5 previously failing tests
-      - [x] Action: `pytest -q` targeted to those tests only.
-      - [x] Verify: All five pass; failures should point to missing externals rather than being skipped.
-
-  - **Container lifecycle and network policy corrections (from recent changes)**
-    - [x] Align non-unit test behavior with "no graceful skip" policy
-      - [x] Action: Update `tests/conftest.py::docker_services` to FAIL if Docker/daemon is unavailable instead of calling `pytest.skip` (only for non-unit suites). Keep the in-container CI guard (`/.dockerenv`) as-is.
-      - [x] Verify: Run an integration test with Docker stopped; expect a clear failure explaining Docker is required (not a skip).
-    - [x] Enforce teardown in CI; keep-up only for local iterations
-      - [x] Action: In CI workflows, set `TEARDOWN_DOCKER=1` (or pass `--teardown-docker`) so the session fixture tears down services. Keep local default as keep-up for fast iterations.
-      - [x] Verify: CI logs show `docker compose down -v` after tests; no leftover CI containers/volumes.
-    - [x] Document fast-iteration defaults and the wrapper script
-      - [x] Action: Add a short section to `docs/DEVELOPMENT.md` describing: default keep-up policy, `--teardown-docker` and env toggles (`KEEP_DOCKER_UP`, `TEARDOWN_DOCKER`), and usage of `scripts/pytest_with_cleanup.sh`.
-      - [x] Verify: Follow the doc steps locally to run `scripts/pytest_with_cleanup.sh -m integration` (keeps up by default) and with `--teardown-docker` (cleans up compose and Testcontainers).
-    - [x] Ensure sockets are enabled per-suite for all non-unit tests
-      - [x] Action: Confirm we have autouse fixtures that temporarily `enable_socket()` in `tests/integration/`, `tests/environment/`, and `tests/e2e/` (added). No suite should rely on global allow-all.
-      - [x] Verify: Representative tests in each suite can reach real services without `SocketBlockedError` while unit tests remain blocked by default.
+Archived on 2025-08-13
 
 #### P1 — ...
 
@@ -100,7 +68,7 @@ No tasks here at the moment
      - [x] Implement a minimal, safe fix in code
       - [x] Add/adjust a unit test if applicable — Added timeout assertions for Ollama HTTP calls in `tests/unit/test_ollama_client_unit.py`
   4) Verify locally
-     - [ ] Re-run pre-push; confirm Semgrep has no blocking findings
+     - [x] Re-run pre-push; confirm Semgrep has no blocking findings
        - [BLOCKED: pre-push stops at lint due to protobuf constraint mismatch; Semgrep job run directly reports 0 blocking findings]
 
 #### P4 — CI/SAST enforcement
@@ -150,6 +118,34 @@ No tasks here at the moment
   - [ ] Ensure `ruff` version in pre-commit matches the CI action version (`0.5.3` today)
 
 #### P6 — E2E testing Tasks (CLI and Streamlit)
+
+  - [ ] Create dedicated UI dependency extra (isolate Playwright)
+    - [ ] Action: In `pyproject.toml`, move `pytest-playwright==0.4.4` and `playwright>=1.45,<2` out of the `test` extra and define a new extra: `[project.optional-dependencies].ui = ["pytest-playwright==0.4.4", "playwright>=1.45,<2"]`.
+    - [ ] Action: Ensure default local/dev installs do NOT include `ui` (e.g., keep `-e .[test,docs,cli]`).
+    - [ ] Verify: A fresh `pip install -e .[test,docs,cli]` does not install Playwright; `python -m playwright` is not available until `-e .[ui]` is installed.
+
+  - [ ] CI dependency isolation for UI suite
+    - [ ] Action: In `.github/workflows/python-lint-test.yml`, ensure only the UI job installs the UI extra (e.g., `pip install -e .[ui]` or `-e .[test,docs,cli,ui]` if those are needed there).
+    - [ ] Action: In the same UI job, run `python -m playwright install --with-deps` before executing tests; remove any Playwright installs from non-UI jobs.
+    - [ ] Verify: `act pull_request -j ui_tests_act` shows the UI extra being installed and browsers installed; `-j fast_tests`/`-j core_suite` do not install Playwright nor browsers.
+
+  - [ ] Document isolated UI workflow for developers
+    - [ ] Action: Update `docs/DEVELOPMENT.md` to show two paths:
+      - Regular dev: `pip install -e .[test,docs,cli]` (no Playwright)
+      - UI run: `pip install -e .[ui] && python -m playwright install --with-deps && pytest --test-ui --no-cov`
+    - [ ] Verify: Follow the doc steps on a clean venv; UI tests only run after installing the `ui` extra and browsers.
+
+  - [ ] Playwright dependency explicit pin (stability)
+    - [ ] Action: In `pyproject.toml` add `"playwright>=1.45,<2"` to `[project.optional-dependencies].test` next to `pytest-playwright==0.4.4`, then reinstall dev deps.
+    - [ ] Verify: `.venv/bin/python -m playwright --version` succeeds; `.venv/bin/python -m pytest --test-ui --no-cov -q` collects and runs UI tests.
+
+  - [ ] Trim CI Playwright browser installs to UI jobs only (simplify CI)
+    - [ ] Action: In `.github/workflows/python-lint-test.yml`, remove Playwright browser install steps from non-UI jobs (e.g., `core_suite`). Keep them only where `--test-ui` (or other Playwright tests) actually run.
+    - [ ] Verify: `act pull_request -j fast_tests` and `-j core_suite` show no Playwright install step; `-j ui_tests_act` still installs browsers and runs UI tests.
+
+  - [ ] Simplify UI coverage gating (reduce custom logic)
+    - [ ] Action: In `tests/e2e_streamlit/conftest.py`, simplify the collection hook to only enforce: if `--test-ui` is used while coverage is enabled, raise a clear `pytest.UsageError`. Rely on default `-m "not ui"` from `pyproject.toml` to exclude UI tests in normal runs; drop verbose coverage detection/deselect logic if not needed.
+    - [ ] Verify: `.venv/bin/python -m pytest -q` runs green with UI tests deselected; `.venv/bin/python -m pytest --test-ui --no-cov -q` runs UI tests; `.venv/bin/python -m pytest --test-ui -q` errors with the expected usage message.
 
   - [ ] Streamlit E2E: Improve locator resilience (only if still flaky)
     - Action: Switch input selection to `get_by_label("Ask a question:")`, keep `[data-testid]` for answers, and if needed add `page.wait_for_function` to await `TEST_ANSWER` text.
@@ -205,15 +201,39 @@ No tasks here at the moment
 
 #### P8.1 — Socket handling simplification (follow-up)
 
-- [ ] Simplify unit-only socket blocking configuration
-  - [ ] Action: In `tests/unit/conftest.py`, remove the `markexpr` heuristic from `_disable_network_for_unit_tests` (unit scope already limits it to unit tests).
-  - [ ] Action: Remove stack-based exceptions in `_guard_against_enable_socket_misuse`; keep a simple guard that allows `allow_network` only.
-  - [ ] Verify: `pytest -q -k network_block_unit` shows unit blocking still enforced; `-m integration` remains green.
+Archived on 2025-08-13
 
-- [ ] Remove unnecessary socket toggles in non-unit fixtures
-  - [ ] Action: In `tests/conftest.py::docker_services`, drop temporary `enable_socket()/disable_socket()` — sockets are allowed by default now.
-  - [ ] Action: Remove no-op network fixtures/comments in `tests/integration/`, `tests/environment/`, and `tests/e2e/` where not needed.
-  - [ ] Verify: `pytest -q -m integration`, `-m environment`, and E2E single tests still pass locally.
+#### P8.2 — Test path trust and tagging simplification
+
+- Goal: Make test type derive from path (source of truth) and simplify markers to align with best practices.
+- Plan (small, incremental steps)
+  1) Enforce path-derived default markers
+     - [ ] Action: Add/adjust a `pytest_collection_modifyitems` hook in `tests/conftest.py` to auto-apply markers by path:
+       - `tests/unit/` → `unit`
+       - `tests/integration/` → `integration`
+       - `tests/environment/` → `environment`
+       - `tests/e2e/` → `e2e`
+       - `tests/e2e_streamlit/` → `ui`
+       - `tests/docker/` → `docker`
+     - [ ] Verify: `pytest --co -q` shows sample items with expected markers.
+  2) Tighten fast suite selection
+     - [x] Action: Ensure `--test-fast` collects only from `tests/unit/` and sets `UNIT_ONLY_TESTS=1` to enforce early socket block.
+     - [ ] Verify: `.venv/bin/python -m pytest --test-fast -q` is green; no external network attempts appear in logs.
+  3) Audit and relocate miscategorized tests
+     - [ ] Action: Scan for tests under `tests/unit/` importing heavy/external services or carrying non-unit markers; move them to the correct directory (usually `tests/integration/`).
+     - [ ] Verify: Re-run `--test-fast`; confirm it remains green and faster. Run `-m integration` to ensure moved tests are collected there.
+  4) Simplify explicit markers
+     - [ ] Action: Remove redundant `@pytest.mark.<type>` where the path already determines the type; keep only additional markers like `slow`, `ui`, or `docker` when needed.
+     - [ ] Verify: `pytest -q` collects the same tests as before; diffs show only marker removals.
+  5) Guardrail: reject mismatched path/marker
+     - [ ] Action: In `pytest_collection_modifyitems`, error if a test under `tests/unit/` has markers `integration`, `e2e`, `docker`, or `environment` (and vice versa when appropriate).
+     - [ ] Verify: Introduce a deliberate mismatch in a temporary branch; confirm collection fails with a clear message; revert.
+  6) Documentation
+     - [ ] Action: Update `docs/DEVELOPMENT.md` to document that path determines test type; markers are optional for extra semantics only. Document `--test-fast`, `--test-core`, `--test-ui` behavior.
+     - [ ] Verify: Follow the doc to run each suite locally; results match expectations.
+  7) CI alignment
+     - [ ] Action: Keep the CI "Fast Tests" job on `--test-fast`. Add a lightweight job or step to run `pytest --check-test-paths` (via env/flag) to enforce the guardrail in PRs.
+     - [ ] Verify: Open a draft PR with an intentional mismatch; CI step fails with a helpful message; revert.
 
 #### P9 — Soon (quality, CI structure, performance)
 - [ ] Expand unit test coverage, focusing on core logic and error paths.

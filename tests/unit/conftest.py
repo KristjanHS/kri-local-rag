@@ -52,13 +52,6 @@ def _disable_network_for_unit_tests(pytestconfig: pytest.Config):
     except Exception as exc:  # pragma: no cover - make failure explicit
         raise RuntimeError("pytest-socket must be installed for unit tests to run with network disabled.") from exc
 
-    # Apply only to unit tests: skip disabling when running non-unit suites
-    # Heuristic: if -m selects integration/e2e/environment/docker/ui, do not disable here
-    markexpr = getattr(pytestconfig.option, "markexpr", "") or ""
-    if any(k in markexpr for k in ("integration", "e2e", "environment", "docker", "ui")):
-        yield
-        return
-
     disable_socket(allow_unix_socket=True)
     # Verify blocking is active; fail fast if not
     # Lightweight verification: ensure connect() is intercepted by pytest-socket
@@ -187,9 +180,6 @@ def _guard_against_enable_socket_misuse():
     the test opted-in via the allow_network fixture.
     """
     try:
-        import logging
-        import traceback
-
         import pytest_socket as _ps  # type: ignore
 
         original_enable = getattr(_ps, "enable_socket", None)
@@ -198,32 +188,9 @@ def _guard_against_enable_socket_misuse():
             return
 
         def _guarded_enable_socket(*args, **kwargs):  # type: ignore[no-redef]
-            # Allow non-unit suites (integration/environment/e2e/docker/ui) to enable sockets
-            stack = "".join(traceback.format_stack(limit=25))
-            if (
-                "tests/integration/" in stack
-                or "tests/environment/" in stack
-                or "tests/e2e/" in stack
-                or "tests/e2e_streamlit/" in stack
-                or "tests/docker/" in stack
-            ):
-                return original_enable(*args, **kwargs)
-
+            # Simple guard: only allow when the test opted in via allow_network
             if not _allow_network_active:
-                msg = (
-                    "UnitNetGuard: enable_socket() called during unit tests without allow_network. "
-                    f"nodeid={_current_nodeid}\n" + "".join(traceback.format_stack(limit=15))
-                )
-                logging.getLogger("UnitNetGuard").error(msg)
-                # Also append a concise line to the session log for quick grep
-                try:
-                    from pathlib import Path
-
-                    with (Path("reports") / "test_session.log").open("a") as f:
-                        f.write(f"UnitNetGuard: enable_socket misuse at { _current_nodeid }\n")
-                except Exception:
-                    pass
-                raise AssertionError(msg)
+                raise AssertionError("UnitNetGuard: enable_socket() called during unit tests without allow_network.")
             return original_enable(*args, **kwargs)
 
         # Apply guard

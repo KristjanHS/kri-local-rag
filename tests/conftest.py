@@ -18,6 +18,15 @@ def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: D401
     """Ensure report directories exist before any logging is configured."""
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    # When running the fast (unit-only) suite, enforce socket blocking early in the session
+    try:
+        if os.environ.get("UNIT_ONLY_TESTS") == "1":
+            from pytest_socket import disable_socket  # type: ignore
+
+            disable_socket(allow_unix_socket=True)
+    except Exception:
+        # Best-effort: if the plugin isn't available, continue; unit suite will still run
+        pass
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -114,6 +123,8 @@ def _apply_suite_shortcuts(config: pytest.Config) -> None:
         config.option.markexpr = (
             "not ui and not e2e and not docker and not environment and not integration and not slow"
         )
+        # Signal unit-only run so unit conftest can enforce early socket blocking
+        os.environ["UNIT_ONLY_TESTS"] = "1"
 
     if core:
         # Core: everything except UI tests; may include integration/slow depending on selection
@@ -187,6 +198,18 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     """Narrow to Streamlit UI directory when --test-ui is used."""
     if not items:
         return
+    # When running the fast (unit-only) suite, deselect anything outside tests/unit
+    if bool(getattr(config.option, "test_fast", False)):
+        keep_fast: list[pytest.Item] = []
+        deselect_fast: list[pytest.Item] = []
+        for item in items:
+            if "tests/unit/" in str(item.fspath):
+                keep_fast.append(item)
+            else:
+                deselect_fast.append(item)
+        if deselect_fast:
+            config.hook.pytest_deselected(items=deselect_fast)
+            items[:] = keep_fast
     if bool(getattr(config.option, "test_ui", False)):
         keep: list[pytest.Item] = []
         deselect: list[pytest.Item] = []
@@ -252,15 +275,7 @@ def docker_services(request, test_log_file):
     # Docker is available, manage the services
     console.print("\n--- Setting up Docker services for testing ---")
 
-    # Ensure sockets are enabled while bringing up services and performing readiness checks
-    _sockets_enabled = False
-    try:
-        from pytest_socket import disable_socket, enable_socket  # type: ignore
-
-        enable_socket()
-        _sockets_enabled = True
-    except Exception:
-        pass
+    # Sockets are allowed by default in non-unit suites; no explicit toggling needed
 
     with open(test_log_file, "a") as log:
         # --- Configure a file handler for the test-specific log file ---
@@ -392,14 +407,7 @@ def docker_services(request, test_log_file):
     except Exception as e:
         console.print(f"✗ Failed to tear down Docker services: {e}")
     finally:
-        # Restore socket blocking at session end if we enabled it
-        if _sockets_enabled:
-            try:
-                from pytest_socket import disable_socket  # type: ignore
-
-                disable_socket(allow_unix_socket=True)
-            except Exception:
-                pass
+        pass
 
 
 @pytest.fixture(scope="session")
