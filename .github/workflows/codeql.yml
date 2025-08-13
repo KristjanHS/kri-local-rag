@@ -4,7 +4,8 @@ on:
   push:
     branches: ["main"]
   pull_request:
-    branches: ["main"]
+    # Run on all PRs regardless of branch to cover Renovate updates
+    # (branch protection should require this check)
   schedule:
     - cron: "0 2 * * 1"  # weekly, Mon 02:00 UTC
   workflow_dispatch:  # Allow manual triggering
@@ -57,15 +58,22 @@ jobs:
           category: "/language:${{ matrix.language }}"
           # Skip upload under Act and forked PRs; still produce SARIF locally
           upload: ${{ github.actor != 'nektos/act' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
-          output: codeql-results.sarif
 
       - name: Summarize CodeQL findings (local only)
-        if: ${{ env.ACT == 'true' || github.actor == 'nektos/act' }}
+        if: ${{ github.actor == 'nektos/act' }}
         run: |
           python - <<'PY'
           import json, sys, os, glob
           # The SARIF file may be in a subdirectory when multiple languages are scanned
-          sarif_files = glob.glob('codeql-results.sarif/**/*.sarif', recursive=True)
+          candidates = [
+              'codeql-results/**/*.sarif',
+              'codeql-results.sarif/**/*.sarif',
+              'codeql-results.sarif',
+              '*.sarif'
+          ]
+          sarif_files = []
+          for pat in candidates:
+              sarif_files.extend(glob.glob(pat, recursive=True))
           if not sarif_files:
               # Fallback for single-language scan
               sarif_files = ['codeql-results.sarif'] if os.path.isfile('codeql-results.sarif') else []

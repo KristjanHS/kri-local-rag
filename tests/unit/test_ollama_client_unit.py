@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from typing import cast
+
 import httpx
 import pytest
 
@@ -83,3 +85,59 @@ def test_generate_response_handles_empty_and_exception(monkeypatch, caplog):
     assert "Error generating response" in text
     msgs = [rec.getMessage() for rec in caplog.records]
     assert any("Exception in generate_response" in m for m in msgs)
+
+
+def test_ensure_model_available_uses_timeout_and_download(monkeypatch):
+    calls: list[tuple[str, int]] = []
+
+    def fake_get(url, timeout):  # noqa: ARG001
+        calls.append((url, timeout))
+        # Simulate no models present initially
+        return DummyResp(200, json_data={"models": []})
+
+    # Avoid performing real download/verify in this unit test
+    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr(oc, "_download_model_with_progress", lambda model_name, base_url: True)
+    monkeypatch.setattr(oc, "_verify_model_download", lambda model_name, base_url: True)
+
+    assert oc.ensure_model_available("some/model:tag") is True
+
+    # Assert we called the tags endpoint with a timeout
+    assert calls, "httpx.get was not called"
+    url, timeout = calls[0]
+    assert isinstance(url, str)
+    assert url.endswith("/api/tags")
+    assert timeout == 2
+
+
+def test_download_model_with_progress_uses_timeout_in_stream(monkeypatch):
+    seen: dict[str, object] = {"timeout": None, "url": None, "method": None}
+
+    class FakeStream:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):  # noqa: D401, ARG001
+            return False
+
+        def raise_for_status(self):
+            return None
+
+        def iter_lines(self):
+            yield b'{\n"status": "verifying"}\n'
+            yield b'{\n"status": "complete"}\n'
+
+    def fake_stream(method, url, json, timeout):  # noqa: ARG001
+        seen["method"] = method
+        seen["url"] = url
+        seen["timeout"] = timeout
+        return FakeStream()
+
+    monkeypatch.setattr(httpx, "stream", fake_stream)
+
+    ok = oc._download_model_with_progress("some/model:tag", "http://localhost:11434")
+    assert ok is True
+    assert seen["method"] == "POST"
+    seen_url = cast(str, seen["url"])
+    assert seen_url.endswith("/api/pull")
+    assert seen["timeout"] == 300
