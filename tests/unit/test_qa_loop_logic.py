@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.qa_loop import _rerank, _score_chunks, answer
+import backend.qa_loop as qa_loop
 
 pytestmark = pytest.mark.unit
 
@@ -42,7 +42,7 @@ def test_rerank_cross_encoder_success():
         chunks = ["relevant", "irrelevant"]
         question = "test query"
 
-        result = _rerank(question, chunks, k_keep=2)
+        result = qa_loop._rerank(question, chunks, k_keep=2)
 
         assert len(result) == 2
         assert result[0].text == "relevant"
@@ -57,7 +57,7 @@ def test_rerank_fallback_to_keyword_overlap_on_predict_failure():
         chunks = ["some matching keywords", "completely different text"]
         question = "test with matching keywords"
 
-        result = _rerank(question, chunks, k_keep=2)
+        result = qa_loop._rerank(question, chunks, k_keep=2)
 
         assert len(result) == 2
         assert result[0].text == "some matching keywords"
@@ -72,7 +72,7 @@ def test_rerank_fallback_when_encoder_is_unavailable():
         chunks = ["some matching keywords", "completely different text"]
         question = "test with matching keywords"
 
-        result = _rerank(question, chunks, k_keep=2)
+        result = qa_loop._rerank(question, chunks, k_keep=2)
 
         assert len(result) == 2
         assert result[0].text == "some matching keywords"
@@ -89,7 +89,7 @@ def test_rerank_final_fallback_to_neutral_scores(caplog):
             chunks = ["chunk1", "chunk2"]
             question = "test query"
 
-            result = _rerank(question, chunks, k_keep=2)
+            result = qa_loop._rerank(question, chunks, k_keep=2)
 
             assert len(result) == 2
             assert all(r.score == 0.0 for r in result)
@@ -99,7 +99,7 @@ def test_rerank_final_fallback_to_neutral_scores(caplog):
 
 def test_rerank_empty_chunks_list():
     """Test that reranking with an empty list of chunks returns an empty list."""
-    result = _rerank("test query", [], k_keep=2)
+    result = qa_loop._rerank("test query", [], k_keep=2)
     assert result == []
 
 
@@ -109,7 +109,7 @@ def test_keyword_scoring():
         chunks = ["some matching keywords", "completely different text"]
         question = "test with matching keywords"
 
-        scored_chunks = _score_chunks(question, chunks)
+        scored_chunks = qa_loop._score_chunks(question, chunks)
 
         assert len(scored_chunks) == 2
         assert scored_chunks[0].text == "some matching keywords"
@@ -124,15 +124,16 @@ def test_keyword_scoring_no_union():
         chunks = ["", ""]
         question = ""
 
-        scored_chunks = _score_chunks(question, chunks)
+        scored_chunks = qa_loop._score_chunks(question, chunks)
 
         assert len(scored_chunks) == 2
         assert all(sc.score == 0.0 for sc in scored_chunks)
 
 
+@pytest.mark.external
 @patch("backend.qa_loop.generate_response")
 @patch("backend.qa_loop.get_top_k")
-def test_answer_streaming_output(mock_get_top_k, mock_generate_response, capsys):
+def test_answer_streaming_output(mock_get_top_k, mock_generate_response, capsys, caplog):
     """Test that the answer function streams tokens to the console."""
     mock_get_top_k.return_value = ["Some context."]
 
@@ -144,6 +145,11 @@ def test_answer_streaming_output(mock_get_top_k, mock_generate_response, capsys)
 
     mock_generate_response.side_effect = mock_streamer
 
-    answer("test question")
+    # Suppress warning logs from backend.qa_loop to avoid polluting stdout capture
+    import logging as _logging
+
+    caplog.set_level(_logging.ERROR, logger="backend.qa_loop")
+
+    qa_loop.answer("test question")
     captured = capsys.readouterr()
     assert captured.out == "Answer: Hello World\n"

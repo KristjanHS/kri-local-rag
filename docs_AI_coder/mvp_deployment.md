@@ -24,7 +24,11 @@ OLLAMA_URL=http://ollama:11434
 WEAVIATE_URL=http://weaviate:8080
 ```
 
-### Start core services
+### Start core services (recommended)
+```
+./scripts/docker-setup.sh
+```
+Manual alternative (advanced users):
 ```
 docker compose -f docker/docker-compose.yml up -d weaviate ollama
 ```
@@ -39,6 +43,9 @@ docker compose -f docker/docker-compose.yml exec -T ollama ollama pull "$OLLAMA_
 ```
 
 ### Start the app (Streamlit)
+If you used `docker-setup.sh`, the app is already running at http://localhost:8501
+
+Manual alternative:
 ```
 docker compose -f docker/docker-compose.yml up -d app
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8501

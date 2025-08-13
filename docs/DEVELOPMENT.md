@@ -13,12 +13,15 @@ source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements-dev.txt
 pip install -e .
+# Install Semgrep in a separate, tool-managed environment (isolated from .venv)
+# pipx is recommended for best performance and isolation
+python -m pip install --user pipx || true
+python -m pipx ensurepath || true
+pipx install --force semgrep
 ```
 
-## Run the app (CLI QA loop)
-```bash
-.venv/bin/python -m backend.qa_loop
-```
+## Run the app (CLI / Web UI)
+For basic usage and quick-start commands, see the root README. This document focuses on development workflows and advanced topics.
 
 ## Run tests
 
@@ -32,12 +35,31 @@ pip install -e .
 .venv/bin/python -m pytest --test-ui --no-cov
 ```
 
-## Docker (optional)
+- **Integration tests (with Docker auto-managed)**:
 ```bash
-docker compose -f docker/docker-compose.yml up -d --build
+.venv/bin/python -m pytest -m integration
 ```
-Then open `http://localhost:8501`.
-For logs, rebuilds, service ops, and troubleshooting, see `docs/docker-management.md`.
+
+- **Fast iteration vs teardown**:
+```bash
+# Default keeps compose services up for quick local re-runs
+scripts/pytest_with_cleanup.sh -m integration
+
+# Force teardown of compose and Testcontainers after the run
+scripts/pytest_with_cleanup.sh --teardown-docker -m integration
+
+# Or via env toggles
+TEARDOWN_DOCKER=1 scripts/pytest_with_cleanup.sh -m integration
+KEEP_DOCKER_UP=1 scripts/pytest_with_cleanup.sh -m integration
+```
+
+
+## Docker (optional)
+Preferred startup: use the automated setup script which builds the image, starts services, and waits for health checks.
+```bash
+./scripts/docker-setup.sh
+```
+See the root README for starting/stopping the stack and simple day-to-day commands. For deeper service operations and troubleshooting, see `docs/docker-management.md`.
 
 ## Wheels (CPU/GPU) — concise
 - Docker build (choose one channel):
@@ -69,23 +91,6 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 - Avoid setting `PYTHONPATH`. Use editable installs (`pip install -e .`) and module execution with `-m`.
  - `kri_local_rag.egg-info/` provides package metadata that enables editable installs, dependency resolution, and discovery of modules/entry points by tooling.
 
-## UV sandbox — ultra-short
-
-- Policy: pip-only for app/CI. Use `tools/uv_sandbox/` only to validate pins for major upgrades or conflicts.
-- Run and verify:
-```bash
-cd tools/uv_sandbox
-./run.sh
-uv pip check && uv tree | head -200 | cat
-```
-- If clean, copy direct pins to `requirements.txt`/`requirements-dev.txt`, then verify locally (CPU wheels by default):
-```bash
-export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
-.venv/bin/python -m pip install -r requirements-dev.txt
-.venv/bin/python -m pip check
-.venv/bin/python -m pytest --test-core -q
-```
-- Guardrails: no `uv` in app/CI; use `uv lock --check` + `uv sync --frozen`; do not track `tools/uv_sandbox/.venv/`; commit `pyproject.toml`/`uv.lock`; prefer CPU wheels unless CUDA/ROCm needed.
 
 ## More docs
 - Detailed guidance used mostly by AI coder: `docs_AI_coder/AI_instructions.md`
@@ -138,5 +143,21 @@ For comprehensive information about GitHub Actions, Act CLI, and local CI testin
   ```bash
   SKIP_LOCAL_SEC_SCANS=1 git push
   ```
+- Local Semgrep (isolated from .venv):
+  ```bash
+  # Using pipx-managed Semgrep
+  pipx run semgrep ci --config auto --metrics off --sarif --output semgrep_local.sarif
+  ```
 - Manual CI: `./scripts/ci_act.sh`
 - Cleanup: `./scripts/cleanup_docker_and_ci_cache.sh`
+ 
+## Branch protection (main)
+
+- Required status checks to merge into `main`:
+  - Code scanning results / CodeQL
+  - Semgrep / Sec Scan
+- Direct pushes to `main` are blocked unless these checks pass on the PR.
+- View current protection settings:
+```bash
+gh api -H "Accept: application/vnd.github+json" repos/KristjanHS/kri-local-rag/branches/main/protection | jq .
+```

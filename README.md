@@ -4,9 +4,100 @@ Local RAG system using Weaviate, Ollama, and a CPU-optimized Python backend.
 
 ---
 
-## Quick Start
+## What you can do
 
-See `docs/DEVELOPMENT.md` for setup, Docker, testing, and helper scripts.
+- Ingest your local PDFs/Markdown into a vector DB
+- Ask questions about your documents via a CLI or a simple web UI
+- Run everything locally with Docker (recommended)
+
+---
+
+## Quick Start (Docker)
+
+1) Start services (recommended)
+```bash
+./scripts/docker-setup.sh
+```
+- Builds the app image, starts Weaviate, Ollama, and the app, and waits until services are healthy.
+- The first run can take a while due to downloading base images and models.
+
+Alternative (manual):
+```bash
+docker compose -f docker/docker-compose.yml up -d --build
+```
+
+2) Open the web UI at `http://localhost:8501`
+
+3) Ingest documents
+- Put your files into the `data/` folder, then run:
+```bash
+./scripts/ingest.sh           # uses data/ by default
+./scripts/ingest.sh ./data    # explicit path
+./scripts/ingest.sh /abs/path # absolute path also works
+```
+
+4) Ask questions
+- Web UI: use the Streamlit app at `http://localhost:8501`
+- CLI inside container:
+```bash
+./scripts/cli.sh                 # interactive
+./scripts/cli.sh --debug         # interactive with verbose streaming logs
+./scripts/cli.sh python -m backend.qa_loop --question "What is in my docs?"
+```
+
+5) Stop services (data persists)
+```bash
+docker compose -f docker/docker-compose.yml down
+```
+
+Full reset (deletes containers, images, and volumes):
+```bash
+./scripts/docker-reset.sh
+```
+
+---
+
+## Local (no Docker)
+
+If you prefer to run Python locally and point to Docker services (or your own):
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements-dev.txt
+pip install -e .
+
+# Start Docker services (for Weaviate + Ollama) in another shell if needed
+docker compose -f docker/docker-compose.yml up -d --build
+
+# Ingest local docs from ./data
+.venv/bin/python backend/ingest.py --data-dir ./data
+
+# Ask questions via CLI
+.venv/bin/python -m backend.qa_loop
+.venv/bin/python -m backend.qa_loop --question "Summarize project setup"
+```
+
+Notes:
+- By default the app expects `WEAVIATE_URL=http://weaviate:8080` and `OLLAMA_URL=http://ollama:11434` in Docker. When running fully locally without Docker networking, set them to `http://localhost:8080` and `http://localhost:11434` respectively.
+
+---
+
+## Common Docker commands
+
+```bash
+# Rebuild just the app image
+docker compose -f docker/docker-compose.yml build app
+
+# Restart the app to pick up code changes
+docker compose -f docker/docker-compose.yml restart app
+
+# Follow logs
+docker compose -f docker/docker-compose.yml logs -f app | cat
+docker compose -f docker/docker-compose.yml logs -f weaviate | cat
+docker compose -f docker/docker-compose.yml logs -f ollama | cat
+```
 
 ---
 
@@ -20,8 +111,9 @@ See `docs/DEVELOPMENT.md` for setup, Docker, testing, and helper scripts.
 
 ## Documentation
 
-- [Development Guide](docs/DEVELOPMENT.md) – Setup, Docker, helper scripts, usage details.
+- [Development Guide](docs/DEVELOPMENT.md) – More setup, testing, helper scripts, and power-user tips.
 - AI-coder guide: `docs_AI_coder/AI_instructions.md` – automation-friendly commands.
+- [Docker Management](docs/docker-management.md) – deeper service ops and troubleshooting.
 
 ## License
 

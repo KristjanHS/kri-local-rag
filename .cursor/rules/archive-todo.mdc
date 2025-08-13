@@ -1,0 +1,12 @@
+---
+description: "Archive completed task groups from product_todo.md"
+type: agent-select
+globs: []
+alwaysApply: false
+---
+- Archive when a task group in `docs_AI_coder/product_todo.md` is fully done.
+- Steps:
+  1) Move the whole group (heading + bullets) to `docs_AI_coder/archived-tasks.md` under `## Archived on YYYY-MM-DD`.
+  2) In `product_todo.md`, replace the group with a one-line note: "Archived on YYYY-MM-DD".
+  3) Keep original formatting/checkboxes; make minimal diffs.
+- Paths and date format must be exact.

@@ -187,7 +187,11 @@ Repository preparation tasks
   ```
 
 3.2) Validate external services standalone
-- [x] Action: Start only `weaviate` and `ollama`. Verify readiness (or equivalent checks):
+- [x] Action: Preferred: run the setup script to start and wait for services:
+  ```bash
+  ./scripts/docker-setup.sh
+  ```
+  Manual alternative: start only `weaviate` and `ollama`. Verify readiness (or equivalent checks):
   ```bash
   docker compose -f docker/docker-compose.yml up -d weaviate ollama
   # Weaviate (inside container):
