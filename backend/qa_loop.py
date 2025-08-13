@@ -29,8 +29,8 @@ class ScoredChunk:
     score: float
 
 
-# Record whether sentence_transformers was initially unavailable at module import time.
-_ST_INITIALLY_MISSING = sys.modules.get("sentence_transformers", "__MISSING__") in (None, "__MISSING__")
+# Note: Do not eagerly check/import heavy deps at module import time. We'll lazily
+# attempt to import inside the getter and gracefully fall back if unavailable.
 
 # Cross-encoder is optional and heavy; import lazily inside the getter.
 # Provide a patch seam for tests.
@@ -53,9 +53,7 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
     calling code can gracefully fall back to vector-search ordering.
     """
     global _cross_encoder
-    # Respect explicit absence/mocking (snapshot at import time) to avoid importing heavy deps during tests
-    if _ST_INITIALLY_MISSING:
-        return None
+    # Lazily attempt to import the cross-encoder implementation; if unavailable, return None.
 
     # Determine constructor: prefer patched module-level `CrossEncoder` if provided
     ctor = CrossEncoder

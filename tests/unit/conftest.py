@@ -52,6 +52,7 @@ def _disable_network_for_unit_tests(pytestconfig: pytest.Config):
     except Exception as exc:  # pragma: no cover - make failure explicit
         raise RuntimeError("pytest-socket must be installed for unit tests to run with network disabled.") from exc
 
+    # Re-assert blocking in case any earlier code enabled sockets
     disable_socket(allow_unix_socket=True)
     # Verify blocking is active; fail fast if not
     # Lightweight verification: ensure connect() is intercepted by pytest-socket
@@ -64,7 +65,8 @@ def _disable_network_for_unit_tests(pytestconfig: pytest.Config):
         test_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             # This should be intercepted by pytest-socket and raise immediately.
-            test_sock.connect(("10.0.0.0", 9))  # unroutable; no DNS resolution
+            test_sock.settimeout(0.01)
+            test_sock.connect(("10.255.255.1", 9))  # unroutable/reserved range
             raise AssertionError("Network blocking did not activate in unit tests (socket.connect succeeded).")
         except SocketBlockedError:
             # Expected: sockets are blocked
@@ -82,6 +84,42 @@ def _disable_network_for_unit_tests(pytestconfig: pytest.Config):
         yield
     finally:
         enable_socket()
+
+
+# Final safety net: explicitly force AF_INET connect/create_connection to raise in unit tests
+@pytest.fixture(autouse=True)
+def _force_af_inet_block(monkeypatch: pytest.MonkeyPatch):
+    try:
+        import socket as _socket
+
+        from pytest_socket import SocketBlockedError  # type: ignore
+
+        original_connect = _socket.socket.connect
+        original_create_connection = _socket.create_connection
+
+        def _blocked_connect(self: _socket.socket, address):  # type: ignore[no-redef]
+            # Allow opt-in when the test explicitly requested network
+            if _allow_network_active:
+                return original_connect(self, address)
+            # Block only INET/INET6 tuple addresses; allow AF_UNIX (str path)
+            if isinstance(address, tuple) and len(address) >= 2:
+                raise SocketBlockedError("Network disabled in unit tests (forced)")
+            return original_connect(self, address)
+
+        from typing import Any
+
+        def _blocked_create_connection(address: Any, *args: Any, **kwargs: Any):  # type: ignore[no-redef]
+            if _allow_network_active:
+                return original_create_connection(address, *args, **kwargs)  # type: ignore[arg-type]
+            if isinstance(address, tuple) and len(address) >= 2:
+                raise SocketBlockedError("Network disabled in unit tests (forced)")
+            return original_create_connection(address, *args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(_socket.socket, "connect", _blocked_connect, raising=True)
+        monkeypatch.setattr(_socket, "create_connection", _blocked_create_connection, raising=True)
+    except Exception:
+        # Best-effort; pytest-socket should already enforce this
+        pass
 
 
 @pytest.fixture()

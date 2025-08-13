@@ -20,7 +20,8 @@ def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: D401
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
     # When running the fast (unit-only) suite, enforce socket blocking early in the session
     try:
-        if os.environ.get("UNIT_ONLY_TESTS") == "1":
+        is_fast_suite = bool(getattr(session.config.option, "test_fast", False))
+        if is_fast_suite or os.environ.get("UNIT_ONLY_TESTS") == "1":
             from pytest_socket import disable_socket  # type: ignore
 
             disable_socket(allow_unix_socket=True)

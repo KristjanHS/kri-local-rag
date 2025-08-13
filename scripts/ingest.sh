@@ -22,8 +22,10 @@ if [ $# -lt 1 ]; then
 else
   # Use the resolve_path function to handle both relative and absolute paths
   DATA_PATH="$(resolve_path "$1")"
-  log INFO "Using provided data path: $DATA_PATH" | tee -a "$LOG_FILE"
+  # Convert to a path relative to project root so it maps inside the container (working_dir=/app)
+  REL_PATH="$(get_relative_path "$DATA_PATH")"
+  log INFO "Using provided data path: $DATA_PATH (container: $REL_PATH)" | tee -a "$LOG_FILE"
 fi
 
-log INFO "Starting PDF ingestion with data path: $DATA_PATH" | tee -a "$LOG_FILE"
-docker compose -f "$DOCKER_COMPOSE_FILE" run --rm "$APP_SERVICE" python backend/ingest.py --data-dir "$DATA_PATH" 2>&1 | tee -a "$LOG_FILE"
+log INFO "Starting PDF ingestion with data path: $REL_PATH" | tee -a "$LOG_FILE"
+docker compose -f "$DOCKER_COMPOSE_FILE" run --rm "$APP_SERVICE" python backend/ingest.py --data-dir "$REL_PATH" 2>&1 | tee -a "$LOG_FILE"

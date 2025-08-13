@@ -66,7 +66,7 @@ enable_debug_trace "$LOG_FILE"
 log INFO "Starting $SCRIPT_NAME" | tee -a "$LOG_FILE"
 
 # Ensure helper scripts are executable
-chmod +x scripts/cli.sh scripts/ingest.sh scripts/docker-reset.sh || true
+chmod +x scripts/cli.sh scripts/ingest.sh scripts/docker-reset.sh scripts/build_app.sh || true
 
 # --- Step 1: Build Docker Images ---
 echo ""
@@ -86,6 +86,32 @@ echo "The script will wait for all services to report a 'healthy' status."
 echo "Detailed output is being saved to '$LOG_FILE'."
 run_step "Compose up services: ${SERVICES_UP[*]}" "$LOG_FILE" docker compose --file "$DOCKER_COMPOSE_FILE" up --detach --wait "${SERVICES_UP[@]}"
 echo -e "${GREEN}✓ All services are up and healthy.${NC}"
+
+
+# --- Step 2b: Pre-pull default Ollama model to reduce first-answer latency ---
+ensure_ollama_model() {
+  local model_to_pull
+  model_to_pull="${OLLAMA_MODEL:-cas/mistral-7b-instruct-v0.3}"
+  log INFO "Checking if Ollama model is present: ${model_to_pull}" | tee -a "$LOG_FILE"
+  # If already present, exit quickly
+  if docker compose -f "$DOCKER_COMPOSE_FILE" exec -T "$OLLAMA_SERVICE" ollama list | grep -q "$model_to_pull"; then
+    log INFO "Model '${model_to_pull}' already available." | tee -a "$LOG_FILE"
+    return 0
+  fi
+  log INFO "Pulling Ollama model '${model_to_pull}' (this may take a long time on first run)…" | tee -a "$LOG_FILE"
+  # Try to pull; do not fail the setup if the pull is unavailable or fails.
+  if docker compose -f "$DOCKER_COMPOSE_FILE" exec -T "$OLLAMA_SERVICE" ollama pull "$model_to_pull"; then
+    log INFO "Model '${model_to_pull}' pulled successfully." | tee -a "$LOG_FILE"
+  else
+    log WARN "Failed to pre-pull Ollama model '${model_to_pull}'. The app will attempt to download it on first use." | tee -a "$LOG_FILE"
+  fi
+  return 0
+}
+
+echo "" 
+log INFO "Ensuring default Ollama model is downloaded" | tee -a "$LOG_FILE"
+echo -e "${BOLD}--- Step 2b: Pre-pulling default Ollama model (optional) ---${NC}"
+run_step "Pre-pull Ollama model" "$LOG_FILE" ensure_ollama_model
 
 
 # --- Step 3: Verify Final Status ---

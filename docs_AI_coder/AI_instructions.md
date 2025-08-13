@@ -4,7 +4,13 @@ Action-first cheatsheet for automations.
 
 ### Golden commands (copy-paste)
 
-- Start services (build + up + wait):
+- Start services (recommended, includes build + health-wait):
+
+```bash
+./scripts/docker-setup.sh
+```
+
+- Start services (manual alternative):
 
 ```bash
 docker compose -f docker/docker-compose.yml up -d --build
@@ -29,8 +35,7 @@ docker compose -f docker/docker-compose.yml logs -f app | cat
 - All-in-one (build + wait + tests):
 
 ```bash
-docker compose -f docker/docker-compose.yml up -d --build && \
-for i in {1..60}; do curl -fsS http://localhost:8501 >/dev/null 2>&1 && echo ready && break || sleep 1; done && \
+./scripts/docker-setup.sh && \
 .venv/bin/python -m pytest -q -m e2e --disable-warnings --maxfail=1
 ```
 
@@ -277,13 +282,8 @@ Paths and ports:
 Commands:
 
 ```bash
-docker compose -f docker/docker-compose.yml up -d --build
-
-# Wait for the app to be reachable
-for i in {1..60}; do
-  if curl -fsS http://localhost:8501 >/dev/null 2>&1; then echo ready; break; fi
-  sleep 1
-done
+# Preferred
+./scripts/docker-setup.sh
 
 # Tail app logs if needed
 docker compose -f docker/docker-compose.yml logs -f app | cat

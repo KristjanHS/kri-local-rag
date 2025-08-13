@@ -84,6 +84,9 @@ def _setup_logging():
     logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
     logging.getLogger("transformers").setLevel(logging.WARNING)
     logging.getLogger("torch").setLevel(logging.WARNING)
+    # Common PDF parsing noise (e.g., from pypdf) that doesn't affect outcomes
+    logging.getLogger("pypdf").setLevel(logging.ERROR)
+    logging.getLogger("pypdf.generic._base").setLevel(logging.ERROR)
 
     _logging_configured = True
 

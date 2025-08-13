@@ -25,11 +25,7 @@ import torch
 import weaviate
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import (
-    DirectoryLoader,
-    PyPDFLoader,
-    UnstructuredMarkdownLoader,
-)
+from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, UnstructuredMarkdownLoader
 from sentence_transformers import SentenceTransformer
 
 from backend.config import (
@@ -46,25 +42,55 @@ from backend.vector_utils import to_float_list
 logger = get_logger(__name__)
 
 
-def load_and_split_documents(directory: str) -> List[Document]:
-    """Load documents using LangChain and split them into chunks."""
-    loader_configs = {
-        "**/*.pdf": PyPDFLoader,
-        "**/*.md": UnstructuredMarkdownLoader,
-    }
-    docs = []
-    for glob_pattern, loader_cls in loader_configs.items():
-        loader = DirectoryLoader(
-            directory,
-            glob=glob_pattern,
-            loader_cls=loader_cls,
-            show_progress=True,
-            use_multithreading=True,
-        )
-        docs.extend(loader.load())
+def load_and_split_documents(path: str) -> List[Document]:
+    """Load documents from a directory or a single file, then split into chunks."""
+    # Choose the most robust/accurate PDF loader available in this environment
+    pdf_loader_cls = PyPDFLoader
+    try:
+        from langchain_community.document_loaders import PyMuPDFLoader  # type: ignore
+
+        pdf_loader_cls = PyMuPDFLoader  # fastest, robust on malformed PDFs
+        logger.info("Using PyMuPDFLoader for PDFs (best available).")
+    except Exception:
+        try:
+            from langchain_community.document_loaders import UnstructuredPDFLoader  # type: ignore
+
+            pdf_loader_cls = UnstructuredPDFLoader  # layout-aware; robust
+            logger.info("Using UnstructuredPDFLoader for PDFs.")
+        except Exception:
+            logger.info("Using PyPDFLoader for PDFs (fallback).")
+
+    # 1) Single file path support
+    docs: List[Document] = []
+    if os.path.isfile(path):
+        ext = os.path.splitext(path)[1].lower()
+        if ext == ".pdf":
+            loader = pdf_loader_cls(path)
+            docs.extend(loader.load())
+        elif ext == ".md":
+            loader = UnstructuredMarkdownLoader(path)
+            docs.extend(loader.load())
+        else:
+            logger.warning(f"Unsupported file extension '{ext}' for path '{path}'.")
+            return []
+    else:
+        # 2) Directory path with glob patterns
+        loader_configs = {
+            "**/*.pdf": pdf_loader_cls,
+            "**/*.md": UnstructuredMarkdownLoader,
+        }
+        for glob_pattern, loader_cls in loader_configs.items():
+            loader = DirectoryLoader(
+                path,
+                glob=glob_pattern,
+                loader_cls=loader_cls,
+                show_progress=True,
+                use_multithreading=True,
+            )
+            docs.extend(loader.load())
 
     if not docs:
-        logger.warning(f"No documents found in '{directory}'.")
+        logger.warning(f"No documents found in '{path}'.")
         return []
 
     logger.info(f"Loaded {len(docs)} documents.")
@@ -136,9 +162,13 @@ def process_and_upload_chunks(
     # Access collection (standard accessor for our tests/mocks)
     collection = client.collections.get(collection_name)
     stats = {"inserts": 0, "updates": 0, "skipped": 0}
+    total_chunks = len(docs)
+    logger.info(f"Encoding and uploading {total_chunks} chunks… This can take a while on first run.")
+    start_ts = time.time()
+    last_log_ts = start_ts
 
     with collection.batch.dynamic() as batch:
-        for doc in docs:
+        for idx, doc in enumerate(docs, start=1):
             uuid = deterministic_uuid(doc)
             vector_tensor = model.encode(doc.page_content)
             # Normalize to a plain Python list of floats for the Weaviate client
@@ -165,6 +195,19 @@ def process_and_upload_chunks(
             # which defeats the purpose of batching. Weaviate's batching
             # with specified UUIDs effectively handles this as an upsert.
             stats["inserts"] += 1  # We'll count all as inserts for simplicity in batch mode.
+
+            # Periodic progress logging (every ~100 chunks or 10 seconds)
+            now = time.time()
+            if idx == 1 or idx % 100 == 0 or (now - last_log_ts) >= 10:
+                elapsed = now - start_ts
+                rate = idx / elapsed if elapsed > 0 else 0.0
+                remaining = max(total_chunks - idx, 0)
+                eta_s = (remaining / rate) if rate > 0 else 0.0
+                logger.info(
+                    f"Progress: {idx}/{total_chunks} chunks ({idx / max(total_chunks, 1):.0%}), "
+                    f"{rate:.1f} chunks/s, ETA ~{eta_s:.0f}s"
+                )
+                last_log_ts = now
 
     logger.info(f"Batch ingestion complete: {stats}")
     return stats

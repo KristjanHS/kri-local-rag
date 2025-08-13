@@ -20,10 +20,8 @@ python -m pipx ensurepath || true
 pipx install --force semgrep
 ```
 
-## Run the app (CLI QA loop)
-```bash
-.venv/bin/python -m backend.qa_loop
-```
+## Run the app (CLI / Web UI)
+For basic usage and quick-start commands, see the root README. This document focuses on development workflows and advanced topics.
 
 ## Run tests
 
@@ -57,11 +55,11 @@ KEEP_DOCKER_UP=1 scripts/pytest_with_cleanup.sh -m integration
 
 
 ## Docker (optional)
+Preferred startup: use the automated setup script which builds the image, starts services, and waits for health checks.
 ```bash
-docker compose -f docker/docker-compose.yml up -d --build
+./scripts/docker-setup.sh
 ```
-Then open `http://localhost:8501`.
-For logs, rebuilds, service ops, and troubleshooting, see `docs/docker-management.md`.
+See the root README for starting/stopping the stack and simple day-to-day commands. For deeper service operations and troubleshooting, see `docs/docker-management.md`.
 
 ## Wheels (CPU/GPU) — concise
 - Docker build (choose one channel):

@@ -43,10 +43,25 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for context on completed Phase 1 testing work.
 
-#### P0 — Must do now (stability, forward-compat, fast feedback)
 
-Reserved for new urgent topic/tasks
+#### P0 — Focused debug plan: QA loop tests inconsistent between isolated vs core runs
 
+- [ ] Step 1 — Reconfirm failures in core vs isolated
+  - Action: Run `pytest -q -vv tests/unit/test_qa_loop_logic.py` and `pytest --test-core -q`.
+  - Verify: Isolated pass vs core failures reproduced.
+
+- [ ] Step 2 — Fix test patching to avoid module reload side effects
+  - Action: Remove `importlib.reload` uses from `tests/unit/test_qa_loop_logic.py`; ensure all calls reference `qa_loop._...` consistently.
+  - Verify: Core run shows QA loop unit tests now stable.
+
+- [ ] Step 3 — Validate integration QA pipeline tests
+  - Action: Run `pytest -q -vv tests/integration/test_qa_pipeline.py`.
+  - Verify: Both integration tests pass.
+
+- [ ] Step 4 — Full core verification
+  - Action: Run `pytest --test-core -q`.
+  - Verify: Suite passes or matches previous green baseline.
+  
 #### P1 — ...
 
 Reserved for new almost-urgent topic/tasks
@@ -90,6 +105,36 @@ Reserved for new topic/tasks
 - [ ] Version alignment and consistency
   - [ ] Pin the local `pyright` version (e.g., in `requirements-dev.txt`) to match CI
   - [ ] Ensure `ruff` version in pre-commit matches the CI action version (`0.5.3` today)
+
+#### P5.1 — Docker build cache and context optimizations
+
+- [ ] Add a root `.dockerignore` to shrink build context and improve cache hits
+  - Action: Create `.dockerignore` at repo root including at minimum: `.git`, `.venv`, `__pycache__/`, `*.pyc`, `logs/`, `data/`, `node_modules/`, `dist/`, `build/`, `*.ipynb_checkpoints`.
+  - Verify: Run a build and confirm the "Sending build context" size drops and cache hit rate increases on subsequent builds.
+
+- [ ] Use BuildKit apt cache for OS package installs
+  - Action: In `docker/app.Dockerfile`, change the apt layer to use a cache mount:
+    - Replace the apt RUN with `RUN --mount=type=cache,target=/var/cache/apt apt-get update && apt-get install -y --no-install-recommends ... && apt-get clean && rm -rf /var/lib/apt/lists/*`.
+  - Verify: Second build is faster with cache hits on apt downloads.
+
+- [ ] Document BuildKit and cache guidance
+  - Action: In `docs/DEVELOPMENT.md` (Docker section), note that BuildKit is on by default; prefer cached builds. Use `--no-cache` only when intentionally refreshing. Mention `scripts/build_app.sh` passes through extra flags (e.g., `--no-cache`).
+  - Verify: Doc updated and referenced from README as appropriate.
+
+- [ ] Pin remote image tags for reproducibility (where reasonable)
+  - Action: Audit image tags in `docker/docker-compose.yml` and `docker/app.Dockerfile`.
+    - Keep `weaviate` pinned (already pinned).
+    - Consider pinning `OLLAMA_IMAGE` default from `latest` to a known-good version; document override via env var.
+    - Python base images are already pinned; keep that practice.
+  - Verify: `docker compose up` uses the pinned versions; builds remain reproducible.
+
+- [ ] Optional: Add opt-in image refresh step while defaulting to cache usage
+  - Action: In `scripts/docker-setup.sh`, honor an env flag `FORCE_PULL=1` to run `docker compose pull` before build/up; default to not pulling.
+  - Verify: With `FORCE_PULL=1`, images are updated; without it, local cache is used.
+
+- [ ] Optional: Avoid dependency-layer cache busting
+  - Action: Keep `requirements.txt` stable and separate dev/runtime dependencies (`requirements-dev.txt` vs runtime). Ensure `docker/app.Dockerfile` installs only runtime deps to preserve cache.
+  - Verify: Code-only changes do not invalidate the dependency install layer; rebuilds are fast.
 
 #### P6 — E2E testing Tasks (CLI and Streamlit)
 

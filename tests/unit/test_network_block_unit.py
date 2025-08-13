@@ -10,4 +10,5 @@ def test_block_external_network_low_level():
     from pytest_socket import SocketBlockedError  # type: ignore
 
     with pytest.raises(SocketBlockedError):
-        socket.create_connection(("example.com", 80), timeout=0.5)
+        # Use an IP literal to avoid DNS variability; pytest-socket should intercept before OS
+        socket.create_connection(("10.255.255.1", 9), timeout=0.5)
