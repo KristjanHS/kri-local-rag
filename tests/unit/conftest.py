@@ -42,7 +42,7 @@ def _configure_unitnetguard_logging():
 
 
 @pytest.fixture(autouse=True, scope="session")
-def _disable_network_for_unit_tests():
+def _disable_network_for_unit_tests(pytestconfig: pytest.Config):
     """Disable real network access for unit tests.
 
     Allows only Unix domain sockets so pytest can function normally.
@@ -51,6 +51,13 @@ def _disable_network_for_unit_tests():
         from pytest_socket import disable_socket, enable_socket
     except Exception as exc:  # pragma: no cover - make failure explicit
         raise RuntimeError("pytest-socket must be installed for unit tests to run with network disabled.") from exc
+
+    # Apply only to unit tests: skip disabling when running non-unit suites
+    # Heuristic: if -m selects integration/e2e/environment/docker/ui, do not disable here
+    markexpr = getattr(pytestconfig.option, "markexpr", "") or ""
+    if any(k in markexpr for k in ("integration", "e2e", "environment", "docker", "ui")):
+        yield
+        return
 
     disable_socket(allow_unix_socket=True)
     # Verify blocking is active; fail fast if not
@@ -191,6 +198,17 @@ def _guard_against_enable_socket_misuse():
             return
 
         def _guarded_enable_socket(*args, **kwargs):  # type: ignore[no-redef]
+            # Allow non-unit suites (integration/environment/e2e/docker/ui) to enable sockets
+            stack = "".join(traceback.format_stack(limit=25))
+            if (
+                "tests/integration/" in stack
+                or "tests/environment/" in stack
+                or "tests/e2e/" in stack
+                or "tests/e2e_streamlit/" in stack
+                or "tests/docker/" in stack
+            ):
+                return original_enable(*args, **kwargs)
+
             if not _allow_network_active:
                 msg = (
                     "UnitNetGuard: enable_socket() called during unit tests without allow_network. "

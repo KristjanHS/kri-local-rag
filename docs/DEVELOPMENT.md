@@ -37,6 +37,24 @@ pipx install --force semgrep
 .venv/bin/python -m pytest --test-ui --no-cov
 ```
 
+- **Integration tests (with Docker auto-managed)**:
+```bash
+.venv/bin/python -m pytest -m integration
+```
+
+- **Fast iteration vs teardown**:
+```bash
+# Default keeps compose services up for quick local re-runs
+scripts/pytest_with_cleanup.sh -m integration
+
+# Force teardown of compose and Testcontainers after the run
+scripts/pytest_with_cleanup.sh --teardown-docker -m integration
+
+# Or via env toggles
+TEARDOWN_DOCKER=1 scripts/pytest_with_cleanup.sh -m integration
+KEEP_DOCKER_UP=1 scripts/pytest_with_cleanup.sh -m integration
+```
+
 
 ## Docker (optional)
 ```bash

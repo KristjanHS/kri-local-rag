@@ -74,8 +74,13 @@ act pull_request -j fast_tests --pull=false --reuse --log-prefix-job-id 2>&1 | t
 
 # Run local Semgrep via pipx (isolated) unless skipped
 if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
-  log INFO "Running Semgrep (local) via pipx …" | tee -a "$LOG_FILE"
-  bash "$SCRIPT_DIR/semgrep_local.sh" 2>&1 | tee -a "$LOG_FILE" || true
+  if command -v act >/dev/null 2>&1; then
+    log INFO "Running Semgrep (local workflow) via act …" | tee -a "$LOG_FILE"
+    act workflow_dispatch -W .github/workflows/semgrep_local.yml --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
+  else
+    log INFO "Running Semgrep (local) via pipx …" | tee -a "$LOG_FILE"
+    bash "$SCRIPT_DIR/semgrep_local.sh" 2>&1 | tee -a "$LOG_FILE" || true
+  fi
 else
   log INFO "Skipping Semgrep due to SKIP_LOCAL_SEC_SCANS=1" | tee -a "$LOG_FILE"
 fi

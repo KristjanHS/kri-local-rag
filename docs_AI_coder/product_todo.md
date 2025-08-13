@@ -45,13 +45,47 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
 
 #### P0 — Must do now (stability, forward-compat, fast feedback)
 
+- **Fix 5 failing tests (network blocking and heavyweight model downloads)**
+  - Plan (small, incremental steps)
+    - [x] Enable sockets per-test for all non-unit suites (integration, environment, e2e, docker)
+      - [x] Action: Add/update autouse fixtures in each suite's `conftest.py` to enable sockets at test start and restore blocking at test end. Update root guard in `tests/conftest.py` to also allow `e2e` (currently allows only integration/slow/docker).
+      - [x] Verify: Run a representative test from each suite; confirm no `SocketBlockedError` and real connections are attempted.
+    - [x] Use real models in non-unit tests where applicable
+      - [x] Action: Ensure integration/environment tests instantiate real `SentenceTransformer`/`CrossEncoder` as written; do not use dummy embedders.
+      - [x] Verify: `tests/integration/test_ingest_pipeline.py::{test_ingest_pipeline_loads_and_embeds_data,test_ingest_pipeline_is_idempotent}` now use the real model.
+    - [x] Do not skip non-unit tests on missing external components
+      - [x] Action: Remove graceful skips everywhere (fixtures and tests). Specifically:
+        - [x] Drop skip logic from `tests/integration/test_ingest_pipeline.py::weaviate_client`.
+        - [x] Remove Docker pre-check skip from `tests/integration/test_weaviate_integration.py`.
+      - [x] Verify: When external components are unavailable, these tests fail, surfacing the issue.
+    - [x] Use real external components in non-unit tests
+      - [x] Action: Ensure integration/env/e2e/docker tests target real services and models; no dummy stand-ins. Keep only mocks where a test explicitly verifies mocked behavior.
+      - [x] Verify: `tests/integration/test_vectorizer_enabled_integration.py` uses live Weaviate; ingestion tests use real `SentenceTransformer`; environment tests download required models. The container lifecycle test should pass when Docker is available; if not available, it should fail clearly.
+    - [x] Re-run the 5 previously failing tests
+      - [x] Action: `pytest -q` targeted to those tests only.
+      - [x] Verify: All five pass; failures should point to missing externals rather than being skipped.
+
+  - **Container lifecycle and network policy corrections (from recent changes)**
+    - [x] Align non-unit test behavior with "no graceful skip" policy
+      - [x] Action: Update `tests/conftest.py::docker_services` to FAIL if Docker/daemon is unavailable instead of calling `pytest.skip` (only for non-unit suites). Keep the in-container CI guard (`/.dockerenv`) as-is.
+      - [x] Verify: Run an integration test with Docker stopped; expect a clear failure explaining Docker is required (not a skip).
+    - [x] Enforce teardown in CI; keep-up only for local iterations
+      - [x] Action: In CI workflows, set `TEARDOWN_DOCKER=1` (or pass `--teardown-docker`) so the session fixture tears down services. Keep local default as keep-up for fast iterations.
+      - [x] Verify: CI logs show `docker compose down -v` after tests; no leftover CI containers/volumes.
+    - [x] Document fast-iteration defaults and the wrapper script
+      - [x] Action: Add a short section to `docs/DEVELOPMENT.md` describing: default keep-up policy, `--teardown-docker` and env toggles (`KEEP_DOCKER_UP`, `TEARDOWN_DOCKER`), and usage of `scripts/pytest_with_cleanup.sh`.
+      - [x] Verify: Follow the doc steps locally to run `scripts/pytest_with_cleanup.sh -m integration` (keeps up by default) and with `--teardown-docker` (cleans up compose and Testcontainers).
+    - [x] Ensure sockets are enabled per-suite for all non-unit tests
+      - [x] Action: Confirm we have autouse fixtures that temporarily `enable_socket()` in `tests/integration/`, `tests/environment/`, and `tests/e2e/` (added). No suite should rely on global allow-all.
+      - [x] Verify: Representative tests in each suite can reach real services without `SocketBlockedError` while unit tests remain blocked by default.
+
+#### P1 — ...
+
 No tasks here at the moment
 
-#### P1 — Stabilization and Finalization
-Archived on 2025-08-13
+#### P2 — ...
 
-#### P2 — CI pipeline separation and test architecture tasks
-Archived on 2025-08-13
+No tasks here at the moment
 
 #### P3 — Semgrep blocking findings visibility and triage (local)
 
@@ -164,6 +198,22 @@ Archived on 2025-08-13
 - [ ] Replace fragile relative paths with robust absolute paths where appropriate.
 - [ ] Configure centralized file logging (e.g., `logs/app.log`) across CLI and services.
 - [ ] Enhance progress logging for long-running ingestion (progress bar or granular steps).
+- [ ] Review integration suite Docker autostart
+  - [ ] Action: Measure runtime impact of `tests/integration/conftest.py::_start_docker_services_session` autouse startup.
+  - [ ] Action: If overhead is significant and not broadly needed, scope compose startup to tests that require it (explicit `docker_services` usage) or guard autostart behind an env flag (e.g., `INTEGRATION_AUTOSTART_COMPOSE=1`).
+  - [ ] Verify: Integration tests that need compose still pass; testcontainers-only tests remain unaffected and faster.
+
+#### P8.1 — Socket handling simplification (follow-up)
+
+- [ ] Simplify unit-only socket blocking configuration
+  - [ ] Action: In `tests/unit/conftest.py`, remove the `markexpr` heuristic from `_disable_network_for_unit_tests` (unit scope already limits it to unit tests).
+  - [ ] Action: Remove stack-based exceptions in `_guard_against_enable_socket_misuse`; keep a simple guard that allows `allow_network` only.
+  - [ ] Verify: `pytest -q -k network_block_unit` shows unit blocking still enforced; `-m integration` remains green.
+
+- [ ] Remove unnecessary socket toggles in non-unit fixtures
+  - [ ] Action: In `tests/conftest.py::docker_services`, drop temporary `enable_socket()/disable_socket()` — sockets are allowed by default now.
+  - [ ] Action: Remove no-op network fixtures/comments in `tests/integration/`, `tests/environment/`, and `tests/e2e/` where not needed.
+  - [ ] Verify: `pytest -q -m integration`, `-m environment`, and E2E single tests still pass locally.
 
 #### P9 — Soon (quality, CI structure, performance)
 - [ ] Expand unit test coverage, focusing on core logic and error paths.

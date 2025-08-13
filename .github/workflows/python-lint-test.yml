@@ -17,6 +17,8 @@ on:
 env:
   # Default to CPU-only PyTorch wheels for smaller images and reliable installs
   PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
+  # Enforce teardown of docker services in CI to avoid leftovers
+  TEARDOWN_DOCKER: "1"
 
 concurrency:
   group: ci-${{ github.ref }}

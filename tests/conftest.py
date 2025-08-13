@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import types
 from pathlib import Path
 from typing import Iterator
@@ -74,6 +75,21 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store_true",
         default=False,
         help="Run only UI/Playwright tests without coverage",
+    )
+
+    # Docker/test environment management flags
+    docker_group = parser.getgroup("docker-env")
+    docker_group.addoption(
+        "--keep-docker-up",
+        action="store_true",
+        default=False,
+        help=("Do not tear down docker compose services after tests. " "Equivalent to setting KEEP_DOCKER_UP=1"),
+    )
+    docker_group.addoption(
+        "--teardown-docker",
+        action="store_true",
+        default=False,
+        help=("Force tear down docker compose services after tests. " "Equivalent to setting TEARDOWN_DOCKER=1"),
     )
 
 
@@ -222,16 +238,29 @@ def docker_services(request, test_log_file):
         # Add a timeout to prevent hanging if Docker daemon is unresponsive
         subprocess.run(["docker", "info"], check=True, capture_output=True, timeout=5)
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as e:
-        # If Docker is not running, not installed, or times out, skip all Docker-dependent tests
+        # If Docker is not running, not installed, or times out, FAIL clearly for non-unit suites
         if isinstance(e, subprocess.TimeoutExpired):
-            console.print("\n--- Docker daemon is unresponsive. Skipping Docker-dependent tests. ---")
+            console.print("\n--- Docker daemon is unresponsive. Docker is REQUIRED for these tests. ---")
         else:
-            console.print("\n--- Docker is not running or not installed. Skipping Docker-dependent tests. ---")
+            console.print("\n--- Docker is not running or not installed. Docker is REQUIRED for these tests. ---")
 
-        pytest.skip("Docker is not available or unresponsive, skipping Docker-dependent tests.")
+        pytest.fail(
+            "Docker is required for docker/integration/e2e tests. Start the Docker daemon, "
+            "or deselect these tests (e.g., -m 'not docker')."
+        )
 
     # Docker is available, manage the services
     console.print("\n--- Setting up Docker services for testing ---")
+
+    # Ensure sockets are enabled while bringing up services and performing readiness checks
+    _sockets_enabled = False
+    try:
+        from pytest_socket import disable_socket, enable_socket  # type: ignore
+
+        enable_socket()
+        _sockets_enabled = True
+    except Exception:
+        pass
 
     with open(test_log_file, "a") as log:
         # --- Configure a file handler for the test-specific log file ---
@@ -340,9 +369,37 @@ def docker_services(request, test_log_file):
     # Yield to let the tests run
     yield
 
-    # Teardown is now disabled as per user instruction.
-    # Containers will be left running after tests.
-    console.print("\n--- Docker services left running for manual inspection ---")
+    # Controlled teardown based on flags or environment variables
+    keep_up_flag = bool(getattr(request.config.option, "keep_docker_up", False))
+    teardown_flag = bool(getattr(request.config.option, "teardown_docker", False))
+    keep_up_env = os.environ.get("KEEP_DOCKER_UP", "").strip() not in ("", "0", "false", "False")
+    teardown_env = os.environ.get("TEARDOWN_DOCKER", "").strip() not in ("", "0", "false", "False")
+
+    # Default: keep containers up for fast iterations unless teardown is explicitly requested
+    teardown_requested = teardown_flag or teardown_env
+    keep_requested = keep_up_flag or keep_up_env
+
+    if not teardown_requested:
+        console.print("\n--- Docker services left running (default for fast iterations) ---")
+        if keep_requested:
+            console.print("    note: explicit keep requested via flag/env")
+        return
+
+    compose_file = Path(__file__).parent.parent / "docker" / "docker-compose.yml"
+    console.print("\n--- Tearing down Docker services (docker compose down -v) ---")
+    try:
+        subprocess.run(["docker", "compose", "-f", str(compose_file), "down", "-v"], check=True)
+    except Exception as e:
+        console.print(f"✗ Failed to tear down Docker services: {e}")
+    finally:
+        # Restore socket blocking at session end if we enabled it
+        if _sockets_enabled:
+            try:
+                from pytest_socket import disable_socket  # type: ignore
+
+                disable_socket(allow_unix_socket=True)
+            except Exception:
+                pass
 
 
 @pytest.fixture(scope="session")
@@ -376,7 +433,8 @@ def _guard_against_real_external_services(monkeypatch: pytest.MonkeyPatch, reque
     Such tests must stub or monkeypatch external service connections.
     """
     marker_names = {m.name for m in request.node.iter_markers()}
-    if {"integration", "slow", "docker"} & marker_names:
+    # Allow network for any non-unit suite: integration, slow, docker, e2e, ui, environment
+    if {"integration", "slow", "docker", "e2e", "ui", "environment"} & marker_names:
         return
 
     # ---- Weaviate guard ----

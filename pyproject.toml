@@ -37,7 +37,6 @@ addopts = [
     "-m",
     "not ui",
     "--tb=short",
-    "--disable-socket",
     "--cov=backend",
     "--cov=frontend",
     "--cov-report=term-missing",
