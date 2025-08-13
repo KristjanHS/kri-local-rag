@@ -17,6 +17,8 @@ on:
 env:
   # Default to CPU-only PyTorch wheels for smaller images and reliable installs
   PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
+  # Enforce teardown of docker services in CI to avoid leftovers
+  TEARDOWN_DOCKER: "1"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -65,7 +67,7 @@ jobs:
       - name: Run fast tests
         run: |
           # Fastest suite (no external services) via custom option defined in tests/conftest.py
-          python -m pytest --test-fast --junitxml=reports/junit.xml
+          python -m pytest --test-fast -n auto --junitxml=reports/junit.xml
 
       - name: Upload fast test reports
         # Skip under act (local GitHub Actions emulator) because ACTIONS_RUNTIME_TOKEN is not available.
@@ -224,7 +226,7 @@ jobs:
       - name: Run core test suite (everything except UI)
         # Enforce coverage threshold for core suite
         run: |
-          python -m pytest -v --test-core --cov-fail-under=60 \
+          python -m pytest -v --test-core -n auto --cov-fail-under=60 \
             --html=reports/report_core.html --self-contained-html \
             --junitxml=reports/junit_core.xml
       - name: Upload core suite reports

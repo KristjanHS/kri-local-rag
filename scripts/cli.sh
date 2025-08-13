@@ -29,7 +29,7 @@ docker compose -f "$DOCKER_COMPOSE_FILE" exec "$APP_SERVICE" python -c "print('C
 
 # Check for debug flag
 DEBUG_MODE=false
-if [[ "$1" == "--debug" ]]; then
+if [[ $# -gt 0 && "${1:-}" == "--debug" ]]; then
     DEBUG_MODE=true
     shift  # Remove --debug from arguments
 fi
