@@ -71,8 +71,8 @@ Reserved for new topic/tasks
   - [x] Keep tests via `act` for parity, or add a native fast path: `.venv/bin/python -m pytest --test-fast --maxfail=1 -q`
 
 - [ ] Add pre-push skip toggles (env-driven)
-  - [ ] Support `SKIP_LINT=1`, `SKIP_PYRIGHT=1`, `SKIP_TESTS=1` to selectively skip steps locally
-  - [ ] Default heavy scans to opt-in (CodeQL already defaults to skip via `SKIP_LOCAL_SEC_SCANS=1`)
+  - [x] Support `SKIP_LINT=1`, `SKIP_PYRIGHT=1`, `SKIP_TESTS=1` to selectively skip steps locally
+  - [x] Default heavy scans to opt-in (CodeQL already defaults to skip via `SKIP_LOCAL_SEC_SCANS=1`)
 
 - [ ] Fail-fast for local tests
   - [ ] Update pre-push fast tests invocation to include `--maxfail=1 -q` for quicker feedback on first failure
