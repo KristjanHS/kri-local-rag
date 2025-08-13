@@ -244,3 +244,37 @@ This file records tasks that have been completed and moved out of the active TOD
   - [x] Action: In `tests/conftest.py::docker_services`, drop temporary `enable_socket()/disable_socket()` — sockets are allowed by default now.
   - [x] Action: Remove no-op network fixtures/comments in `tests/integration/`, `tests/environment/`, and `tests/e2e/` where not needed.
   - [x] Verify: `pytest -q -m integration`, `-m environment`, and E2E single tests still pass locally.
+
+### P3 — Semgrep blocking findings visibility and triage (local)
+
+- Objective: Make blocking findings clearly visible locally and fix at least the top one.
+- Plan (small, incremental steps)
+   1) Ensure findings are shown even when the scan fails locally
+      - [x] Update Semgrep workflow to run the summary step unconditionally (always) while keeping PRs failing on findings in CI
+  2) Surface findings in terminal during pre-push
+     - [x] Run the pre-push hook and verify the Semgrep findings summary shows rule, file:line, and message
+  3) Triage and fix the top finding
+     - [x] Identify the most critical/simple-to-fix finding from the summary
+     - [x] Implement a minimal, safe fix in code
+      - [x] Add/adjust a unit test if applicable — Added timeout assertions for Ollama HTTP calls in `tests/unit/test_ollama_client_unit.py`
+  4) Verify locally
+     - [x] Re-run pre-push; confirm Semgrep has no blocking findings
+       - [BLOCKED: pre-push stops at lint due to protobuf constraint mismatch; Semgrep job run directly reports 0 blocking findings]
+
+### P4 — CI/SAST enforcement
+
+- CodeQL workflow
+  - [x] Disable Default CodeQL setup in GitHub repo settings (to avoid advanced-config conflict)
+  - [x] Broaden PR trigger (run on all PRs): remove `branches: ["main"]` under `on.pull_request`
+  - [x] Validate `analyze@v3` inputs against official docs; if `output` is unsupported, remove it and adjust the local summary step accordingly
+  - [x] Keep uploads enabled only on GitHub (skip on forks and under Act), and enforce via branch protection rather than hard-fail
+- Semgrep workflow
+  - [x] Ensure robust baseline: add a step to unshallow history before scan (`git fetch --prune --unshallow || true`), or fetch base commit for PRs
+  - [x] Switch to official Semgrep Docker action; do not run under local act
+  - [x] Keep SARIF upload skipped for forked PRs; consider two-job upload pattern if uploads are needed for forks
+- Pre-push (local)
+  - [x] Make pre-push resilient if `act` is missing: detect and skip with a clear message
+  - [x] Add `SKIP_LOCAL_SEC_SCANS=1` guard to optionally skip Semgrep/CodeQL locally when needed
+  - [x] Document the guard and prerequisites in `docs/DEVELOPMENT.md`
+- Repo protection
+  - [x] Configure branch protection to require "Code scanning results / CodeQL" and Semgrep check on PRs

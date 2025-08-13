@@ -152,3 +152,14 @@ For comprehensive information about GitHub Actions, Act CLI, and local CI testin
   ```
 - Manual CI: `./scripts/ci_act.sh`
 - Cleanup: `./scripts/cleanup_docker_and_ci_cache.sh`
+ 
+## Branch protection (main)
+
+- Required status checks to merge into `main`:
+  - Code scanning results / CodeQL
+  - Semgrep / Sec Scan
+- Direct pushes to `main` are blocked unless these checks pass on the PR.
+- View current protection settings:
+```bash
+gh api -H "Accept: application/vnd.github+json" repos/KristjanHS/kri-local-rag/branches/main/protection | jq .
+```

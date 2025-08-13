@@ -47,9 +47,12 @@ enable_debug_trace "$LOG_FILE"
 
 log INFO "Starting pre-push checks" | tee -a "$LOG_FILE"
 
-if ! command -v act >/dev/null 2>&1; then
-  log WARN "'act' not found. Skipping local CI checks. Install: https://github.com/nektos/act" | tee -a "$LOG_FILE"
-  exit 0
+# Detect if 'act' is available; we'll use native tools where possible and only run act-based steps when available
+if command -v act >/dev/null 2>&1; then
+  ACT_AVAILABLE=1
+else
+  ACT_AVAILABLE=0
+  log WARN "'act' not found. Will run native checks only (ruff/pyright); skipping act-based steps. Install: https://github.com/nektos/act" | tee -a "$LOG_FILE"
 fi
 
 # Honor optional guard to skip local security scans (CodeQL/Semgrep)
@@ -60,21 +63,67 @@ if [[ "$SKIP_LOCAL_SEC_SCANS" == "1" ]]; then
   log INFO "SKIP_LOCAL_SEC_SCANS=1 — security scans will be skipped" | tee -a "$LOG_FILE"
 fi
 
-# Run pyright (type checking). This job is configured to run under workflow_dispatch only.
-log INFO "Running pyright via act (workflow_dispatch) …" | tee -a "$LOG_FILE"
-act workflow_dispatch -j pyright --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
+# Optional local skip toggles (developer ergonomics)
+SKIP_LINT=${SKIP_LINT:-0}
+SKIP_PYRIGHT=${SKIP_PYRIGHT:-0}
+SKIP_TESTS=${SKIP_TESTS:-0}
+if [[ "$SKIP_LINT" == "1" ]]; then
+  log INFO "SKIP_LINT=1 — lint checks will be skipped" | tee -a "$LOG_FILE"
+fi
+if [[ "$SKIP_PYRIGHT" == "1" ]]; then
+  log INFO "SKIP_PYRIGHT=1 — type checks will be skipped" | tee -a "$LOG_FILE"
+fi
+if [[ "$SKIP_TESTS" == "1" ]]; then
+  log INFO "SKIP_TESTS=1 — tests will be skipped" | tee -a "$LOG_FILE"
+fi
 
-# Run lint job
-log INFO "Running lint via act (pull_request) …" | tee -a "$LOG_FILE"
-act pull_request -j lint --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
+# Run ruff (format check + lint) natively from the project venv
+if [[ "$SKIP_LINT" != "1" ]]; then
+  if [[ -x ".venv/bin/ruff" ]]; then
+    log INFO "Running ruff format --check …" | tee -a "$LOG_FILE"
+    .venv/bin/ruff format --check . 2>&1 | tee -a "$LOG_FILE"
+    log INFO "Running ruff check …" | tee -a "$LOG_FILE"
+    .venv/bin/ruff check . 2>&1 | tee -a "$LOG_FILE"
+  else
+    log WARN "'.venv/bin/ruff' not found. Skipping ruff checks. Ensure dev deps are installed: 'pip install -e .[test,docs,cli]'" | tee -a "$LOG_FILE"
+  fi
+else
+  log INFO "Skipping ruff due to SKIP_LINT=1" | tee -a "$LOG_FILE"
+fi
 
-# Run fast tests
-log INFO "Running fast_tests via act (pull_request) …" | tee -a "$LOG_FILE"
-act pull_request -j fast_tests --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
+# Run pyright (type checking) natively from the project venv
+if [[ "$SKIP_PYRIGHT" != "1" ]]; then
+  if [[ -x ".venv/bin/pyright" ]]; then
+    log INFO "Running pyright (native) …" | tee -a "$LOG_FILE"
+    .venv/bin/pyright 2>&1 | tee -a "$LOG_FILE"
+  else
+    log WARN "'.venv/bin/pyright' not found. Skipping type checks. Install pyright in the venv (e.g., add to dev deps)." | tee -a "$LOG_FILE"
+  fi
+else
+  log INFO "Skipping pyright due to SKIP_PYRIGHT=1" | tee -a "$LOG_FILE"
+fi
+
+# Run fast tests (keep via act for parity when available)
+if [[ "$SKIP_TESTS" == "1" ]]; then
+  log INFO "Skipping tests due to SKIP_TESTS=1" | tee -a "$LOG_FILE"
+else
+  if [[ "$ACT_AVAILABLE" == "1" ]]; then
+    log INFO "Running fast_tests via act (pull_request) …" | tee -a "$LOG_FILE"
+    act pull_request -j fast_tests --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
+  else
+    # Native fast path for quick feedback when act isn't available
+    if [[ -x ".venv/bin/python" ]]; then
+      log INFO "Running native fast tests: pytest --test-fast --maxfail=1 -q …" | tee -a "$LOG_FILE"
+      .venv/bin/python -m pytest --test-fast --maxfail=1 -q 2>&1 | tee -a "$LOG_FILE"
+    else
+      log WARN "'.venv/bin/python' not found; cannot run native fast tests." | tee -a "$LOG_FILE"
+    fi
+  fi
+fi
 
 # Run local Semgrep via pipx (isolated) unless skipped
 if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
-  if command -v act >/dev/null 2>&1; then
+  if [[ "$ACT_AVAILABLE" == "1" ]]; then
     log INFO "Running Semgrep (local workflow) via act …" | tee -a "$LOG_FILE"
     act workflow_dispatch -W .github/workflows/semgrep_local.yml --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
   else
@@ -87,8 +136,12 @@ fi
 
 # Optional: run CodeQL locally (informational)
 if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
-  log INFO "Running CodeQL (informational) via act …" | tee -a "$LOG_FILE"
-  act pull_request -W .github/workflows/codeql.yml --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
+  if [[ "$ACT_AVAILABLE" == "1" ]]; then
+    log INFO "Running CodeQL (informational) via act …" | tee -a "$LOG_FILE"
+    act pull_request -W .github/workflows/codeql.yml --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
+  else
+    log INFO "Skipping CodeQL (act not available)." | tee -a "$LOG_FILE"
+  fi
 else
   log INFO "Skipping CodeQL due to SKIP_LOCAL_SEC_SCANS=1" | tee -a "$LOG_FILE"
 fi
