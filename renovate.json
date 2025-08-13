@@ -134,6 +134,11 @@
             "labels": [
                 "deps",
                 "ci"
+            ]
+        },
+        {
+            "matchManagers": [
+                "github-actions"
             ],
             "matchUpdateTypes": [
                 "minor",
