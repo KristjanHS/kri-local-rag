@@ -57,15 +57,9 @@ def test_bootstrap_creates_missing_collection_and_cleans_example_data(tmp_path):
         http_port = weaviate_container.get_exposed_port(8080)
         weaviate_url = f"http://localhost:{http_port}"
 
-        with _env_vars({"WEAVIATE_URL": weaviate_url, "DOCKER_ENV": ""}):
-            # Run the bootstrap function
-            # Also patch the app's collection name during this import
-            import importlib
-
+        with _env_vars({"WEAVIATE_URL": weaviate_url, "DOCKER_ENV": "", "COLLECTION_NAME": target_collection}):
+            # Run the bootstrap function with the collection name provided via environment
             from backend.qa_loop import ensure_weaviate_ready_and_populated
-
-            qa_loop = importlib.import_module("backend.qa_loop")
-            qa_loop.COLLECTION_NAME = target_collection
 
             # Ensure the target collection is absent before bootstrap
             try:

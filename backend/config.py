@@ -104,7 +104,7 @@ def get_logger(name: str) -> logging.Logger:
 # --- End Logging Configuration ---
 
 
-COLLECTION_NAME = "Document"
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "Document")
 
 # Text splitting parameters
 CHUNK_SIZE = 800
