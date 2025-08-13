@@ -107,3 +107,35 @@ This file records tasks that have been completed and moved out of the active TOD
     - Exclude `str`/`bytes`/`bytearray` from generic `Sequence` handling
     - Handle numeric scalars via `numbers.Real`
   - Verify: Lints clean; `.venv/bin/python -m pytest --test-core` passes.
+
+## Archived on 2025-08-13
+
+### P2.9 — Enforce no-network in unit tests (completed)
+
+- Add `pytest-socket` to `pyproject.toml` test extras and document usage — done
+- Add an `autouse=True` session fixture to call `disable_socket(allow_unix_socket=True)` — done
+- Replace connection-based self-check in session fixture with a lightweight assert — done
+- Drop per-test re-disable once the offender was disproven — done
+- Provide `allow_network` opt-in fixture (function scope) for rare cases; ensure any such tests are moved to `tests/integration/` or marked `@pytest.mark.integration` — done
+- Keep root guards against real Weaviate/Ollama calls; reconciled with pytest-socket to avoid duplicate/confusing messages — done
+
+- Verify: a unit test attempting `httpx.get("http://example.com")` fails with a clear error — `tests/unit/test_network_block_httpx_unit.py` covers this; passes in isolation and in suite.
+
+- Unit networking flake (investigated and resolved)
+  - Added per-test logging in `tests/unit/conftest.py` to record socket-blocking status and test `nodeid` — done
+  - Added early/late canaries `tests/unit/test__network_canary_first.py` and `tests/unit/test__network_canary_last.py` — added then removed after stability
+  - Implemented a fail-fast diagnostic to immediately surface the first victim when sockets were detected enabled — gated via `UNITNETGUARD_FAIL_FAST` and kept as a toggle
+  - Bisection and inspection found no offender locally; validated stability with randomized orders; canaries removed and a sentinel test kept
+
+- Fail-fast and localization steps (summary)
+  1) Fail-fast diagnostic enabled via env flag; active check asserts `SocketBlockedError`
+  2) Bisection with `-k` and randomized order; no offender reproduced locally
+  3) Fixture/library inspection; no state leaks identified; continued monitoring strategy adopted
+  4) Full suite re-run green; fail-fast left as optional toggle
+  5) Cleanup: removed canaries; kept session guard and `allow_network` fixture
+  6) Hardening: added sentinel test and `weaviate.connect_to_custom` guard; docs updated
+
+- Follow-up corrections (best-practice alignment)
+      - [x] Update unit tests to assert `pytest_socket.SocketBlockedError` explicitly instead of generic `Exception`
+      - [x] Reduce `UnitNetGuard` diagnostic log level from WARNING to INFO to avoid noisy test output
+- Skeptic checks considered: ensured detection isn’t masked by OS errors; reviewed shared fixtures; verified serial vs. parallel behavior

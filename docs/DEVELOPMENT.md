@@ -32,6 +32,7 @@ pip install -e .
 .venv/bin/python -m pytest --test-ui --no-cov
 ```
 
+
 ## Docker (optional)
 ```bash
 docker compose -f docker/docker-compose.yml up -d --build
@@ -69,23 +70,6 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 - Avoid setting `PYTHONPATH`. Use editable installs (`pip install -e .`) and module execution with `-m`.
  - `kri_local_rag.egg-info/` provides package metadata that enables editable installs, dependency resolution, and discovery of modules/entry points by tooling.
 
-## UV sandbox — ultra-short
-
-- Policy: pip-only for app/CI. Use `tools/uv_sandbox/` only to validate pins for major upgrades or conflicts.
-- Run and verify:
-```bash
-cd tools/uv_sandbox
-./run.sh
-uv pip check && uv tree | head -200 | cat
-```
-- If clean, copy direct pins to `requirements.txt`/`requirements-dev.txt`, then verify locally (CPU wheels by default):
-```bash
-export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
-.venv/bin/python -m pip install -r requirements-dev.txt
-.venv/bin/python -m pip check
-.venv/bin/python -m pytest --test-core -q
-```
-- Guardrails: no `uv` in app/CI; use `uv lock --check` + `uv sync --frozen`; do not track `tools/uv_sandbox/.venv/`; commit `pyproject.toml`/`uv.lock`; prefer CPU wheels unless CUDA/ROCm needed.
 
 ## More docs
 - Detailed guidance used mostly by AI coder: `docs_AI_coder/AI_instructions.md`

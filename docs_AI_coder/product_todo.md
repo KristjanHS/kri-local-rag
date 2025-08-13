@@ -49,7 +49,7 @@ No tasks here at the moment
 
 #### P1 — Stabilization and Finalization
  
-- [ ] Finalize: Full suite green
+- [x] Finalize: Full suite green
   - Action: Run the full suite locally; then update CI if needed.
   - Verify: `.venv/bin/python -m pytest -q -m "not environment" --disable-warnings` passes with 0 failures.
 
@@ -79,7 +79,7 @@ No tasks here at the moment
   - Action: Configured `.coveragerc` and `pyproject.toml` to store coverage data in `reports/coverage/`. The UI test suite guard ensures it is run with `--no-cov`.
   - Verify: `.coverage` files no longer appear in the project root.
 
-- [ ] P2.7 — CI pipeline separation
+ - [x] P2.7 — CI pipeline separation
   - Action: Split CI into two jobs: `tests-core` (coverage) and `tests-ui` (no coverage). Publish coverage from core job only.
   - Verify: CI runs green; core job uploads coverage HTML; Playwright browsers cached for UI job.
 
@@ -87,17 +87,19 @@ No tasks here at the moment
   - Action: Updated `docs/DEVELOPMENT.md` and `docs_AI_coder/AI_instructions.md` with new `pytest` options.
   - Verify: Documentation reflects the new testing commands.
 
-
 - [ ] P2.9 — Optional hardening for unit/fast test suites
-  - Enforce no-network in unit tests
-    - [ ] Add `pytest-socket` to `requirements-dev.txt` and document usage
-    - [ ] Add an `autouse=True` fixture scoped to unit tests to call `disable_socket()` (allow Unix sockets if needed)
-    - [ ] Verify: a unit test that attempts `httpx.get("http://example.com")` fails with a clear error
-  - Tighten fast selection
-    - [ ] Update `tests/conftest.py` so `--test-core` also excludes `slow` (in addition to `ui`, `e2e`, `docker`, `environment`, `integration`)
-    - [ ] Align `fast_tests` job to use `--test-core` (or equivalent `-m` expression) and verify it does not start Docker/services under `act`
-  - Speed up feedback
-    - [ ] Optionally add `pytest-xdist` and run fast tests with `-n auto` in CI for quicker PR feedback
+    - Post-cleanup follow-ups (keep unit suite fast and deterministic)
+      - [x] Make per-test diagnostic fixture a no-op by default
+        - Action: Update `tests/unit/conftest.py::_log_socket_block_status` to return immediately unless `UNITNETGUARD_FAIL_FAST=1` is set; avoid doing any socket probe/logging on the default path.
+        - Verify: `.venv/bin/python -m pytest -q tests/unit` remains green; wall time improves vs current.
+      - [x] Keep fail-fast as an opt-in toggle only
+        - Action: Document in `docs_AI_coder/AI_instructions.md` that setting `UNITNETGUARD_FAIL_FAST=1` enables the per-test probe and immediate failure on first detection.
+        - Verify: With `UNITNETGUARD_FAIL_FAST=1`, the first victim is reported; without it, suite runs with no per-test probe.
+      - Rationale: Best practice with `pytest-socket` is to rely on a session-level block plus targeted opt-in allowances. A default per-test network probe adds overhead and can mask offenders; keeping it behind an env flag provides rapid diagnosis without slowing normal runs.
+    - Speed up feedback
+      - [ ] Add `pytest-xdist` and run fast tests with `-n auto` in CI for quicker PR feedback
+        - [x] Add dependency to test extras and local env; verify `pytest -q -n auto tests/unit` passes
+        - [ ] Update CI workflow to use `-n auto` for the fast/core job
   - Guard against accidental real clients in unit tests
     - [ ] Add a unit-scope fixture that monkeypatches `weaviate.connect_to_custom` to raise if called (unless explicitly patched in a test)
     - [ ] Verify: a unit test calling real `connect_to_custom` fails; patched tests still pass

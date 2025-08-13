@@ -65,7 +65,7 @@ jobs:
       - name: Run fast tests
         run: |
           # Fastest suite (no external services) via custom option defined in tests/conftest.py
-          python -m pytest --test-fast --junitxml=reports/junit.xml
+          python -m pytest --test-fast -n auto --junitxml=reports/junit.xml
 
       - name: Upload fast test reports
         # Skip under act (local GitHub Actions emulator) because ACTIONS_RUNTIME_TOKEN is not available.

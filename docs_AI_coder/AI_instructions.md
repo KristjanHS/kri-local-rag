@@ -142,6 +142,27 @@ Coverage policy:
 - Coverage is collected by default, but the fail-under threshold is only enforced on full runs (e.g., CI or the command above with `--cov-fail-under=60`).
 - On partial runs (using `-k`, `-m`, or explicit test paths), a safety in `tests/conftest.py` relaxes `--cov-fail-under` to 0 to avoid false failures. To disable coverage entirely, add `--no-cov`.
 
+### Network policy in unit tests (for agents)
+
+- Enforcement (always on)
+  - Global flag: `--disable-socket` in `pyproject.toml` addopts
+  - Session fixture: `disable_socket(allow_unix_socket=True)`
+  - Guards: sentinel test asserts `SocketBlockedError`; `weaviate.connect_to_custom` is blocked in unit runs
+  - Fail-fast diagnostic (opt-in): set `UNITNETGUARD_FAIL_FAST=1` to enable a per-test socket probe and immediate failure on first detection (default off to keep runs fast)
+
+- Allowing network in one test
+  - Use the opt-in fixture on that test only: `def test_x(allow_network): ...`
+  - Prefer moving real-network tests to `tests/integration/` and marking `@pytest.mark.integration`
+
+- Quick verify
+  - `.venv/bin/python -m pytest -q tests/unit/test_network_block_sentinel_unit.py` should pass
+  - `.venv/bin/python -m pytest -q tests/unit` should show no OS-level network errors
+
+- When things fail late in the suite
+  - Cause: sockets re-enabled mid-run or a subprocess/library bypassed `pytest-socket`
+  - Debug: set `UNITNETGUARD_FAIL_FAST=1`, re-run to pinpoint the first victim; use `-k` to bisect; try randomized order (pytest-randomly)
+  - Fix: mock clients (e.g., `httpx.MockTransport`); avoid `enable_socket`/socket monkeypatches; move real-network tests to integration
+
 
 ## Development Environment and Dependencies
 
@@ -164,7 +185,24 @@ Install for development:
 
 Quick run: `.venv/bin/python -m backend.qa_loop`
 
- 
+### UV sandbox — ultra-short (for agents)
+
+- Policy: pip-only for app/CI. Use `tools/uv_sandbox/` only to validate pins for major upgrades or conflicts.
+- Run and verify:
+```bash
+cd tools/uv_sandbox
+./run.sh
+uv pip check && uv tree | head -200 | cat
+```
+- If clean, copy direct pins to `requirements.txt`/`requirements-dev.txt`, then verify locally (CPU wheels by default):
+```bash
+export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
+.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pip check
+.venv/bin/python -m pytest --test-core -q
+```
+- Guardrails: no `uv` in app/CI; use `uv lock --check` + `uv sync --frozen`; do not track `tools/uv_sandbox/.venv/`; commit `pyproject.toml`/`uv.lock`; prefer CPU wheels unless CUDA/ROCm needed.
+
 
 ## Python Module and Import Strategy
 
