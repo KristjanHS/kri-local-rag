@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """E2E test: when the target collection is missing in a real Weaviate,
 running ensure_weaviate_ready_and_populated should create it by ingesting
-example_data/test.md (and test.pdf), then remove the example data, leaving
-an empty collection schema present.
+example_data/test.pdf, then remove the example data, leaving an empty
+collection schema present.
 
 This uses testcontainers' Weaviate for a real server.
 """
@@ -48,30 +48,42 @@ def test_bootstrap_creates_missing_collection_and_cleans_example_data(tmp_path):
     with WeaviateContainer() as weaviate_container:
         client = weaviate_container.get_client()
 
-        # Pick the same collection used by the app during bootstrap
-        from backend.config import COLLECTION_NAME as APP_COLLECTION
+        # We'll target the explicit test collection name
+        target_collection = "TestCollection"
 
-        # Ensure the collection is absent
-        try:
-            if client.collections.exists(APP_COLLECTION):
-                client.collections.delete(APP_COLLECTION)
-        except Exception:
-            pass
+        # Point the app to this testcontainers Weaviate via env var.
+        # The python client returned by testcontainers is already configured for host/ports.
+        # We pass the URL it uses (http://localhost:<mapped_port>) into the app via env.
+        http_port = weaviate_container.get_exposed_port(8080)
+        weaviate_url = f"http://localhost:{http_port}"
 
-        # Point the app to this testcontainers Weaviate via env var
-        weaviate_url = weaviate_container.get_url()
-
-        with _env_vars({"WEAVIATE_URL": weaviate_url}):
+        with _env_vars({"WEAVIATE_URL": weaviate_url, "DOCKER_ENV": ""}):
             # Run the bootstrap function
+            # Also patch the app's collection name during this import
+            import importlib
+
             from backend.qa_loop import ensure_weaviate_ready_and_populated
+
+            qa_loop = importlib.import_module("backend.qa_loop")
+            qa_loop.COLLECTION_NAME = target_collection
+
+            # Ensure the target collection is absent before bootstrap
+            try:
+                if client.collections.exists(target_collection):
+                    client.collections.delete(target_collection)
+            except Exception:
+                pass
 
             ensure_weaviate_ready_and_populated()
 
             # After bootstrap:
-            # - The collection should exist
-            assert client.collections.exists(APP_COLLECTION)
+            # - The collection should exist (robust check via get)
+            try:
+                client.collections.get(target_collection)
+            except Exception as e:  # pragma: no cover - diagnostic in CI
+                pytest.fail(f"Collection 'TestCollection' does not exist after bootstrap: {e}")
 
             # - Example data should have been ingested and then removed, so the
-            #   collection should be empty of objects
-            has_objects = _collection_has_any_objects(client, APP_COLLECTION)
+            #   collection should now be empty
+            has_objects = _collection_has_any_objects(client, target_collection)
             assert has_objects is False

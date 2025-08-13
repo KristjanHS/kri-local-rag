@@ -327,13 +327,14 @@ def ensure_weaviate_ready_and_populated():
             if not os.path.isdir(example_data_path):
                 raise FileNotFoundError(f"Directory not found: '{example_data_path}'")
 
-            # Prefer a minimal warmup using only the example PDF to avoid heavy markdown deps
+            # Warmup using the example PDF file only
             test_pdf_path = os.path.join(example_data_path, "test.pdf")
             if not os.path.isfile(test_pdf_path):
                 raise FileNotFoundError(f"File not found: '{test_pdf_path}'")
 
             logger.info("   → Ingesting example test PDF from %s", test_pdf_path)
-            ingest(test_pdf_path, collection_name=COLLECTION_NAME)
+            # Reuse the already connected client to avoid separate gRPC/port issues in tests
+            ingest(test_pdf_path, collection_name=COLLECTION_NAME, client=client)
 
             # Clean up the example data now that the schema is created.
             # This check is important in case the example_data folder was empty.
@@ -349,6 +350,7 @@ def ensure_weaviate_ready_and_populated():
                 has_objects = False
 
             if has_objects:
+                # Remove the example PDF, leaving an empty collection schema for the user
                 collection.data.delete_many(where=Filter.by_property("source_file").equal("test.pdf"))
                 logger.info("   ✓ Example data removed, leaving a clean collection for the user.")
 

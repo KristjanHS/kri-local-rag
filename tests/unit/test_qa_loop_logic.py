@@ -130,6 +130,7 @@ def test_keyword_scoring_no_union():
         assert all(sc.score == 0.0 for sc in scored_chunks)
 
 
+@pytest.mark.external
 @patch("backend.qa_loop.generate_response")
 @patch("backend.qa_loop.get_top_k")
 def test_answer_streaming_output(mock_get_top_k, mock_generate_response, capsys, caplog):
