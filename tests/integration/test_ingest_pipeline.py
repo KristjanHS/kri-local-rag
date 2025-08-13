@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-import weaviate
 from sentence_transformers import SentenceTransformer
 
 from backend import config, ingest
@@ -32,13 +31,18 @@ def sample_documents_path(tmpdir_factory):
 @pytest.fixture(scope="module")
 def weaviate_client():
     """Fixture for a real Weaviate client, ensuring the service is available."""
+    client = ingest.connect_to_weaviate()
     try:
-        client = ingest.connect_to_weaviate()
-        client.collections.delete(COLLECTION_NAME)
-        yield client
-        client.collections.delete(COLLECTION_NAME)
-    except weaviate.exceptions.WeaviateStartUpError:
-        pytest.skip("Weaviate is not running, skipping integration test.")
+        if client.collections.exists(COLLECTION_NAME):
+            client.collections.delete(COLLECTION_NAME)
+    except Exception:
+        pass
+    yield client
+    try:
+        if client.collections.exists(COLLECTION_NAME):
+            client.collections.delete(COLLECTION_NAME)
+    except Exception:
+        pass
 
 
 @pytest.fixture
@@ -53,7 +57,7 @@ def weaviate_collection_mock():
 
 
 @pytest.mark.integration
-def test_ingest_pipeline_with_real_weaviate(weaviate_client):
+def test_ingest_pipeline_with_real_weaviate(docker_services, weaviate_client):
     """Test the full ingestion pipeline with a real Weaviate instance, using a local model."""
     # Run the ingestion process on the 'test_data' directory
     ingest.ingest(directory="test_data/", collection_name=COLLECTION_NAME)
@@ -66,7 +70,7 @@ def test_ingest_pipeline_with_real_weaviate(weaviate_client):
 
 
 @pytest.mark.integration
-def test_ingest_pipeline_loads_and_embeds_data(weaviate_collection_mock, sample_documents_path):
+def test_ingest_pipeline_loads_and_embeds_data(docker_services, weaviate_collection_mock, sample_documents_path):
     """Test the full ingestion pipeline from loading docs to inserting into Weaviate with a local model."""
     # Provide a real embedding model for this integration test
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
@@ -114,7 +118,7 @@ def test_ingest_pipeline_handles_no_embedding_model(mock_get_model, weaviate_col
 
 
 @pytest.mark.integration
-def test_ingest_pipeline_is_idempotent(weaviate_collection_mock, sample_documents_path):
+def test_ingest_pipeline_is_idempotent(docker_services, weaviate_collection_mock, sample_documents_path):
     """Test that running ingestion multiple times doesn't create duplicate data, using a local model."""
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
     with patch("backend.ingest.get_embedding_model", return_value=embedding_model):

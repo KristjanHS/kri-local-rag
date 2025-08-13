@@ -15,3 +15,8 @@ alwaysApply: false
    - E2E: `@pytest.mark.e2e` (+ `@pytest.mark.slow` if long) in `tests/e2e*`
    - Environment: `@pytest.mark.environment` in `tests/environment/`
  - Default excludes `slow`; include with: `python -m pytest -m slow`
+ - Network policy for unit tests (pytest-socket):
+   - Unit tests must not perform real network I/O. Global block is enforced via `--disable-socket` and a session fixture.
+   - To temporarily allow sockets in a single test, use the `allow_network` fixture: `def test_x(allow_network): ...`.
+   - Any test that truly needs network should move to `tests/integration/` and/or be marked `@pytest.mark.integration` instead of using `allow_network`.
+   - When debugging flakiness, set `UNITNETGUARD_FAIL_FAST=1` to enable fail-fast detection of socket re-enablement.

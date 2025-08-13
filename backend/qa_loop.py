@@ -29,8 +29,8 @@ class ScoredChunk:
     score: float
 
 
-# Record whether sentence_transformers was initially unavailable at module import time.
-_ST_INITIALLY_MISSING = sys.modules.get("sentence_transformers", "__MISSING__") in (None, "__MISSING__")
+# Note: Do not eagerly check/import heavy deps at module import time. We'll lazily
+# attempt to import inside the getter and gracefully fall back if unavailable.
 
 # Cross-encoder is optional and heavy; import lazily inside the getter.
 # Provide a patch seam for tests.
@@ -53,9 +53,7 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
     calling code can gracefully fall back to vector-search ordering.
     """
     global _cross_encoder
-    # Respect explicit absence/mocking (snapshot at import time) to avoid importing heavy deps during tests
-    if _ST_INITIALLY_MISSING:
-        return None
+    # Lazily attempt to import the cross-encoder implementation; if unavailable, return None.
 
     # Determine constructor: prefer patched module-level `CrossEncoder` if provided
     ctor = CrossEncoder
@@ -315,11 +313,28 @@ def ensure_weaviate_ready_and_populated():
 
             create_collection_if_not_exists(client, COLLECTION_NAME)
 
-            # Ingest example data to ensure all modules are warm, then remove it.
+            # Ingest example data to ensure all modules are warm; hard-fail if it's missing.
             # Get the absolute path to the project root, which is the parent of the 'backend' directory
             project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            logger.debug("Resolved project_root: %s", project_root)
+            # Only accept project-root example_data when running outside Docker
             example_data_path = os.path.join(project_root, "example_data")
-            ingest(example_data_path)
+            logger.debug(
+                "Checking example_data_path: %s (exists=%s)",
+                example_data_path,
+                os.path.isdir(example_data_path),
+            )
+            if not os.path.isdir(example_data_path):
+                raise FileNotFoundError(f"Directory not found: '{example_data_path}'")
+
+            # Warmup using the example PDF file only
+            test_pdf_path = os.path.join(example_data_path, "test.pdf")
+            if not os.path.isfile(test_pdf_path):
+                raise FileNotFoundError(f"File not found: '{test_pdf_path}'")
+
+            logger.info("   → Ingesting example test PDF from %s", test_pdf_path)
+            # Reuse the already connected client to avoid separate gRPC/port issues in tests
+            ingest(test_pdf_path, collection_name=COLLECTION_NAME, client=client)
 
             # Clean up the example data now that the schema is created.
             # This check is important in case the example_data folder was empty.
@@ -335,6 +350,7 @@ def ensure_weaviate_ready_and_populated():
                 has_objects = False
 
             if has_objects:
+                # Remove the example PDF, leaving an empty collection schema for the user
                 collection.data.delete_many(where=Filter.by_property("source_file").equal("test.pdf"))
                 logger.info("   ✓ Example data removed, leaving a clean collection for the user.")
 

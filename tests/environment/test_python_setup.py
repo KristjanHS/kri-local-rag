@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -14,18 +15,56 @@ BACKEND_CONFIG_PATH = PROJECT_ROOT / "backend" / "config.py"
 @pytest.mark.skipif(Path("/.dockerenv").exists(), reason="Test not applicable in Docker container")
 def test_python_executable_is_from_venv():
     """
-    Verifies that the Python interpreter running the tests is the one
-    from the project's virtual environment.
-    """
-    current_python_executable = Path(sys.executable).resolve()
-    venv_path = PROJECT_ROOT / ".venv"
+    Verifies that pytest runs inside the project's virtual environment.
 
-    if venv_path not in current_python_executable.parents:
-        pytest.skip(
-            "Pytest is running with a Python interpreter outside the virtual environment. "
-            "This is acceptable in CI/CD but not recommended for local development."
+    Note: Many virtual environments create `python` as a symlink to the base
+    interpreter (e.g., /usr/bin/python3.12). Relying on Path.resolve() can
+    therefore produce false negatives. Instead, verify venv activation using
+    sys.prefix vs sys.base_prefix and ensure sys.prefix points inside `.venv`.
+    """
+    venv_dir = (PROJECT_ROOT / ".venv").resolve()
+
+    # Detect that a venv is active
+    in_virtual_env = getattr(sys, "real_prefix", None) is not None or sys.prefix != sys.base_prefix
+    # Consider common CI environments where using the system interpreter is acceptable
+    is_ci = any(
+        (
+            os.environ.get("CI"),
+            os.environ.get("GITHUB_ACTIONS"),
+            os.environ.get("BUILDKITE"),
+            os.environ.get("GITLAB_CI"),
+            os.environ.get("AZURE_PIPELINES"),
+            os.environ.get("JENKINS_URL"),
+            os.environ.get("TEAMCITY_VERSION"),
+        )
+    )
+    if not in_virtual_env:
+        if is_ci:
+            pytest.skip(
+                "Pytest is running with a Python interpreter outside the virtual environment. "
+                "This is acceptable in CI/CD but not recommended for local development."
+            )
+        pytest.fail(
+            "TEST FAILED: Pytest is running outside the project's virtual environment.\n"
+            r"Activate the venv first (source .venv/bin/activate) or run with: ./\.venv/bin/python -m pytest"
         )
 
+    # Ensure the active venv matches the project's `.venv`
+    active_prefix = Path(sys.prefix).resolve()
+    try:
+        is_project_venv = active_prefix.is_relative_to(venv_dir)
+    except AttributeError:
+        # Fallback for very old Python (<3.9). Not expected in this project.
+        is_project_venv = str(active_prefix).startswith(str(venv_dir))
+
+    assert is_project_venv, (
+        "TEST FAILED: A virtual environment is active, but it is not the project's `.venv`.\n"
+        f"Expected venv at: {venv_dir}\n"
+        f"Active sys.prefix: {active_prefix}"
+    )
+
+    # Sanity check executable name (don't resolve symlinks)
+    current_python_executable = Path(sys.executable)
     assert current_python_executable.name in ("python", "python3"), (
         f"TEST FAILED: The Python executable has an unexpected name.\n"
         f"Expected name: 'python' or 'python3'\n"

@@ -2,7 +2,7 @@
 
 > **Note:** Other documentation files refer to this guide for all Docker usage, troubleshooting, and advanced commands.
 
-> **For basic startup and quick reference commands, see the root [README.md](../README.md).**
+> For basic startup and quick reference commands, see the root [README.md](../README.md). This guide covers advanced operations and troubleshooting only.
 
 ## Services
 
@@ -32,17 +32,19 @@
 - **Purpose**: Batch ingest documents
 - **Profile**: `ingest`
 
-## Service Operations
+## Service Operations (advanced)
+
+Refer to the root README for common operations. Prefer using `scripts/docker-setup.sh` to build and start all services with health checks. Below are additional/advanced commands not covered there:
 
 ```bash
-# Pick up code changes (live mounts)
-docker compose restart app
+# Rebuild all images with no cache (slower, clean rebuild)
+DOCKER_BUILDKIT=1 docker compose build --no-cache
 
-# Logs
-docker compose logs -f app | cat
+# Restart only Weaviate with full health recheck
+docker compose restart weaviate && docker compose logs -f weaviate | cat
 
-# Rebuild images
-docker compose build
+# Execute a shell inside the app container with env debug
+docker compose exec -e LOG_LEVEL=DEBUG app bash
 ```
 
 ## Troubleshooting
@@ -71,22 +73,26 @@ sudo systemctl restart docker
 
 ## Debug & Monitoring
 
-### Service Health
+### Service Health (advanced)
 ```bash
-# Weaviate
-curl http://localhost:8080/v1/meta
-# Ollama (service up, list models)
-curl http://localhost:11434/api/tags
-# App (basic reachability)
-curl -fsS http://localhost:8501 >/dev/null && echo ok
+# Weaviate readiness and cluster status
+curl -fsS http://localhost:8080/v1/.well-known/ready && echo ready
+curl -fsS http://localhost:8080/v1/meta | jq .
+
+# Ollama: list models and pull a model (example)
+curl -fsS http://localhost:11434/api/tags | jq .
+curl -fsS -X POST http://localhost:11434/api/pull -d '{"model":"llama3"}' | jq .
+
+# App reachability with headers
+curl -I http://localhost:8501
 ```
 
 ### Service Issues
 ```bash
-# Check logs
-docker compose logs weaviate
-docker compose logs ollama
-docker compose logs rag-backend
+# Check logs for individual services
+docker compose logs weaviate | tail -n 200
+docker compose logs ollama | tail -n 200
+docker compose logs app | tail -n 200
 
 # Check status
 docker ps -a

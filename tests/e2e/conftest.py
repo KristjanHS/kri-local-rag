@@ -20,3 +20,9 @@ def project_root():
 def cli_script_path(project_root):
     """Provides the absolute path to the main CLI script."""
     return project_root / "scripts" / "cli.sh"
+
+
+## No per-test socket toggling required; sockets are allowed by default in non-unit suites.
+@pytest.fixture(autouse=True)
+def _noop_e2e_network_fixture():
+    yield

@@ -84,6 +84,9 @@ def _setup_logging():
     logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
     logging.getLogger("transformers").setLevel(logging.WARNING)
     logging.getLogger("torch").setLevel(logging.WARNING)
+    # Common PDF parsing noise (e.g., from pypdf) that doesn't affect outcomes
+    logging.getLogger("pypdf").setLevel(logging.ERROR)
+    logging.getLogger("pypdf.generic._base").setLevel(logging.ERROR)
 
     _logging_configured = True
 
@@ -101,7 +104,7 @@ def get_logger(name: str) -> logging.Logger:
 # --- End Logging Configuration ---
 
 
-COLLECTION_NAME = "Document"
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "Document")
 
 # Text splitting parameters
 CHUNK_SIZE = 800

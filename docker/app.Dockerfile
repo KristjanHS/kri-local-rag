@@ -34,6 +34,7 @@ FROM python:3.12.3-slim
 
 ENV VENV_PATH=/opt/venv
 ENV PATH="${VENV_PATH}/bin:${PATH}"
+ENV NLTK_DATA=/opt/venv/nltk_data
 
 WORKDIR /app
 
@@ -53,7 +54,11 @@ COPY --from=builder ${VENV_PATH} ${VENV_PATH}
 
 # Copy application assets that are not part of the Python package
 COPY frontend/ /app/frontend/
-COPY example_data/ /example_data/
+COPY example_data/ /app/example_data/
+
+# Pre-download required NLTK data for Unstructured markdown parsing
+RUN mkdir -p /opt/venv/nltk_data \
+    && ${VENV_PATH}/bin/python -c "import nltk; [nltk.download(p, download_dir='/opt/venv/nltk_data') for p in ['punkt','punkt_tab']]" || true
 
 # Runtime tuning (safe defaults for CPU-only deployments)
 ENV OMP_NUM_THREADS=6
@@ -64,7 +69,7 @@ EXPOSE 8501
 
 # Non-root user and permissions
 RUN useradd -ms /bin/bash appuser \
-    && chown -R appuser:appuser /app /example_data
+    && chown -R appuser:appuser /app /app/example_data /opt/venv/nltk_data
 USER appuser
 
 CMD ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
