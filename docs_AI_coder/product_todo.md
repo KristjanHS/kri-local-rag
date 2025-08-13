@@ -43,109 +43,51 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for context on completed Phase 1 testing work.
 
-#### P0 — Must do now (stability, forward-compat, fast feedback)
 
-No tasks here at the moment
+#### P0 — Focused debug plan: QA loop tests inconsistent between isolated vs core runs
 
-#### P1 — Stabilization and Finalization
- 
-- [ ] Finalize: Full suite green
-  - Action: Run the full suite locally; then update CI if needed.
-  - Verify: `.venv/bin/python -m pytest -q -m "not environment" --disable-warnings` passes with 0 failures.
+- [ ] Step 1 — Reconfirm failures in core vs isolated
+  - Action: Run `pytest -q -vv tests/unit/test_qa_loop_logic.py` and `pytest --test-core -q`.
+  - Verify: Isolated pass vs core failures reproduced.
 
-#### P2 — CI pipeline separation and test architecture tasks
+- [ ] Step 2 — Fix test patching to avoid module reload side effects
+  - Action: Remove `importlib.reload` uses from `tests/unit/test_qa_loop_logic.py`; ensure all calls reference `qa_loop._...` consistently.
+  - Verify: Core run shows QA loop unit tests now stable.
 
-- [x] P2.1 — Split test suites and defaults (unit/integration with coverage vs. UI/E2E without coverage)
-  - Action: Adjusted `addopts` in `pyproject.toml` to exclude UI/E2E tests by default. Added `pytest` options (`--test-core`, `--test-ui`) in `tests/conftest.py` to run specific suites.
-  - Verify: `pytest --test-core` runs the core suite with coverage. `pytest --test-ui --no-cov` runs the UI suite without coverage.
+- [ ] Step 3 — Validate integration QA pipeline tests
+  - Action: Run `pytest -q -vv tests/integration/test_qa_pipeline.py`.
+  - Verify: Both integration tests pass.
 
-- [x] P2.2 — Prefer marker selection over runtime skip hooks
-  - Action: Added a `pytest_collection_modifyitems` hook in `tests/e2e_streamlit/conftest.py` that raises a `pytest.UsageError` if UI tests are run with coverage enabled. Marked Playwright tests with `@pytest.mark.ui`.
-  - Verify: Running UI tests with coverage fails early with a clear error message.
+- [ ] Step 4 — Full core verification
+  - Action: Run `pytest --test-core -q`.
+  - Verify: Suite passes or matches previous green baseline.
+  
+#### P1 — ...
 
-- [x] P2.3 — Simplify logging; drop per-test file handlers
-  - Action: Removed `pytest_runtest_setup/teardown/logreport` hooks from `tests/conftest.py`.
-  - Verify: Logging now relies entirely on the centralized `log_cli`/`log_file` configuration in `pyproject.toml`.
+Reserved for new almost-urgent topic/tasks
 
-- [x] P2.4 — Standardize Docker management via pytest-docker
-  - Action: Removed the custom `docker_services` and `test_log_file` fixtures from `tests/conftest.py`, relying on the `pytest-docker` plugin.
-  - Verify: Integration tests still pass, with service management handled by the plugin.
+#### P2 — ...
 
-- [x] P2.5 — Normalize markers and directories
-  - Action: Added a `ui` marker and ensured test selection commands work correctly.
-  - Verify: `pytest --test-ui` selects only Playwright tests; `pytest --test-core` excludes them.
+Reserved for new topic/tasks
 
-- [x] P2.6 — Coverage configuration hardening
-  - Action: Configured `.coveragerc` and `pyproject.toml` to store coverage data in `reports/coverage/`. The UI test suite guard ensures it is run with `--no-cov`.
-  - Verify: `.coverage` files no longer appear in the project root.
+#### P3 — ...
 
-- [ ] P2.7 — CI pipeline separation
-  - Action: Split CI into two jobs: `tests-core` (coverage) and `tests-ui` (no coverage). Publish coverage from core job only.
-  - Verify: CI runs green; core job uploads coverage HTML; Playwright browsers cached for UI job.
+Reserved for new topic/tasks
 
-- [x] P2.8 — Developer docs and DX commands
-  - Action: Updated `docs/DEVELOPMENT.md` and `docs_AI_coder/AI_instructions.md` with new `pytest` options.
-  - Verify: Documentation reflects the new testing commands.
+#### P4 — ...
 
-
-- [ ] P2.9 — Optional hardening for unit/fast test suites
-  - Enforce no-network in unit tests
-    - [ ] Add `pytest-socket` to `requirements-dev.txt` and document usage
-    - [ ] Add an `autouse=True` fixture scoped to unit tests to call `disable_socket()` (allow Unix sockets if needed)
-    - [ ] Verify: a unit test that attempts `httpx.get("http://example.com")` fails with a clear error
-  - Tighten fast selection
-    - [ ] Update `tests/conftest.py` so `--test-core` also excludes `slow` (in addition to `ui`, `e2e`, `docker`, `environment`, `integration`)
-    - [ ] Align `fast_tests` job to use `--test-core` (or equivalent `-m` expression) and verify it does not start Docker/services under `act`
-  - Speed up feedback
-    - [ ] Optionally add `pytest-xdist` and run fast tests with `-n auto` in CI for quicker PR feedback
-  - Guard against accidental real clients in unit tests
-    - [ ] Add a unit-scope fixture that monkeypatches `weaviate.connect_to_custom` to raise if called (unless explicitly patched in a test)
-    - [ ] Verify: a unit test calling real `connect_to_custom` fails; patched tests still pass
-
-#### P3 — Semgrep blocking findings visibility and triage (local)
-
-- Objective: Make blocking findings clearly visible locally and fix at least the top one.
-- Plan (small, incremental steps)
-   1) Ensure findings are shown even when the scan fails locally
-      - [x] Update Semgrep workflow to run the summary step unconditionally (always) while keeping PRs failing on findings in CI
-  2) Surface findings in terminal during pre-push
-     - [x] Run the pre-push hook and verify the Semgrep findings summary shows rule, file:line, and message
-  3) Triage and fix the top finding
-     - [x] Identify the most critical/simple-to-fix finding from the summary
-     - [x] Implement a minimal, safe fix in code
-     - [ ] Add/adjust a unit test if applicable
-  4) Verify locally
-     - [ ] Re-run pre-push; confirm Semgrep has no blocking findings
-       - [BLOCKED: pre-push stops at lint due to protobuf constraint mismatch; Semgrep job run directly reports 0 blocking findings]
-
-#### P4 — CI/SAST enforcement
-
-- CodeQL workflow
-  - [x] Disable Default CodeQL setup in GitHub repo settings (to avoid advanced-config conflict)
-  - [x] Broaden PR trigger (run on all PRs): remove `branches: ["main"]` under `on.pull_request`
-  - [x] Validate `analyze@v3` inputs against official docs; if `output` is unsupported, remove it and adjust the local summary step accordingly
-  - [x] Keep uploads enabled only on GitHub (skip on forks and under Act), and enforce via branch protection rather than hard-fail
-- Semgrep workflow
-  - [x] Ensure robust baseline: add a step to unshallow history before scan (`git fetch --prune --unshallow || true`), or fetch base commit for PRs
-  - [x] Switch to official Semgrep Docker action; do not run under local act
-  - [x] Keep SARIF upload skipped for forked PRs; consider two-job upload pattern if uploads are needed for forks
-- Pre-push (local)
-  - [x] Make pre-push resilient if `act` is missing: detect and skip with a clear message
-  - [x] Add `SKIP_LOCAL_SEC_SCANS=1` guard to optionally skip Semgrep/CodeQL locally when needed
-  - [x] Document the guard and prerequisites in `docs/DEVELOPMENT.md`
-- Repo protection
-  - [ ] Configure branch protection to require "Code scanning results / CodeQL" and Semgrep check on PRs
+Reserved for new topic/tasks
 
 #### P5 — Pre-push performance optimizations (local DX)
 
-- [ ] Switch lint/typecheck to native venv (faster than act)
-  - [ ] Replace `act ... -j lint` in the pre-push hook with native calls: `.venv/bin/ruff check .` and `.venv/bin/ruff format --check .`
-  - [ ] Replace `act ... -j pyright` with `.venv/bin/pyright`
-  - [ ] Keep tests via `act` for parity, or add a native fast path: `.venv/bin/python -m pytest --test-fast --maxfail=1 -q`
+- [x] Switch lint/typecheck to native venv (faster than act)
+  - [x] Replace `act ... -j lint` in the pre-push hook with native calls: `.venv/bin/ruff check .` and `.venv/bin/ruff format --check .`
+  - [x] Replace `act ... -j pyright` with `.venv/bin/pyright`
+  - [x] Keep tests via `act` for parity, or add a native fast path: `.venv/bin/python -m pytest --test-fast --maxfail=1 -q`
 
 - [ ] Add pre-push skip toggles (env-driven)
-  - [ ] Support `SKIP_LINT=1`, `SKIP_PYRIGHT=1`, `SKIP_TESTS=1` to selectively skip steps locally
-  - [ ] Default heavy scans to opt-in (CodeQL already defaults to skip via `SKIP_LOCAL_SEC_SCANS=1`)
+  - [x] Support `SKIP_LINT=1`, `SKIP_PYRIGHT=1`, `SKIP_TESTS=1` to selectively skip steps locally
+  - [x] Default heavy scans to opt-in (CodeQL already defaults to skip via `SKIP_LOCAL_SEC_SCANS=1`)
 
 - [ ] Fail-fast for local tests
   - [ ] Update pre-push fast tests invocation to include `--maxfail=1 -q` for quicker feedback on first failure
@@ -164,7 +106,101 @@ No tasks here at the moment
   - [ ] Pin the local `pyright` version (e.g., in `requirements-dev.txt`) to match CI
   - [ ] Ensure `ruff` version in pre-commit matches the CI action version (`0.5.3` today)
 
+#### P5.1 — Docker build cache and context optimizations
+
+- [ ] Add a root `.dockerignore` to shrink build context and improve cache hits
+  - Action: Create `.dockerignore` at repo root including at minimum: `.git`, `.venv`, `__pycache__/`, `*.pyc`, `logs/`, `data/`, `node_modules/`, `dist/`, `build/`, `*.ipynb_checkpoints`.
+  - Verify: Run a build and confirm the "Sending build context" size drops and cache hit rate increases on subsequent builds.
+
+- [ ] Use BuildKit apt cache for OS package installs
+  - Action: In `docker/app.Dockerfile`, change the apt layer to use a cache mount:
+    - Replace the apt RUN with `RUN --mount=type=cache,target=/var/cache/apt apt-get update && apt-get install -y --no-install-recommends ... && apt-get clean && rm -rf /var/lib/apt/lists/*`.
+  - Verify: Second build is faster with cache hits on apt downloads.
+
+- [ ] Document BuildKit and cache guidance
+  - Action: In `docs/DEVELOPMENT.md` (Docker section), note that BuildKit is on by default; prefer cached builds. Use `--no-cache` only when intentionally refreshing. Mention `scripts/build_app.sh` passes through extra flags (e.g., `--no-cache`).
+  - Verify: Doc updated and referenced from README as appropriate.
+
+- [ ] Pin remote image tags for reproducibility (where reasonable)
+  - Action: Audit image tags in `docker/docker-compose.yml` and `docker/app.Dockerfile`.
+    - Keep `weaviate` pinned (already pinned).
+    - Consider pinning `OLLAMA_IMAGE` default from `latest` to a known-good version; document override via env var.
+    - Python base images are already pinned; keep that practice.
+  - Verify: `docker compose up` uses the pinned versions; builds remain reproducible.
+
+- [ ] Optional: Add opt-in image refresh step while defaulting to cache usage
+  - Action: In `scripts/docker-setup.sh`, honor an env flag `FORCE_PULL=1` to run `docker compose pull` before build/up; default to not pulling.
+  - Verify: With `FORCE_PULL=1`, images are updated; without it, local cache is used.
+
+- [ ] Optional: Avoid dependency-layer cache busting
+  - Action: Keep `requirements.txt` stable and separate dev/runtime dependencies (`requirements-dev.txt` vs runtime). Ensure `docker/app.Dockerfile` installs only runtime deps to preserve cache.
+  - Verify: Code-only changes do not invalidate the dependency install layer; rebuilds are fast.
+
+#### P5.2 — NLTK data setup - to make .md ingestion work (deterministic and reproducible)
+
+- [ ] Replace brittle inline NLTK downloads in Docker with official downloader CLI
+  - Action: In `docker/app.Dockerfile`, replace the current `python -c "import nltk; ..."` with:
+    ```Dockerfile
+    RUN mkdir -p /opt/venv/nltk_data \
+        && ${VENV_PATH}/bin/python -m nltk.downloader -d /opt/venv/nltk_data punkt punkt_tab
+    ```
+  - Action: Remove any `|| true` so the build fails fast if downloads fail.
+  - Verify: A fresh build succeeds and the layer contains `tokenizers/punkt` and `tokenizers/punkt_tab` under `/opt/venv/nltk_data`.
+
+- [ ] Establish a single data path via `NLTK_DATA`
+  - Action: Keep `ENV NLTK_DATA=/opt/venv/nltk_data` in Docker. For local dev, document using `export NLTK_DATA="$(pwd)/.venv/nltk_data"`.
+  - Verify: `python -c "import nltk.data; print(nltk.data.path)"` includes the expected path in both envs.
+
+- [ ] Local dev parity: documented bootstrap
+  - Action: In `docs/DEVELOPMENT.md`, add a snippet for devs:
+    ```bash
+    export NLTK_DATA="$(pwd)/.venv/nltk_data"
+    mkdir -p "$NLTK_DATA"
+    .venv/bin/python -m nltk.downloader -d "$NLTK_DATA" punkt punkt_tab
+    ```
+  - Verify: On a clean venv, the commands complete and `nltk.data.find('tokenizers/punkt')` succeeds.
+
+- [ ] Startup verification with clear error
+  - Action: Add a lightweight check at app startup (or first-use path) to assert NLTK resources exist, e.g. `nltk.data.find('tokenizers/punkt')`, and raise a helpful message if missing.
+  - Verify: When the data is removed/absent, the app fails fast with a clear remediation hint referencing the dev/Docker steps above.
+
+- [ ] Pin library version for stability
+  - Action: Pin `nltk` to a known-working version in `requirements.txt` (runtime) and `requirements-dev.txt` if needed.
+  - Verify: Rebuild/install resolves the pinned version; tokenization works as before.
+
+- [ ] Optional: Offline/CI artifacts for corpora
+  - Action: For fully offline or hermetic builds, package the required subset of `nltk_data` as a build artifact (e.g., tarball) and add a Docker build step to extract it to `/opt/venv/nltk_data` with checksum verification.
+  - Verify: Docker build succeeds without network when the artifact is provided; app runs and passes the startup verification.
+
 #### P6 — E2E testing Tasks (CLI and Streamlit)
+
+  - [ ] Create dedicated UI dependency extra (isolate Playwright)
+    - [ ] Action: In `pyproject.toml`, move `pytest-playwright==0.4.4` and `playwright>=1.45,<2` out of the `test` extra and define a new extra: `[project.optional-dependencies].ui = ["pytest-playwright==0.4.4", "playwright>=1.45,<2"]`.
+    - [ ] Action: Ensure default local/dev installs do NOT include `ui` (e.g., keep `-e .[test,docs,cli]`).
+    - [ ] Verify: A fresh `pip install -e .[test,docs,cli]` does not install Playwright; `python -m playwright` is not available until `-e .[ui]` is installed.
+
+  - [ ] CI dependency isolation for UI suite
+    - [ ] Action: In `.github/workflows/python-lint-test.yml`, ensure only the UI job installs the UI extra (e.g., `pip install -e .[ui]` or `-e .[test,docs,cli,ui]` if those are needed there).
+    - [ ] Action: In the same UI job, run `python -m playwright install --with-deps` before executing tests; remove any Playwright installs from non-UI jobs.
+    - [ ] Verify: `act pull_request -j ui_tests_act` shows the UI extra being installed and browsers installed; `-j fast_tests`/`-j core_suite` do not install Playwright nor browsers.
+
+  - [ ] Document isolated UI workflow for developers
+    - [ ] Action: Update `docs/DEVELOPMENT.md` to show two paths:
+      - Regular dev: `pip install -e .[test,docs,cli]` (no Playwright)
+      - UI run: `pip install -e .[ui] && python -m playwright install --with-deps && pytest --test-ui --no-cov`
+    - [ ] Verify: Follow the doc steps on a clean venv; UI tests only run after installing the `ui` extra and browsers.
+
+  - [ ] Playwright dependency explicit pin (stability)
+    - [ ] Action: In `pyproject.toml` add `"playwright>=1.45,<2"` to `[project.optional-dependencies].test` next to `pytest-playwright==0.4.4`, then reinstall dev deps.
+    - [ ] Verify: `.venv/bin/python -m playwright --version` succeeds; `.venv/bin/python -m pytest --test-ui --no-cov -q` collects and runs UI tests.
+
+  - [ ] Trim CI Playwright browser installs to UI jobs only (simplify CI)
+    - [ ] Action: In `.github/workflows/python-lint-test.yml`, remove Playwright browser install steps from non-UI jobs (e.g., `core_suite`). Keep them only where `--test-ui` (or other Playwright tests) actually run.
+    - [ ] Verify: `act pull_request -j fast_tests` and `-j core_suite` show no Playwright install step; `-j ui_tests_act` still installs browsers and runs UI tests.
+
+  - [ ] Simplify UI coverage gating (reduce custom logic)
+    - [ ] Action: In `tests/e2e_streamlit/conftest.py`, simplify the collection hook to only enforce: if `--test-ui` is used while coverage is enabled, raise a clear `pytest.UsageError`. Rely on default `-m "not ui"` from `pyproject.toml` to exclude UI tests in normal runs; drop verbose coverage detection/deselect logic if not needed.
+    - [ ] Verify: `.venv/bin/python -m pytest -q` runs green with UI tests deselected; `.venv/bin/python -m pytest --test-ui --no-cov -q` runs UI tests; `.venv/bin/python -m pytest --test-ui -q` errors with the expected usage message.
 
   - [ ] Streamlit E2E: Improve locator resilience (only if still flaky)
     - Action: Switch input selection to `get_by_label("Ask a question:")`, keep `[data-testid]` for answers, and if needed add `page.wait_for_function` to await `TEST_ANSWER` text.
@@ -213,6 +249,46 @@ No tasks here at the moment
 - [ ] Replace fragile relative paths with robust absolute paths where appropriate.
 - [ ] Configure centralized file logging (e.g., `logs/app.log`) across CLI and services.
 - [ ] Enhance progress logging for long-running ingestion (progress bar or granular steps).
+- [ ] Review integration suite Docker autostart
+  - [ ] Action: Measure runtime impact of `tests/integration/conftest.py::_start_docker_services_session` autouse startup.
+  - [ ] Action: If overhead is significant and not broadly needed, scope compose startup to tests that require it (explicit `docker_services` usage) or guard autostart behind an env flag (e.g., `INTEGRATION_AUTOSTART_COMPOSE=1`).
+  - [ ] Verify: Integration tests that need compose still pass; testcontainers-only tests remain unaffected and faster.
+
+#### P8.1 — Socket handling simplification (follow-up)
+
+Archived on 2025-08-13
+
+#### P8.2 — Test path trust and tagging simplification
+
+- Goal: Make test type derive from path (source of truth) and simplify markers to align with best practices.
+- Plan (small, incremental steps)
+  1) Enforce path-derived default markers
+     - [ ] Action: Add/adjust a `pytest_collection_modifyitems` hook in `tests/conftest.py` to auto-apply markers by path:
+       - `tests/unit/` → `unit`
+       - `tests/integration/` → `integration`
+       - `tests/environment/` → `environment`
+       - `tests/e2e/` → `e2e`
+       - `tests/e2e_streamlit/` → `ui`
+       - `tests/docker/` → `docker`
+     - [ ] Verify: `pytest --co -q` shows sample items with expected markers.
+  2) Tighten fast suite selection
+     - [x] Action: Ensure `--test-fast` collects only from `tests/unit/` and sets `UNIT_ONLY_TESTS=1` to enforce early socket block.
+     - [ ] Verify: `.venv/bin/python -m pytest --test-fast -q` is green; no external network attempts appear in logs.
+  3) Audit and relocate miscategorized tests
+     - [ ] Action: Scan for tests under `tests/unit/` importing heavy/external services or carrying non-unit markers; move them to the correct directory (usually `tests/integration/`).
+     - [ ] Verify: Re-run `--test-fast`; confirm it remains green and faster. Run `-m integration` to ensure moved tests are collected there.
+  4) Simplify explicit markers
+     - [ ] Action: Remove redundant `@pytest.mark.<type>` where the path already determines the type; keep only additional markers like `slow`, `ui`, or `docker` when needed.
+     - [ ] Verify: `pytest -q` collects the same tests as before; diffs show only marker removals.
+  5) Guardrail: reject mismatched path/marker
+     - [ ] Action: In `pytest_collection_modifyitems`, error if a test under `tests/unit/` has markers `integration`, `e2e`, `docker`, or `environment` (and vice versa when appropriate).
+     - [ ] Verify: Introduce a deliberate mismatch in a temporary branch; confirm collection fails with a clear message; revert.
+  6) Documentation
+     - [ ] Action: Update `docs/DEVELOPMENT.md` to document that path determines test type; markers are optional for extra semantics only. Document `--test-fast`, `--test-core`, `--test-ui` behavior.
+     - [ ] Verify: Follow the doc to run each suite locally; results match expectations.
+  7) CI alignment
+     - [ ] Action: Keep the CI "Fast Tests" job on `--test-fast`. Add a lightweight job or step to run `pytest --check-test-paths` (via env/flag) to enforce the guardrail in PRs.
+     - [ ] Verify: Open a draft PR with an intentional mismatch; CI step fails with a helpful message; revert.
 
 #### P9 — Soon (quality, CI structure, performance)
 - [ ] Expand unit test coverage, focusing on core logic and error paths.

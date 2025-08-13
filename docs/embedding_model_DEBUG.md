@@ -49,7 +49,7 @@ The key is to set `LOG_LEVEL=DEBUG` in your environment. The debug level in the 
 **Option A: Set environment variable before running**
 ```bash
 export LOG_LEVEL=DEBUG
-docker compose -f docker/docker-compose.yml up
+./scripts/docker-setup.sh
 ```
 
 **Option B: Create a .env file**

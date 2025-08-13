@@ -74,7 +74,9 @@ def test_manual_vectorization_uses_local_embedding(docker_services, tmp_path):
         # Load the same embedding model used by the application
         model = retriever._get_embedding_model(EMBEDDING_MODEL)
         if model is None:
-            pytest.skip("Local embedding model unavailable for test")
+            pytest.fail(
+                "Local embedding model unavailable; non-unit tests require the real SentenceTransformer to be present."
+            )
 
         # Insert two small objects WITH manual vectors using batch (like application code)
         v1 = model.encode("The Eiffel Tower is in Paris.")

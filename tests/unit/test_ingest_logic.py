@@ -27,7 +27,8 @@ def mock_docs():
 
 
 @patch("backend.ingest.DirectoryLoader")
-def test_load_and_split_documents(mock_loader):
+@patch("backend.ingest.os.path.exists", return_value=True)
+def test_load_and_split_documents(mock_exists, mock_loader):
     """Test that documents are loaded and split correctly."""
     # Arrange
     mock_instance = mock_loader.return_value

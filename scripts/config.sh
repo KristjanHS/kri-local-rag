@@ -172,7 +172,8 @@ init_script_logging() {
 enable_error_trap() {
     local log_file="$1"
     local script_name="$2"
-    trap 'rc=$?; line=${BASH_LINENO[0]:-?}; cmd=${BASH_COMMAND:-?}; msg="${script_name}: line ${line}: ${cmd} (exit ${rc})"; log ERROR "$msg" | tee -a "$log_file"; exit $rc' ERR
+    # Expand variables at definition time to avoid unbound-variable issues in the ERR trap with `set -u`.
+    trap "rc=\$?; line=\${BASH_LINENO[0]:-?}; cmd=\${BASH_COMMAND:-?}; msg=\"${script_name}: line \${line}: \${cmd} (exit \${rc})\"; log ERROR \"\$msg\" | tee -a \"${log_file}\"; exit \$rc" ERR
 }
 
 # Optional debug trace to the log file only (export DEBUG=1 to enable)
