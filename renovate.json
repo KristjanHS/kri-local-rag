@@ -26,6 +26,17 @@
     },
     "packageRules": [
         {
+            "matchPackageNames": [
+                "torch"
+            ],
+            "matchUpdateTypes": [
+                "major",
+                "minor",
+                "patch"
+            ],
+            "enabled": false
+        },
+        {
             "matchManagers": [
                 "pip_requirements"
             ],
@@ -167,8 +178,5 @@
     "schedule": [
         "before 6am on monday"
     ],
-    "vulnerabilityAlerts": true,
-    "ignoreDeps": [
-        "torch"
-    ]
+    "vulnerabilityAlerts": true
 }
