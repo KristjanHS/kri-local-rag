@@ -23,34 +23,33 @@ pipx install --force semgrep
 ## Run the app (CLI / Web UI)
 For basic usage and quick-start commands, see the root README. This document focuses on development workflows and advanced topics.
 
-## Run tests
+## Run tests (directory-based bundles)
 
-- **Core test suite** (fast, with coverage):
+- Unit (fast, sockets blocked):
 ```bash
-.venv/bin/python -m pytest --test-core
+.venv/bin/python -m pytest tests/unit -n auto -q
 ```
 
-- **UI test suite** (Playwright/Streamlit, no coverage):
+- Integration (one real component; network allowed):
 ```bash
-.venv/bin/python -m pytest --test-ui --no-cov
+.venv/bin/python -m pytest tests/integration -q
 ```
 
-- **Integration tests (with Docker auto-managed)**:
+- E2E (full stack via Docker Compose):
 ```bash
-.venv/bin/python -m pytest -m integration
+docker compose -f docker/docker-compose.yml up -d --build
+.venv/bin/python -m pytest tests/e2e -q
+docker compose -f docker/docker-compose.yml down -v
 ```
 
-- **Fast iteration vs teardown**:
+- UI (Playwright/Streamlit; coverage disabled):
 ```bash
-# Default keeps compose services up for quick local re-runs
-scripts/pytest_with_cleanup.sh -m integration
+.venv/bin/python -m pytest tests/ui --no-cov -q
+```
 
-# Force teardown of compose and Testcontainers after the run
-scripts/pytest_with_cleanup.sh --teardown-docker -m integration
-
-# Or via env toggles
-TEARDOWN_DOCKER=1 scripts/pytest_with_cleanup.sh -m integration
-KEEP_DOCKER_UP=1 scripts/pytest_with_cleanup.sh -m integration
+- Pre-push fast path (runs unit bundle by default; respects SKIP_TESTS=1):
+```bash
+scripts/pre_push.sh
 ```
 
 

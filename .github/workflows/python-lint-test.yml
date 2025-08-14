@@ -24,17 +24,22 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # ⬅️ do not store token in git config
       - name: Ruff static analysis
         uses: astral-sh/ruff-action@v1
         with:
           version: "0.5.3"
-          args: check .
+          args: check --fix .
       - name: Ruff formatting check
         uses: astral-sh/ruff-action@v1
         with:
@@ -46,6 +51,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -66,8 +73,8 @@ jobs:
           mkdir -p reports
       - name: Run fast tests
         run: |
-          # Fastest suite (no external services) via custom option defined in tests/conftest.py
-          python -m pytest --test-fast -n auto --junitxml=reports/junit.xml
+          # Fastest suite: run only unit tests (no external services)
+          python -m pytest tests/unit -n auto --maxfail=1 -q --junitxml=reports/junit.xml
 
       - name: Upload fast test reports
         # Skip under act (local GitHub Actions emulator) because ACTIONS_RUNTIME_TOKEN is not available.
@@ -80,10 +87,11 @@ jobs:
 
   pyright:
     name: Pyright
-    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -92,6 +100,9 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
+      - name: Install pyright
+        run: npm install -g pyright
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -106,6 +117,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -143,6 +156,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -190,7 +205,7 @@ jobs:
         env:
           PLAYWRIGHT_HEADLESS: "1"
         run: |
-          python -m pytest --test-ui --no-cov \
+          python -m pytest tests/ui --no-cov \
             --html=reports/report_ui.html --self-contained-html \
             --junitxml=reports/junit_ui.xml
       - name: Tear down local stack
@@ -206,6 +221,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -223,10 +240,10 @@ jobs:
       - name: Prepare reports directories
         run: |
           mkdir -p reports
-      - name: Run core test suite (everything except UI)
+      - name: Run core test suite (unit + integration, excludes UI)
         # Enforce coverage threshold for core suite
         run: |
-          python -m pytest -v --test-core -n auto --cov-fail-under=60 \
+          python -m pytest -v -n auto --cov-fail-under=60 tests/unit tests/integration \
             --html=reports/report_core.html --self-contained-html \
             --junitxml=reports/junit_core.xml
       - name: Upload core suite reports
@@ -245,6 +262,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # ⬅️ do not store token in git config
       - name: Set up Python
         # Python is needed for the runner environment, but dependencies are inside the container
         uses: actions/setup-python@v5
