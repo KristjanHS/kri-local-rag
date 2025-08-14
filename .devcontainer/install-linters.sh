@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # Debian Bullseye base (your image) — install yamllint via apt.
-sudo apt-get update
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
   curl jq ca-certificates tar xz-utils python3 python3-pip yamllint file
+
 
 # --- hadolint (static binary, arch-aware) ---
 arch="$(uname -m)"
