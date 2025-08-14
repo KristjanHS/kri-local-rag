@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.environment
+pytestmark = []
 
 # --- Constants for Environment Validation ---
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent

@@ -107,18 +107,18 @@ fi
 if [[ "$SKIP_TESTS" == "1" ]]; then
   log INFO "Skipping tests due to SKIP_TESTS=1" | tee -a "$LOG_FILE"
 else
-  if [[ "$ACT_AVAILABLE" == "1" ]]; then
-    log INFO "Running fast_tests via act (pull_request) …" | tee -a "$LOG_FILE"
-    act pull_request -j fast_tests --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
-  else
-    # Native fast path for quick feedback when act isn't available
-    if [[ -x ".venv/bin/python" ]]; then
-      log INFO "Running native fast tests: pytest --test-fast --maxfail=1 -q …" | tee -a "$LOG_FILE"
-      .venv/bin/python -m pytest --test-fast --maxfail=1 -q 2>&1 | tee -a "$LOG_FILE"
+    if [[ "$ACT_AVAILABLE" == "1" ]]; then
+      log INFO "Running fast_tests via act (pull_request) …" | tee -a "$LOG_FILE"
+      act pull_request -j fast_tests --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
     else
-      log WARN "'.venv/bin/python' not found; cannot run native fast tests." | tee -a "$LOG_FILE"
+      # Native fast path for quick feedback when act isn't available
+      if [[ -x ".venv/bin/python" ]]; then
+        log INFO "Running native unit tests: pytest tests/unit --maxfail=1 -q …" | tee -a "$LOG_FILE"
+        .venv/bin/python -m pytest tests/unit --maxfail=1 -q 2>&1 | tee -a "$LOG_FILE"
+      else
+        log WARN "'.venv/bin/python' not found; cannot run native unit tests." | tee -a "$LOG_FILE"
+      fi
     fi
-  fi
 fi
 
 # Run local Semgrep via pipx (isolated) unless skipped
