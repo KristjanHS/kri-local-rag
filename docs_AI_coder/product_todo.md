@@ -115,12 +115,18 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Prefer e2e orchestration via `scripts/test.sh e2e` that wraps `docker compose up -d --build && pytest tests/e2e -q && docker compose down -v`.
   - Verify: No plugin warnings on run; e2e orchestration flows through the script.
 
-- [ ] Step 3 — Integration bundle (one real component; network allowed)
+- [x] Step 3 — Integration bundle (one real component; network allowed)
   - Action: Standardize command: `.venv/bin/python -m pytest tests/integration -q`.
   - Action: Document policy: prefer Testcontainers or a single real dependency; for multi-service needs, move test to `e2e`.
   - Verify: Typical tests (e.g., `tests/integration/test_weaviate_integration.py`) pass without requiring the full compose stack; logs show no socket-block enforcement.
 
-- [ ] Step 4 — E2E bundle (all real components; network allowed)
+  - [x] Fix: Reset cached globals to avoid cross-test state (best practices)
+    - Action: Add autouse fixture in `tests/integration/conftest.py` that clears `RAG_FAKE_ANSWER` and resets caches only if respective modules are already imported: `backend.qa_loop._cross_encoder`, `backend.qa_loop._ollama_context`, and `backend.retriever._embedding_model` via `sys.modules`.
+    - Rationale: Aligns with `docs_AI_coder/AI_instructions.md` guidance to prevent flaky tests caused by cached globals and to not import modules inside fixtures (keeps patch decorators effective).
+    - Verify: `.venv/bin/python -m pytest tests/integration -q` shows deterministic results; streaming test passes in isolation and alongside others.
+    - Validation: All integration tests pass (28/28); flaky-tests guidance updated and condensed in `docs_AI_coder/AI_instructions.md`.
+
+- [x] Step 4 — E2E bundle (all real components; network allowed)
   - Action: Provide a single dispatcher script `scripts/test.sh` with usage: `test.sh [unit|integration|e2e|ui]` that runs the standardized directory-based commands; for e2e it does `docker compose up -d --build && pytest tests/e2e -q && docker compose down -v` with `set -euo pipefail`.
   - Verify: `bash scripts/test.sh unit|integration|e2e|ui` runs the intended bundle with minimal flags.
 
@@ -202,12 +208,12 @@ New Tasks/Topic can be added here.
   - [x] Replace `act ... -j pyright` with `.venv/bin/pyright`
 - [x] Keep tests via `act` for parity; native fast path runs the unit bundle: `.venv/bin/python -m pytest tests/unit --maxfail=1 -q`
 
-- [ ] Add pre-push skip toggles (env-driven)
+- [x] Add pre-push skip toggles (env-driven)
   - [x] Support `SKIP_LINT=1`, `SKIP_PYRIGHT=1`, `SKIP_TESTS=1` to selectively skip steps locally
   - [x] Default heavy scans to opt-in (CodeQL already defaults to skip via `SKIP_LOCAL_SEC_SCANS=1`)
 
-- [ ] Fail-fast for local tests
-  - [ ] Update pre-push fast tests invocation to include `--maxfail=1 -q` for quicker feedback on first failure
+- [x] Fail-fast for local tests
+  - [x] Update pre-push fast tests invocation to include `--maxfail=1 -q` for quicker feedback on first failure
 
 - [ ] Pre-commit integration for changed-files speedups
   - [ ] Add `.pre-commit-config.yaml` with `ruff` (lint + format) and optional `pyright` hooks
@@ -223,8 +229,8 @@ New Tasks/Topic can be added here.
   - [ ] Pin the local `pyright` version (e.g., in `requirements-dev.txt`) to match CI
   - [ ] Ensure `ruff` version in pre-commit matches the CI action version (`0.5.3` today)
   
- - [ ] Pre-push alignment
-   - [ ] Replace any `--test-fast` references with `tests/unit` for pre-push context and update `scripts/pre_push.sh` accordingly
+ - [x] Pre-push alignment
+   - [x] Replace any `--test-fast` references with `tests/unit` for pre-push context and update `scripts/pre_push.sh` accordingly
 
 #### P5.1 — Docker build cache and context optimizations
 
