@@ -56,7 +56,7 @@ testpaths = [
     "tests/unit",
     "tests/integration",
     "tests/e2e",
-    "tests/e2e_streamlit",
+    "tests/ui",
     "tests/environment",
     "tests/docker",
 ]
@@ -146,5 +146,5 @@ pep621_dev_dependency_groups = ["tests", "docs", "cli"]
 DEP002 = ["boto3"]       # AWS libs pulled in indirectly
 
 [tool.coverage.run]
-omit = ["tests/e2e_streamlit/*"]
+omit = ["tests/ui/*"]
 data_file = "reports/coverage/.coverage"

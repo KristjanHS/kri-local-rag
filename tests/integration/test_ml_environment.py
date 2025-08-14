@@ -3,7 +3,7 @@ import logging
 import pytest
 import torch
 
-# Mark the entire module as 'slow'
+# Mark the entire module as 'slow' (no environment marker needed)
 pytestmark = pytest.mark.slow
 
 # --- Constants for ML Environment Validation ---

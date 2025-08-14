@@ -2,8 +2,9 @@
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
     "extends": [
         "config:recommended",
-        "security:updates",
-        "docker:pinDigests"
+        "docker:pinDigests",
+        "helpers:pinGitHubActionDigests",
+        "security:only-security-updates"
     ],
     "dependencyDashboard": true,
     "rebaseWhen": "behind-base-branch",
@@ -165,5 +166,6 @@
     ],
     "schedule": [
         "before 6am on monday"
-    ]
+    ],
+    "vulnerabilityAlerts": true
 }
