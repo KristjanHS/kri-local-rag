@@ -168,22 +168,35 @@ Coverage policy:
   - Debug: set `UNITNETGUARD_FAIL_FAST=1`, re-run to pinpoint the first victim; use `-k` to bisect; try randomized order (pytest-randomly)
   - Fix: mock clients (e.g., `httpx.MockTransport`); avoid `enable_socket`/socket monkeypatches; move real-network tests to integration
 
-### Flaky unit tests: cached globals (cross-encoder)
+### Flaky tests: cached globals/env
 
-- Symptom: `tests/unit/test_qa_loop_logic.py::test_rerank_cross_encoder_success` sometimes fails depending on earlier tests.
-- Cause: `backend.qa_loop` caches the cross-encoder in global `qa_loop._cross_encoder`. If another test instantiates/patches it first, later tests mocking `_get_cross_encoder` may not take effect.
-- Fix: Reset the cache before mocking so the mock is used deterministically:
+- Symptoms: order-dependent failures, real LLM text instead of mocked tokens, mocks not taking effect.
+- Likely causes: cached globals (`qa_loop._cross_encoder`, `qa_loop._ollama_context`, `retriever._embedding_model`), leftover `RAG_FAKE_ANSWER`, importing target modules inside fixtures before `@patch` runs.
 
-```python
-import backend.qa_loop as qa_loop
-qa_loop._cross_encoder = None
-with patch("backend.qa_loop._get_cross_encoder") as get_ce:
-    mock = MagicMock(); mock.predict.return_value = [0.9, 0.1]
-    get_ce.return_value = mock
-    # run assertions
-```
+- Fix quickly:
+  1) Unit: reset cache before mocking
+  ```python
+  import backend.qa_loop as qa_loop
+  qa_loop._cross_encoder = None
+  with patch("backend.qa_loop._get_cross_encoder") as get_ce:
+      get_ce.return_value = MagicMock(predict=lambda pairs: [0.9, 0.1])
+  ```
 
-- Tip: wrap the reset in a helper/fixture to ensure isolation across randomized order runs.
+  2) Integration: autouse fixture (no imports; use sys.modules)
+  ```python
+  import sys, pytest
+  @pytest.fixture(autouse=True)
+  def _reset_state(monkeypatch):
+      monkeypatch.delenv("RAG_FAKE_ANSWER", raising=False)
+      if (ql := sys.modules.get("backend.qa_loop")):
+          setattr(ql, "_cross_encoder", None); setattr(ql, "_ollama_context", None)
+      if (rt := sys.modules.get("backend.retriever")):
+          setattr(rt, "_embedding_model", None)
+  ```
+
+  3) Don’t import target modules in fixtures that run before patches; prefer `sys.modules.get(...)`.
+  4) Reproduce fast: run the failing test alone, then the suite; enable `pytest-randomly`.
+  5) Env hygiene: set `RAG_FAKE_ANSWER` per-test via `monkeypatch.setenv`; let the autouse fixture clear it.
 
 
 ## Development Environment and Dependencies
