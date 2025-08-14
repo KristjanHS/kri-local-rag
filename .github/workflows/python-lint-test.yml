@@ -39,7 +39,7 @@ jobs:
         uses: astral-sh/ruff-action@v1
         with:
           version: "0.5.3"
-          args: check .
+          args: check --fix .
       - name: Ruff formatting check
         uses: astral-sh/ruff-action@v1
         with:
