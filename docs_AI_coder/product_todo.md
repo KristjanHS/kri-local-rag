@@ -43,40 +43,156 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for context on completed Phase 1 testing work.
 
+#### P0 — Test suite bundling into four bundles (unit, integration, e2e, ui) — simplified
 
-#### P0 — Focused debug plan: QA loop tests inconsistent between isolated vs core runs
+- Context and goal
+  - Current situation: tests are split across `tests/unit`, `tests/integration`, `tests/e2e`, `tests/e2e_streamlit`, plus `tests/environment` and `tests/docker`. There are custom pytest flags/hooks and some global marker-based exclusions (e.g., `-m "not ui"`). Unit socket blocking exists but enforcement paths are a bit complex.
+  - Goal: simplify to directory-as-bundle as the single source of truth; remove custom flags and most hooks; rename `e2e_streamlit` → `ui`; migrate `environment` and `docker` tests into `integration` or `e2e`; run UI explicitly without coverage; select suites by path in dev and CI; keep only cross-cutting markers (`slow`, `docker` if needed, `external`).
 
-- [ ] Step 1 — Reconfirm failures in core vs isolated
-  - Action: Run `pytest -q -vv tests/unit/test_qa_loop_logic.py` and `pytest --test-core -q`.
-  - Verify: Isolated pass vs core failures reproduced.
+- [ ] Step 1 — Use directory-as-bundle; keep tagging minimal
+  - Action: Treat each folder under `tests/` as the bundle source of truth; select suites by directory paths only:
+    - `tests/unit/` (sockets blocked; fully mocked)
+    - `tests/integration/` (one real component; network allowed)
+    - `tests/e2e/` (full stack via Docker Compose)
+    - `tests/ui/` (UI; Playwright/Streamlit; coverage disabled; run only when targeted)
+    - Keep only cross-cutting markers like `slow`, `docker`, or `external` when needed.
+  - Verify: `.venv/bin/python -m pytest --co -q tests/unit tests/integration tests/e2e tests/ui` lists items by directory; no reliance on `-m`.
 
-- [ ] Step 2 — Fix test patching to avoid module reload side effects
-  - Action: Remove `importlib.reload` uses from `tests/unit/test_qa_loop_logic.py`; ensure all calls reference `qa_loop._...` consistently.
-  - Verify: Core run shows QA loop unit tests now stable.
+- [ ] Step 1.0 — Remove custom suite flags and collection hooks; keep one simple unit guard
+  - Action: Delete custom options `--test-fast`, `--test-core`, `--test-ui` and related `pytest_collection_modifyitems` logic from `tests/conftest.py`.
+  - Action: Keep a minimal autouse fixture in `tests/unit/conftest.py` that calls `pytest_socket.disable_socket(allow_unix_socket=True)`; remove redundant double-guards and diagnostics unless actively needed.
+  - Verify: Unit runs block sockets; selecting by directory runs the expected tests without any custom flags or mark expressions.
 
-- [ ] Step 3 — Validate integration QA pipeline tests
-  - Action: Run `pytest -q -vv tests/integration/test_qa_pipeline.py`.
-  - Verify: Both integration tests pass.
+- [ ] Step 1.1 — Rename UI directory and update configs
+  - Action: Rename `tests/e2e_streamlit/` → `tests/ui/`.
+  - Action: Update references in configs and docs:
+    - `pyproject.toml` → `[tool.pytest.ini_options].testpaths` (replace `tests/e2e_streamlit` with `tests/ui`).
+    - `pyproject.toml` → `[tool.coverage.run].omit` (replace `tests/e2e_streamlit/*` with `tests/ui/*`).
+    - `tests/e2e_streamlit/conftest.py` move to `tests/ui/conftest.py` and keep a simple guard: raise a `pytest.UsageError` if coverage is enabled (UI requires `--no-cov`).
+    - `tests/conftest.py` path filters that reference `tests/e2e_streamlit/` updated to `tests/ui/`.
+    - CI workflow jobs and any scripts to point to `tests/ui`.
+    - Docs (`DEVELOPMENT.md`, README, any references) to use `tests/ui` nomenclature.
+  - Verify: `.venv/bin/python -m pytest tests/ui --no-cov -q` collects and runs the UI tests; coverage omit still skips UI as expected.
 
-- [ ] Step 4 — Full core verification
-  - Action: Run `pytest --test-core -q`.
-  - Verify: Suite passes or matches previous green baseline.
-  
-#### P1 — ...
+- [ ] Step 1.2 — Deprecate `tests/environment/` by migrating tests
+  - Action: Audit each test in `tests/environment/` and move to:
+    - `tests/integration/` if it validates local/python/ML setup without full compose or cross-service orchestration.
+    - `tests/e2e/` if it depends on the full Docker stack or multiple real services.
+  - Action: Remove redundant `environment` markers once migrated; keep only cross-cutting tags if needed.
+  - Action: Delete `tests/environment/` after migration.
+  - Verify: Directory-scoped runs for integration and e2e remain green; CI no longer references `environment`.
 
-Reserved for new almost-urgent topic/tasks
+- [ ] Step 1.3 — Deprecate `tests/docker/` by migrating tests
+  - Action: Audit each test in `tests/docker/` and move to:
+    - `tests/integration/` if it validates packaging/imports, app image build, or a single service without orchestrating the full stack during the test run.
+    - `tests/e2e/` if it requires bringing up the full Compose stack or exercises cross-service interactions as part of the test.
+  - Action: Remove redundant `docker` markers once migrated; keep only cross-cutting tags like `slow` when applicable.
+  - Action: Delete `tests/docker/` after migration.
+  - Verify: Directory-scoped integration and e2e runs are green; CI no longer references the `tests/docker/` directory (optional `-m docker` marker usage remains only if still needed).
+
+- [ ] Step 1.4 — Normalize project config to new folder layout
+  - Action: In `pyproject.toml` `[tool.pytest.ini_options].testpaths`, remove `tests/ui` so default runs exclude UI entirely; developers and CI must target `tests/ui` explicitly.
+  - Action: Replace any `tests/e2e_streamlit` references with `tests/ui`; remove `tests/environment` and `tests/docker` after migration.
+  - Action: In `pyproject.toml` `[tool.pytest.ini_options].markers`, trim to cross-cutting only: keep `slow`, `docker` (if still used post-migration), and `external`; remove `unit`, `integration`, `e2e`, `ui`, and `environment` to avoid marker drift.
+  - Action: Update docs (`DEVELOPMENT.md`) to state that directories determine bundles; markers are for cross-cutting semantics only.
+  - Verify: `pytest --markers | cat` shows only the minimal cross-cutting markers; `pytest --co -q` lists items from the expected directories.
+
+- [ ] Step 1.5 — Remove unused pytest-docker config and prefer explicit Compose in scripts
+  - Action: If not using `pytest-docker` plugin features directly, delete `[tool.pytest.docker]*` sections from `pyproject.toml` to reduce confusion.
+  - Action: Prefer e2e orchestration via `scripts/test.sh e2e` that wraps `docker compose up -d --build && pytest tests/e2e -q && docker compose down -v`.
+  - Verify: No plugin warnings on run; e2e orchestration flows through the script.
+
+- [ ] Step 2 — Unit bundle (fast, fully mocked, sockets blocked)
+  - Action: Standardize command alias: `.venv/bin/python -m pytest tests/unit -n auto -q`. Keep `UNIT_ONLY_TESTS=1` behavior and socket guards from `tests/unit/conftest.py`.
+  - Verify: Command runs only `tests/unit/*`, exits green, and any real socket attempt fails fast with `SocketBlockedError`.
+
+- [ ] Step 3 — Integration bundle (one real component; network allowed)
+  - Action: Standardize command: `.venv/bin/python -m pytest tests/integration -q`.
+  - Action: Document policy: prefer Testcontainers or a single real dependency; for multi-service needs, move test to `e2e`.
+  - Verify: Typical tests (e.g., `tests/integration/test_weaviate_integration.py`) pass without requiring the full compose stack; logs show no socket-block enforcement.
+
+- [ ] Step 4 — E2E bundle (all real components; network allowed)
+  - Action: Provide a single dispatcher script `scripts/test.sh` with usage: `test.sh [unit|integration|e2e|ui]` that runs the standardized directory-based commands; for e2e it does `docker compose up -d --build && pytest tests/e2e -q && docker compose down -v` with `set -euo pipefail`.
+  - Verify: `bash scripts/test.sh unit|integration|e2e|ui` runs the intended bundle with minimal flags.
+
+- [ ] Step 5 — UI bundle (frontend/UI only; network allowed; coverage disabled)
+  - Action: Require `-e .[ui]` and browsers; standardize command: `.venv/bin/python -m pytest tests/ui --no-cov -q`.
+  - Verify: Without `--no-cov`, the run errors with clear usage as enforced by `tests/ui/conftest.py`. With `--no-cov`, only `tests/ui/*` are collected and run.
+
+- [ ] Step 6 — CI wiring: dedicated jobs per bundle
+  - Action: In `.github/workflows/python-lint-test.yml`, keep `fast_tests` for Unit; add (or adjust existing) manual/scheduled jobs:
+    - Integration: run `pytest tests/integration -q` with caching; avoid Playwright and full compose.
+    - E2E: manual or scheduled; bring up compose, run `pytest tests/e2e -q`, then tear down.
+    - UI: keep existing `ui_tests_act` flow; ensure it installs `-e .[ui]` and `playwright install`, then run `pytest tests/ui --no-cov -q`.
+  - Verify: `act pull_request -j fast_tests` remains green. Manual `act workflow_dispatch -j ui_tests_act` runs UI. Integration/E2E jobs run only when triggered and pass locally under `act`.
+
+- [ ] Step 6.1 — Simplify default pytest options to avoid marker drift
+  - Action: In `pyproject.toml` `[tool.pytest.ini_options].addopts`, remove `-m "not ui"` (directory selection and UI testpaths exclusion handle UI). Keep coverage args.
+  - Action: Keep marker declarations only for cross-cutting categories (`slow`, `docker`, `external`) to document intent; do not require `unit/integration/e2e/ui` markers.
+  - Verify: `pytest -q` on a fresh env collects all non-UI tests due to UI's own conftest coverage gating and directory-based commands in CI/scripts.
+
+- [ ] Step 7 — Developer UX: top-level scripts/Make targets
+  - Action: Add convenience wrappers: `scripts/test_unit.sh`, `scripts/test_integration.sh`, `scripts/test_e2e.sh`, `scripts/test_ui.sh` with the standardized directory-based commands and minimal flags.
+  - Verify: `bash scripts/test_unit.sh` runs the unit bundle; similar for other scripts.
+
+- [ ] Step 8 — Pre-push and docs
+  - Action: Update pre-push hook to run only unit bundle by default: `.venv/bin/python -m pytest tests/unit --maxfail=1 -q` (respect `SKIP_TESTS=1`).
+  - Action: Update `docs/DEVELOPMENT.md` with bundle definitions, directory-based commands, and expectations (mocking policy, network rules, and when to promote a test to a heavier bundle).
+  - Verify: Fresh clone dev can follow docs to run each bundle successfully; pre-push remains quick.
+
+- [ ] Step 9 — Audit and migrate tests to correct bundles
+  - Action: Move any heavy or external-service-touching tests out of `tests/unit/` into `tests/integration/` (or `e2e` if they require the full stack). Remove redundant `unit/integration/e2e/ui` markers where the directory already defines the type; keep only cross-cutting tags like `slow`, `docker`, `external`.
+  - Verify: `.venv/bin/python -m pytest tests/unit -q` remains green and fast; directory-scoped runs cover the moved tests.
+
+#### P1 — CLI/QA Loop UX and Logging Cleanup (reduce clutter, keep essentials)
+
+- Context and goal
+  - Current situation: The CLI prints duplicate and overly verbose INFO logs (e.g., both plain and rich formats), shows non-actionable boot warnings, and surfaces low-level retrieval details (candidate counts, chunk heads) at INFO. This clutters the UX and hides the actual answer stream.
+  - Goal: Provide a clean, minimal default console that shows only essential status and the streamed answer, while keeping rich diagnostic detail in rotating file logs and behind an explicit `--debug` mode. Ensure there is a single logger initialization path and predictable verbosity controls.
+
+- [ ] Step 1 — Centralize logging (root-only, minimal console)
+  - Action: Make `backend.config.get_logger` the only logger factory. Remove or delegate `backend.console.get_logger` to avoid handler duplication.
+  - Action: Initialize once in `backend.config`:
+    - RichHandler to stderr for console (message-only), level from `LOG_LEVEL` (default INFO).
+    - RotatingFileHandler at DEBUG to `logs/rag_system.log` with full format.
+    - Set noisy third-party loggers (`httpx`, `urllib3`, `requests`, `transformers`, `torch`, `sentence_transformers`, `pypdf`) to WARNING/ERROR.
+    - Enable `logging.captureWarnings(True)`.
+  - Verify: `.venv/bin/python -m backend.qa_loop --question "ping"` prints each message once; DEBUG appears only in the file log.
+
+- [ ] Step 2 — Simplify console UX (show essentials only)
+  - Action: Replace multi-line readiness/info banners with `Console().status(...)` spinners; show at most two lines before the input prompt.
+  - Action: Stream the answer prefixed with a single "Answer: "; use `rich.rule.Rule` for separators as needed.
+  - Action: Downgrade retrieval details and step-by-step readiness logs from INFO → DEBUG; keep user-facing guidance at INFO.
+  - Verify: Default run shows a clean prompt, concise status, and the streamed answer; detailed steps are only in `logs/rag_system.log`.
+
+- [ ] Step 3 — Predictable verbosity controls (CLI > env > default)
+  - Action: Support `-q/--quiet` and `-v/--verbose` (repeatable) plus `--log-level LEVEL` in `backend.qa_loop`. Apply level early.
+  - Action: Precedence: `--log-level` > `-q/-v` > `LOG_LEVEL` env > default INFO. Keep file handler at DEBUG regardless.
+  - Action: Simplify `scripts/cli.sh` to pass flags through; avoid exporting `LOG_LEVEL` when `--debug/-v` is provided to prevent conflicts.
+  - Verify: `-q` shows only warnings/errors; default shows minimal INFO; `-vv` shows DEBUG.
+
+- [ ] Step 4 — Targeted warning handling (no blanket ignores)
+  - Action: Add selective `warnings.filterwarnings` for known noisy imports (e.g., specific SWIG deprecations). Do not globally ignore `DeprecationWarning`.
+  - Action: Keep filtered warnings recorded in file logs via `captureWarnings`; suppress them from console by default.
+  - Verify: Boot-time SWIG warnings disappear from console; remain visible in `logs/rag_system.log`.
+
+- [ ] Step 5 — Guardrails and docs
+  - Action: Add a unit test asserting a single Rich console handler and no duplicate stream handlers after importing `backend.retriever`, `backend.qa_loop`, etc.
+  - Action: Add a CLI output test asserting default/quiet/verbose behaviors using `capsys`.
+  - Action: Update `README.md` and `docs/DEVELOPMENT.md` to document flags, precedence, and log file location.
+  - Verify: `.venv/bin/python -m pytest -q tests/unit/test_logging_config.py tests/integration/test_cli_output.py` passes.
 
 #### P2 — ...
 
-Reserved for new topic/tasks
+New Tasks/Topic can be added here.
 
 #### P3 — ...
 
-Reserved for new topic/tasks
+New Tasks/Topic can be added here.
 
 #### P4 — ...
 
-Reserved for new topic/tasks
+New Tasks/Topic can be added here.
 
 #### P5 — Pre-push performance optimizations (local DX)
 
@@ -243,6 +359,50 @@ Reserved for new topic/tasks
     - [ ] Active monitoring: Actively track the status of `opentelemetry-proto` support for Protobuf ≥5. If opentelemetry becomes a requirement later, and compatibility is confirmed, update the sandbox and re-pin. Until then, strictly avoid including opentelemetry in the application's main environment.
     - [ ] Weaviate-client integration: Confirm the tested version range for gRPC compatibility with the current Weaviate server version used. Add specific integration tests that target gRPC paths within the application if not already present.
     - [ ] Rollback strategy: Define clear rollback procedures. If updates introduced regressions, revert the pins in `requirements*.txt` and iterate in the `uv` sandbox to find a stable, compatible set before re-attempting the upgrade.
+
+#### P7.3 — Renovate configuration best practices alignment
+
+- [ ] Validate current Renovate config against best practices
+  - Action: Run config validator locally to confirm schema and detect deprecations:
+    - `npx --yes --package renovate -- renovate-config-validator`
+  - Verify: Command exits 0; no errors; note any warnings for follow-up.
+
+- [ ] Consider adopting Renovate `config:best-practices` (or add equivalent presets explicitly)
+  - Action: Evaluate replacing `extends` with `config:best-practices`. If unavailable in your Renovate runner version, add the nearest equivalents explicitly:
+    - Keep `config:recommended`
+    - Add `helpers:pinGitHubActionDigests` (pin Actions to commit SHAs)
+    - Add `:configMigration` (auto-migrate deprecated options)
+    - Keep `docker:pinDigests` (already present)
+  - Verify: Re-run validator; open a Renovate onboarding PR reflecting the new extends; confirm Actions are pinned to SHAs in subsequent PRs.
+
+- [ ] Enable and verify GitHub vulnerability alerts integration
+  - Action: Add/verify `"vulnerabilityAlerts": true` so Renovate opens PRs for GH advisories when supported by the platform/repo permissions.
+  - Verify: After next run, security alert PRs appear when applicable; Renovate log shows the vulnerability alerts step enabled.
+
+- [ ] Keep PR noise low while maintaining safety
+  - Action: Review/update limits and schedule:
+    - Confirm `prConcurrentLimit: 10`, `prHourlyLimit: 2` fit team capacity
+    - Keep off-hours schedule (currently `before 6am on monday`) or consider `schedule:nonOfficeHours`
+  - Verify: Next cycle keeps PR volume manageable; no daytime bursts.
+
+- [ ] CI guardrail: validate Renovate config on PRs that touch it
+  - Action: Add a lightweight CI job that runs the validator when `renovate.json` changes:
+    - `npx --yes --package renovate -- renovate-config-validator`
+  - Verify: Open a dummy PR modifying `renovate.json`; job runs and passes/fails appropriately.
+
+- [ ] Python updates: confirm pinning and grouping strategy
+  - Action: Keep `rangeStrategy: "replace"` for `pip_requirements` to update pins in `requirements*.txt`.
+  - Action: Audit `pip_requirements.fileMatch` patterns cover all requirement files (e.g., `requirements.txt`, `requirements-dev.txt`, any `requirements-*.txt`). Expand if needed.
+  - Action: Keep/adjust grouping rules (pytest/ruff/mypy/sphinx) and patch-only automerge for Python for safe, low-risk merges.
+  - Verify: Sample cycle shows grouped PRs as expected; patch PRs for Python auto-merge cleanly.
+
+- [ ] GitHub Actions updates: safety and automation
+  - Action: Keep minor/patch automerge for Actions; ensure digest pinning is enabled via `helpers:pinGitHubActionDigests` (or `config:best-practices`).
+  - Verify: New Actions PRs use commit SHAs and auto-merge when minor/patch.
+
+- [ ] Docker updates: digest safety and auto-merge
+  - Action: Keep `docker:pinDigests` extend and the packageRule that auto-merges `digest` updates on branch.
+  - Verify: Digest-only PRs auto-merge and images remain pinned by digest.
 
 #### P8 Next up (maintainability, observability)
 - [ ] Refactor Weaviate connection logic into a single reusable function.
