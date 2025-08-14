@@ -38,8 +38,8 @@ case "$bundle" in
         echo "[test.sh] Leaving Docker stack up (KEEP_DOCKER_UP set)."
         return 0
       fi
-      echo "[test.sh] Tearing down Docker stack (down -v)…"
-      docker compose -f "$COMPOSE_FILE" down -v || true
+      echo "[test.sh] Tearing down Docker stack (down, preserving volumes)…"
+      docker compose -f "$COMPOSE_FILE" down || true
     }
     trap cleanup EXIT INT TERM
     "$PY" -m pytest tests/e2e -q "$@"
