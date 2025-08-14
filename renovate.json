@@ -167,5 +167,8 @@
     "schedule": [
         "before 6am on monday"
     ],
-    "vulnerabilityAlerts": true
+    "vulnerabilityAlerts": true,
+    "ignoreDeps": [
+        "torch"
+    ]
 }
