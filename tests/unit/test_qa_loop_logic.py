@@ -10,7 +10,15 @@ pytestmark = pytest.mark.unit
 
 @contextmanager
 def mock_encoder_success():
-    """Mock _get_cross_encoder to return a working encoder."""
+    """Mock _get_cross_encoder to return a working encoder.
+
+    Also resets any cached encoder to avoid cross-test interference.
+    """
+    # Ensure no cached encoder leaks from previous tests
+    try:
+        qa_loop._cross_encoder = None  # type: ignore[attr-defined]
+    except Exception:
+        pass
     with patch("backend.qa_loop._get_cross_encoder") as get_ce:
         mock = MagicMock()
         mock.predict.return_value = [0.9, 0.1]
@@ -20,7 +28,14 @@ def mock_encoder_success():
 
 @contextmanager
 def mock_encoder_predict_failure():
-    """Mock _get_cross_encoder to return an encoder that fails on predict."""
+    """Mock _get_cross_encoder to return an encoder that fails on predict.
+
+    Also resets any cached encoder to avoid cross-test interference.
+    """
+    try:
+        qa_loop._cross_encoder = None  # type: ignore[attr-defined]
+    except Exception:
+        pass
     with patch("backend.qa_loop._get_cross_encoder") as get_ce:
         mock = MagicMock()
         mock.predict.side_effect = Exception("Model prediction failure")
@@ -30,7 +45,14 @@ def mock_encoder_predict_failure():
 
 @contextmanager
 def mock_encoder_unavailable():
-    """Mock _get_cross_encoder to return None (encoder unavailable)."""
+    """Mock _get_cross_encoder to return None (encoder unavailable).
+
+    Also resets any cached encoder to avoid cross-test interference.
+    """
+    try:
+        qa_loop._cross_encoder = None  # type: ignore[attr-defined]
+    except Exception:
+        pass
     with patch("backend.qa_loop._get_cross_encoder") as get_ce:
         get_ce.return_value = None
         yield

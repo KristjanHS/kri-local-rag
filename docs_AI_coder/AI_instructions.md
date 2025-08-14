@@ -112,7 +112,7 @@ The test suite is organized with markers to control scope and speed:
   - Generates a coverage report.
 
 ```bash
-.venv/bin/python -m pytest --test-core
+.venv/bin/python -m pytest -q tests/unit tests/integration
 ```
 
 - **UI test suite** (Playwright/Streamlit, no coverage):
@@ -120,7 +120,7 @@ The test suite is organized with markers to control scope and speed:
   - Must be run with `--no-cov`.
 
 ```bash
-.venv/bin/python -m pytest --test-ui --no-cov
+.venv/bin/python -m pytest tests/ui --no-cov
 ```
 
 - Run all tests (including slow and E2E):
@@ -168,6 +168,23 @@ Coverage policy:
   - Debug: set `UNITNETGUARD_FAIL_FAST=1`, re-run to pinpoint the first victim; use `-k` to bisect; try randomized order (pytest-randomly)
   - Fix: mock clients (e.g., `httpx.MockTransport`); avoid `enable_socket`/socket monkeypatches; move real-network tests to integration
 
+### Flaky unit tests: cached globals (cross-encoder)
+
+- Symptom: `tests/unit/test_qa_loop_logic.py::test_rerank_cross_encoder_success` sometimes fails depending on earlier tests.
+- Cause: `backend.qa_loop` caches the cross-encoder in global `qa_loop._cross_encoder`. If another test instantiates/patches it first, later tests mocking `_get_cross_encoder` may not take effect.
+- Fix: Reset the cache before mocking so the mock is used deterministically:
+
+```python
+import backend.qa_loop as qa_loop
+qa_loop._cross_encoder = None
+with patch("backend.qa_loop._get_cross_encoder") as get_ce:
+    mock = MagicMock(); mock.predict.return_value = [0.9, 0.1]
+    get_ce.return_value = mock
+    # run assertions
+```
+
+- Tip: wrap the reset in a helper/fixture to ensure isolation across randomized order runs.
+
 
 ## Development Environment and Dependencies
 
@@ -204,7 +221,7 @@ uv pip check && uv tree | head -200 | cat
 export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
 .venv/bin/python -m pip install -r requirements-dev.txt
 .venv/bin/python -m pip check
-.venv/bin/python -m pytest --test-core -q
+.venv/bin/python -m pytest -q tests/unit tests/integration
 ```
 - Guardrails: no `uv` in app/CI; use `uv lock --check` + `uv sync --frozen`; do not track `tools/uv_sandbox/.venv/`; commit `pyproject.toml`/`uv.lock`; prefer CPU wheels unless CUDA/ROCm needed.
 

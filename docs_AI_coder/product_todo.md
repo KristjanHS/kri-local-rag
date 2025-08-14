@@ -76,7 +76,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Update `docs/DEVELOPMENT.md` with bundle definitions, directory-based commands, and expectations (mocking policy, network rules, and when to promote a test to a heavier bundle).
   - Verify: Fresh clone dev can follow docs to run each bundle successfully; pre-push remains quick.
 
-- [ ] Step 1.3 — Deprecate `tests/environment/` by migrating tests
+- [x] Step 1.3 — Deprecate `tests/environment/` by migrating tests
   - Action: Audit each test in `tests/environment/` and move to:
     - `tests/integration/` if it validates local/python/ML setup without full compose or cross-service orchestration.
     - `tests/e2e/` if it depends on the full Docker stack or multiple real services.
@@ -92,7 +92,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Delete `tests/docker/` after migration.
   - Verify: Directory-scoped integration and e2e runs are green; CI no longer references the `tests/docker/` directory (optional `-m docker` marker usage remains only if still needed).
 
-- [ ] Step 1.5 — Rename UI directory and update configs
+- [x] Step 1.5 — Rename UI directory and update configs
   - Action: Rename `tests/e2e_streamlit/` → `tests/ui/`.
   - Action: Update references in configs and docs:
     - `pyproject.toml` → `[tool.pytest.ini_options].testpaths` updated to include `tests/ui`.
@@ -103,14 +103,14 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
     - Docs (`DEVELOPMENT.md`, README, any references) to use `tests/ui` nomenclature.
   - Verify: `.venv/bin/python -m pytest tests/ui --no-cov -q` collects and runs the UI tests; coverage omit still skips UI as expected.
 
-- [ ] Step 1.6 — Normalize project config to new folder layout
+- [x] Step 1.6 — Normalize project config to new folder layout
   - Action: In `pyproject.toml` `[tool.pytest.ini_options].testpaths`, remove `tests/ui` so default runs exclude UI entirely; developers and CI must target `tests/ui` explicitly.
   - Action: Replace any `tests/e2e_streamlit` references with `tests/ui`; remove `tests/environment` and `tests/docker` after migration.
   - Action: In `pyproject.toml` `[tool.pytest.ini_options].markers`, trim to cross-cutting only: keep `slow`, `docker` (if still used post-migration), and `external`; remove `unit`, `integration`, `e2e`, `ui`, and `environment` to avoid marker drift.
   - Action: Update docs (`DEVELOPMENT.md`) to state that directories determine bundles; markers are for cross-cutting semantics only.
   - Verify: `pytest --markers | cat` shows only the minimal cross-cutting markers; `pytest --co -q` lists items from the expected directories.
 
-- [ ] Step 1.7 — Remove unused pytest-docker config and prefer explicit Compose in scripts
+- [x] Step 1.7 — Remove unused pytest-docker config and prefer explicit Compose in scripts
   - Action: If not using `pytest-docker` plugin features directly, delete `[tool.pytest.docker]*` sections from `pyproject.toml` to reduce confusion.
   - Action: Prefer e2e orchestration via `scripts/test.sh e2e` that wraps `docker compose up -d --build && pytest tests/e2e -q && docker compose down -v`.
   - Verify: No plugin warnings on run; e2e orchestration flows through the script.
