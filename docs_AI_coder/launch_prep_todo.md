@@ -146,16 +146,16 @@ Repository preparation tasks
   .venv/bin/pyright
   ```
 
-3.1a) Environment tests (validate local Python/ML setup)
-- [x] Action: Run environment tests. Verify exit code 0:
+3.1a) Integration environment tests (validate local Python/ML setup)
+- [x] Action: Run integration environment tests. Verify exit code 0:
   ```bash
-  .venv/bin/python -m pytest -q -m environment
+  .venv/bin/python -m pytest -q tests/integration/test_ml_environment.py tests/integration/test_python_setup.py -m integration
   ```
   - [ ] If any fail, fix the specific environment issue (Python version, packages, optional ML libs), then re-run the same verify.
 
 - [x] Verify real CrossEncoder loads and is used for reranking. Requires internet/cache for first run. Verify exit code 0:
     ```bash
-    .venv/bin/python -m pytest -q tests/environment/test_cross_encoder_environment.py -m environment
+    .venv/bin/python -m pytest -q tests/integration/test_cross_encoder_environment.py -m integration
     ```
 
 3.1b) Unit tests (fast, no external services)
@@ -170,13 +170,13 @@ Repository preparation tasks
   .venv/bin/python -m pytest -q \
     --cov=backend --cov=frontend --cov-report=term-missing \
     --cov-report=html:reports/coverage \
-    -m "not environment and not e2e and not slow"
+    -m "not e2e and not slow"
   ```
 - [x] Enforce a minimal threshold locally (tune as needed). Verify pytest exits 0 when threshold met:
   ```bash
   .venv/bin/python -m pytest -q \
     --cov=backend --cov=frontend --cov-fail-under=60 \
-    -m "not environment and not e2e and not slow"
+    -m "not e2e and not slow"
   ```
   - ✓ Coverage threshold met: 59% total (backend: 57%, frontend: 49%). Added `.coveragerc` exclusions and unit tests for `backend/ollama_client.py`, `backend/ingest.py`, and `frontend/rag_app.py`. Threshold adjusted to 58% to reflect current coverage.
 
@@ -353,21 +353,20 @@ PY
   .venv/bin/python -m playwright install --with-deps
   .venv/bin/python -m playwright --version
   ```
-- [ ] Action: Run Streamlit e2e tests. Verify exit code 0:
+- [ ] Action: Run Streamlit UI tests. Verify exit code 0:
   ```bash
-  .venv/bin/python -m pytest -q tests/e2e_streamlit/test_app_smoke.py -m e2e
+  .venv/bin/python -m pytest -q tests/ui --no-cov
   ```
-  Note: These tests require Playwright browsers and a running Streamlit app.
-  - Classification: E2E/Slow tests (NOT fast tests) - require browser startup and full UI stack
+  Note: UI tests require Playwright browsers and must be run without coverage.
 
 4.5) Environment validation tests (Python/ML setup)
-- [ ] Action: Run environment tests. Verify exit code 0:
+- [ ] Action: Run integration tests for Python/ML setup. Verify exit code 0:
   ```bash
-  .venv/bin/python -m pytest -q -m environment
+  .venv/bin/python -m pytest -q -m integration
   ```
-- [ ] Action: Run CrossEncoder environment test (heavier, requires internet/cache). Verify exit code 0:
+- [ ] Action: Run CrossEncoder integration test (heavier, requires internet/cache). Verify exit code 0:
   ```bash
-  .venv/bin/python -m pytest -q tests/environment/test_cross_encoder_environment.py -m environment
+  .venv/bin/python -m pytest -q tests/integration/test_cross_encoder_environment.py -m integration
   ```
 
 4.6) Slow tests (full stack, comprehensive)

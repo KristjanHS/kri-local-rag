@@ -3,6 +3,10 @@ name: Local Semgrep
 on:
   workflow_dispatch: {}
 
+permissions: 
+  contents: read, 
+  security-events: write
+
 jobs:
   local_semgrep:
     name: Local Semgrep Scan (isolated env)

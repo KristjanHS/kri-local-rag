@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Environment test to verify real CrossEncoder is loaded and used for reranking.
 
-Marks: slow, environment
+Marks: slow
 """
 
 import importlib
@@ -10,7 +10,7 @@ import sys
 
 import pytest
 
-pytestmark = [pytest.mark.slow, pytest.mark.environment]
+pytestmark = [pytest.mark.slow]
 
 
 def test_cross_encoder_is_loaded_and_used_for_reranking():
