@@ -1,0 +1,59 @@
+name: Security scans (pip-audit + Trivy)
+
+on:
+  pull_request:
+    paths:
+      - "requirements.txt"
+      - "requirements-dev.txt"
+      - "pyproject.toml"
+      - "Dockerfile"
+      - "docker/**"
+  schedule:
+    - cron: "0 3 * * 1"  # Mondays 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: security-scans-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pip-audit:
+    name: pip-audit (deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Audit requirements.txt
+        uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          inputs: requirements.txt
+      - name: Audit requirements-dev.txt
+        if: hashFiles('requirements-dev.txt') != ''
+        uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          inputs: requirements-dev.txt
+
+  trivy-fs:
+    name: Trivy FS (vuln+config+secrets)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy repo scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif

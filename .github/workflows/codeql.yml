@@ -1,8 +1,10 @@
 name: CodeQL
 
+permissions: 
+  contents: read, 
+  security-events: write
+
 on:
-  push:
-    branches: ["main"]
   pull_request:
     # Run on all PRs regardless of branch to cover Renovate updates
     # (branch protection should require this check)
@@ -15,21 +17,14 @@ jobs:
     name: CodeQL
     runs-on: ubuntu-latest
     
-    
-    
     # Add timeout to prevent hanging jobs
     timeout-minutes: 360
-    
+
+    if: ${{ github.actor != 'nektos/act' }}
     # Use concurrency to cancel in-progress jobs on new commits
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
-    
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-      pull-requests: read
     
     strategy:
       fail-fast: false
