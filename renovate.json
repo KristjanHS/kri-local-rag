@@ -19,8 +19,8 @@
         "dockerfile"
     ],
     "pip_requirements": {
-        "fileMatch": [
-            "(^|/)requirements(-dev)?\\.txt$"
+        "managerFilePatterns": [
+            "/(^|/)requirements(-dev)?\\.txt$/"
         ],
         "rangeStrategy": "replace"
     },
@@ -71,23 +71,20 @@
             "matchManagers": [
                 "pip_requirements"
             ],
-            "matchPackagePatterns": [
-                "^pytest($|-.+)"
-            ],
             "groupName": "pytest ecosystem",
             "labels": [
                 "deps",
                 "python",
                 "pytest"
             ],
-            "prPriority": 1
+            "prPriority": 1,
+            "matchPackageNames": [
+                "/^pytest($|-.+)/"
+            ]
         },
         {
             "matchManagers": [
                 "pip_requirements"
-            ],
-            "matchPackagePatterns": [
-                "^ruff($|-.+)"
             ],
             "groupName": "ruff ecosystem",
             "labels": [
@@ -95,14 +92,14 @@
                 "python",
                 "ruff"
             ],
-            "prPriority": 1
+            "prPriority": 1,
+            "matchPackageNames": [
+                "/^ruff($|-.+)/"
+            ]
         },
         {
             "matchManagers": [
                 "pip_requirements"
-            ],
-            "matchPackagePatterns": [
-                "^mypy($|-.+)"
             ],
             "groupName": "mypy ecosystem",
             "labels": [
@@ -110,14 +107,14 @@
                 "python",
                 "mypy"
             ],
-            "prPriority": 1
+            "prPriority": 1,
+            "matchPackageNames": [
+                "/^mypy($|-.+)/"
+            ]
         },
         {
             "matchManagers": [
                 "pip_requirements"
-            ],
-            "matchPackagePatterns": [
-                "^sphinx($|-.+)"
             ],
             "groupName": "sphinx ecosystem",
             "labels": [
@@ -125,7 +122,10 @@
                 "python",
                 "sphinx"
             ],
-            "prPriority": 0
+            "prPriority": 0,
+            "matchPackageNames": [
+                "/^sphinx($|-.+)/"
+            ]
         },
         {
             "matchManagers": [
@@ -167,6 +167,7 @@
     "schedule": [
         "before 6am on monday"
     ],
+
     "vulnerabilityAlerts": true,
     "ignoreDeps": [
         "torch"
