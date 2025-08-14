@@ -26,6 +26,17 @@
     },
     "packageRules": [
         {
+            "matchPackageNames": [
+                "torch"
+            ],
+            "matchUpdateTypes": [
+                "major",
+                "minor",
+                "patch"
+            ],
+            "enabled": false
+        },
+        {
             "matchManagers": [
                 "pip_requirements"
             ],
@@ -168,6 +179,11 @@
         "before 6am on monday"
     ],
     "vulnerabilityAlerts": {
-        "enabled": true
+        "enabled": true,
+        "labels": [
+            "security",
+            "vulnerability",
+            "renovate"
+        ]
     }
 }
