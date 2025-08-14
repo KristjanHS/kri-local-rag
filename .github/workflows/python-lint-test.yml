@@ -66,8 +66,8 @@ jobs:
           mkdir -p reports
       - name: Run fast tests
         run: |
-          # Fastest suite (no external services) via custom option defined in tests/conftest.py
-          python -m pytest --test-fast -n auto --junitxml=reports/junit.xml
+          # Fastest suite: run only unit tests (no external services)
+          python -m pytest tests/unit -n auto --maxfail=1 -q --junitxml=reports/junit.xml
 
       - name: Upload fast test reports
         # Skip under act (local GitHub Actions emulator) because ACTIONS_RUNTIME_TOKEN is not available.

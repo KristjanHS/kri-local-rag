@@ -49,7 +49,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Current situation: tests are split across `tests/unit`, `tests/integration`, `tests/e2e`, `tests/e2e_streamlit`, plus `tests/environment` and `tests/docker`. There are custom pytest flags/hooks and some global marker-based exclusions (e.g., `-m "not ui"`). Unit socket blocking exists but enforcement paths are a bit complex.
   - Goal: simplify to directory-as-bundle as the single source of truth; remove custom flags and most hooks; rename `e2e_streamlit` → `ui`; migrate `environment` and `docker` tests into `integration` or `e2e`; run UI explicitly without coverage; select suites by path in dev and CI; keep only cross-cutting markers (`slow`, `docker` if needed, `external`).
 
-- [ ] Step 1 — Use directory-as-bundle; keep tagging minimal
+- [x] Step 1 — Use directory-as-bundle; keep tagging minimal
   - Action: Treat each folder under `tests/` as the bundle source of truth; select suites by directory paths only:
     - `tests/unit/` (sockets blocked; fully mocked)
     - `tests/integration/` (one real component; network allowed)
@@ -58,23 +58,25 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
     - Keep only cross-cutting markers like `slow`, `docker`, or `external` when needed.
   - Verify: `.venv/bin/python -m pytest --co -q tests/unit tests/integration tests/e2e tests/ui` lists items by directory; no reliance on `-m`.
 
-- [ ] Step 1.0 — Remove custom suite flags and collection hooks; keep one simple unit guard
+- [x] Step 1.0 — Remove custom suite flags and collection hooks; keep one simple unit guard
   - Action: Delete custom options `--test-fast`, `--test-core`, `--test-ui` and related `pytest_collection_modifyitems` logic from `tests/conftest.py`.
   - Action: Keep a minimal autouse fixture in `tests/unit/conftest.py` that calls `pytest_socket.disable_socket(allow_unix_socket=True)`; remove redundant double-guards and diagnostics unless actively needed.
   - Verify: Unit runs block sockets; selecting by directory runs the expected tests without any custom flags or mark expressions.
 
-- [ ] Step 1.1 — Rename UI directory and update configs
-  - Action: Rename `tests/e2e_streamlit/` → `tests/ui/`.
-  - Action: Update references in configs and docs:
-    - `pyproject.toml` → `[tool.pytest.ini_options].testpaths` (replace `tests/e2e_streamlit` with `tests/ui`).
-    - `pyproject.toml` → `[tool.coverage.run].omit` (replace `tests/e2e_streamlit/*` with `tests/ui/*`).
-    - `tests/e2e_streamlit/conftest.py` move to `tests/ui/conftest.py` and keep a simple guard: raise a `pytest.UsageError` if coverage is enabled (UI requires `--no-cov`).
-    - `tests/conftest.py` path filters that reference `tests/e2e_streamlit/` updated to `tests/ui/`.
-    - CI workflow jobs and any scripts to point to `tests/ui`.
-    - Docs (`DEVELOPMENT.md`, README, any references) to use `tests/ui` nomenclature.
-  - Verify: `.venv/bin/python -m pytest tests/ui --no-cov -q` collects and runs the UI tests; coverage omit still skips UI as expected.
+- [x] Step 1.1 — Unit bundle (fast, fully mocked, sockets blocked)
+  - Action: Standardize command alias: `.venv/bin/python -m pytest tests/unit -n auto -q`. Keep `UNIT_ONLY_TESTS=1` behavior and socket guards from `tests/unit/conftest.py`.
+  - Verify: Command runs only `tests/unit/*`, exits green, and any real socket attempt fails fast with `SocketBlockedError`.
 
-- [ ] Step 1.2 — Deprecate `tests/environment/` by migrating tests
+- [x] Step 1.2 — Audit and migrate tests to correct bundles
+  - Action: Move any heavy or external-service-touching tests out of `tests/unit/` into `tests/integration/` (or `e2e` if they require the full stack). Remove redundant `unit/integration/e2e/ui` markers where the directory already defines the type; keep only cross-cutting tags like `slow`, `docker`, `external`.
+  - Verify: `.venv/bin/python -m pytest tests/unit -q` remains green and fast; directory-scoped runs cover the moved tests.
+
+- [x] Step 1.2.1 — Pre-push and docs
+  - Action: Update pre-push hook to run only unit bundle by default: `.venv/bin/python -m pytest tests/unit --maxfail=1 -q` (respect `SKIP_TESTS=1`).
+  - Action: Update `docs/DEVELOPMENT.md` with bundle definitions, directory-based commands, and expectations (mocking policy, network rules, and when to promote a test to a heavier bundle).
+  - Verify: Fresh clone dev can follow docs to run each bundle successfully; pre-push remains quick.
+
+- [ ] Step 1.3 — Deprecate `tests/environment/` by migrating tests
   - Action: Audit each test in `tests/environment/` and move to:
     - `tests/integration/` if it validates local/python/ML setup without full compose or cross-service orchestration.
     - `tests/e2e/` if it depends on the full Docker stack or multiple real services.
@@ -82,7 +84,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Delete `tests/environment/` after migration.
   - Verify: Directory-scoped runs for integration and e2e remain green; CI no longer references `environment`.
 
-- [ ] Step 1.3 — Deprecate `tests/docker/` by migrating tests
+- [x] Step 1.4 — Deprecate `tests/docker/` by migrating tests
   - Action: Audit each test in `tests/docker/` and move to:
     - `tests/integration/` if it validates packaging/imports, app image build, or a single service without orchestrating the full stack during the test run.
     - `tests/e2e/` if it requires bringing up the full Compose stack or exercises cross-service interactions as part of the test.
@@ -90,21 +92,28 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Delete `tests/docker/` after migration.
   - Verify: Directory-scoped integration and e2e runs are green; CI no longer references the `tests/docker/` directory (optional `-m docker` marker usage remains only if still needed).
 
-- [ ] Step 1.4 — Normalize project config to new folder layout
+- [ ] Step 1.5 — Rename UI directory and update configs
+  - Action: Rename `tests/e2e_streamlit/` → `tests/ui/`.
+  - Action: Update references in configs and docs:
+    - `pyproject.toml` → `[tool.pytest.ini_options].testpaths` updated to include `tests/ui`.
+    - `pyproject.toml` → `[tool.coverage.run].omit` updated to `tests/ui/*`.
+    - `tests/ui/conftest.py` contains a guard: raise a `pytest.UsageError` if coverage is enabled (UI requires `--no-cov`).
+    - `tests/conftest.py` path filters updated to `tests/ui/`.
+    - CI workflow jobs and any scripts to point to `tests/ui`.
+    - Docs (`DEVELOPMENT.md`, README, any references) to use `tests/ui` nomenclature.
+  - Verify: `.venv/bin/python -m pytest tests/ui --no-cov -q` collects and runs the UI tests; coverage omit still skips UI as expected.
+
+- [ ] Step 1.6 — Normalize project config to new folder layout
   - Action: In `pyproject.toml` `[tool.pytest.ini_options].testpaths`, remove `tests/ui` so default runs exclude UI entirely; developers and CI must target `tests/ui` explicitly.
   - Action: Replace any `tests/e2e_streamlit` references with `tests/ui`; remove `tests/environment` and `tests/docker` after migration.
   - Action: In `pyproject.toml` `[tool.pytest.ini_options].markers`, trim to cross-cutting only: keep `slow`, `docker` (if still used post-migration), and `external`; remove `unit`, `integration`, `e2e`, `ui`, and `environment` to avoid marker drift.
   - Action: Update docs (`DEVELOPMENT.md`) to state that directories determine bundles; markers are for cross-cutting semantics only.
   - Verify: `pytest --markers | cat` shows only the minimal cross-cutting markers; `pytest --co -q` lists items from the expected directories.
 
-- [ ] Step 1.5 — Remove unused pytest-docker config and prefer explicit Compose in scripts
+- [ ] Step 1.7 — Remove unused pytest-docker config and prefer explicit Compose in scripts
   - Action: If not using `pytest-docker` plugin features directly, delete `[tool.pytest.docker]*` sections from `pyproject.toml` to reduce confusion.
   - Action: Prefer e2e orchestration via `scripts/test.sh e2e` that wraps `docker compose up -d --build && pytest tests/e2e -q && docker compose down -v`.
   - Verify: No plugin warnings on run; e2e orchestration flows through the script.
-
-- [ ] Step 2 — Unit bundle (fast, fully mocked, sockets blocked)
-  - Action: Standardize command alias: `.venv/bin/python -m pytest tests/unit -n auto -q`. Keep `UNIT_ONLY_TESTS=1` behavior and socket guards from `tests/unit/conftest.py`.
-  - Verify: Command runs only `tests/unit/*`, exits green, and any real socket attempt fails fast with `SocketBlockedError`.
 
 - [ ] Step 3 — Integration bundle (one real component; network allowed)
   - Action: Standardize command: `.venv/bin/python -m pytest tests/integration -q`.
@@ -135,14 +144,6 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Add convenience wrappers: `scripts/test_unit.sh`, `scripts/test_integration.sh`, `scripts/test_e2e.sh`, `scripts/test_ui.sh` with the standardized directory-based commands and minimal flags.
   - Verify: `bash scripts/test_unit.sh` runs the unit bundle; similar for other scripts.
 
-- [ ] Step 8 — Pre-push and docs
-  - Action: Update pre-push hook to run only unit bundle by default: `.venv/bin/python -m pytest tests/unit --maxfail=1 -q` (respect `SKIP_TESTS=1`).
-  - Action: Update `docs/DEVELOPMENT.md` with bundle definitions, directory-based commands, and expectations (mocking policy, network rules, and when to promote a test to a heavier bundle).
-  - Verify: Fresh clone dev can follow docs to run each bundle successfully; pre-push remains quick.
-
-- [ ] Step 9 — Audit and migrate tests to correct bundles
-  - Action: Move any heavy or external-service-touching tests out of `tests/unit/` into `tests/integration/` (or `e2e` if they require the full stack). Remove redundant `unit/integration/e2e/ui` markers where the directory already defines the type; keep only cross-cutting tags like `slow`, `docker`, `external`.
-  - Verify: `.venv/bin/python -m pytest tests/unit -q` remains green and fast; directory-scoped runs cover the moved tests.
 
 #### P1 — CLI/QA Loop UX and Logging Cleanup (reduce clutter, keep essentials)
 
@@ -199,7 +200,7 @@ New Tasks/Topic can be added here.
 - [x] Switch lint/typecheck to native venv (faster than act)
   - [x] Replace `act ... -j lint` in the pre-push hook with native calls: `.venv/bin/ruff check .` and `.venv/bin/ruff format --check .`
   - [x] Replace `act ... -j pyright` with `.venv/bin/pyright`
-  - [x] Keep tests via `act` for parity, or add a native fast path: `.venv/bin/python -m pytest --test-fast --maxfail=1 -q`
+- [x] Keep tests via `act` for parity; native fast path runs the unit bundle: `.venv/bin/python -m pytest tests/unit --maxfail=1 -q`
 
 - [ ] Add pre-push skip toggles (env-driven)
   - [x] Support `SKIP_LINT=1`, `SKIP_PYRIGHT=1`, `SKIP_TESTS=1` to selectively skip steps locally
@@ -221,6 +222,9 @@ New Tasks/Topic can be added here.
 - [ ] Version alignment and consistency
   - [ ] Pin the local `pyright` version (e.g., in `requirements-dev.txt`) to match CI
   - [ ] Ensure `ruff` version in pre-commit matches the CI action version (`0.5.3` today)
+  
+ - [ ] Pre-push alignment
+   - [ ] Replace any `--test-fast` references with `tests/unit` for pre-push context and update `scripts/pre_push.sh` accordingly
 
 #### P5.1 — Docker build cache and context optimizations
 

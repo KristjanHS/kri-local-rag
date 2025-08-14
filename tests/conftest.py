@@ -18,16 +18,6 @@ def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: D401
     """Ensure report directories exist before any logging is configured."""
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    # When running the fast (unit-only) suite, enforce socket blocking early in the session
-    try:
-        is_fast_suite = bool(getattr(session.config.option, "test_fast", False))
-        if is_fast_suite or os.environ.get("UNIT_ONLY_TESTS") == "1":
-            from pytest_socket import disable_socket  # type: ignore
-
-            disable_socket(allow_unix_socket=True)
-    except Exception:
-        # Best-effort: if the plugin isn't available, continue; unit suite will still run
-        pass
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -63,31 +53,7 @@ console = Console()
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    """Add convenience options to select common suites without shell scripts."""
-    group = parser.getgroup("test-suites")
-    group.addoption(
-        "--test-fast",
-        action="store_true",
-        default=False,
-        help=(
-            "Run the fastest unit suite only (no external services): excludes ui, e2e, docker, "
-            "environment, integration, and slow"
-        ),
-    )
-    group.addoption(
-        "--test-core",
-        action="store_true",
-        default=False,
-        help=("Run core suite (everything except UI): excludes only ui; may include integration/slow as selected"),
-    )
-    group.addoption(
-        "--test-ui",
-        action="store_true",
-        default=False,
-        help="Run only UI/Playwright tests without coverage",
-    )
-
-    # Docker/test environment management flags
+    """Add docker environment management options."""
     docker_group = parser.getgroup("docker-env")
     docker_group.addoption(
         "--keep-docker-up",
@@ -103,126 +69,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-def _apply_suite_shortcuts(config: pytest.Config) -> None:
-    fast: bool = bool(getattr(config.option, "test_fast", False))
-    core: bool = bool(getattr(config.option, "test_core", False))
-    ui: bool = bool(getattr(config.option, "test_ui", False))
-    if sum([fast, core, ui]) > 1:
-        raise pytest.UsageError("Choose only one of --test-fast, --test-core, or --test-ui")
-
-    # quiet output to mimic -q
-    if fast or core or ui:
-        try:
-            current_quiet = int(getattr(config.option, "quiet", 0) or 0)
-        except Exception:
-            current_quiet = 0
-        if current_quiet < 1:
-            config.option.quiet = 1
-
-    if fast:
-        # Fastest suite: strict excludes to avoid any external services
-        config.option.markexpr = (
-            "not ui and not e2e and not docker and not environment and not integration and not slow"
-        )
-        # Signal unit-only run so unit conftest can enforce early socket blocking
-        os.environ["UNIT_ONLY_TESTS"] = "1"
-
-    if core:
-        # Core: everything except UI tests; may include integration/slow depending on selection
-        config.option.markexpr = "not ui"
-
-    if ui:
-        # select UI tests; user must run with --no-cov
-        config.option.markexpr = "ui or e2e"
-
-
 def pytest_configure(config: pytest.Config) -> None:  # noqa: D401
-    """Apply suite shortcut flags early in configuration.
-
-    Additionally, when only a subset of tests is selected, relax any explicit
-    coverage fail-under threshold to avoid false failures. This does not disable
-    coverage collection; it only prevents failing a partial run because total
-    coverage appears artificially low.
-    """
-    _apply_suite_shortcuts(config)
-
-    def _is_partial_run(cfg: pytest.Config) -> bool:
-        # Consider partial when user filtered by -k/-m or provided explicit paths/tests.
-        try:
-            has_k = bool(getattr(cfg.option, "keyword", None))
-        except Exception:
-            has_k = False
-        try:
-            has_m = bool(getattr(cfg.option, "markexpr", None))
-        except Exception:
-            has_m = False
-
-        args = list(getattr(cfg, "args", []) or [])
-        if not args:
-            return has_k or has_m
-
-        # Any explicit args indicate user-targeted selection; treat as partial.
-        # This intentionally treats `pytest tests/` as partial to avoid enforcing
-        # thresholds in fast local runs.
-        return True
-
-    # If a threshold was explicitly supplied (e.g., via CLI or CI), but this is
-    # a partial run, relax it to 0 to avoid spurious failures.
-    if _is_partial_run(config):
-        # Relax CLI option if set
-        try:
-            cov_fail = getattr(config.option, "cov_fail_under", None)
-            if cov_fail not in (None, 0, "0"):
-                config.option.cov_fail_under = 0
-        except Exception:
-            pass
-
-        # Also try to relax pytest-cov plugin’s internal options so the
-        # enforcement at session end respects the relaxed threshold.
-        try:
-            cov_plugin = config.pluginmanager.get_plugin("_cov") or config.pluginmanager.get_plugin("cov")
-            if cov_plugin is not None:
-                opts = getattr(cov_plugin, "options", None)
-                if opts is not None:
-                    for attr in ("cov_fail_under", "fail_under"):
-                        try:
-                            if getattr(opts, attr, None) not in (None, 0, "0"):
-                                setattr(opts, attr, 0)
-                        except Exception:
-                            continue
-        except Exception:
-            # Best-effort; if plugin API changes, the CLI option override above should still help
-            pass
+    """Minimal global configuration (no suite flags or collection hooks)."""
+    return
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Narrow to Streamlit UI directory when --test-ui is used."""
-    if not items:
-        return
-    # When running the fast (unit-only) suite, deselect anything outside tests/unit
-    if bool(getattr(config.option, "test_fast", False)):
-        keep_fast: list[pytest.Item] = []
-        deselect_fast: list[pytest.Item] = []
-        for item in items:
-            if "tests/unit/" in str(item.fspath):
-                keep_fast.append(item)
-            else:
-                deselect_fast.append(item)
-        if deselect_fast:
-            config.hook.pytest_deselected(items=deselect_fast)
-            items[:] = keep_fast
-    if bool(getattr(config.option, "test_ui", False)):
-        keep: list[pytest.Item] = []
-        deselect: list[pytest.Item] = []
-        for item in items:
-            # Keep only tests under tests/e2e_streamlit
-            if "tests/e2e_streamlit/" in str(item.fspath):
-                keep.append(item)
-            else:
-                deselect.append(item)
-        if deselect:
-            config.hook.pytest_deselected(items=deselect)
-            items[:] = keep
+    """No custom collection filtering; selection is by directory paths."""
+    return
 
 
 @pytest.fixture(scope="session")
