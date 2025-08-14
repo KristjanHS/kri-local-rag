@@ -215,8 +215,8 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         keep: list[pytest.Item] = []
         deselect: list[pytest.Item] = []
         for item in items:
-            # Keep only tests under tests/e2e_streamlit
-            if "tests/e2e_streamlit/" in str(item.fspath):
+            # Keep only tests under tests/ui
+            if "tests/ui/" in str(item.fspath):
                 keep.append(item)
             else:
                 deselect.append(item)

@@ -49,7 +49,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Current situation: tests are split across `tests/unit`, `tests/integration`, `tests/e2e`, `tests/e2e_streamlit`, plus `tests/environment` and `tests/docker`. There are custom pytest flags/hooks and some global marker-based exclusions (e.g., `-m "not ui"`). Unit socket blocking exists but enforcement paths are a bit complex.
   - Goal: simplify to directory-as-bundle as the single source of truth; remove custom flags and most hooks; rename `e2e_streamlit` → `ui`; migrate `environment` and `docker` tests into `integration` or `e2e`; run UI explicitly without coverage; select suites by path in dev and CI; keep only cross-cutting markers (`slow`, `docker` if needed, `external`).
 
-- [ ] Step 1 — Use directory-as-bundle; keep tagging minimal
+- [x] Step 1 — Use directory-as-bundle; keep tagging minimal
   - Action: Treat each folder under `tests/` as the bundle source of truth; select suites by directory paths only:
     - `tests/unit/` (sockets blocked; fully mocked)
     - `tests/integration/` (one real component; network allowed)
@@ -57,22 +57,6 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
     - `tests/ui/` (UI; Playwright/Streamlit; coverage disabled; run only when targeted)
     - Keep only cross-cutting markers like `slow`, `docker`, or `external` when needed.
   - Verify: `.venv/bin/python -m pytest --co -q tests/unit tests/integration tests/e2e tests/ui` lists items by directory; no reliance on `-m`.
-
-- [ ] Step 1.0 — Remove custom suite flags and collection hooks; keep one simple unit guard
-  - Action: Delete custom options `--test-fast`, `--test-core`, `--test-ui` and related `pytest_collection_modifyitems` logic from `tests/conftest.py`.
-  - Action: Keep a minimal autouse fixture in `tests/unit/conftest.py` that calls `pytest_socket.disable_socket(allow_unix_socket=True)`; remove redundant double-guards and diagnostics unless actively needed.
-  - Verify: Unit runs block sockets; selecting by directory runs the expected tests without any custom flags or mark expressions.
-
-- [ ] Step 1.1 — Rename UI directory and update configs
-  - Action: Rename `tests/e2e_streamlit/` → `tests/ui/`.
-  - Action: Update references in configs and docs:
-    - `pyproject.toml` → `[tool.pytest.ini_options].testpaths` (replace `tests/e2e_streamlit` with `tests/ui`).
-    - `pyproject.toml` → `[tool.coverage.run].omit` (replace `tests/e2e_streamlit/*` with `tests/ui/*`).
-    - `tests/e2e_streamlit/conftest.py` move to `tests/ui/conftest.py` and keep a simple guard: raise a `pytest.UsageError` if coverage is enabled (UI requires `--no-cov`).
-    - `tests/conftest.py` path filters that reference `tests/e2e_streamlit/` updated to `tests/ui/`.
-    - CI workflow jobs and any scripts to point to `tests/ui`.
-    - Docs (`DEVELOPMENT.md`, README, any references) to use `tests/ui` nomenclature.
-  - Verify: `.venv/bin/python -m pytest tests/ui --no-cov -q` collects and runs the UI tests; coverage omit still skips UI as expected.
 
 - [ ] Step 1.2 — Deprecate `tests/environment/` by migrating tests
   - Action: Audit each test in `tests/environment/` and move to:
@@ -89,6 +73,22 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Remove redundant `docker` markers once migrated; keep only cross-cutting tags like `slow` when applicable.
   - Action: Delete `tests/docker/` after migration.
   - Verify: Directory-scoped integration and e2e runs are green; CI no longer references the `tests/docker/` directory (optional `-m docker` marker usage remains only if still needed).
+
+- [ ] Step 1.0 — Remove custom suite flags and collection hooks; keep one simple unit guard
+  - Action: Delete custom options `--test-fast`, `--test-core`, `--test-ui` and related `pytest_collection_modifyitems` logic from `tests/conftest.py`.
+  - Action: Keep a minimal autouse fixture in `tests/unit/conftest.py` that calls `pytest_socket.disable_socket(allow_unix_socket=True)`; remove redundant double-guards and diagnostics unless actively needed.
+  - Verify: Unit runs block sockets; selecting by directory runs the expected tests without any custom flags or mark expressions.
+
+- [ ] Step 1.1 — Rename UI directory and update configs
+  - Action: Rename `tests/e2e_streamlit/` → `tests/ui/`.
+  - Action: Update references in configs and docs:
+    - `pyproject.toml` → `[tool.pytest.ini_options].testpaths` updated to include `tests/ui`.
+    - `pyproject.toml` → `[tool.coverage.run].omit` updated to `tests/ui/*`.
+    - `tests/ui/conftest.py` contains a guard: raise a `pytest.UsageError` if coverage is enabled (UI requires `--no-cov`).
+    - `tests/conftest.py` path filters updated to `tests/ui/`.
+    - CI workflow jobs and any scripts to point to `tests/ui`.
+    - Docs (`DEVELOPMENT.md`, README, any references) to use `tests/ui` nomenclature.
+  - Verify: `.venv/bin/python -m pytest tests/ui --no-cov -q` collects and runs the UI tests; coverage omit still skips UI as expected.
 
 - [ ] Step 1.4 — Normalize project config to new folder layout
   - Action: In `pyproject.toml` `[tool.pytest.ini_options].testpaths`, remove `tests/ui` so default runs exclude UI entirely; developers and CI must target `tests/ui` explicitly.
