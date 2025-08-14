@@ -4,14 +4,15 @@ running ensure_weaviate_ready_and_populated should create it by ingesting
 example_data/test.pdf, then remove the example data, leaving an empty
 collection schema present.
 
-This uses testcontainers' Weaviate for a real server.
+This prepares Weaviate by starting the docker-compose service (no rebuild of the app).
 """
 
 import os
 from contextlib import contextmanager
+from urllib.parse import urlparse
 
 import pytest
-from testcontainers.weaviate import WeaviateContainer
+import weaviate
 
 pytestmark = [pytest.mark.slow, pytest.mark.e2e]
 
@@ -43,21 +44,23 @@ def _collection_has_any_objects(client, collection_name: str) -> bool:
         return False
 
 
-def test_bootstrap_creates_missing_collection_and_cleans_example_data(tmp_path):
-    # Start a real Weaviate instance
-    with WeaviateContainer() as weaviate_container:
-        client = weaviate_container.get_client()
+def test_bootstrap_creates_missing_collection_and_cleans_example_data(tmp_path, weaviate_compose_up):
+    # We'll target the explicit test collection name and local compose port
+    target_collection = "TestCollection"
+    weaviate_url = "http://localhost:8080"
 
-        # We'll target the explicit test collection name
-        target_collection = "TestCollection"
-
-        # Point the app to this testcontainers Weaviate via env var.
-        # The python client returned by testcontainers is already configured for host/ports.
-        # We pass the URL it uses (http://localhost:<mapped_port>) into the app via env.
-        http_port = weaviate_container.get_exposed_port(8080)
-        weaviate_url = f"http://localhost:{http_port}"
-
-        with _env_vars({"WEAVIATE_URL": weaviate_url, "DOCKER_ENV": "", "COLLECTION_NAME": target_collection}):
+    with _env_vars({"WEAVIATE_URL": weaviate_url, "DOCKER_ENV": "", "COLLECTION_NAME": target_collection}):
+        # Connect a client to the compose Weaviate (gRPC 50051 is exposed in compose)
+        parsed = urlparse(weaviate_url)
+        client = weaviate.connect_to_custom(
+            http_host=parsed.hostname or "localhost",
+            http_port=parsed.port or 80,
+            grpc_host=parsed.hostname or "localhost",
+            grpc_port=50051,
+            http_secure=parsed.scheme == "https",
+            grpc_secure=parsed.scheme == "https",
+        )
+        try:
             # Run the bootstrap function with the collection name provided via environment
             from backend.qa_loop import ensure_weaviate_ready_and_populated
 
@@ -81,3 +84,8 @@ def test_bootstrap_creates_missing_collection_and_cleans_example_data(tmp_path):
             #   collection should now be empty
             has_objects = _collection_has_any_objects(client, target_collection)
             assert has_objects is False
+        finally:
+            try:
+                client.close()
+            except Exception:
+                pass
