@@ -84,7 +84,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Delete `tests/environment/` after migration.
   - Verify: Directory-scoped runs for integration and e2e remain green; CI no longer references `environment`.
 
-- [ ] Step 1.4 — Deprecate `tests/docker/` by migrating tests
+- [x] Step 1.4 — Deprecate `tests/docker/` by migrating tests
   - Action: Audit each test in `tests/docker/` and move to:
     - `tests/integration/` if it validates packaging/imports, app image build, or a single service without orchestrating the full stack during the test run.
     - `tests/e2e/` if it requires bringing up the full Compose stack or exercises cross-service interactions as part of the test.
