@@ -33,7 +33,7 @@ jobs:
 
       - name: Run Semgrep scan (no metrics)
         run: |
-          ~/.local/bin/pipx run semgrep ci \
+          ~/.local/bin/semgrep ci \
             --config auto \
             --metrics off \
             --sarif \
