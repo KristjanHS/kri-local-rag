@@ -281,14 +281,18 @@ import weaviate
 from weaviate.classes.query import Filter
 from weaviate.exceptions import WeaviateConnectionError
 
-from backend.config import COLLECTION_NAME, WEAVIATE_URL
+from backend import config as app_config
 
 
 def ensure_weaviate_ready_and_populated():
     logger.info("--- Checking Weaviate status and collection ---")
     client = None  # explicit reference to avoid dynamic locals()/globals() access
     try:
-        parsed_url = urlparse(WEAVIATE_URL)
+        # Read connection settings dynamically at runtime so tests can override via env vars
+        weaviate_url = os.getenv("WEAVIATE_URL", app_config.WEAVIATE_URL)
+        collection_name = os.getenv("COLLECTION_NAME", app_config.COLLECTION_NAME)
+
+        parsed_url = urlparse(weaviate_url)
         http_host = parsed_url.hostname or "localhost"
         grpc_host = parsed_url.hostname or "localhost"
         client = weaviate.connect_to_custom(
@@ -299,19 +303,19 @@ def ensure_weaviate_ready_and_populated():
             http_secure=parsed_url.scheme == "https",
             grpc_secure=parsed_url.scheme == "https",
         )
-        logger.info("1. Attempting to connect to Weaviate at %s...", WEAVIATE_URL)
+        logger.info("1. Attempting to connect to Weaviate at %s...", weaviate_url)
         client.is_ready()  # Raises if not ready
         logger.info("   ✓ Connection successful.")
 
         # Check if collection exists
-        logger.info("2. Checking if collection '%s' exists...", COLLECTION_NAME)
-        if not client.collections.exists(COLLECTION_NAME):
+        logger.info("2. Checking if collection '%s' exists...", collection_name)
+        if not client.collections.exists(collection_name):
             # First-time setup: create the collection, ingest examples, then clean up.
             logger.info("   → Collection does not exist. Running one-time initialization...")
             # Defer heavy import to avoid torch initialization during module import
             from backend.ingest import create_collection_if_not_exists, ingest
 
-            create_collection_if_not_exists(client, COLLECTION_NAME)
+            create_collection_if_not_exists(client, collection_name)
 
             # Ingest example data to ensure all modules are warm; hard-fail if it's missing.
             # Get the absolute path to the project root, which is the parent of the 'backend' directory
@@ -334,14 +338,14 @@ def ensure_weaviate_ready_and_populated():
 
             logger.info("   → Ingesting example test PDF from %s", test_pdf_path)
             # Reuse the already connected client to avoid separate gRPC/port issues in tests
-            ingest(test_pdf_path, collection_name=COLLECTION_NAME, client=client)
+            ingest(test_pdf_path, collection_name=collection_name, client=client)
 
             # Clean up the example data now that the schema is created.
             # This check is important in case the example_data folder was empty.
             try:
-                collection = client.collections.use(COLLECTION_NAME)
+                collection = client.collections.use(collection_name)
             except Exception:
-                collection = client.collections.get(COLLECTION_NAME)
+                collection = client.collections.get(collection_name)
             # Use the robust iterator method to check for objects
             try:
                 next(collection.iterator())
@@ -358,7 +362,7 @@ def ensure_weaviate_ready_and_populated():
 
         # If the collection already exists, we do nothing. This avoids checking if it's empty
         # and re-populating, which could be slow on large user databases.
-        logger.info("   ✓ Collection '%s' exists.", COLLECTION_NAME)
+        logger.info("   ✓ Collection '%s' exists.", collection_name)
 
     except WeaviateConnectionError:
         raise WeaviateConnectionError(

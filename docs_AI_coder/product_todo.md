@@ -76,7 +76,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Update `docs/DEVELOPMENT.md` with bundle definitions, directory-based commands, and expectations (mocking policy, network rules, and when to promote a test to a heavier bundle).
   - Verify: Fresh clone dev can follow docs to run each bundle successfully; pre-push remains quick.
 
-- [ ] Step 1.3 — Deprecate `tests/environment/` by migrating tests
+- [x] Step 1.3 — Deprecate `tests/environment/` by migrating tests
   - Action: Audit each test in `tests/environment/` and move to:
     - `tests/integration/` if it validates local/python/ML setup without full compose or cross-service orchestration.
     - `tests/e2e/` if it depends on the full Docker stack or multiple real services.
@@ -92,7 +92,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Delete `tests/docker/` after migration.
   - Verify: Directory-scoped integration and e2e runs are green; CI no longer references the `tests/docker/` directory (optional `-m docker` marker usage remains only if still needed).
 
-- [ ] Step 1.5 — Rename UI directory and update configs
+- [x] Step 1.5 — Rename UI directory and update configs
   - Action: Rename `tests/e2e_streamlit/` → `tests/ui/`.
   - Action: Update references in configs and docs:
     - `pyproject.toml` → `[tool.pytest.ini_options].testpaths` updated to include `tests/ui`.
@@ -103,27 +103,57 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
     - Docs (`DEVELOPMENT.md`, README, any references) to use `tests/ui` nomenclature.
   - Verify: `.venv/bin/python -m pytest tests/ui --no-cov -q` collects and runs the UI tests; coverage omit still skips UI as expected.
 
-- [ ] Step 1.6 — Normalize project config to new folder layout
+- [x] Step 1.6 — Normalize project config to new folder layout
   - Action: In `pyproject.toml` `[tool.pytest.ini_options].testpaths`, remove `tests/ui` so default runs exclude UI entirely; developers and CI must target `tests/ui` explicitly.
   - Action: Replace any `tests/e2e_streamlit` references with `tests/ui`; remove `tests/environment` and `tests/docker` after migration.
   - Action: In `pyproject.toml` `[tool.pytest.ini_options].markers`, trim to cross-cutting only: keep `slow`, `docker` (if still used post-migration), and `external`; remove `unit`, `integration`, `e2e`, `ui`, and `environment` to avoid marker drift.
   - Action: Update docs (`DEVELOPMENT.md`) to state that directories determine bundles; markers are for cross-cutting semantics only.
   - Verify: `pytest --markers | cat` shows only the minimal cross-cutting markers; `pytest --co -q` lists items from the expected directories.
 
-- [ ] Step 1.7 — Remove unused pytest-docker config and prefer explicit Compose in scripts
+- [x] Step 1.7 — Remove unused pytest-docker config and prefer explicit Compose in scripts
   - Action: If not using `pytest-docker` plugin features directly, delete `[tool.pytest.docker]*` sections from `pyproject.toml` to reduce confusion.
   - Action: Prefer e2e orchestration via `scripts/test.sh e2e` that wraps `docker compose up -d --build && pytest tests/e2e -q && docker compose down -v`.
   - Verify: No plugin warnings on run; e2e orchestration flows through the script.
 
-- [ ] Step 3 — Integration bundle (one real component; network allowed)
+- [x] Step 3 — Integration bundle (one real component; network allowed)
   - Action: Standardize command: `.venv/bin/python -m pytest tests/integration -q`.
   - Action: Document policy: prefer Testcontainers or a single real dependency; for multi-service needs, move test to `e2e`.
   - Verify: Typical tests (e.g., `tests/integration/test_weaviate_integration.py`) pass without requiring the full compose stack; logs show no socket-block enforcement.
 
+  - [x] Fix: Reset cached globals to avoid cross-test state (best practices)
+    - Action: Add autouse fixture in `tests/integration/conftest.py` that clears `RAG_FAKE_ANSWER` and resets caches only if respective modules are already imported: `backend.qa_loop._cross_encoder`, `backend.qa_loop._ollama_context`, and `backend.retriever._embedding_model` via `sys.modules`.
+    - Rationale: Aligns with `docs_AI_coder/AI_instructions.md` guidance to prevent flaky tests caused by cached globals and to not import modules inside fixtures (keeps patch decorators effective).
+    - Verify: `.venv/bin/python -m pytest tests/integration -q` shows deterministic results; streaming test passes in isolation and alongside others.
+    - Validation: All integration tests pass (28/28); flaky-tests guidance updated and condensed in `docs_AI_coder/AI_instructions.md`.
+
 - [ ] Step 4 — E2E bundle (all real components; network allowed)
   - Action: Provide a single dispatcher script `scripts/test.sh` with usage: `test.sh [unit|integration|e2e|ui]` that runs the standardized directory-based commands; for e2e it does `docker compose up -d --build && pytest tests/e2e -q && docker compose down -v` with `set -euo pipefail`.
   - Verify: `bash scripts/test.sh unit|integration|e2e|ui` runs the intended bundle with minimal flags.
+  
+  ### Hotfix Log — 2025-08-14
+- [x] Ensure real QA e2e test uses ingestion fixture
+  - **Action**: Explicitly import `docker_services_ready` from `tests/e2e/fixtures_ingestion.py` in `tests/e2e/test_qa_real_end_to_end.py` so Weaviate is bootstrapped and populated before calling `answer()`.
+  - **Rationale**: Tests should prepare their environment; `answer()` should not implicitly bootstrap databases. This aligns with best practices of explicit test setup and isolation.
+  - **Verify**: `bash scripts/test.sh e2e` runs green.
 
+- [x] Preserve volumes during e2e teardown and clean up only test data
+  - **Action**: Change `scripts/test.sh` e2e teardown to `docker compose down` (without `-v`) to avoid removing persistent volumes.
+  - **Action**: Add session autouse fixture in `tests/e2e/conftest.py` to delete only the `TestCollection` at the end of the e2e session.
+  - **Rationale**: Prevent accidental production data loss while ensuring ephemeral test data does not persist.
+  - **Verify**: After e2e, volumes remain; `TestCollection` is removed.
+
+- [x] Make bootstrap e2e use compose Weaviate (no app rebuild), not Testcontainers
+  - **Action**: Add `weaviate_compose_up` fixture in `tests/e2e/conftest.py` to start only the `weaviate` service via docker compose (`up -d --wait weaviate`).
+  - **Action**: Update `tests/e2e/test_weaviate_bootstrap_missing_collection_e2e.py` to use this fixture and connect to `http://localhost:8080` with gRPC 50051.
+  - **Rationale**: Mirrors production networking (HTTP + gRPC) and avoids gRPC port mismatch issues seen with Testcontainers defaults.
+  - **Verify**: Running the single test passes; e2e suite remains green.
+
+- [x] Ensure e2e tests that need real Ollama start that container too
+  - **Action**: Add `ollama_compose_up` fixture in `tests/e2e/conftest.py` to start only the `ollama` service via docker compose (`up -d --wait ollama`).
+  - **Action**: Update `tests/e2e/test_qa_real_end_to_end.py` to depend on both `weaviate_compose_up` and `ollama_compose_up` (and register `tests/e2e/fixtures_ingestion` via `pytest_plugins`).
+  - **Rationale**: Makes tests explicitly start real services they need and aligns with the production stack; avoids hidden dependencies.
+  - **Verify**: Test runs with real Weaviate + Ollama and returns a non-empty answer without "I found no relevant context".
+  
 - [ ] Step 5 — UI bundle (frontend/UI only; network allowed; coverage disabled)
   - Action: Require `-e .[ui]` and browsers; standardize command: `.venv/bin/python -m pytest tests/ui --no-cov -q`.
   - Verify: Without `--no-cov`, the run errors with clear usage as enforced by `tests/ui/conftest.py`. With `--no-cov`, only `tests/ui/*` are collected and run.
@@ -183,9 +213,42 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Update `README.md` and `docs/DEVELOPMENT.md` to document flags, precedence, and log file location.
   - Verify: `.venv/bin/python -m pytest -q tests/unit/test_logging_config.py tests/integration/test_cli_output.py` passes.
 
-#### P2 — ...
+#### P2 — Containerized CLI E2E copies (keep host-run E2E; add container-run twins)
 
-New Tasks/Topic can be added here.
+- Why: Host-run E2E miss packaging/runtime issues (entrypoint, PATH, env, OS libs). Twins validate the real image without replacing fast host tests.
+
+- [ ] Step 1 — Identify candidates
+  - Action: List E2E tests invoking CLI in-process (e.g., `backend.qa_loop`) such as `tests/e2e/test_qa_real_end_to_end.py`.
+  - Verify: Confirm they don’t already run via container.
+
+- [ ] Step 2 — Compose runner for CLI (no bind mounts)
+  - Action: Add `cli` service (profile `cli`) in `docker/docker-compose.yml` using `kri-local-rag-app`, no `volumes`, `working_dir: /app`, and env:
+    - `WEAVIATE_URL=http://weaviate:8080`, `OLLAMA_URL=http://ollama:11434`.
+  - Verify: `docker compose --profile cli run --rm cli python -m backend.qa_loop --help | cat` exits 0.
+
+- [ ] Step 3 — Test helper
+  - Action: In `tests/e2e/conftest.py`, add `run_cli_in_container(args, env=None)` that runs `docker compose --profile cli run --rm cli ...`, returns `returncode/stdout/stderr`.
+  - Verify: `--help` smoke passes.
+
+- [ ] Step 4 — Readiness and URLs
+  - Action: Use existing `weaviate_compose_up`/`ollama_compose_up`; ensure ingestion uses compose-internal URLs.
+  - Verify: Readiness checks pass before CLI twin runs.
+
+- [ ] Step 5 — Create test twins
+  - Action: Add `_container_e2e.py` twins that call `run_cli_in_container([...])` with equivalent CLI subcommands; optionally mark with `@pytest.mark.docker`.
+  - Verify: Single twin passes via `.venv/bin/python -m pytest -q tests/e2e/test_qa_real_end_to_end_container_e2e.py` after compose `--wait`.
+
+- [ ] Step 6 — Build outside tests
+  - Action: Ensure scripts/CI build `kri-local-rag-app` once; helper should raise `pytest.UsageError` if image missing.
+  - Verify: Second run is faster due to image reuse.
+
+- [ ] Step 7 — Diagnostics and isolation
+  - Action: On failure, print exit code, last 200 lines of app logs, and tails of `weaviate`/`ollama` logs; use ephemeral dirs/volumes.
+  - Verify: Failures are actionable; runs are deterministic and isolated.
+
+- [ ] Step 8 — Wire into scripts/docs/CI
+  - Action: Document commands in `docs/DEVELOPMENT.md` and `AI_instructions.md`; mention in `scripts/test.sh e2e` help; add a CI job for the containerized CLI subset.
+  - Verify: Fresh env runs `tests/e2e/*_container_e2e.py` green; CI job passes locally under `act` and on hosted runners.
 
 #### P3 — ...
 
@@ -202,12 +265,12 @@ New Tasks/Topic can be added here.
   - [x] Replace `act ... -j pyright` with `.venv/bin/pyright`
 - [x] Keep tests via `act` for parity; native fast path runs the unit bundle: `.venv/bin/python -m pytest tests/unit --maxfail=1 -q`
 
-- [ ] Add pre-push skip toggles (env-driven)
+- [x] Add pre-push skip toggles (env-driven)
   - [x] Support `SKIP_LINT=1`, `SKIP_PYRIGHT=1`, `SKIP_TESTS=1` to selectively skip steps locally
   - [x] Default heavy scans to opt-in (CodeQL already defaults to skip via `SKIP_LOCAL_SEC_SCANS=1`)
 
-- [ ] Fail-fast for local tests
-  - [ ] Update pre-push fast tests invocation to include `--maxfail=1 -q` for quicker feedback on first failure
+- [x] Fail-fast for local tests
+  - [x] Update pre-push fast tests invocation to include `--maxfail=1 -q` for quicker feedback on first failure
 
 - [ ] Pre-commit integration for changed-files speedups
   - [ ] Add `.pre-commit-config.yaml` with `ruff` (lint + format) and optional `pyright` hooks
@@ -223,8 +286,8 @@ New Tasks/Topic can be added here.
   - [ ] Pin the local `pyright` version (e.g., in `requirements-dev.txt`) to match CI
   - [ ] Ensure `ruff` version in pre-commit matches the CI action version (`0.5.3` today)
   
- - [ ] Pre-push alignment
-   - [ ] Replace any `--test-fast` references with `tests/unit` for pre-push context and update `scripts/pre_push.sh` accordingly
+ - [x] Pre-push alignment
+   - [x] Replace any `--test-fast` references with `tests/unit` for pre-push context and update `scripts/pre_push.sh` accordingly
 
 #### P5.1 — Docker build cache and context optimizations
 
@@ -471,5 +534,7 @@ Archived on 2025-08-13
 - [ ] Create testing standards document.
 - [ ] Add test templates for consistency and performance benchmarking.
 - [ ] Improve test documentation and add test quality metrics tracking over time.
+
+
 
  
