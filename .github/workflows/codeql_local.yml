@@ -3,7 +3,7 @@ name: Local CodeQL
 on:
   workflow_dispatch: {}
 
-permissions: 
+permissions:
   contents: read
   security-events: write
 
@@ -24,26 +24,41 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Download and install CodeQL CLI
+      - name: Download and cache CodeQL CLI
         run: |
-          CODEQL_VERSION="2.18.2"
-          wget https://github.com/github/codeql-cli-binaries/releases/download/v${CODEQL_VERSION}/codeql-linux64.zip
-          unzip codeql-linux64.zip
-          echo "${PWD}/codeql" >> $GITHUB_PATH
+          if [[ ! -x "${HOME}/codeql-cli/codeql/codeql" ]]; then
+            CODEQL_VERSION="2.18.2"
+            echo "Downloading CodeQL CLI v${CODEQL_VERSION}..."
+            wget -q https://github.com/github/codeql-cli-binaries/releases/download/v${CODEQL_VERSION}/codeql-linux64.zip -O /tmp/codeql.zip
+            mkdir -p "${HOME}/codeql-cli"
+            unzip -q /tmp/codeql.zip -d "${HOME}/codeql-cli"
+            rm /tmp/codeql.zip
+          else
+            echo "Using cached CodeQL CLI."
+          fi
+          echo "${HOME}/codeql-cli/codeql" >> $GITHUB_PATH
+
+      - name: Download CodeQL Python query pack
+        run: codeql pack download codeql/python-queries
 
       - name: Run CodeQL Analysis
         run: |
-          codeql database create --language=python codeql-db
-          codeql database analyze codeql-db --format=sarif-latest --output=codeql_local.sarif python-security-and-quality.qls
+          DB_PATH="${RUNNER_TEMP}/codeql-db"
+          SARIF_PATH="${RUNNER_TEMP}/codeql_local.sarif"
+          echo "SARIF_PATH=${SARIF_PATH}" >> $GITHUB_ENV
+          # Create database
+          codeql database create --language=python "${DB_PATH}"
+          # Analyze database
+          codeql database analyze "${DB_PATH}" --format=sarif-latest --output="${SARIF_PATH}" codeql/python-queries
 
       - name: Summarize CodeQL findings to logs
         if: ${{ always() }}
         run: |
           python - << 'PY'
           import json, sys, os
-          path = "codeql_local.sarif"
-          if not os.path.exists(path):
-              print("CodeQL findings: 0 (no codeql_local.sarif found)")
+          path = os.environ.get("SARIF_PATH")
+          if not path or not os.path.exists(path):
+              print(f"CodeQL findings: 0 (no SARIF file found at '{path}')")
               sys.exit(0)
           
           with open(path, 'r', encoding='utf-8') as f:
