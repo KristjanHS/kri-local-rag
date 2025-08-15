@@ -2,6 +2,28 @@
 
 This file records tasks that have been completed and moved out of the active TODO backlog.
 
+## Archived on 2025-08-15
+
+### P0.1a — Git Hooks Management (Best Practices) ✅ COMPLETED
+
+- [x] Step 1 — Centralize Git Hooks in a Versioned Directory
+  - Action: Create a new directory `scripts/git-hooks/`.
+  - Action: Move the existing `.git/hooks/pre-commit` and `.git/hooks/pre-push` scripts to `scripts/git-hooks/`.
+  - Action: Ensure the new `scripts/git-hooks/` directory is tracked by git.
+  - Verify: `ls scripts/git-hooks` shows `pre-commit` and `pre-push`. The files are added in `git status`.
+
+- [x] Step 2 — Configure Git to Use the Centralized Hooks Directory
+  - Action: In `docs/DEVELOPMENT.md`, instruct developers to run `git config core.hooksPath scripts/git-hooks` once after cloning.
+  - Action: Add a small script or a make target (e.g., `make setup-hooks`) to automate this configuration.
+  - Verify: Running `git config --get core.hooksPath` returns `scripts/git-hooks`. Committing triggers the centralized hook.
+
+- [x] Step 3 — Clean Up and Document
+  - Action: Document the purpose of the shared hooks and the setup command in `docs/DEVELOPMENT.md`.
+  - Action: Remind developers they can still have local, untracked hooks in `.git/hooks/` if they need to override something for their own workflow, but the shared hooks should be the default.
+  - Verify: The documentation is clear and easy for a new developer to follow.
+
+**Status**: All steps completed. Git hooks are centralized in `scripts/git-hooks/`, git is configured to use the centralized path, and documentation is complete in `docs/DEVELOPMENT.md`.
+
 ## Archived on 2025-08-10
 
 ### Test Refactoring Status

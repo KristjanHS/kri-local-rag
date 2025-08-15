@@ -1,4 +1,4 @@
-# Project TODO List
+# Product TODO List
 
 This file tracks outstanding tasks and planned improvements for the project.
 
@@ -15,52 +15,23 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 - **Commands are examples**: Any equivalent approach that achieves the same outcome is acceptable
 - **Paths, ports, and model names**: Adapt to your environment as needed
-- **Host vs container URLs**:
-  - From host: use `http://localhost:8080` (Weaviate) and `http://localhost:11434` (Ollama)
-  - From containers: use `http://weaviate:8080` and `http://ollama:11434`
 - Each step has Action and Verify. Aim for one change per step to allow quick fix-and-retry.
 - On any Verify failure: stop and create a focused debugging plan before proceeding (assume even these TODO instructions may be stale or mistaken). The plan should:
-   - Summarize expected vs. actual behavior and include the exact command/output/exit code.
-   - Gather quick signals (only the minimum needed): relevant service logs, port bindings, container status, environment variables, and config diffs.
-   - Re-check key assumptions (host vs container URLs, credentials, network bindings, versions, availability of external services).
-   - Consider that the step description might be wrong; cross-check code, `DEVELOPMENT.md`, and `docker/` for the source of truth.
+   - Summarize expected vs. actual behavior
+   - Re-check key assumptions
+   - Consider that the step description might be wrong; cross-check code for the source of truth.
    - Propose 1–3 small, reversible next actions with a clear Verify for each. Apply the smallest change first.
    - After a change, re-run the same Verify command from the failed step. Only then continue.
    - If blocked, mark the step as `[BLOCKED: <short reason/date>]` in this todo file and proceed to the smallest independent next step if any; otherwise stop and request help.
 
-
 ## Quick References
 
-- **AI agent cheatsheet and E2E commands**: [`docs_AI_coder/AI_instructions.md`](AI_instructions.md) (sections: "Golden commands" and "AI Agent Hints: Docker startup and E2E tests")
-- **Test suites and markers**: [`docs_AI_coder/AI_instructions.md`](AI_instructions.md) (section: "Testing")
+- **AI agent cheatsheet and E2E commands**: [`docs_AI_coder/AI_instructions.md`](AI_instructions.md)
 - **Human dev quickstart**: [`docs/DEVELOPMENT.md`](../docs/DEVELOPMENT.md)
-- **MVP runbook**: [`docs_AI_coder/mvp_deployment.md`](mvp_deployment.md)
 - **Archived tasks**: [`docs_AI_coder/archived-tasks.md`](archived-tasks.md)
 
- 
 
 ## Prioritized Backlog
-
-Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for context on completed Phase 1 testing work.
-
-
-#### P0.1a — Git Hooks Management (Best Practices)
-
-- [ ] Step 1 — Centralize Git Hooks in a Versioned Directory
-  - Action: Create a new directory `scripts/git-hooks/`.
-  - Action: Move the existing `.git/hooks/pre-commit` and `.git/hooks/pre-push` scripts to `scripts/git-hooks/`.
-  - Action: Ensure the new `scripts/git-hooks/` directory is tracked by git.
-  - Verify: `ls scripts/git-hooks` shows `pre-commit` and `pre-push`. The files are added in `git status`.
-
-- [ ] Step 2 — Configure Git to Use the Centralized Hooks Directory
-  - Action: In `docs/DEVELOPMENT.md`, instruct developers to run `git config core.hooksPath scripts/git-hooks` once after cloning.
-  - Action: Add a small script or a make target (e.g., `make setup-hooks`) to automate this configuration.
-  - Verify: Running `git config --get core.hooksPath` returns `scripts/git-hooks`. Committing triggers the centralized hook.
-
-- [ ] Step 3 — Clean Up and Document
-  - Action: Document the purpose of the shared hooks and the setup command in `docs/DEVELOPMENT.md`.
-  - Action: Remind developers they can still have local, untracked hooks in `.git/hooks/` if they need to override something for their own workflow, but the shared hooks should be the default.
-  - Verify: The documentation is clear and easy for a new developer to follow.
 
 #### P0.1b Immediate — Local dev checks (pre-push)
 
@@ -68,7 +39,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Run push with `SKIP_LOCAL_SEC_SCANS=0` to include Semgrep/CodeQL locally: `SKIP_LOCAL_SEC_SCANS=0 git push -n` (dry run) or actual push.
   - Verify: Pre-push log shows Semgrep/CodeQL steps executed without schema errors and exits 0.
 
-- [ ] Install pyright in `.venv` so type checks run in pre-push
+- [x] Install pyright in `.venv` so type checks run in pre-push
   - Action: `.venv/bin/pip install pyright` (optionally pin to CI version) and commit if adding to `requirements-dev.txt`.
   - Verify: `.venv/bin/pyright --version` succeeds and pre-push no longer warns about missing pyright.
 
