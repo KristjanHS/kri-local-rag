@@ -44,7 +44,9 @@ markers = [
     "slow: Tests that take longer to run (>30s)",
     "docker: Tests requiring a running Docker daemon",
     "external: Tests that require external services (Weaviate, Ollama)",
-    "unit: Unit tests (fast, no external dependencies)"
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (slower, may require Docker)",
+    "e2e: End-to-end tests (slowest, require full environment)",
 ]
 testpaths = [
     "tests/unit",
