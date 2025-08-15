@@ -1,6 +1,6 @@
 name: CodeQL
 
-permissions: 
+permissions:
   contents: read
   security-events: write
 
@@ -16,21 +16,23 @@ jobs:
   codeql:
     name: CodeQL
     runs-on: ubuntu-latest
-    
+
     # Add timeout to prevent hanging jobs
     timeout-minutes: 360
 
-    if: ${{ github.actor != 'nektos/act' }}
+    if: >-
+      ${{ github.event_name != 'pull_request' ||
+      github.actor != 'nektos/act' }}
     # Use concurrency to cancel in-progress jobs on new commits
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
-    
+
     strategy:
       fail-fast: false
       matrix:
         language: ['python']
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,28 +40,31 @@ jobs:
           # Fetch at least the immediate parents so that if this is
           # a pull request then we can checkout the head.
           fetch-depth: 2
-      
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-      
+
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
-      
+
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
           # Skip upload under Act and forked PRs; still produce SARIF locally
-          upload: ${{ github.actor != 'nektos/act' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
+          upload: >-
+            ${{ github.actor != 'nektos/act' && (github.event_name != 'pull_request' ||
+            github.event.pull_request.head.repo.fork == false) }}
 
       - name: Summarize CodeQL findings (local only)
         if: ${{ github.actor == 'nektos/act' }}
         run: |
           python - <<'PY'
           import json, sys, os, glob
-          # The SARIF file may be in a subdirectory when multiple languages are scanned
+          # The SARIF file may be in a subdirectory when multiple
+          # languages are scanned
           candidates = [
               'codeql-results/**/*.sarif',
               'codeql-results.sarif/**/*.sarif',
@@ -71,12 +76,17 @@ jobs:
               sarif_files.extend(glob.glob(pat, recursive=True))
           if not sarif_files:
               # Fallback for single-language scan
-              sarif_files = ['codeql-results.sarif'] if os.path.isfile('codeql-results.sarif') else []
+              sarif_files = ['codeql-results.sarif'] if os.path.isfile(
+                  'codeql-results.sarif'
+              ) else []
 
           if not sarif_files or not os.path.exists(sarif_files[0]):
-              print('No SARIF file produced by CodeQL. Assuming no findings for local gate.')
+              print(
+                  'No SARIF file produced by CodeQL. '
+                  'Assuming no findings for local gate.'
+              )
               sys.exit(0)
-          
+
           path = sarif_files[0]
           with open(path, 'r', encoding='utf-8') as f:
               sarif = json.load(f)
@@ -87,10 +97,20 @@ jobs:
               # Print top 20 findings concisely
               for i, r in enumerate(results[:20], 1):
                   msg = (r.get('message') or {}).get('text') or ''
-                  loc = ((r.get('locations') or [{}])[0].get('physicalLocation') or {})
-                  file = (loc.get('artifactLocation') or {}).get('uri') or 'unknown-file'
+                  loc = (
+                      (r.get('locations') or [{}])[0]
+                      .get('physicalLocation') or {}
+                  )
+                  file = (
+                      (loc.get('artifactLocation') or {})
+                      .get('uri') or 'unknown-file'
+                  )
                   line = (loc.get('region') or {}).get('startLine') or 1
                   rule = r.get('ruleId') or 'unknown-rule'
                   print(f"{i}. {rule} at {file}:{line} - {msg}")
-              print('Note: Local run under Act is informational. Review the findings above and the Security tab in GitHub when uploaded.')
+              print(
+                  'Note: Local run under Act is informational. '
+                  'Review the findings above and the Security tab in '
+                  'GitHub when uploaded.'
+              )
           PY

@@ -27,13 +27,18 @@ jobs:
 
       - name: Install pipx and Semgrep (isolated)
         run: |
-          python -m pip install --user pipx || true
-          python -m pipx ensurepath || true
-          ~/.local/bin/pipx install --force semgrep
+          if ! command -v ~/.local/bin/semgrep &> /dev/null; then
+            echo "semgrep not found, installing..."
+            python -m pip install --user pipx || true
+            python -m pipx ensurepath || true
+            ~/.local/bin/pipx install --force semgrep
+          else
+            echo "semgrep is already installed."
+          fi
 
       - name: Run Semgrep scan (no metrics)
         run: |
-          ~/.local/bin/pipx run semgrep ci \
+          ~/.local/bin/semgrep ci \
             --config auto \
             --metrics off \
             --sarif \

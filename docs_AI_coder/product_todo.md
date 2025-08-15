@@ -43,7 +43,36 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for context on completed Phase 1 testing work.
 
-#### P0 — Test suite bundling into four bundles (unit, integration, e2e, ui) — simplified
+
+#### P0.1a — Git Hooks Management (Best Practices)
+
+- [ ] Step 1 — Centralize Git Hooks in a Versioned Directory
+  - Action: Create a new directory `scripts/git-hooks/`.
+  - Action: Move the existing `.git/hooks/pre-commit` and `.git/hooks/pre-push` scripts to `scripts/git-hooks/`.
+  - Action: Ensure the new `scripts/git-hooks/` directory is tracked by git.
+  - Verify: `ls scripts/git-hooks` shows `pre-commit` and `pre-push`. The files are added in `git status`.
+
+- [ ] Step 2 — Configure Git to Use the Centralized Hooks Directory
+  - Action: In `docs/DEVELOPMENT.md`, instruct developers to run `git config core.hooksPath scripts/git-hooks` once after cloning.
+  - Action: Add a small script or a make target (e.g., `make setup-hooks`) to automate this configuration.
+  - Verify: Running `git config --get core.hooksPath` returns `scripts/git-hooks`. Committing triggers the centralized hook.
+
+- [ ] Step 3 — Clean Up and Document
+  - Action: Document the purpose of the shared hooks and the setup command in `docs/DEVELOPMENT.md`.
+  - Action: Remind developers they can still have local, untracked hooks in `.git/hooks/` if they need to override something for their own workflow, but the shared hooks should be the default.
+  - Verify: The documentation is clear and easy for a new developer to follow.
+
+#### P0.1b Immediate — Local dev checks (pre-push)
+
+- [x] Re-enable local security scans in pre-push
+  - Action: Run push with `SKIP_LOCAL_SEC_SCANS=0` to include Semgrep/CodeQL locally: `SKIP_LOCAL_SEC_SCANS=0 git push -n` (dry run) or actual push.
+  - Verify: Pre-push log shows Semgrep/CodeQL steps executed without schema errors and exits 0.
+
+- [ ] Install pyright in `.venv` so type checks run in pre-push
+  - Action: `.venv/bin/pip install pyright` (optionally pin to CI version) and commit if adding to `requirements-dev.txt`.
+  - Verify: `.venv/bin/pyright --version` succeeds and pre-push no longer warns about missing pyright.
+
+#### P0.2 — Test suite bundling into four bundles (unit, integration, e2e, ui) — simplified
 
 - Context and goal
   - Current situation: tests are split across `tests/unit`, `tests/integration`, `tests/e2e`, `tests/e2e_streamlit`, plus `tests/environment` and `tests/docker`. There are custom pytest flags/hooks and some global marker-based exclusions (e.g., `-m "not ui"`). Unit socket blocking exists but enforcement paths are a bit complex.
@@ -130,7 +159,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Provide a single dispatcher script `scripts/test.sh` with usage: `test.sh [unit|integration|e2e|ui]` that runs the standardized directory-based commands; for e2e it does `docker compose up -d --build && pytest tests/e2e -q && docker compose down -v` with `set -euo pipefail`.
   - Verify: `bash scripts/test.sh unit|integration|e2e|ui` runs the intended bundle with minimal flags.
   
-  ### Hotfix Log — 2025-08-14
+  ##### Hotfix Log — 2025-08-14
 - [x] Ensure real QA e2e test uses ingestion fixture
   - **Action**: Explicitly import `docker_services_ready` from `tests/e2e/fixtures_ingestion.py` in `tests/e2e/test_qa_real_end_to_end.py` so Weaviate is bootstrapped and populated before calling `answer()`.
   - **Rationale**: Tests should prepare their environment; `answer()` should not implicitly bootstrap databases. This aligns with best practices of explicit test setup and isolation.
@@ -250,9 +279,31 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Document commands in `docs/DEVELOPMENT.md` and `AI_instructions.md`; mention in `scripts/test.sh e2e` help; add a CI job for the containerized CLI subset.
   - Verify: Fresh env runs `tests/e2e/*_container_e2e.py` green; CI job passes locally under `act` and on hosted runners.
 
-#### P3 — ...
+#### P3 — E2E retrieval failure: QA test returns no context (Weaviate)
 
-New Tasks/Topic can be added here.
+ - Context and goal
+   - Failing test returns no context from Weaviate. Likely mismatch between collection name used by retrieval and the one populated by ingestion, or ingestion not executed.
+
+ - [ ] Task 1 — Reproduce quickly
+   - Run only the failing test to confirm the symptom.
+
+ - [ ] Task 2 — Check config and schema
+   - Confirm effective `COLLECTION_NAME` and that the corresponding collection exists in Weaviate.
+
+ - [ ] Task 3 — Confirm data population
+   - Ensure the ingestion fixture ran and that the target collection contains objects.
+
+ - [ ] Task 4 — Probe retrieval directly
+   - Call the retriever to verify it returns non-empty results when data is present.
+
+ - [ ] Task 5 — Standardize collection naming
+   - Decide one collection name for E2E and apply consistently (tests, fixtures, and config).
+
+ - [ ] Task 6 — Implement and verify
+   - Apply the change, re-run E2E, and confirm the QA test passes.
+
+ - [ ] Task 7 — Add minimal guardrails
+   - Log the active collection name in the e2e fixture and add a small test ensuring graceful behavior when empty.
 
 #### P4 — ...
 
@@ -534,6 +585,7 @@ Archived on 2025-08-13
 - [ ] Create testing standards document.
 - [ ] Add test templates for consistency and performance benchmarking.
 - [ ] Improve test documentation and add test quality metrics tracking over time.
+
 
 
 

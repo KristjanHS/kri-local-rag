@@ -57,11 +57,12 @@ def _setup_logging():
     log_dir = _resolve_log_dir()
     log_file = log_dir / "rag_system.log"
 
-    # Use a rotating file handler to prevent log files from growing indefinitely
-    file_handler = logging.handlers.RotatingFileHandler(
+    # Use a timed rotating file handler to create a new log file each day
+    file_handler = logging.handlers.TimedRotatingFileHandler(
         log_file,
-        maxBytes=10 * 1024 * 1024,
-        backupCount=5,  # 10 MB per file, 5 backups
+        when="midnight",  # Rotate at midnight
+        backupCount=7,  # Keep 7 days of logs
+        utc=True,  # Use UTC for consistency
     )
     file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
 

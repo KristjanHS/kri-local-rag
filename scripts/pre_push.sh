@@ -138,7 +138,7 @@ fi
 if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
   if [[ "$ACT_AVAILABLE" == "1" ]]; then
     log INFO "Running CodeQL (informational) via act …" | tee -a "$LOG_FILE"
-    act pull_request -W .github/workflows/codeql.yml --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
+    act workflow_dispatch -W .github/workflows/codeql_local.yml --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
   else
     log INFO "Skipping CodeQL (act not available)." | tee -a "$LOG_FILE"
   fi
