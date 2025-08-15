@@ -72,7 +72,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: `.venv/bin/pip install pyright` (optionally pin to CI version) and commit if adding to `requirements-dev.txt`.
   - Verify: `.venv/bin/pyright --version` succeeds and pre-push no longer warns about missing pyright.
 
-- [ ] Refactor setup scripts for a single, unified developer entrypoint
+- [x] Refactor setup scripts for a single, unified developer entrypoint
   - Action: Rename `scripts/install-linters.sh` to `scripts/install-system-tools.sh` to clarify its purpose (system-level, non-pip tools).
   - Action: Create a new top-level orchestrator script `scripts/setup-dev-env.sh` that handles venv creation, pip upgrades, dependency installation, and calls `install-system-tools.sh`.
   - Action: Update `.devcontainer/devcontainer.json` to use a simple `postCreateCommand`: `scripts/setup-dev-env.sh`.
