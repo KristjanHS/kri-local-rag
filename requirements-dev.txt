@@ -2,4 +2,5 @@
 -e .[test,docs,cli]
 # Dev installs rely on extras defined in pyproject
 # Explicitly avoid OTel in app/dev env until protobuf≥5 support is confirmed
-# opentelemetry-proto<5 is incompatible with protobuf>=5; do not add OTel deps herepyright==1.1.403
+# opentelemetry-proto<5 is incompatible with protobuf>=5; do not add OTel deps here
+pyright==1.1.403

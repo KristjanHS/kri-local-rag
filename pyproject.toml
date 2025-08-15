@@ -43,7 +43,8 @@ addopts = [
 markers = [
     "slow: Tests that take longer to run (>30s)",
     "docker: Tests requiring a running Docker daemon",
-    "external: Tests that require external services (Weaviate, Ollama)"
+    "external: Tests that require external services (Weaviate, Ollama)",
+    "unit: Unit tests (fast, no external dependencies)"
 ]
 testpaths = [
     "tests/unit",
