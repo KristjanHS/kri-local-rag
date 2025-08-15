@@ -205,7 +205,7 @@ jobs:
         env:
           PLAYWRIGHT_HEADLESS: "1"
         run: |
-          python -m pytest --test-ui --no-cov \
+          python -m pytest tests/ui --no-cov \
             --html=reports/report_ui.html --self-contained-html \
             --junitxml=reports/junit_ui.xml
       - name: Tear down local stack
@@ -240,10 +240,10 @@ jobs:
       - name: Prepare reports directories
         run: |
           mkdir -p reports
-      - name: Run core test suite (everything except UI)
+      - name: Run core test suite (unit + integration, excludes UI)
         # Enforce coverage threshold for core suite
         run: |
-          python -m pytest -v --test-core -n auto --cov-fail-under=60 \
+          python -m pytest -v -n auto --cov-fail-under=60 tests/unit tests/integration \
             --html=reports/report_core.html --self-contained-html \
             --junitxml=reports/junit_core.xml
       - name: Upload core suite reports

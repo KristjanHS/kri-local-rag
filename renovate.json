@@ -24,6 +24,9 @@
         ],
         "rangeStrategy": "replace"
     },
+    "ignoreDeps": [
+        "torch"
+    ],
     "packageRules": [
         {
             "matchPackageNames": [

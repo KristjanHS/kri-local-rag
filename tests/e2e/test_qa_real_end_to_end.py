@@ -8,6 +8,7 @@ import os
 
 import pytest
 
+pytest_plugins = ["tests.e2e.fixtures_ingestion"]
 from backend.config import OLLAMA_MODEL
 from backend.ollama_client import ensure_model_available
 from backend.qa_loop import answer
@@ -15,7 +16,7 @@ from backend.qa_loop import answer
 pytestmark = [pytest.mark.e2e, pytest.mark.integration, pytest.mark.slow, pytest.mark.external]
 
 
-def test_e2e_answer_with_real_services(docker_services_ready):  # noqa: ANN001
+def test_e2e_answer_with_real_services(docker_services_ready, weaviate_compose_up, ollama_compose_up):  # noqa: ANN001
     # Ensure the required model is available (will download with visible progress if missing)
     assert ensure_model_available(OLLAMA_MODEL) is True
     # Ensure fake-answer mode is not active
