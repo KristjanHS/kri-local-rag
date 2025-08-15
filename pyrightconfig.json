@@ -1,10 +1,24 @@
 {
-    "reportMissingTypeStubs": false,
-    "typeCheckingMode": "basic",
-    "pythonVersion": "3.9",
-    "exclude": [
-        ".venv"
+    "include": [
+        "backend",
+        "tests"
     ],
-    "ignore": [],
+    "exclude": [
+        "**/.venv/**",
+        "**/__pycache__/**",
+        "**/build/**",
+        "**/dist/**"
+    ],
+    "venvPath": ".",
+    "venv": ".venv",
+    "typeCheckingMode": "standard",
+    "pythonVersion": "3.12",
+    "pythonPlatform": "Linux",
+    "extraPaths": [
+        "backend"
+    ],
+    "reportMissingTypeStubs": "warning",
+    "reportUnusedImport": "warning",
+    "reportUnusedVariable": "warning",
     "lineLength": 120
 }
