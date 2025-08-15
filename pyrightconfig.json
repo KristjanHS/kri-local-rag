@@ -1,0 +1,27 @@
+{
+    "include": [
+        "backend",
+        "tests"
+    ],
+    "exclude": [
+        "**/.venv/**",
+        "**/__pycache__/**",
+        "**/build/**",
+        "**/dist/**"
+    ],
+    "venvPath": ".",
+    "venv": ".venv",
+    "typeCheckingMode": "standard",
+    "pythonVersion": "3.12",
+    "pythonPlatform": "Linux",
+    "extraPaths": [
+        "backend"
+    ],
+    "reportMissingTypeStubs": false,
+    "diagnosticSeverityOverrides": {
+        "reportMissingModuleSource": "none"
+    },
+    "reportUnusedImport": "warning",
+    "reportUnusedVariable": "warning",
+    "lineLength": 120
+}

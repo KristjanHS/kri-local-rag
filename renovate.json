@@ -7,6 +7,7 @@
         "security:only-security-updates"
     ],
     "dependencyDashboard": true,
+    "dependencyDashboardClose": true,
     "rebaseWhen": "behind-base-branch",
     "timezone": "UTC",
     "semanticCommits": "enabled",
@@ -28,17 +29,6 @@
         "torch"
     ],
     "packageRules": [
-        {
-            "matchPackageNames": [
-                "torch"
-            ],
-            "matchUpdateTypes": [
-                "major",
-                "minor",
-                "patch"
-            ],
-            "enabled": false
-        },
         {
             "matchManagers": [
                 "pip_requirements"

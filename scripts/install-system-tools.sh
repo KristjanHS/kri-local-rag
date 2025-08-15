@@ -33,25 +33,29 @@ if ! file /usr/local/bin/hadolint | grep -q 'ELF'; then
   exit 1
 fi
 
-# actionlint (user-scope install into ~/.local/bin)
+# actionlint (system-wide install into /usr/local/bin)
 # Uses official download script with positional args: <version> <install-dir>.
 : "${ACTIONLINT_VERSION:=latest}"
 
-# Ensure user bin dir exists and is on PATH for future shells.
-mkdir -p "${HOME}/.local/bin"
-if ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "${HOME}/.bashrc" 2>/dev/null; then
-  echo 'export PATH="$HOME/.local/bin:$PATH"' >> "${HOME}/.bashrc"
-fi
-# Also update PATH for this current shell so the version check works.
-export PATH="$HOME/.local/bin:$PATH"
+# Download and install actionlint system-wide (Codespaces-compatible: avoid process substitution).
+TMP_SCRIPT="$(mktemp)"
+curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash -o "$TMP_SCRIPT"
+sudo bash "$TMP_SCRIPT" "${ACTIONLINT_VERSION}" "/usr/local/bin"
+rm -f "$TMP_SCRIPT"
 
-# Download and install actionlint to user scope.
-bash <(curl -fsSL \
-  https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) \
-  "${ACTIONLINT_VERSION}" "${HOME}/.local/bin"
+# pyright is installed via pip from requirements-dev.txt into the project's .venv.
+# This ensures it's version-pinned and isolated. No system-wide install needed.
 
 # Show versions for a quick sanity check.
 echo "Installed versions:"
-actionlint -version
-yamllint --version
-hadolint --version
+# Only print the first line of actionlint -version to avoid duplicate details
+echo -n "actionlint: " && actionlint -version | head -n 1
+echo -n "yamllint: " && yamllint --version
+echo -n "hadolint: " && hadolint --version
+echo -n "pyright: " && (
+  if [ -f ".venv/bin/pyright" ]; then
+    .venv/bin/pyright --version 2>/dev/null
+  else
+    echo "not installed (run pip install -r requirements-dev.txt)"
+  fi
+)

@@ -42,11 +42,11 @@ def test_e2e_ingest_with_heavy_optimizations_into_real_weaviate(caplog):
 
         ingest.ingest(directory=data_dir, collection_name=collection_name, client=client)
 
-        # Verify data was ingested
-        collection = client.collections.get(collection_name)
-        count = collection.aggregate.over_all(total_count=True)
-        assert count.total_count >= 2  # expect at least markdown and pdf entries
+    # Verify data was ingested
+    collection = client.collections.get(collection_name)
+    count = collection.aggregate.over_all(total_count=True)
+    assert count.total_count is not None and count.total_count >= 2  # expect at least markdown and pdf entries
 
-        # Verify optimization message appeared in logs
-        msgs = [rec.getMessage() for rec in caplog.records if rec.name == "backend.ingest"]
-        assert any("torch.compile optimization completed" in m for m in msgs)
+    # Verify optimization message appeared in logs
+    msgs = [rec.getMessage() for rec in caplog.records if rec.name == "backend.ingest"]
+    assert any("torch.compile optimization completed" in m for m in msgs)
