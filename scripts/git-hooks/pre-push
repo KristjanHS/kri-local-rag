@@ -119,6 +119,7 @@ else
 fi
 
 log INFO "Pre-push checks complete" | tee -a "$LOG_FILE"
+
 exit 0
 
 
