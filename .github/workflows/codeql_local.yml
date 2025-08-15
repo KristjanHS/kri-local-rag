@@ -46,6 +46,8 @@ jobs:
           DB_PATH="${RUNNER_TEMP}/codeql-db"
           SARIF_PATH="${RUNNER_TEMP}/codeql_local.sarif"
           echo "SARIF_PATH=${SARIF_PATH}" >> $GITHUB_ENV
+          # Clean up previous database
+          rm -rf "${DB_PATH}"
           # Create database
           codeql database create --language=python "${DB_PATH}"
           # Analyze database
