@@ -30,8 +30,14 @@ def _enforce_blocked_sockets(monkeypatch: pytest.MonkeyPatch) -> None:
             raise SocketBlockedError("Network disabled in unit tests (connect)")
         return original_connect(self, address)
 
-    def _blocked_create_connection(address, *args, **kwargs):  # type: ignore[no-redef]
-        if isinstance(address, tuple) and len(address) >= 2:
+    from typing import Any
+    def _blocked_create_connection(address: Any, *args, **kwargs):  # type: ignore[no-redef]
+        # Only block if address is a tuple of length 2 and matches (str|None, int)
+        if (
+            isinstance(address, tuple)
+            and len(address) == 2
+            and (isinstance(address[0], (str, type(None))) and isinstance(address[1], int))
+        ):
             raise SocketBlockedError("Network disabled in unit tests (create_connection)")
         return original_create_connection(address, *args, **kwargs)
 

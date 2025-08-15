@@ -1,2 +1,4 @@
 ignored:
-	- DL4001
+  - DL4001
+trustedRegistries:
+  - "*"

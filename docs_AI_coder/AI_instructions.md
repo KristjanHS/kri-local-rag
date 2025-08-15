@@ -1,3 +1,12 @@
+## Linter and Pyright Setup
+
+To install all required linters and the Pyright CLI for static analysis, run:
+
+```bash
+./scripts/install-linters.sh
+```
+
+This script installs yamllint, hadolint, actionlint, and pyright (requires Node.js/npm for pyright). Suitable for Codespaces, devcontainers, and Ubuntu/WSL2 dev PCs.
 # AI Agent Instructions
 
 Action-first cheatsheet for automations.

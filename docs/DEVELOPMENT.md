@@ -1,3 +1,12 @@
+## Linters and Pyright
+
+To install all required linters and the Pyright CLI, run:
+
+```bash
+./scripts/install-linters.sh
+```
+
+This script sets up yamllint, hadolint, actionlint, and pyright for code quality and static analysis.
 # Development Quickstart
 
 Concise setup for human developers. For detailed, AI-automation-focused guidance, see `docs_AI_coder/AI_instructions.md`.

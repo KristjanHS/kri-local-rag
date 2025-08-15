@@ -43,9 +43,11 @@ curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/downl
 sudo bash "$TMP_SCRIPT" "${ACTIONLINT_VERSION}" "/usr/local/bin"
 rm -f "$TMP_SCRIPT"
 
-# --- pyright (npm global install) ---
+# --- pyright (npm global install, user scope, no sudo) ---
 if command -v npm >/dev/null 2>&1; then
-  sudo npm install -g pyright
+  npm install -g pyright
+  # Optionally ensure npm global bin is in PATH for this session
+  export PATH="$PATH:$(npm bin -g)"
 else
   echo "npm not found, skipping pyright install. Install nodejs and npm to enable pyright CLI."
 fi
