@@ -45,7 +45,7 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
 
 #### P0.1 Immediate — Local dev checks (pre-push)
 
-- [ ] Re-enable local security scans in pre-push
+- [x] Re-enable local security scans in pre-push
   - Action: Run push with `SKIP_LOCAL_SEC_SCANS=0` to include Semgrep/CodeQL locally: `SKIP_LOCAL_SEC_SCANS=0 git push -n` (dry run) or actual push.
   - Verify: Pre-push log shows Semgrep/CodeQL steps executed without schema errors and exits 0.
 

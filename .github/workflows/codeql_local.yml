@@ -1,0 +1,62 @@
+name: Local CodeQL
+
+on:
+  workflow_dispatch: {}
+
+permissions: 
+  contents: read
+  security-events: write
+
+jobs:
+  local_codeql:
+    name: Local CodeQL Scan (isolated env)
+    if: ${{ github.actor == 'nektos/act' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download and install CodeQL CLI
+        run: |
+          CODEQL_VERSION="2.18.2"
+          wget https://github.com/github/codeql-cli-binaries/releases/download/v${CODEQL_VERSION}/codeql-linux64.zip
+          unzip codeql-linux64.zip
+          echo "${PWD}/codeql" >> $GITHUB_PATH
+
+      - name: Run CodeQL Analysis
+        run: |
+          codeql database create --language=python codeql-db
+          codeql database analyze codeql-db --format=sarif-latest --output=codeql_local.sarif python-security-and-quality.qls
+
+      - name: Summarize CodeQL findings to logs
+        if: ${{ always() }}
+        run: |
+          python - << 'PY'
+          import json, sys, os
+          path = "codeql_local.sarif"
+          if not os.path.exists(path):
+              print("CodeQL findings: 0 (no codeql_local.sarif found)")
+              sys.exit(0)
+          
+          with open(path, 'r', encoding='utf-8') as f:
+              sarif = json.load(f)
+          results = (sarif.get('runs') or [{}])[0].get('results') or []
+          count = len(results)
+          print(f'\nCodeQL findings: {count}')
+          if count > 0:
+              for i, r in enumerate(results[:20], 1):
+                  msg = (r.get('message') or {}).get('text') or ''
+                  loc = ((r.get('locations') or [{}])[0].get('physicalLocation') or {})
+                  file = (loc.get('artifactLocation') or {}).get('uri') or 'unknown-file'
+                  line = (loc.get('region') or {}).get('startLine') or 1
+                  rule = r.get('ruleId') or 'unknown-rule'
+                  print(f"{i}. {rule} at {file}:{line} - {msg}")
+          PY
