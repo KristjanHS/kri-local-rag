@@ -43,9 +43,17 @@ curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/downl
 sudo bash "$TMP_SCRIPT" "${ACTIONLINT_VERSION}" "/usr/local/bin"
 rm -f "$TMP_SCRIPT"
 
+# --- pyright (npm global install) ---
+if command -v npm >/dev/null 2>&1; then
+  sudo npm install -g pyright
+else
+  echo "npm not found, skipping pyright install. Install nodejs and npm to enable pyright CLI."
+fi
+
 # Show versions for a quick sanity check.
 echo "Installed versions:"
 # Only print the first line of actionlint -version to avoid duplicate details
 echo -n "actionlint: " && actionlint -version | head -n 1
 echo -n "yamllint: " && yamllint --version
 echo -n "hadolint: " && hadolint --version
+echo -n "pyright: " && (pyright --version 2>/dev/null || echo "not installed")

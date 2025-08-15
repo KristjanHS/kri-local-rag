@@ -6,8 +6,14 @@
     "settings": {},
     "extensions": [
       "ms-python.python",
-      "ms-python.vscode-pylance"
+      "ms-python.vscode-pylance",
+      "ms-pyright.pyright"
     ]
   },
-  "postCreateCommand": "HADOLINT_VERSION=2.12.0 ACTIONLINT_VERSION=1.7.1 .devcontainer/install-linters.sh"
+  "postCreateCommand": "HADOLINT_VERSION=2.12.0 ACTIONLINT_VERSION=1.7.1 .devcontainer/install-linters.sh",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    }
+  }
 }
