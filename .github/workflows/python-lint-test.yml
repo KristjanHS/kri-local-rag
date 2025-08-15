@@ -102,8 +102,6 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
-      - name: Install pyright
-        run: npm install -g pyright
 
       - name: Install dependencies
         run: |
