@@ -89,27 +89,26 @@ jobs:
           script: |
             const fs = require('fs');
             const sarif = JSON.parse(fs.readFileSync('semgrep.sarif', 'utf8'));
-            
             const results = sarif?.runs?.[0]?.results || [];
             const findings = results.length;
-            const listItems = results.slice(0, 10).map((r, i) => {
-              const ruleId = r.ruleId || r?.rule?.id || 'unknown-rule';
-              const level = r.level || r?.properties?.severity || 'note';
-              const message = r?.message?.text || '(no message)';
-              const loc = r?.locations?.[0]?.physicalLocation || {};
-              const file = loc?.artifactLocation?.uri || 'unknown-file';
-              const line = loc?.region?.startLine || 1;
-              return `- ${i+1}. [${level}] ${ruleId} at ${file}:${line}\n  ${message}`;
-            }).join('\n');
-            
-            const comment = `## Semgrep Security Scan Results\n\n` +
-            `🔍 **${findings} security findings** detected` +
-            (findings > 0 ? `\n\nTop findings (max 10):\n${listItems}\n\n` : `\n\n✅ No security issues found!\n\n`) +
-            `_Full details: Security → Code scanning alerts (filter by tool: Semgrep)._`;
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
+            if (findings > 0) {
+              const listItems = results.slice(0, 10).map((r, i) => {
+                const ruleId = r.ruleId || r?.rule?.id || 'unknown-rule';
+                const level = r.level || r?.properties?.severity || 'note';
+                const message = r?.message?.text || '(no message)';
+                const loc = r?.locations?.[0]?.physicalLocation || {};
+                const file = loc?.artifactLocation?.uri || 'unknown-file';
+                const line = loc?.region?.startLine || 1;
+                return `- ${i+1}. [${level}] ${ruleId} at ${file}:${line}\n  ${message}`;
+              }).join('\n');
+              const comment = `## Semgrep Security Scan Results\n\n` +
+                `🔍 **${findings} security findings** detected` +
+                `\n\nTop findings (max 10):\n${listItems}\n\n` +
+                `_Full details: Security → Code scanning alerts (filter by tool: Semgrep)._`;
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            }

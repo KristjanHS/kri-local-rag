@@ -125,7 +125,7 @@ def connect_to_weaviate() -> weaviate.WeaviateClient:
     return client
 
 
-def _safe_created_at(source_path: str | None) -> str:
+def _safe_created_at(source_path: Optional[str]) -> str:
     """Return ISO timestamp from file mtime if path exists, else current UTC time."""
     try:
         if source_path and os.path.exists(source_path):
@@ -176,7 +176,7 @@ def process_and_upload_chunks(
             uuid = deterministic_uuid(doc)
             vector_tensor = model.encode(doc.page_content)
             # Normalize to a plain Python list of floats for the Weaviate client
-            vector: list[float] = to_float_list(vector_tensor)
+            vector: List[float] = to_float_list(vector_tensor)
 
             properties = {
                 "content": doc.page_content,
