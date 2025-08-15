@@ -64,7 +64,7 @@ if [[ "$SKIP_LOCAL_SEC_SCANS" == "1" ]]; then
 fi
 
 # Optional local skip toggles (developer ergonomics)
-SKIP_LINT=${SKIP_LINT:-1}
+SKIP_LINT=${SKIP_LINT:-0}
 SKIP_PYRIGHT=${SKIP_PYRIGHT:-0}
 SKIP_TESTS=${SKIP_TESTS:-0}
 if [[ "$SKIP_LINT" == "1" ]]; then
