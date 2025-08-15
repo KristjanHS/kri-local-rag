@@ -46,18 +46,18 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
 
 #### P0.1a — Git Hooks Management (Best Practices)
 
-- [x] Step 1 — Centralize Git Hooks in a Versioned Directory
+- [ ] Step 1 — Centralize Git Hooks in a Versioned Directory
   - Action: Create a new directory `scripts/git-hooks/`.
   - Action: Move the existing `.git/hooks/pre-commit` and `.git/hooks/pre-push` scripts to `scripts/git-hooks/`.
   - Action: Ensure the new `scripts/git-hooks/` directory is tracked by git.
   - Verify: `ls scripts/git-hooks` shows `pre-commit` and `pre-push`. The files are added in `git status`.
 
-- [x] Step 2 — Configure Git to Use the Centralized Hooks Directory
+- [ ] Step 2 — Configure Git to Use the Centralized Hooks Directory
   - Action: In `docs/DEVELOPMENT.md`, instruct developers to run `git config core.hooksPath scripts/git-hooks` once after cloning.
   - Action: Add a small script or a make target (e.g., `make setup-hooks`) to automate this configuration.
   - Verify: Running `git config --get core.hooksPath` returns `scripts/git-hooks`. Committing triggers the centralized hook.
 
-- [x] Step 3 — Clean Up and Document
+- [ ] Step 3 — Clean Up and Document
   - Action: Document the purpose of the shared hooks and the setup command in `docs/DEVELOPMENT.md`.
   - Action: Remind developers they can still have local, untracked hooks in `.git/hooks/` if they need to override something for their own workflow, but the shared hooks should be the default.
   - Verify: The documentation is clear and easy for a new developer to follow.
@@ -68,17 +68,9 @@ Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for co
   - Action: Run push with `SKIP_LOCAL_SEC_SCANS=0` to include Semgrep/CodeQL locally: `SKIP_LOCAL_SEC_SCANS=0 git push -n` (dry run) or actual push.
   - Verify: Pre-push log shows Semgrep/CodeQL steps executed without schema errors and exits 0.
 
-- [x] Install pyright in `.venv` so type checks run in pre-push
+- [ ] Install pyright in `.venv` so type checks run in pre-push
   - Action: `.venv/bin/pip install pyright` (optionally pin to CI version) and commit if adding to `requirements-dev.txt`.
   - Verify: `.venv/bin/pyright --version` succeeds and pre-push no longer warns about missing pyright.
-
-- [x] Refactor setup scripts for a single, unified developer entrypoint
-  - Action: Rename `scripts/install-linters.sh` to `scripts/install-system-tools.sh` to clarify its purpose (system-level, non-pip tools).
-  - Action: Create a new top-level orchestrator script `scripts/setup-dev-env.sh` that handles venv creation, pip upgrades, dependency installation, and calls `install-system-tools.sh`.
-  - Action: Update `.devcontainer/devcontainer.json` to use a simple `postCreateCommand`: `scripts/setup-dev-env.sh`.
-  - Action: Update `docs/DEVELOPMENT.md` to replace the manual setup steps with a single instruction: `bash scripts/setup-dev-env.sh`.
-  - Action: Delete the now-redundant `scripts/devcontainer-setup.sh`.
-  - Verify: Running `bash scripts/setup-dev-env.sh` on a clean clone fully prepares the local and devcontainer environments.
 
 #### P0.2 — Test suite bundling into four bundles (unit, integration, e2e, ui) — simplified
 

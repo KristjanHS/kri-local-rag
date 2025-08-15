@@ -41,12 +41,8 @@ addopts = [
     "--cov-report=html:reports/coverage",
 ]
 markers = [
-    "unit: Fast unit tests with mocked dependencies (should run in <1s)",
-    "integration: Integration tests with real services (may take 5-30s)",
-    "e2e: End-to-end tests requiring full Docker stack (may take 1-5min)",
-    "ui: UI tests using Playwright/Streamlit (runs without coverage)",
-    "docker: Tests requiring a running Docker daemon",
     "slow: Tests that take longer to run (>30s)",
+    "docker: Tests requiring a running Docker daemon",
     "external: Tests that require external services (Weaviate, Ollama)"
 ]
 testpaths = [
@@ -118,7 +114,6 @@ test = [
     "pytest-docker",
     "pytest-html",
     "pytest-socket",
-    "pytest-playwright==0.4.4",
     "requests>=2.31,<3",
     "testcontainers[weaviate]",
     "ruff==0.5.3",
@@ -127,8 +122,9 @@ test = [
 ]
 docs = ["mkdocs"]
 cli = ["rich"]
+ui = ["pytest-playwright==0.4.4"]
 
-pep621_dev_dependency_groups = ["tests", "docs", "cli"]
+pep621_dev_dependency_groups = ["tests", "docs", "cli", "ui"]
 
 [tool.deptry.per_rule_ignores]
 DEP002 = ["boto3"]       # AWS libs pulled in indirectly
