@@ -53,9 +53,9 @@ fi
 if [[ "$SKIP_LINT" != "1" ]]; then
   if [[ -x ".venv/bin/ruff" ]]; then
     log INFO "Running ruff format --check …" | tee -a "$LOG_FILE"
-    .venv/bin/ruff format --check . 2>&1 | tee -a "$LOG_FILE"
+    .venv/bin/ruff format --check . 2>&1 | sed 's/^/[ruff] /' | tee -a "$LOG_FILE"
     log INFO "Running ruff check …" | tee -a "$LOG_FILE"
-    .venv/bin/ruff check . 2>&1 | tee -a "$LOG_FILE"
+    .venv/bin/ruff check . 2>&1 | sed 's/^/[ruff] /' | tee -a "$LOG_FILE"
   else
     log WARN "'.venv/bin/ruff' not found. Skipping ruff checks. Ensure dev deps are installed: 'pip install -e .[test,docs,cli]'" | tee -a "$LOG_FILE"
   fi
@@ -67,7 +67,7 @@ fi
 if [[ "$SKIP_PYRIGHT" != "1" ]]; then
   if [[ -x ".venv/bin/pyright" ]]; then
     log INFO "Running pyright (native) …" | tee -a "$LOG_FILE"
-    .venv/bin/pyright 2>&1 | tee -a "$LOG_FILE"
+    .venv/bin/pyright 2>&1 | sed 's/^/[pyright] /' | tee -a "$LOG_FILE"
   else
     log WARN "'.venv/bin/pyright' not found. Skipping type checks. Install pyright in the venv (e.g., add to dev deps)." | tee -a "$LOG_FILE"
   fi

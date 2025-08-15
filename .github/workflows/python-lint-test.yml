@@ -30,6 +30,7 @@ permissions:
 jobs:
   lint:
     name: Lint
+    if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -85,6 +86,33 @@ jobs:
           name: test-reports-fast
           path: reports/
 
+  pyright:
+    name: Pyright
+    if: ${{ github.actor != 'nektos/act' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # ⬅️ do not store token in git config
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Install pyright
+        run: npm install -g pyright
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Pyright type checking
+        run: pyright
+        
+        
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
@@ -162,31 +190,6 @@ jobs:
         with:
           name: test-reports-e2e
           path: reports/
-
-  pyright:
-    name: Pyright
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false   # ⬅️ do not store token in git config
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
-      - name: Install pyright
-        run: npm install -g pyright
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-      - name: Pyright type checking
-        run: pyright
 
   docker_smoke_tests:
     name: Docker Packaging Smoke Tests
