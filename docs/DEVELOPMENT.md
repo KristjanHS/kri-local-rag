@@ -35,6 +35,11 @@ For basic usage and quick-start commands, see the root README. This document foc
 .venv/bin/python -m pytest tests/integration -q
 ```
 
+Integration policy:
+- Prefer a single real dependency or Testcontainers per test. If multiple real services are required, move the test to `tests/e2e/`.
+- Network is allowed. Do not auto-start Docker Compose in this suite; tests that truly need the full stack belong in E2E.
+- Keep tests deterministic: avoid importing heavy target modules in fixtures; if needed, reset module caches via `sys.modules`.
+
 - E2E (full stack via Docker Compose):
 ```bash
 docker compose -f docker/docker-compose.yml up -d --build
