@@ -43,7 +43,26 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 Reference: See [TEST_REFACTORING_SUMMARY.md](TEST_REFACTORING_SUMMARY.md) for context on completed Phase 1 testing work.
 
-#### P0.1 Immediate — Local dev checks (pre-push)
+
+#### P0.1a — Git Hooks Management (Best Practices)
+
+- [ ] Step 1 — Centralize Git Hooks in a Versioned Directory
+  - Action: Create a new directory `scripts/git-hooks/`.
+  - Action: Move the existing `.git/hooks/pre-commit` and `.git/hooks/pre-push` scripts to `scripts/git-hooks/`.
+  - Action: Ensure the new `scripts/git-hooks/` directory is tracked by git.
+  - Verify: `ls scripts/git-hooks` shows `pre-commit` and `pre-push`. The files are added in `git status`.
+
+- [ ] Step 2 — Configure Git to Use the Centralized Hooks Directory
+  - Action: In `docs/DEVELOPMENT.md`, instruct developers to run `git config core.hooksPath scripts/git-hooks` once after cloning.
+  - Action: Add a small script or a make target (e.g., `make setup-hooks`) to automate this configuration.
+  - Verify: Running `git config --get core.hooksPath` returns `scripts/git-hooks`. Committing triggers the centralized hook.
+
+- [ ] Step 3 — Clean Up and Document
+  - Action: Document the purpose of the shared hooks and the setup command in `docs/DEVELOPMENT.md`.
+  - Action: Remind developers they can still have local, untracked hooks in `.git/hooks/` if they need to override something for their own workflow, but the shared hooks should be the default.
+  - Verify: The documentation is clear and easy for a new developer to follow.
+
+#### P0.1b Immediate — Local dev checks (pre-push)
 
 - [x] Re-enable local security scans in pre-push
   - Action: Run push with `SKIP_LOCAL_SEC_SCANS=0` to include Semgrep/CodeQL locally: `SKIP_LOCAL_SEC_SCANS=0 git push -n` (dry run) or actual push.
@@ -566,6 +585,7 @@ Archived on 2025-08-13
 - [ ] Create testing standards document.
 - [ ] Add test templates for consistency and performance benchmarking.
 - [ ] Improve test documentation and add test quality metrics tracking over time.
+
 
 
 
