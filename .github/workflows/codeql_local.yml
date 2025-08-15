@@ -51,7 +51,8 @@ jobs:
           # Create database
           codeql database create --language=python "${DB_PATH}"
           # Analyze database
-          codeql database analyze "${DB_PATH}" --format=sarif-latest --output="${SARIF_PATH}" codeql/python-queries
+          codeql database analyze "${DB_PATH}" --format=sarif-latest \
+            --output="${SARIF_PATH}" codeql/python-queries
 
       - name: Summarize CodeQL findings to logs
         if: ${{ always() }}
@@ -60,9 +61,10 @@ jobs:
           import json, sys, os
           path = os.environ.get("SARIF_PATH")
           if not path or not os.path.exists(path):
-              print(f"CodeQL findings: 0 (no SARIF file found at '{path}')")
+              print(
+                  f"CodeQL findings: 0 (no SARIF file found at '{path}')"
+              )
               sys.exit(0)
-          
           with open(path, 'r', encoding='utf-8') as f:
               sarif = json.load(f)
           results = (sarif.get('runs') or [{}])[0].get('results') or []
@@ -71,8 +73,14 @@ jobs:
           if count > 0:
               for i, r in enumerate(results[:20], 1):
                   msg = (r.get('message') or {}).get('text') or ''
-                  loc = ((r.get('locations') or [{}])[0].get('physicalLocation') or {})
-                  file = (loc.get('artifactLocation') or {}).get('uri') or 'unknown-file'
+                  loc = (
+                      (r.get('locations') or [{}])[0]
+                      .get('physicalLocation') or {}
+                  )
+                  file = (
+                      (loc.get('artifactLocation') or {})
+                      .get('uri') or 'unknown-file'
+                  )
                   line = (loc.get('region') or {}).get('startLine') or 1
                   rule = r.get('ruleId') or 'unknown-rule'
                   print(f"{i}. {rule} at {file}:{line} - {msg}")
