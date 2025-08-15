@@ -1,4 +1,5 @@
 from typing import Optional
+
 #!/usr/bin/env python3
 """
 Utility to retrieve the Windows host's private IP address from WSL.

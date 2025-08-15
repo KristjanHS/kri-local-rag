@@ -31,6 +31,7 @@ def _enforce_blocked_sockets(monkeypatch: pytest.MonkeyPatch) -> None:
         return original_connect(self, address)
 
     from typing import Any
+
     def _blocked_create_connection(address: Any, *args, **kwargs):  # type: ignore[no-redef]
         # Only block if address is a tuple of length 2 and matches (str|None, int)
         if (

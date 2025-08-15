@@ -29,6 +29,15 @@ python -m pipx ensurepath || true
 pipx install --force semgrep
 ```
 
+## Git Hooks Setup
+To ensure code quality and consistency, this project uses shared Git hooks. After cloning, configure your local repository to use them:
+```bash
+make setup-hooks
+```
+This command points Git to the `scripts/git-hooks/` directory where the shared `pre-commit` and `pre-push` hooks are located.
+
+You can still use local, untracked hooks in `.git/hooks/` for your own workflows. Git will look for hooks there first before falling back to the shared hooks directory.
+
 ## Run the app (CLI / Web UI)
 For basic usage and quick-start commands, see the root README. This document focuses on development workflows and advanced topics.
 
@@ -115,62 +124,4 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 - `scripts/docker-reset.sh`: full Docker cleanup (containers, images, volumes).
 - `scripts/build_app.sh`: build the `app` image; accepts `--no-cache`.
 - `scripts/cli.sh`: convenience wrapper to run the CLI inside Docker.
-- `scripts/ingest.sh`: ingest local documents into the system.
-- `scripts/config.sh`: shared config sourced by the other scripts.
-
-
-## Ingest documents
-
-Run all checks locally without pushing:
-```bash
-./scripts/promote_dev_to_main.sh --dry-run
-```
-
-Promote (push), or create PR if main is protected:
-```bash
-./scripts/promote_dev_to_main.sh
-./scripts/promote_dev_to_main.sh --create-pr
-```
-
-Optional allow-list file for auto conflict resolution (`.promotion-rules.conf`):
-```text
-# Lines are path prefixes or file names that can be auto-resolved by
-# preferring the source branch during conflict resolution
-README.md
-docs/
-docs_AI_coder/
-```
-
-## CI: GitHub Actions and Act CLI for local CI
-
-For comprehensive information about GitHub Actions, Act CLI, and local CI testing, see [GitHub Workflows Documentation](github-workflows.md).
-
-**Quick reference:**
-- Workflow file: `.github/workflows/python-lint-test.yml`
-- Act runner images pinned in `.actrc`
-- Pre-push hook (optional): link to `scripts/pre_push.sh` to run pyright, lint, and fast tests locally before pushing
-  ```bash
-  ln -sf ../../scripts/pre_push.sh .git/hooks/pre-push
-  ```
-- Skip local security scans in pre-push when needed:
-  ```bash
-  SKIP_LOCAL_SEC_SCANS=1 git push
-  ```
-- Local Semgrep (isolated from .venv):
-  ```bash
-  # Using pipx-managed Semgrep
-  pipx run semgrep ci --config auto --metrics off --sarif --output semgrep_local.sarif
-  ```
-- Manual CI: `./scripts/ci_act.sh`
-- Cleanup: `./scripts/cleanup_docker_and_ci_cache.sh`
- 
-## Branch protection (main)
-
-- Required status checks to merge into `main`:
-  - Code scanning results / CodeQL
-  - Semgrep / Sec Scan
-- Direct pushes to `main` are blocked unless these checks pass on the PR.
-- View current protection settings:
-```bash
-gh api -H "Accept: application/vnd.github+json" repos/KristjanHS/kri-local-rag/branches/main/protection | jq .
-```
+- `
