@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
-pytestmark = [pytest.mark.e2e, pytest.mark.ui]
+pytestmark = []
 
 
 def test_browser_launch_smoke(page: Page) -> None:

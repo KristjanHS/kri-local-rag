@@ -30,7 +30,7 @@ case "$bundle" in
   e2e)
     # Bring up full stack, run e2e, then tear down. Honor TEARDOWN_DOCKER/KEEP_DOCKER_UP envs.
     set -x
-    docker compose -f "$COMPOSE_FILE" up -d --build --wait
+    docker compose -f "$COMPOSE_FILE" up -d --wait
     set +x
     # Ensure cleanup on exit unless KEEP_DOCKER_UP=1
     cleanup() {
