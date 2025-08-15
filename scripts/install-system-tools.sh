@@ -43,14 +43,8 @@ curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/downl
 sudo bash "$TMP_SCRIPT" "${ACTIONLINT_VERSION}" "/usr/local/bin"
 rm -f "$TMP_SCRIPT"
 
-# --- pyright (npm global install, user scope, no sudo) ---
-if command -v npm >/dev/null 2>&1; then
-  npm install -g pyright
-  # Optionally ensure npm global bin is in PATH for this session
-  export PATH="$PATH:$(npm bin -g)"
-else
-  echo "npm not found, skipping pyright install. Install nodejs and npm to enable pyright CLI."
-fi
+# pyright is installed via pip from requirements-dev.txt into the project's .venv.
+# This ensures it's version-pinned and isolated. No system-wide install needed.
 
 # Show versions for a quick sanity check.
 echo "Installed versions:"
@@ -58,4 +52,10 @@ echo "Installed versions:"
 echo -n "actionlint: " && actionlint -version | head -n 1
 echo -n "yamllint: " && yamllint --version
 echo -n "hadolint: " && hadolint --version
-echo -n "pyright: " && (pyright --version 2>/dev/null || echo "not installed")
+echo -n "pyright: " && (
+  if [ -f ".venv/bin/pyright" ]; then
+    .venv/bin/pyright --version 2>/dev/null
+  else
+    echo "not installed (run pip install -r requirements-dev.txt)"
+  fi
+)

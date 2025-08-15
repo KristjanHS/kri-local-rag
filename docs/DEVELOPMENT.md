@@ -1,12 +1,3 @@
-## Linters and Pyright
-
-To install all required linters and the Pyright CLI, run:
-
-```bash
-./scripts/install-linters.sh
-```
-
-This script sets up yamllint, hadolint, actionlint, and pyright for code quality and static analysis.
 # Development Quickstart
 
 Concise setup for human developers. For detailed, AI-automation-focused guidance, see `docs_AI_coder/AI_instructions.md`.
@@ -15,18 +6,16 @@ Concise setup for human developers. For detailed, AI-automation-focused guidance
 - Python 3.12+ recommended (matches project requirement)
 - Docker (optional, for running full stack)
 
-## Setup Dev Env
+## Setup
+This project uses a unified script to set up a complete development environment, including a Python virtualenv, all dependencies, and required system tools.
+
 ```bash
-python -m venv .venv
+bash scripts/setup-dev-env.sh
+```
+
+After setup, activate the virtual environment to use the installed tools:
+```bash
 source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements-dev.txt
-pip install -e .
-# Install Semgrep in a separate, tool-managed environment (isolated from .venv)
-# pipx is recommended for best performance and isolation
-python -m pip install --user pipx || true
-python -m pipx ensurepath || true
-pipx install --force semgrep
 ```
 
 ## Git Hooks Setup
