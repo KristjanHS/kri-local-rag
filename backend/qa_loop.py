@@ -10,14 +10,38 @@ import sys
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
+from rich.rule import Rule
+
 # Local .py imports
-from backend.config import OLLAMA_MODEL
-from backend.console import console, get_logger
+from backend.config import OLLAMA_MODEL, get_logger, set_log_level
+from backend.console import console
 from backend.ollama_client import ensure_model_available, generate_response
 from backend.retriever import get_top_k
 
 # Set up logging for this module
 logger = get_logger(__name__)
+
+
+# Constants
+MAX_RETRIES = 3
+
+
+def _setup_cli_logging(log_level: str | None, verbose_count: int, quiet_count: int):
+    """Configure logging based on CLI flags."""
+    if log_level:
+        level = log_level.upper()
+    elif verbose_count >= 2:
+        level = "DEBUG"
+    elif verbose_count == 1:
+        level = "INFO"  # Default, but explicit
+    elif quiet_count >= 1:
+        level = "WARNING"
+    else:
+        level = os.getenv("LOG_LEVEL", "INFO").upper()
+
+    # Use the centralized logging configuration
+    set_log_level(level)
+    logger.debug("Log level set to %s", level)
 
 
 # ---------- cross-encoder helpers --------------------------------------------------
@@ -285,7 +309,6 @@ from backend import config as app_config
 
 
 def ensure_weaviate_ready_and_populated():
-    logger.info("--- Checking Weaviate status and collection ---")
     client = None  # explicit reference to avoid dynamic locals()/globals() access
     try:
         # Read connection settings dynamically at runtime so tests can override via env vars
@@ -303,12 +326,12 @@ def ensure_weaviate_ready_and_populated():
             http_secure=parsed_url.scheme == "https",
             grpc_secure=parsed_url.scheme == "https",
         )
-        logger.info("1. Attempting to connect to Weaviate at %s...", weaviate_url)
+        logger.debug("1. Attempting to connect to Weaviate at %s...", weaviate_url)
         client.is_ready()  # Raises if not ready
         logger.info("   ✓ Connection successful.")
 
         # Check if collection exists
-        logger.info("2. Checking if collection '%s' exists...", collection_name)
+        logger.debug("2. Checking if collection '%s' exists...", collection_name)
         if not client.collections.exists(collection_name):
             # First-time setup: create the collection, ingest examples, then clean up.
             logger.info("   → Collection does not exist. Running one-time initialization...")
@@ -362,8 +385,8 @@ def ensure_weaviate_ready_and_populated():
 
         # If the collection already exists, we do nothing. This avoids checking if it's empty
         # and re-populating, which could be slow on large user databases.
-        logger.info("   ✓ Collection '%s' exists.", collection_name)
-
+        logger.debug("   ✓ Collection '%s' exists.", collection_name)
+        console.log("Weaviate is ready.")
     except WeaviateConnectionError:
         raise WeaviateConnectionError(
             "Failed to connect to Weaviate. "
@@ -377,7 +400,6 @@ def ensure_weaviate_ready_and_populated():
                 client.close()
         except Exception:
             pass
-    logger.info("--- Weaviate check complete ---")
 
 
 def qa_loop(question: str, k: int = 3, metadata_filter: Optional[Dict[str, Any]] = None):
@@ -385,12 +407,13 @@ def qa_loop(question: str, k: int = 3, metadata_filter: Optional[Dict[str, Any]]
     Perform a single question-answering loop.
     This function is a refactoring of the original __main__ block to be reusable.
     """
-    ensure_weaviate_ready_and_populated()
+    with console.status("[bold green]Checking backend services...", spinner="dots"):
+        ensure_weaviate_ready_and_populated()
 
-    # Ensure the required Ollama model is available locally before accepting questions
-    if not ensure_model_available(OLLAMA_MODEL):
-        logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
-        sys.exit(1)
+        # Ensure the required Ollama model is available locally before accepting questions
+        if not ensure_model_available(OLLAMA_MODEL):
+            logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
+            sys.exit(1)
 
     result = answer(question, k=k, metadata_filter=metadata_filter)
     return result
@@ -402,7 +425,18 @@ if __name__ == "__main__":
     parser.add_argument("--language", help="Filter chunks by detected language code (e.g. 'en', 'et')")
     parser.add_argument("--k", type=int, default=3, help="Number of top chunks to keep after re-ranking")
     parser.add_argument("--question", help="If provided, run a single query and exit.")
+    # Logging controls
+    parser.add_argument(
+        "-q", "--quiet", action="count", default=0, help="Decrease verbosity (can be used multiple times)"
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="count", default=0, help="Increase verbosity (can be used multiple times)"
+    )
+    parser.add_argument("--log-level", help="Set explicit log level (e.g., DEBUG, INFO, WARNING)")
     args = parser.parse_args()
+
+    # Set up logging as the very first action
+    _setup_cli_logging(log_level=args.log_level, verbose_count=args.verbose, quiet_count=args.quiet)
 
     # Build metadata filter dict (AND-combination of provided fields)
     meta_filter: Optional[Dict[str, Any]] = None
@@ -422,29 +456,25 @@ if __name__ == "__main__":
         qa_loop(args.question, k=args.k, metadata_filter=meta_filter)
         sys.exit(0)
 
-    # Interactive loop
-    ensure_weaviate_ready_and_populated()
-    if not ensure_model_available(OLLAMA_MODEL):
-        logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
-        sys.exit(1)
+    # Interactive loop - show readiness spinners and then the prompt
+    with console.status("[bold green]Verifying backend services...", spinner="dots"):
+        ensure_weaviate_ready_and_populated()
+        if not ensure_model_available(OLLAMA_MODEL):
+            logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
+            sys.exit(1)
 
-    logger.info("💬 RAG console ready – Ask me anything about your documents (Ctrl-D/Ctrl-C to quit)")
-    console.print("→ ", end="")
+    console.print(Rule(style="blue"))
+    console.print("💬 [bold]RAG CLI Ready.[/] Ask a question to begin.", justify="center")
+    console.print(Rule(style="blue"))
+
     try:
-        for line in sys.stdin:
-            q = line.strip()
-            if not q:
-                # For empty input, just show the prompt again on a new line
-                console.print("→ ", end="")
+        while True:
+            question = console.input("→ ")
+            if not question.strip():
                 continue
 
-            result = qa_loop(q, k=args.k, metadata_filter=meta_filter)
-            # result is already streamed to stdout, no need to print again
+            qa_loop(question, k=args.k, metadata_filter=meta_filter)
+            console.print()  # Add a blank line for readability before the next prompt
 
-            console.print("─" * 50)
-            console.print("💬 Ready for next question... (Ctrl-D/Ctrl-C to quit)")
-            console.print("─" * 50)
-            console.print()  # Extra newline for spacing
-            console.print("→ ", end="")
     except (EOFError, KeyboardInterrupt):
-        pass
+        console.print("\n[bold]Exiting RAG CLI.[/]")

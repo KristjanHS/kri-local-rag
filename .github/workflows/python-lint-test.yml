@@ -9,8 +9,10 @@ name: CI
 
 on:
   pull_request:
-    branches: [ main, dev ]
-  workflow_dispatch: # Allows manual triggering for slow tests
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+  workflow_dispatch: {} # Allows manual triggering for slow tests
   schedule:
     - cron: "0 2 * * 0" # Weekly on Sunday at 2 AM for slow tests
 
@@ -30,11 +32,12 @@ permissions:
 jobs:
   lint:
     name: Lint
+    if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Ruff static analysis
         uses: astral-sh/ruff-action@v1
         with:
@@ -52,7 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -63,8 +66,8 @@ jobs:
             requirements-dev.txt
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Verify dependency health
         run: |
           python -m pip check
@@ -87,11 +90,12 @@ jobs:
 
   pyright:
     name: Pyright
+    if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -100,15 +104,90 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
-      - name: Install pyright
-        run: npm install -g pyright
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Pyright type checking
         run: pyright
+
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: fast_tests
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
+      - name: Prepare reports directories
+        run: mkdir -p reports
+      - name: Run integration tests
+        run: >-
+          python -m pytest tests/integration -q --junitxml=reports/junit_integration.xml
+      - name: Upload integration test reports
+        if: ${{ always() && github.actor != 'nektos/act' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-integration
+          path: reports/
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: fast_tests
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
+      - name: Build and start services
+        run: docker compose -f docker/docker-compose.yml up -d --build
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for Weaviate..."
+          timeout 180s bash -c 'until curl -s http://localhost:8080/v1/.well-known/ready; do sleep 5; done'
+          echo "Waiting for Ollama..."
+          timeout 180s bash -c 'until docker compose -f docker/docker-compose.yml exec -T ollama ollama list; do sleep 5; done'
+      - name: Prepare reports directories
+        run: mkdir -p reports
+      - name: Run E2E tests
+        run: >-
+          python -m pytest tests/e2e -q --junitxml=reports/junit_e2e.xml
+      - name: Tear down services
+        if: always()
+        run: docker compose -f docker/docker-compose.yml down -v
+      - name: Upload E2E test reports
+        if: ${{ always() && github.actor != 'nektos/act' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-e2e
+          path: reports/
 
   docker_smoke_tests:
     name: Docker Packaging Smoke Tests
@@ -118,7 +197,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -129,8 +208,8 @@ jobs:
             requirements-dev.txt
       - name: Install dev test dependencies on host
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Build app image (docker-compose)
         run: |
           docker compose -f docker/docker-compose.yml build app
@@ -157,7 +236,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -166,10 +245,10 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
-      - name: Install dev test dependencies on host
+      - name: Install UI dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -e .[ui] --root-user-action=ignore
       - name: Install Playwright browsers
         run: |
           python -m playwright install --with-deps
@@ -222,7 +301,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -231,8 +310,8 @@ jobs:
           cache-dependency-path: "requirements-dev.txt"
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Install Playwright browsers (for UI/E2E if selected)
         run: |
           python -m playwright install --with-deps
@@ -263,7 +342,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Set up Python
         # Python is needed for the runner environment, but dependencies are inside the container
         uses: actions/setup-python@v5
@@ -275,8 +354,8 @@ jobs:
             requirements-dev.txt
       - name: Install dev test dependencies on host
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Install Playwright browsers
         run: |
           python -m playwright install --with-deps
@@ -301,13 +380,13 @@ jobs:
           # This command runs ONLY tests marked as 'slow' on the host runner
           python -m pytest -sv -m slow --no-cov \
             --html=reports/report_slow.html --self-contained-html --junitxml=reports/junit_slow.xml | tee pytest.log
-          EXIT_CODE=${PIPESTATUS[0]}
-          if [ $EXIT_CODE -ne 0 ]; then
+          EXIT_CODE="${PIPESTATUS[0]}"
+          if [ "$EXIT_CODE" -ne 0 ]; then
             echo -e "\n🔴 Pytest failed — showing container logs for debugging:\n"
             docker compose -f docker/docker-compose.yml logs app || true
             docker compose -f docker/docker-compose.yml logs weaviate || true
             docker compose -f docker/docker-compose.yml logs ollama || true
-            exit $EXIT_CODE
+            exit "$EXIT_CODE"
           fi
       - name: Upload slow test reports
         # Same: upload only on GitHub (not in act) due to missing ACTIONS_RUNTIME_TOKEN locally.

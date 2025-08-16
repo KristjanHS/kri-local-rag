@@ -1,12 +1,12 @@
 ---
-description: "Rules for Terminal Command Execution"
+description: "Execute terminal commands with consistent Python environment and proper output handling"
 type: agent-select
 globs: []
 alwaysApply: false
 ---
 - **Run commands from the project root.**
-- **Use the `python` alias,** as the shell is configured to use the correct virtual environment.
-- **Run Pytest as a module:** `python -m pytest tests/` to avoid `ImportError` issues.
+- **Use `.venv/bin/python` for Python execution** to ensure consistent virtual environment usage.
+- **Run Pytest as a module:** `.venv/bin/python -m pytest tests/` to avoid `ImportError` issues.
 - **NEVER use PYTHONPATH.** It can break virtual environment detection.
 
 - If a command may invoke a pager or hide output in non-interactive mode (e.g., `git log`, `git diff`), append `| cat` to force full output to the chat/logs.

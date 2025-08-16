@@ -9,8 +9,8 @@ on:
       - "Dockerfile"
       - "docker/**"
   schedule:
-    - cron: "0 3 * * 1"  # Mondays 03:00 UTC
-  workflow_dispatch:
+    - cron: "0 3 * * 1" # Mondays 03:00 UTC
+  workflow_dispatch: {}
 
 permissions:
   contents: read
