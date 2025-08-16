@@ -870,7 +870,7 @@ This file records tasks that have been completed and moved out of the active TOD
 - Add an `autouse=True` session fixture to call `disable_socket(allow_unix_socket=True)` — done
 - Replace connection-based self-check in session fixture with a lightweight assert — done
 - Drop per-test re-disable once the offender was disproven — done
-- Provide `allow_network` opt-in fixture (function scope) for rare cases; ensure any such tests are moved to `tests/integration/` or marked `@pytest.mark.integration` — done
+- Provide `allow_network` opt-in fixture (function scope) for rare cases; ensure any such tests are moved to `tests/integration/` — done
 - Keep root guards against real Weaviate/Ollama calls; reconciled with pytest-socket to avoid duplicate/confusing messages — done
 
 - Verify: a unit test attempting `httpx.get("http://example.com")` fails with a clear error — `tests/unit/test_network_block_httpx_unit.py` covers this; passes in isolation and in suite.
@@ -982,7 +982,7 @@ This file records tasks that have been completed and moved out of the active TOD
       - [x] Verify: CI logs show `docker compose down -v` after tests; no leftover CI containers/volumes.
     - [x] Document fast-iteration defaults and the wrapper script
       - [x] Action: Add a short section to `docs/DEVELOPMENT.md` describing: default keep-up policy, `--teardown-docker` and env toggles (`KEEP_DOCKER_UP`, `TEARDOWN_DOCKER`), and usage of `scripts/pytest_with_cleanup.sh`.
-      - [x] Verify: Follow the doc steps locally to run `scripts/pytest_with_cleanup.sh -m integration` (keeps up by default) and with `--teardown-docker` (cleans up compose and Testcontainers).
+      - [x] Verify: Follow the doc steps locally to run `scripts/pytest_with_cleanup.sh tests/integration` (keeps up by default) and with `--teardown-docker` (cleans up compose and Testcontainers).
     - [x] Ensure sockets are enabled per-suite for all non-unit tests
       - [x] Action: Confirm we have autouse fixtures that temporarily `enable_socket()` in `tests/integration/`, `tests/environment/`, and `tests/e2e/` (added). No suite should rely on global allow-all.
       - [x] Verify: Representative tests in each suite can reach real services without `SocketBlockedError` while unit tests remain blocked by default.
@@ -992,12 +992,12 @@ This file records tasks that have been completed and moved out of the active TOD
 - [x] Simplify unit-only socket blocking configuration
   - [x] Action: In `tests/unit/conftest.py`, remove the `markexpr` heuristic from `_disable_network_for_unit_tests` (unit scope already limits it to unit tests).
   - [x] Action: Remove stack-based exceptions in `_guard_against_enable_socket_misuse`; keep a simple guard that allows `allow_network` only.
-  - [x] Verify: `pytest -q -k network_block_unit` shows unit blocking still enforced; `-m integration` remains green.
+        - [x] Verify: `pytest -q -k network_block_unit` shows unit blocking still enforced; `pytest -q tests/integration` remains green.
 
 - [x] Remove unnecessary socket toggles in non-unit fixtures
   - [x] Action: In `tests/conftest.py::docker_services`, drop temporary `enable_socket()/disable_socket()` — sockets are allowed by default now.
   - [x] Action: Remove no-op network fixtures/comments in `tests/integration/`, `tests/environment/`, and `tests/e2e/` where not needed.
-  - [x] Verify: `pytest -q -m integration`, `-m environment`, and E2E single tests still pass locally.
+        - [x] Verify: `pytest -q tests/integration`, `pytest -q tests/environment`, and E2E single tests still pass locally.
 
 ### P3 — Semgrep blocking findings visibility and triage (local)
 

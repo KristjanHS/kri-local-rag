@@ -11,7 +11,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.integration
 @pytest.mark.external
 class TestInitializationLogging:
     """Integration tests for initialization logging with real service connections."""
@@ -50,7 +49,6 @@ class TestInitializationLogging:
         assert result is True
 
 
-@pytest.mark.integration
 @pytest.mark.external
 class TestHybridSearchIntegration:
     """Integration tests for hybrid search with real service interactions."""
@@ -98,7 +96,6 @@ class TestHybridSearchIntegration:
         assert result == ["Test content 1", "Test content 2"]
 
 
-@pytest.mark.integration
 @pytest.mark.slow
 class TestContainerReadiness:
     """Integration tests for container readiness and CLI behaviors."""

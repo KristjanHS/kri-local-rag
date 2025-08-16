@@ -61,9 +61,9 @@ services:
       - hf_cache:/root/.cache/huggingface
     working_dir: /app
     # Auto-start Streamlit when container starts
-    command: ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    command: [ "streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0" ]
     env_file:
-      - ./docker/.env.docker
+      - .env.docker
     environment:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
@@ -83,8 +83,8 @@ services:
       - ../tests:/app/tests # Mount tests for in-container testing
       - hf_cache:/root/.cache/huggingface
     env_file:
-      - ./docker/.env.docker
-    command: ["python", "backend/ingest.py", "/app/data"]
+      - .env.docker
+    command: [ "python", "backend/ingest.py", "/app/data" ]
 
 volumes:
   weaviate_db:
