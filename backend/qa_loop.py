@@ -70,7 +70,10 @@ _ollama_context: list[int] | None = None
 
 
 # ---------- Cross-encoder helpers --------------------------------------------------
-def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
+def _get_cross_encoder(
+    model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    cache_folder: Optional[str] = os.getenv("CROSS_ENCODER_CACHE_DIR"),
+):
     """Return a (cached) CrossEncoder instance or ``None`` if the library is unavailable.
 
     If ``sentence_transformers`` is not installed, the function returns ``None`` so that the
@@ -90,7 +93,10 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
             return None
     if _cross_encoder is None:
         try:
-            _cross_encoder = ctor(model_name)
+            # Pass cache_folder to the constructor if it's provided
+            kwargs = {"cache_folder": cache_folder} if cache_folder else {}
+            _cross_encoder = ctor(model_name, **kwargs)
+
             # Apply PyTorch CPU optimizations (skip in testing environments)
             # New preferred flag: RERANKER_CROSS_ENCODER_OPTIMIZATIONS (true enables opts)
             enable_opts_str = os.getenv("RERANKER_CROSS_ENCODER_OPTIMIZATIONS", "true").lower()

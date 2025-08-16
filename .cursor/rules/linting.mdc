@@ -3,7 +3,7 @@ description: "Python linting/formatting (Ruff) and type checking (Pyright)"
 type: agent-select
 globs:
   - "**/*.py"
-alwaysApply: false
+alwaysApply: true
 ---
 - Use Ruff for all Python linting and formatting.
 - Ruff runs automatically on save and on commit. If working headless or fixing CI, use:
