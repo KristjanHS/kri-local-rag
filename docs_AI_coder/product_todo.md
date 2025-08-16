@@ -32,35 +32,38 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 ## Prioritized Backlog
 
-#### P1 — Remove sudo from install-system-tools.sh for devcontainer compatibility
+#### P1 - ...
 
-- **Context**: The script uses sudo throughout but devcontainer runs as root, making sudo unnecessary and potentially problematic
-- **Goal**: Make the script work in both host and devcontainer environments without sudo dependency
+place new topic goal+tasks here
 
-- [x] Step 1 — Detect environment and conditionally use sudo
-  - Action: Add environment detection at the top of `scripts/install-system-tools.sh`:
-    ```bash
-    # Detect if we're running as root (devcontainer) or need sudo (host)
-    if [ "$(id -u)" -eq 0 ]; then
-        SUDO_CMD=""
-    else
-        SUDO_CMD="sudo"
-    fi
-    ```
-  - Verify: Script runs without errors in both host and devcontainer environments ✅
+#### P6 — Docker Build Optimizations (formerly P5.1)
 
-- [x] Step 2 — Replace all sudo calls with conditional sudo
-  - Action: Replace all `sudo` commands with `$SUDO_CMD`:
-    - `sudo apt-get update` → `$SUDO_CMD apt-get update` ✅
-    - `sudo rm -f /usr/local/bin/hadolint` → `$SUDO_CMD rm -f /usr/local/bin/hadolint` ✅
-    - `sudo curl -fLso /usr/local/bin/hadolint` → `$SUDO_CMD curl -fLso /usr/local/bin/hadolint` ✅
-    - `sudo chmod +x /usr/local/bin/hadolint` → `$SUDO_CMD chmod +x /usr/local/bin/hadolint` ✅
-    - `sudo bash "$TMP_SCRIPT"` → `$SUDO_CMD bash "$TMP_SCRIPT"` ✅
-  - Verify: All commands execute correctly in both environments ✅
+- **Goal**: Improve Docker build performance by reducing the build context and leveraging BuildKit caching.
 
-- [x] Step 3 — Test in both environments
-  - Action: Test the script in host environment (should use sudo) and devcontainer (should not use sudo)
-  - Verify: Both environments work correctly and no temporary files are left behind ✅
+- [ ] **Step 1: Add `.dockerignore`**
+  - Action: Create a root `.dockerignore` file to exclude unnecessary files like `.git`, `.venv`, and `__pycache__` from the build context.
+  - Verify: Observe a smaller "Sending build context to Docker daemon" size during the next build.
+
+- [ ] **Step 2: Use BuildKit Cache for `apt`**
+  - Action: Modify the `apt-get` layer in `docker/app.Dockerfile` to use a `--mount=type=cache`, which will speed up subsequent builds.
+  - Verify: Confirm that a second `docker build` run is significantly faster due to cache hits on `apt` downloads.
+
+#### P7 — Final Verification of All Meta Linters
+
+- **Goal**: Confirm that all meta-linters pass after all preceding fixes and optimizations.
+
+- Action: Run all three meta linters:
+  - `actionlint -color`
+  - `yamlfmt --lint .`
+  - `hadolint docker/app.Dockerfile`
+
+- Verify: All commands exit with code 0 and report no errors.
+
+#### P1.1 — Correct Dockerfile Package Pinning (Session Review) - ARCHIVED ✅
+
+- **Goal**: Fix the incorrect package pinning approach implemented in this session and ensure the linter correctly ignores the intentional use of unpinned packages.
+
+- **Status**: All steps completed and archived. See `docs_AI_coder/archived-tasks.md` for full details.
 
 #### P2 — Containerized CLI E2E copies (keep host-run E2E; add container-run twins)
 
@@ -170,96 +173,3 @@ This file tracks outstanding tasks and planned improvements for the project.
   - [ ] Pin the local `pyright` version (e.g., in `requirements-dev.txt`) to match CI
   - [ ] Ensure `ruff` version in pre-commit matches the CI action version (`0.5.3` today)
 
-#### P5.1 — Docker build cache and context optimizations
-
-- [ ] Add a root `.dockerignore` to shrink build context and improve cache hits
-  - Action: Create `.dockerignore` at repo root including at minimum: `.git`, `.venv`, `__pycache__/`, `*.pyc`, `logs/`, `data/`, `node_modules/`, `dist/`, `build/`, `*.ipynb_checkpoints`.
-  - Verify: Run a build and confirm the "Sending build context" size drops and cache hit rate increases on subsequent builds.
-
-- [ ] Use BuildKit apt cache for OS package installs
-  - Action: In `docker/app.Dockerfile`, change the apt layer to use a cache mount:
-    - Replace the apt RUN with `RUN --mount=type=cache,target=/var/cache/apt apt-get update && apt-get install -y --no-install-recommends ... && apt-get clean && rm -rf /var/lib/apt/lists/*`.
-  - Verify: Second build is faster with cache hits on apt downloads.
-
-#### P6 — Cursor Rules Audit: Resolve Conflicts and Standardize
-
-- **Context**: Audit of `.cursor/rules/` identified critical conflicts between rules that could cause inconsistent agent behavior
-- **Goal**: Resolve conflicts and standardize guidance for consistent agent behavior
-
-#### **Best Practices Alignment: Simplify Overly Detailed Rules**
-
-- [x] **Simplify 1: Overly lengthy uv-sandbox rule**
-  - Action: Condense the 30-line uv-sandbox rule to focus on core principles only
-  - Action: Remove detailed step-by-step instructions that belong in documentation
-  - Action: Keep only essential guidance for when and how to use uv sandbox
-  - Verify: Rule is concise and actionable without being overly prescriptive ✅
-
-- [x] **Simplify 2: Overly detailed testing rule**
-  - Action: Reduce the 23-line testing rule to core testing principles
-  - Action: Remove specific implementation details that belong in docs
-  - Action: Focus on high-level testing guidance and markers
-  - Verify: Rule provides clear direction without excessive detail ✅
-
-- [x] **Simplify 3: Overly constraining problem-solving rule**
-  - Action: Condense the verbose problem-solving rule to essential steps
-  - Action: Remove redundant explanations and repetitive language
-  - Action: Keep the core 3-attempt sequence but make it more concise
-  - Verify: Rule is clear and actionable without being overly prescriptive ✅
-
-- [x] **Simplify 4: Overly detailed linting rule**
-  - Action: Consolidate the linting rule to focus on core principles
-  - Action: Remove implementation details that belong in documentation
-  - Action: Keep essential guidance for Ruff and Pyright usage
-  - Verify: Rule is concise and focuses on key principles ✅
-
-#### **Correction Plan: Fix Remaining Issues in Modified Rules**
-
-- [x] **Fix 1: Inconsistent globs usage between related rules**
-  - Action: Update `terminal_and_python.mdc` to include `globs: ["**/*.py"]` to match `linting.mdc` and `testing.mdc`
-  - Action: Ensure all Python-related rules have consistent glob patterns
-  - Verify: All Python-related rules use consistent glob patterns ✅
-
-- [x] **Fix 2: Missing cross-reference in error-handling rule**
-  - Action: Add reference to problem-solving rule in error-handling.mdc for clarity
-  - Action: Ensure rules properly reference each other for sequence understanding
-  - Verify: Rules clearly reference their related counterparts ✅
-
-- [x] **Fix 3: Inconsistent Python path in linting rule**
-  - Action: Update `linting.mdc` to use `.venv/bin/python` instead of just `python` for consistency
-  - Action: Ensure all rules use the same Python path format
-  - Verify: All rules use consistent `.venv/bin/python` path ✅
-
-- [x] **Fix 4: Verify problem-solving rule precedence is clear**
-  - Action: Ensure problem-solving rule clearly states when it overrides error-handling
-  - Action: Add explicit sequence guidance for agents
-  - Verify: Clear sequence: error-handling first, then problem-solving after 3 attempts ✅
-
-- [x] **Critical Fix 1: Resolve problem-solving vs error-handling conflict**
-  - Action: Update `error-handling.mdc` to clarify it applies to initial validation failures only, not after problem-solving attempts
-  - Action: Update `problem-solving.mdc` to specify it applies after error-handling has been attempted 3 times
-  - Verify: Rules provide clear, non-conflicting guidance on failure handling sequence ✅
-
-- [x] **Critical Fix 2: Standardize Python path usage**
-  - Action: Update `terminal_and_python.mdc` to use `.venv/bin/python` consistently instead of `python` alias
-  - Action: Ensure alignment with user rules preference for explicit venv path
-  - Verify: All terminal command examples use consistent Python path ✅
-
-- [x] **Critical Fix 3: Clarify revert vs stop behavior**
-  - Action: Merge guidance from `post-edit-build-test.mdc` and `error-handling.mdc`
-  - Action: Specify when to revert changes vs when to just stop execution
-  - Verify: Clear, non-conflicting guidance on failure response ✅
-
-- [x] **Minor Fix 4: Consolidate testing guidance**
-  - Action: Review overlap between `testing.mdc` and `linting.mdc` for pytest execution
-  - Action: Consolidate redundant guidance into single source of truth
-  - Verify: No duplicate or conflicting testing instructions ✅
-
-- [x] **Minor Fix 5: Clarify agent stopping conditions**
-  - Action: Review `plan-agent-dont-execute.mdc` and `stop-custom-agent.mdc` for overlap
-  - Action: Clarify when each rule applies and their relationship
-  - Verify: Clear distinction between plan mode and execution mode stopping ✅
-
-
-
-
- 

@@ -1,0 +1,16 @@
+---
+# Default configuration: https://github.com/google/yamlfmt/blob/main/docs/config.md
+# Using minimal config to keep it simple.
+# The formatter is opinionated and doesn't need much tuning.
+
+# Dumper config: https://pkg.go.dev/gopkg.in/yaml.v3#Encoder
+dumper:
+  indent: 2
+  line_length: 80
+  # Use double quotes for strings for consistency.
+  quote_style: "double"
+
+# Formatter config
+formatter:
+  # Retain empty lines for readability.
+  retain_line_breaks: true

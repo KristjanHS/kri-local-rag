@@ -9,10 +9,10 @@ name: CI
 
 on:
   pull_request:
-    branches: [ main, dev ]
+    branches: [main, dev]
   push:
-    branches: [ main, dev ]
-  workflow_dispatch: # Allows manual triggering for slow tests
+    branches: [main, dev]
+  workflow_dispatch: {} # Allows manual triggering for slow tests
   schedule:
     - cron: "0 2 * * 0" # Weekly on Sunday at 2 AM for slow tests
 
@@ -37,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Ruff static analysis
         uses: astral-sh/ruff-action@v1
         with:
@@ -55,7 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -95,7 +95,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -111,8 +111,8 @@ jobs:
           pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Pyright type checking
         run: pyright
-        
-        
+
+
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
@@ -137,8 +137,7 @@ jobs:
         run: mkdir -p reports
       - name: Run integration tests
         run: >-
-          python -m pytest tests/integration -q
-          --junitxml=reports/junit_integration.xml
+          python -m pytest tests/integration -q --junitxml=reports/junit_integration.xml
       - name: Upload integration test reports
         if: ${{ always() && github.actor != 'nektos/act' }}
         uses: actions/upload-artifact@v4
@@ -179,8 +178,7 @@ jobs:
         run: mkdir -p reports
       - name: Run E2E tests
         run: >-
-          python -m pytest tests/e2e -q
-          --junitxml=reports/junit_e2e.xml
+          python -m pytest tests/e2e -q --junitxml=reports/junit_e2e.xml
       - name: Tear down services
         if: always()
         run: docker compose -f docker/docker-compose.yml down -v
@@ -199,7 +197,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -238,7 +236,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -303,7 +301,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -344,7 +342,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false   # ⬅️ do not store token in git config
+          persist-credentials: false # ⬅️ do not store token in git config
       - name: Set up Python
         # Python is needed for the runner environment, but dependencies are inside the container
         uses: actions/setup-python@v5
@@ -382,13 +380,13 @@ jobs:
           # This command runs ONLY tests marked as 'slow' on the host runner
           python -m pytest -sv -m slow --no-cov \
             --html=reports/report_slow.html --self-contained-html --junitxml=reports/junit_slow.xml | tee pytest.log
-          EXIT_CODE=${PIPESTATUS[0]}
-          if [ $EXIT_CODE -ne 0 ]; then
+          EXIT_CODE="${PIPESTATUS[0]}"
+          if [ "$EXIT_CODE" -ne 0 ]; then
             echo -e "\n🔴 Pytest failed — showing container logs for debugging:\n"
             docker compose -f docker/docker-compose.yml logs app || true
             docker compose -f docker/docker-compose.yml logs weaviate || true
             docker compose -f docker/docker-compose.yml logs ollama || true
-            exit $EXIT_CODE
+            exit "$EXIT_CODE"
           fi
       - name: Upload slow test reports
         # Same: upload only on GitHub (not in act) due to missing ACTIONS_RUNTIME_TOKEN locally.
