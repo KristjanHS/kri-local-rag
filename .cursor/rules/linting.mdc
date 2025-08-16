@@ -11,3 +11,6 @@ alwaysApply: true
   - `ruff format .`
 - Avoid using `print` (Ruff rule T201). Prefer `logging` for application and tests.
 - Use Pyright for static type checking. Use `# type: ignore[...]` sparingly with justification.
+- Pyright runs automatically on save and on commit. If working headless or fixing CI, use:
+  - `pyright .`
+  - `pyright --watch` (for continuous monitoring during development)
