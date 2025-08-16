@@ -32,151 +32,35 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 ## Prioritized Backlog
 
-#### P0
+#### P1 — Remove sudo from install-system-tools.sh for devcontainer compatibility
 
-- [x] Fix pytest mark warnings by removing `@pytest.mark.unit` and its registration
-  - Rationale: Migrating to folder-based test bundles where test type is derived from path. Explicit `unit` markers are being removed.
-  - Action: Find all Python test files using the `@pytest.mark.unit` decorator.
-  - Action: Remove the `@pytest.mark.unit` line from each identified test.
-  - Action: Remove the `"unit: marks tests as unit tests"` line from the `markers` array in `pyproject.toml`.
-  - Verify: Run pre-push checks (`scripts/git-hooks/pre-push.sh`) and confirm "PytestUnknownMarkWarning: Unknown pytest.mark.unit" warnings are no longer present.
-  - Verify: All existing tests still pass.
+- **Context**: The script uses sudo throughout but devcontainer runs as root, making sudo unnecessary and potentially problematic
+- **Goal**: Make the script work in both host and devcontainer environments without sudo dependency
 
-- [x] Document pip root user warnings (expected in CI)
-  - Action: Add `--root-user-action=ignore` to pip commands in CI if warnings become too noisy
-  - Verify: CI documentation clearly explains these warnings are not actionable and expected behavior
+- [x] Step 1 — Detect environment and conditionally use sudo
+  - Action: Add environment detection at the top of `scripts/install-system-tools.sh`:
+    ```bash
+    # Detect if we're running as root (devcontainer) or need sudo (host)
+    if [ "$(id -u)" -eq 0 ]; then
+        SUDO_CMD=""
+    else
+        SUDO_CMD="sudo"
+    fi
+    ```
+  - Verify: Script runs without errors in both host and devcontainer environments ✅
 
-#### P1 — CLI/QA Loop UX and Logging Cleanup (reduce clutter, keep essentials)
+- [x] Step 2 — Replace all sudo calls with conditional sudo
+  - Action: Replace all `sudo` commands with `$SUDO_CMD`:
+    - `sudo apt-get update` → `$SUDO_CMD apt-get update` ✅
+    - `sudo rm -f /usr/local/bin/hadolint` → `$SUDO_CMD rm -f /usr/local/bin/hadolint` ✅
+    - `sudo curl -fLso /usr/local/bin/hadolint` → `$SUDO_CMD curl -fLso /usr/local/bin/hadolint` ✅
+    - `sudo chmod +x /usr/local/bin/hadolint` → `$SUDO_CMD chmod +x /usr/local/bin/hadolint` ✅
+    - `sudo bash "$TMP_SCRIPT"` → `$SUDO_CMD bash "$TMP_SCRIPT"` ✅
+  - Verify: All commands execute correctly in both environments ✅
 
-- Context and goal
-  - Current situation: The CLI prints duplicate and overly verbose INFO logs (e.g., both plain and rich formats), shows non-actionable boot warnings, and surfaces low-level retrieval details (candidate counts, chunk heads) at INFO. This clutters the UX and hides the actual answer stream.
-  - Goal: Provide a clean, minimal default console that shows only essential status and the streamed answer, while keeping rich diagnostic detail in rotating file logs and behind an explicit `--debug` mode. Ensure there is a single logger initialization path and predictable verbosity controls.
-
-- [x] **CRITICAL: Fix CLI Implementation Issues (prevents meeting P1 goals)**
-  - **Problem**: Nested `console.status` calls cause `LiveError`, CLI doesn't actually work, and original UX goals are not verified.
-  - **Root cause**: Focused on logging configuration without testing the actual CLI behavior and UX improvements.
-  - **Best practice**: Test the actual user experience, not just the underlying configuration.
-  
-  - [x] **Fix 1: Resolve nested console.status calls**
-    - Action: Remove nested `console.status` calls in `qa_loop()` and `ensure_weaviate_ready_and_populated()`
-    - Action: Use single status spinner or simple console messages instead
-    - Action: Ensure only one live display is active at any time
-    - Verify: CLI runs without `LiveError` and shows appropriate status messages
-  
-  - [x] **Fix 2: Verify UX improvements actually work**
-    - Action: Test that verbose logs are suppressed in default mode
-    - Action: Test that detailed logs appear in file but not console
-    - Action: Test that `--debug` mode shows detailed console output
-    - Action: Test that answer streaming works with clean formatting
-    - Verify: CLI actually provides clean, minimal console output as intended
-  
-  - [x] **Fix 3: Test verbosity controls work correctly**
-    - Action: Test `-q/--quiet` shows only warnings/errors
-    - Action: Test `-v/--verbose` shows more detailed output
-    - Action: Test `--log-level DEBUG` shows debug messages
-    - Action: Verify precedence: `--log-level` > `-q/-v` > `LOG_LEVEL` env > default
-    - Verify: All verbosity controls work as specified in original goals
-
-- [x] Step 1 — Centralize logging (root-only, minimal console)
-  - Action: Make `backend.config.get_logger` the only logger factory. Remove or delegate `backend.console.get_logger` to avoid handler duplication.
-  - Action: Initialize once in `backend.config`:
-    - RichHandler to stderr for console (message-only), level from `LOG_LEVEL` (default INFO).
-    - RotatingFileHandler at DEBUG to `logs/rag_system.log` with full format.
-    - Set noisy third-party loggers (`httpx`, `urllib3`, `requests`, `transformers`, `torch`, `sentence_transformers`, `pypdf`) to WARNING/ERROR.
-    - Enable `logging.captureWarnings(True)`.
-  - Verify: `.venv/bin/python -m backend.qa_loop --question "ping"` prints each message once; DEBUG appears only in the file log.
-
-- [x] Step 2 — Simplify console UX (show essentials only)
-  - Action: Replace multi-line readiness/info banners with `Console().status(...)` spinners; show at most two lines before the input prompt.
-  - Action: Stream the answer prefixed with a single "Answer: "; use `rich.rule.Rule` for separators as needed.
-  - Action: Downgrade retrieval details and step-by-step readiness logs from INFO → DEBUG; keep user-facing guidance at INFO.
-  - Verify: Default run shows a clean prompt, concise status, and the streamed answer; detailed steps are only in `logs/rag_system.log`.
-
-- [x] Step 3 — Predictable verbosity controls (CLI > env > default)
-  - Action: Support `-q/--quiet` and `-v/--verbose` (repeatable) plus `--log-level LEVEL` in `backend.qa_loop`. Apply level early.
-  - Action: Precedence: `--log-level` > `-q/-v` > `LOG_LEVEL` env > default INFO. Keep file handler at DEBUG regardless.
-  - Action: Simplify `scripts/cli.sh` to pass flags through; avoid exporting `LOG_LEVEL` when `--debug/-v` is provided to prevent conflicts.
-  - Verify: `-q` shows only warnings/errors; default shows minimal INFO; `-vv` shows DEBUG.
-
-- [x] Step 4 — Targeted warning handling (no blanket ignores)
-  - Action: Add selective `warnings.filterwarnings` for known noisy imports (e.g., specific SWIG deprecations). Do not globally ignore `DeprecationWarning`.
-  - Action: Keep filtered warnings recorded in file logs via `captureWarnings`; suppress them from console by default.
-  - Verify: Boot-time SWIG warnings disappear from console; remain visible in `logs/rag_system.log`.
-
-- [x] **FIX: Logging Configuration Issues (introduced in this session)**
-  - **Problem**: Missing imports (`logging`, `RichHandler`) in `qa_loop.py` cause CLI to fail. Logging setup function is in wrong place.
-  - **Root cause**: Violated single responsibility principle by putting logging configuration in CLI module instead of centralized config.
-  - **Best practice**: Logging configuration should be centralized in `backend/config.py` and CLI should only set levels, not configure handlers.
-  
-  - [x] **Fix 1: Move logging setup to config.py**
-    - Action: Move `_setup_cli_logging` function from `qa_loop.py` to `backend/config.py` as `set_log_level`
-    - Action: Add missing imports (`logging`, `RichHandler`) to `qa_loop.py`
-    - Action: Update `qa_loop.py` to call `config.set_log_level` instead of local function
-    - Verify: CLI runs without import errors
-  
-  - [x] **Fix 2: Simplify test approach**
-    - Action: Remove complex CLI output tests that require full backend setup
-    - Action: Keep simple unit test for logging configuration
-    - Action: Focus on testing the logging setup function directly, not CLI output
-    - Verify: Tests pass without requiring backend services
-  
-  - [x] **Fix 3: Clean up imports and architecture**
-    - Action: Ensure all imports are at top of files
-    - Action: Remove any duplicate or circular imports
-    - Action: Verify logging configuration follows single responsibility principle
-    - Verify: Code follows Python best practices for imports and module organization
-
-- [x] Step 5 — Guardrails and docs
-  - Action: Add a unit test asserting a single Rich console handler and no duplicate stream handlers after importing `backend.retriever`, `backend.qa_loop`, etc.
-  - Action: Add a CLI output test asserting default/quiet/verbose behaviors using `capsys`.
-  - Action: Update `README.md` and `docs/DEVELOPMENT.md` to document flags, precedence, and log file location.
-  - Verify: `.venv/bin/python -m pytest -q tests/unit/test_logging_config.py tests/integration/test_cli_output.py` passes.
-
-- [x] **IMPROVE: Logging Configuration Robustness (follow-up improvements)**
-  - **Problem**: Tests directly manipulate global state, error handling is incomplete, and documentation is lacking.
-  - **Root cause**: Rushed implementation focused on functionality over maintainability and robustness.
-  - **Best practice**: Tests should be isolated, error handling should be comprehensive, and public APIs should be well-documented.
-  
-  - [x] **Improvement 1: Robust test isolation**
-    - Action: Create a proper test fixture that resets logging state without direct global manipulation
-    - Action: Use `pytest.fixture` with `autouse=True` to ensure clean state for all logging tests
-    - Action: Add test for concurrent logging setup to ensure thread safety
-    - Verify: Tests are more reliable and don't interfere with each other
-  
-  - [x] **Improvement 2: Better error handling and validation**
-    - Action: Add input validation to `set_log_level` (check for None, empty strings, etc.)
-    - Action: Use the configured logger instead of `logging.warning` in error cases
-    - Action: Add logging configuration validation function to verify handlers are properly set up
-    - Verify: Error cases are handled gracefully and logged appropriately
-  
-  - [x] **Improvement 3: Documentation and examples**
-    - Action: Add comprehensive docstring to `set_log_level` with usage examples
-    - Action: Document the logging configuration in `docs/DEVELOPMENT.md`
-    - Action: Add type hints and improve function signatures where needed
-    - Verify: New developers can understand and use the logging system correctly
-
-- [x] **FINAL: Code Cleanup and Quality Assurance**
-  - **Problem**: Unused imports remain in `qa_loop.py` after refactoring, and some minor formatting inconsistencies exist.
-  - **Root cause**: Focus on functionality over code quality during rapid development.
-  - **Best practice**: Code should be clean, lint-free, and follow consistent formatting standards.
-  
-  - [x] **Cleanup 1: Remove unused imports**
-    - Action: Remove unused `logging` and `RichHandler` imports from `qa_loop.py`
-    - Action: Run linter to verify no unused imports remain
-    - Action: Ensure all imports are actually used in the code
-    - Verify: `ruff check` passes with no unused import errors
-  
-  - [x] **Cleanup 2: Formatting consistency**
-    - Action: Run `ruff format` on all modified files
-    - Action: Ensure consistent spacing and line breaks
-    - Action: Verify no trailing whitespace or formatting issues
-    - Verify: All files follow consistent formatting standards
-  
-  - [x] **Cleanup 3: Final validation**
-    - Action: Run all tests to ensure cleanup didn't break anything
-    - Action: Test CLI functionality to ensure it still works
-    - Action: Verify logging configuration works as expected
-    - Verify: All functionality works correctly after cleanup
+- [x] Step 3 — Test in both environments
+  - Action: Test the script in host environment (should use sudo) and devcontainer (should not use sudo)
+  - Verify: Both environments work correctly and no temporary files are left behind ✅
 
 #### P2 — Containerized CLI E2E copies (keep host-run E2E; add container-run twins)
 
@@ -184,7 +68,7 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 - [ ] Step 1 — Identify candidates
   - Action: List E2E tests invoking CLI in-process (e.g., `backend.qa_loop`) such as `tests/e2e/test_qa_real_end_to_end.py`.
-  - Verify: Confirm they don’t already run via container.
+  - Verify: Confirm they don't already run via container.
 
 - [ ] Step 2 — Compose runner for CLI (no bind mounts)
   - Action: Add `cli` service (profile `cli`) in `docker/docker-compose.yml` using `kri-local-rag-app`, no `volumes`, `working_dir: /app`, and env:
@@ -297,240 +181,83 @@ This file tracks outstanding tasks and planned improvements for the project.
     - Replace the apt RUN with `RUN --mount=type=cache,target=/var/cache/apt apt-get update && apt-get install -y --no-install-recommends ... && apt-get clean && rm -rf /var/lib/apt/lists/*`.
   - Verify: Second build is faster with cache hits on apt downloads.
 
-- [ ] Document BuildKit and cache guidance
-  - Action: In `docs/DEVELOPMENT.md` (Docker section), note that BuildKit is on by default; prefer cached builds. Use `--no-cache` only when intentionally refreshing. Mention `scripts/build_app.sh` passes through extra flags (e.g., `--no-cache`).
-  - Verify: Doc updated and referenced from README as appropriate.
+#### P6 — Cursor Rules Audit: Resolve Conflicts and Standardize
 
-- [ ] Pin remote image tags for reproducibility (where reasonable)
-  - Action: Audit image tags in `docker/docker-compose.yml` and `docker/app.Dockerfile`.
-    - Keep `weaviate` pinned (already pinned).
-    - Consider pinning `OLLAMA_IMAGE` default from `latest` to a known-good version; document override via env var.
-    - Python base images are already pinned; keep that practice.
-  - Verify: `docker compose up` uses the pinned versions; builds remain reproducible.
+- **Context**: Audit of `.cursor/rules/` identified critical conflicts between rules that could cause inconsistent agent behavior
+- **Goal**: Resolve conflicts and standardize guidance for consistent agent behavior
 
-- [ ] Optional: Add opt-in image refresh step while defaulting to cache usage
-  - Action: In `scripts/docker-setup.sh`, honor an env flag `FORCE_PULL=1` to run `docker compose pull` before build/up; default to not pulling.
-  - Verify: With `FORCE_PULL=1`, images are updated; without it, local cache is used.
+#### **Best Practices Alignment: Simplify Overly Detailed Rules**
 
-- [ ] Optional: Avoid dependency-layer cache busting
-  - Action: Keep `requirements.txt` stable and separate dev/runtime dependencies (`requirements-dev.txt` vs runtime). Ensure `docker/app.Dockerfile` installs only runtime deps to preserve cache.
-  - Verify: Code-only changes do not invalidate the dependency install layer; rebuilds are fast.
+- [x] **Simplify 1: Overly lengthy uv-sandbox rule**
+  - Action: Condense the 30-line uv-sandbox rule to focus on core principles only
+  - Action: Remove detailed step-by-step instructions that belong in documentation
+  - Action: Keep only essential guidance for when and how to use uv sandbox
+  - Verify: Rule is concise and actionable without being overly prescriptive ✅
 
-#### P5.2 — NLTK data setup - to make .md ingestion work (deterministic and reproducible)
+- [x] **Simplify 2: Overly detailed testing rule**
+  - Action: Reduce the 23-line testing rule to core testing principles
+  - Action: Remove specific implementation details that belong in docs
+  - Action: Focus on high-level testing guidance and markers
+  - Verify: Rule provides clear direction without excessive detail ✅
 
-- [ ] Replace brittle inline NLTK downloads in Docker with official downloader CLI
-  - Action: In `docker/app.Dockerfile`, replace the current `python -c "import nltk; ..."` with:
-    ```Dockerfile
-    RUN mkdir -p /opt/venv/nltk_data \
-        && ${VENV_PATH}/bin/python -m nltk.downloader -d /opt/venv/nltk_data punkt punkt_tab
-    ```
-  - Action: Remove any `|| true` so the build fails fast if downloads fail.
-  - Verify: A fresh build succeeds and the layer contains `tokenizers/punkt` and `tokenizers/punkt_tab` under `/opt/venv/nltk_data`.
+- [x] **Simplify 3: Overly constraining problem-solving rule**
+  - Action: Condense the verbose problem-solving rule to essential steps
+  - Action: Remove redundant explanations and repetitive language
+  - Action: Keep the core 3-attempt sequence but make it more concise
+  - Verify: Rule is clear and actionable without being overly prescriptive ✅
 
-- [ ] Establish a single data path via `NLTK_DATA`
-  - Action: Keep `ENV NLTK_DATA=/opt/venv/nltk_data` in Docker. For local dev, document using `export NLTK_DATA="$(pwd)/.venv/nltk_data"`.
-  - Verify: `python -c "import nltk.data; print(nltk.data.path)"` includes the expected path in both envs.
+- [x] **Simplify 4: Overly detailed linting rule**
+  - Action: Consolidate the linting rule to focus on core principles
+  - Action: Remove implementation details that belong in documentation
+  - Action: Keep essential guidance for Ruff and Pyright usage
+  - Verify: Rule is concise and focuses on key principles ✅
 
-- [ ] Local dev parity: documented bootstrap
-  - Action: In `docs/DEVELOPMENT.md`, add a snippet for devs:
-    ```bash
-    export NLTK_DATA="$(pwd)/.venv/nltk_data"
-    mkdir -p "$NLTK_DATA"
-    .venv/bin/python -m nltk.downloader -d "$NLTK_DATA" punkt punkt_tab
-    ```
-  - Verify: On a clean venv, the commands complete and `nltk.data.find('tokenizers/punkt')` succeeds.
+#### **Correction Plan: Fix Remaining Issues in Modified Rules**
 
-- [ ] Startup verification with clear error
-  - Action: Add a lightweight check at app startup (or first-use path) to assert NLTK resources exist, e.g. `nltk.data.find('tokenizers/punkt')`, and raise a helpful message if missing.
-  - Verify: When the data is removed/absent, the app fails fast with a clear remediation hint referencing the dev/Docker steps above.
+- [x] **Fix 1: Inconsistent globs usage between related rules**
+  - Action: Update `terminal_and_python.mdc` to include `globs: ["**/*.py"]` to match `linting.mdc` and `testing.mdc`
+  - Action: Ensure all Python-related rules have consistent glob patterns
+  - Verify: All Python-related rules use consistent glob patterns ✅
 
-- [ ] Pin library version for stability
-  - Action: Pin `nltk` to a known-working version in `requirements.txt` (runtime) and `requirements-dev.txt` if needed.
-  - Verify: Rebuild/install resolves the pinned version; tokenization works as before.
+- [x] **Fix 2: Missing cross-reference in error-handling rule**
+  - Action: Add reference to problem-solving rule in error-handling.mdc for clarity
+  - Action: Ensure rules properly reference each other for sequence understanding
+  - Verify: Rules clearly reference their related counterparts ✅
 
-- [ ] Optional: Offline/CI artifacts for corpora
-  - Action: For fully offline or hermetic builds, package the required subset of `nltk_data` as a build artifact (e.g., tarball) and add a Docker build step to extract it to `/opt/venv/nltk_data` with checksum verification.
-  - Verify: Docker build succeeds without network when the artifact is provided; app runs and passes the startup verification.
+- [x] **Fix 3: Inconsistent Python path in linting rule**
+  - Action: Update `linting.mdc` to use `.venv/bin/python` instead of just `python` for consistency
+  - Action: Ensure all rules use the same Python path format
+  - Verify: All rules use consistent `.venv/bin/python` path ✅
 
-#### P6 — E2E testing Tasks (CLI and Streamlit)
+- [x] **Fix 4: Verify problem-solving rule precedence is clear**
+  - Action: Ensure problem-solving rule clearly states when it overrides error-handling
+  - Action: Add explicit sequence guidance for agents
+  - Verify: Clear sequence: error-handling first, then problem-solving after 3 attempts ✅
 
-  - [ ] Create dedicated UI dependency extra (isolate Playwright)
-    - [ ] Action: In `pyproject.toml`, move `pytest-playwright==0.4.4` and `playwright>=1.45,<2` out of the `test` extra and define a new extra: `[project.optional-dependencies].ui = ["pytest-playwright==0.4.4", "playwright>=1.45,<2"]`.
-    - [ ] Action: Ensure default local/dev installs do NOT include `ui` (e.g., keep `-e .[test,docs,cli]`).
-    - [ ] Verify: A fresh `pip install -e .[test,docs,cli]` does not install Playwright; `python -m playwright` is not available until `-e .[ui]` is installed.
+- [x] **Critical Fix 1: Resolve problem-solving vs error-handling conflict**
+  - Action: Update `error-handling.mdc` to clarify it applies to initial validation failures only, not after problem-solving attempts
+  - Action: Update `problem-solving.mdc` to specify it applies after error-handling has been attempted 3 times
+  - Verify: Rules provide clear, non-conflicting guidance on failure handling sequence ✅
 
-  - [ ] CI dependency isolation for UI suite
-    - [ ] Action: In `.github/workflows/python-lint-test.yml`, ensure only the UI job installs the UI extra (e.g., `pip install -e .[ui]` or `-e .[test,docs,cli,ui]` if those are needed there).
-    - [ ] Action: In the same UI job, run `python -m playwright install --with-deps` before executing tests; remove any Playwright installs from non-UI jobs.
-    - [ ] Verify: `act pull_request -j ui_tests_act` shows the UI extra being installed and browsers installed; `-j fast_tests`/`-j core_suite` do not install Playwright nor browsers.
+- [x] **Critical Fix 2: Standardize Python path usage**
+  - Action: Update `terminal_and_python.mdc` to use `.venv/bin/python` consistently instead of `python` alias
+  - Action: Ensure alignment with user rules preference for explicit venv path
+  - Verify: All terminal command examples use consistent Python path ✅
 
-  - [ ] Document isolated UI workflow for developers
-    - [ ] Action: Update `docs/DEVELOPMENT.md` to show two paths:
-      - Regular dev: `pip install -e .[test,docs,cli]` (no Playwright)
-      - UI run: `pip install -e .[ui] && python -m playwright install --with-deps && pytest --test-ui --no-cov`
-    - [ ] Verify: Follow the doc steps on a clean venv; UI tests only run after installing the `ui` extra and browsers.
+- [x] **Critical Fix 3: Clarify revert vs stop behavior**
+  - Action: Merge guidance from `post-edit-build-test.mdc` and `error-handling.mdc`
+  - Action: Specify when to revert changes vs when to just stop execution
+  - Verify: Clear, non-conflicting guidance on failure response ✅
 
-  - [ ] Playwright dependency explicit pin (stability)
-    - [ ] Action: In `pyproject.toml` add `"playwright>=1.45,<2"` to `[project.optional-dependencies].test` next to `pytest-playwright==0.4.4`, then reinstall dev deps.
-    - [ ] Verify: `.venv/bin/python -m playwright --version` succeeds; `.venv/bin/python -m pytest --test-ui --no-cov -q` collects and runs UI tests.
+- [x] **Minor Fix 4: Consolidate testing guidance**
+  - Action: Review overlap between `testing.mdc` and `linting.mdc` for pytest execution
+  - Action: Consolidate redundant guidance into single source of truth
+  - Verify: No duplicate or conflicting testing instructions ✅
 
-  - [ ] Trim CI Playwright browser installs to UI jobs only (simplify CI)
-    - [ ] Action: In `.github/workflows/python-lint-test.yml`, remove Playwright browser install steps from non-UI jobs (e.g., `core_suite`). Keep them only where `--test-ui` (or other Playwright tests) actually run.
-    - [ ] Verify: `act pull_request -j fast_tests` and `-j core_suite` show no Playwright install step; `-j ui_tests_act` still installs browsers and runs UI tests.
-
-  - [ ] Simplify UI coverage gating (reduce custom logic)
-    - [ ] Action: In `tests/e2e_streamlit/conftest.py`, simplify the collection hook to only enforce: if `--test-ui` is used while coverage is enabled, raise a clear `pytest.UsageError`. Rely on default `-m "not ui"` from `pyproject.toml` to exclude UI tests in normal runs; drop verbose coverage detection/deselect logic if not needed.
-    - [ ] Verify: `.venv/bin/python -m pytest -q` runs green with UI tests deselected; `.venv/bin/python -m pytest --test-ui --no-cov -q` runs UI tests; `.venv/bin/python -m pytest --test-ui -q` errors with the expected usage message.
-
-  - [ ] Streamlit E2E: Improve locator resilience (only if still flaky)
-    - Action: Switch input selection to `get_by_label("Ask a question:")`, keep `[data-testid]` for answers, and if needed add `page.wait_for_function` to await `TEST_ANSWER` text.
-    - Verify: Re-run the single test; expect pass without diagnostic waits.
-
-  - [ ] **Task 1: Isolate and Reproduce the Failure Reliably.**
-    - **Goal:** Create a minimal, fast command that reliably demonstrates the failure, so we don't have to run the full 1-minute test suite to verify our fix.
-    - **Action:** Use the simplest Playwright test we have (`test_browser_launch_only.py`) and run it with `pytest-cov` enabled.
-    - **Verify:** Confirm this single test fails with the known `AttributeError`. Then, run it with `--no-cov` and confirm it passes. This gives us a clear baseline.
-
-  - [ ] **Task 2: Implement a Conditional Skip.**
-    - **Goal:** Ensure the default, coverage-enabled full suite runs green by not executing Playwright tests.
-    - **Action:** In `tests/e2e_streamlit/conftest.py`, add a `pytest_collection_modifyitems` hook that unconditionally skips all tests in this directory whenever `--no-cov` is not present (i.e., default coverage runs). Keep a guard that raises if `--test-ui` is used without `--no-cov`.
-    - **Verify:** Re-run the failing command from Task 1. All UI tests should now report as `SKIPPED` instead of `ERROR`.
-
-  - [ ] Correction plan: Make UI skip unconditional under coverage
-    - [ ] Simplify detection to: if not `--no-cov`, fully deselect items in `tests/e2e_streamlit` to avoid fixture setup
-    - [ ] Re-run full suite: `.venv/bin/python -m pytest -q -m "not environment" --disable-warnings` should pass with 0 errors
-    - [ ] Run UI-only suite without coverage: `.venv/bin/python -m pytest --test-ui --no-cov -q` should pass or at least run without coverage-related errors
-
-  - [ ] **Task 3: Achieve a "Green" Full Suite Run.**
-    - **Goal:** Ensure the main test suite can now run to completion and generate a coverage report without any errors.
-    - **Action:** Run the full test suite command (`pytest -m "not environment"`).
-    - **Verify:** The command should complete with all tests either passing or being skipped (specifically the Playwright tests). There should be zero errors, and a coverage report should be generated for the rest of the codebase.
-
-  - [ ] **Task 4: Create a Separate, Coverage-Free E2E Test Run.**
-    - **Goal:** Make sure our important Playwright E2E tests are still executed somewhere.
-    - **Action:** Define a new, separate command that runs *only* the Playwright tests and explicitly disables coverage (`--no-cov`). This command will be used in our CI pipeline and for local E2E checks.
-    - **Verify:** Run this new command and confirm that all Playwright tests pass.
-
-#### P7 — Dependencies management last tasks: Compatibility monitors and guardrails
-
-- Goal: Stabilize on Protobuf 5.x lane, keep sentence-transformers 5.x, and address dependency compatibility to minimize future surprises.
-- Proposed Approach: Use `uv` as a diagnostic tool to find compatible pinned versions for `pip`, simplifying requirements management and isolating tooling.
-
-#### Skepticism checks (archived; see `docs_AI_coder/archived-tasks.md`)
-#### Modified plan steps (archived; see `docs_AI_coder/archived-tasks.md`)
-
-**Compatibility monitors and guardrails (integrate into workflow)**
-    - [ ] Active monitoring: Actively track the status of `opentelemetry-proto` support for Protobuf ≥5. If opentelemetry becomes a requirement later, and compatibility is confirmed, update the sandbox and re-pin. Until then, strictly avoid including opentelemetry in the application's main environment.
-    - [ ] Weaviate-client integration: Confirm the tested version range for gRPC compatibility with the current Weaviate server version used. Add specific integration tests that target gRPC paths within the application if not already present.
-    - [ ] Rollback strategy: Define clear rollback procedures. If updates introduced regressions, revert the pins in `requirements*.txt` and iterate in the `uv` sandbox to find a stable, compatible set before re-attempting the upgrade.
-
-#### P7.3 — Renovate configuration best practices alignment
-
-- [ ] Validate current Renovate config against best practices
-  - Action: Run config validator locally to confirm schema and detect deprecations:
-    - `npx --yes --package renovate -- renovate-config-validator`
-  - Verify: Command exits 0; no errors; note any warnings for follow-up.
-
-- [ ] Consider adopting Renovate `config:best-practices` (or add equivalent presets explicitly)
-  - Action: Evaluate replacing `extends` with `config:best-practices`. If unavailable in your Renovate runner version, add the nearest equivalents explicitly:
-    - Keep `config:recommended`
-    - Add `helpers:pinGitHubActionDigests` (pin Actions to commit SHAs)
-    - Add `:configMigration` (auto-migrate deprecated options)
-    - Keep `docker:pinDigests` (already present)
-  - Verify: Re-run validator; open a Renovate onboarding PR reflecting the new extends; confirm Actions are pinned to SHAs in subsequent PRs.
-
-- [ ] Enable and verify GitHub vulnerability alerts integration
-  - Action: Add/verify `"vulnerabilityAlerts": true` so Renovate opens PRs for GH advisories when supported by the platform/repo permissions.
-  - Verify: After next run, security alert PRs appear when applicable; Renovate log shows the vulnerability alerts step enabled.
-
-- [ ] Keep PR noise low while maintaining safety
-  - Action: Review/update limits and schedule:
-    - Confirm `prConcurrentLimit: 10`, `prHourlyLimit: 2` fit team capacity
-    - Keep off-hours schedule (currently `before 6am on monday`) or consider `schedule:nonOfficeHours`
-  - Verify: Next cycle keeps PR volume manageable; no daytime bursts.
-
-- [ ] CI guardrail: validate Renovate config on PRs that touch it
-  - Action: Add a lightweight CI job that runs the validator when `renovate.json` changes:
-    - `npx --yes --package renovate -- renovate-config-validator`
-  - Verify: Open a dummy PR modifying `renovate.json`; job runs and passes/fails appropriately.
-
-- [ ] Python updates: confirm pinning and grouping strategy
-  - Action: Keep `rangeStrategy: "replace"` for `pip_requirements` to update pins in `requirements*.txt`.
-  - Action: Audit `pip_requirements.fileMatch` patterns cover all requirement files (e.g., `requirements.txt`, `requirements-dev.txt`, any `requirements-*.txt`). Expand if needed.
-  - Action: Keep/adjust grouping rules (pytest/ruff/mypy/sphinx) and patch-only automerge for Python for safe, low-risk merges.
-  - Verify: Sample cycle shows grouped PRs as expected; patch PRs for Python auto-merge cleanly.
-
-- [ ] GitHub Actions updates: safety and automation
-  - Action: Keep minor/patch automerge for Actions; ensure digest pinning is enabled via `helpers:pinGitHubActionDigests` (or `config:best-practices`).
-  - Verify: New Actions PRs use commit SHAs and auto-merge when minor/patch.
-
-- [ ] Docker updates: digest safety and auto-merge
-  - Action: Keep `docker:pinDigests` extend and the packageRule that auto-merges `digest` updates on branch.
-  - Verify: Digest-only PRs auto-merge and images remain pinned by digest.
-
-#### P8 Next up (maintainability, observability)
-- [ ] Refactor Weaviate connection logic into a single reusable function.
-- [ ] Replace fragile relative paths with robust absolute paths where appropriate.
-- [ ] Configure centralized file logging (e.g., `logs/app.log`) across CLI and services.
-- [ ] Enhance progress logging for long-running ingestion (progress bar or granular steps).
-- [ ] Review integration suite Docker autostart
-  - [ ] Action: Measure runtime impact of `tests/integration/conftest.py::_start_docker_services_session` autouse startup.
-  - [ ] Action: If overhead is significant and not broadly needed, scope compose startup to tests that require it (explicit `docker_services` usage) or guard autostart behind an env flag (e.g., `INTEGRATION_AUTOSTART_COMPOSE=1`).
-  - [ ] Verify: Integration tests that need compose still pass; testcontainers-only tests remain unaffected and faster.
-
-#### P8.1 — Socket handling simplification (follow-up)
-
-Archived on 2025-08-13
-
-#### P8.2 — Test path trust and tagging simplification
-
-- Goal: Make test type derive from path (source of truth) and simplify markers to align with best practices.
-- Plan (small, incremental steps)
-  1) Enforce path-derived default markers
-     - [ ] Action: Add/adjust a `pytest_collection_modifyitems` hook in `tests/conftest.py` to auto-apply markers by path:
-       - `tests/unit/` → `unit`
-       - `tests/integration/` → `integration`
-       - `tests/environment/` → `environment`
-       - `tests/e2e/` → `e2e`
-       - `tests/e2e_streamlit/` → `ui`
-       - `tests/docker/` → `docker`
-     - [ ] Verify: `pytest --co -q` shows sample items with expected markers.
-  2) Tighten fast suite selection
-     - [x] Action: Ensure `--test-fast` collects only from `tests/unit/` and sets `UNIT_ONLY_TESTS=1` to enforce early socket block.
-     - [ ] Verify: `.venv/bin/python -m pytest --test-fast -q` is green; no external network attempts appear in logs.
-  3) Audit and relocate miscategorized tests
-     - [ ] Action: Scan for tests under `tests/unit/` importing heavy/external services or carrying non-unit markers; move them to the correct directory (usually `tests/integration/`).
-     - [ ] Verify: Re-run `--test-fast`; confirm it remains green and faster. Run `-m integration` to ensure moved tests are collected there.
-  4) Simplify explicit markers
-     - [ ] Action: Remove redundant `@pytest.mark.<type>` where the path already determines the type; keep only additional markers like `slow`, `ui`, or `docker` when needed.
-     - [ ] Verify: `pytest -q` collects the same tests as before; diffs show only marker removals.
-  5) Guardrail: reject mismatched path/marker
-     - [ ] Action: In `pytest_collection_modifyitems`, error if a test under `tests/unit/` has markers `integration`, `e2e`, `docker`, or `environment` (and vice versa when appropriate).
-     - [ ] Verify: Introduce a deliberate mismatch in a temporary branch; confirm collection fails with a clear message; revert.
-  6) Documentation
-     - [ ] Action: Update `docs/DEVELOPMENT.md` to document that path determines test type; markers are optional for extra semantics only. Document `--test-fast`, `--test-core`, `--test-ui` behavior.
-     - [ ] Verify: Follow the doc to run each suite locally; results match expectations.
-  7) CI alignment
-     - [ ] Action: Keep the CI "Fast Tests" job on `--test-fast`. Add a lightweight job or step to run `pytest --check-test-paths` (via env/flag) to enforce the guardrail in PRs.
-     - [ ] Verify: Open a draft PR with an intentional mismatch; CI step fails with a helpful message; revert.
-
-#### P9 — Soon (quality, CI structure, performance)
-- [ ] Expand unit test coverage, focusing on core logic and error paths.
-- [ ] Improve test assertions and edge case testing across existing tests.
-- [ ] Implement test data management fixtures for consistent, reliable tests.
-- [ ] Review all integration tests for isolation and resource cleanup.
-- [ ] Improve overall test isolation to ensure tests do not interfere with each other.
-- [ ] Separate test jobs by type in GitHub Actions and update workflow/service deps.
-- [ ] Add test quality gates (coverage thresholds, basic performance checks).
-- [ ] Add performance benchmarks for critical paths (embedding generation, retrieval).
-- [ ] Add further test categories/organization (logic, utils, mocks, etc.).
-
-#### P10 — Later (docs, standards, templates, metrics)
-- [ ] Update `DEVELOPMENT.md` with dependency management guidelines.
-- [ ] Document logging and monitoring strategy in `DEVELOPMENT.md`.
-- [ ] Create testing standards document.
-- [ ] Add test templates for consistency and performance benchmarking.
-- [ ] Improve test documentation and add test quality metrics tracking over time.
+- [x] **Minor Fix 5: Clarify agent stopping conditions**
+  - Action: Review `plan-agent-dont-execute.mdc` and `stop-custom-agent.mdc` for overlap
+  - Action: Clarify when each rule applies and their relationship
+  - Verify: Clear distinction between plan mode and execution mode stopping ✅
 
 
 
