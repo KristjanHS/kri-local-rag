@@ -1,10 +1,10 @@
 import logging
 import logging.handlers
 import os
-import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
+from rich.logging import RichHandler
 
 # Load environment variables from the project root .env (if present)
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -57,22 +57,30 @@ def _setup_logging():
     log_dir = _resolve_log_dir()
     log_file = log_dir / "rag_system.log"
 
-    # Use a timed rotating file handler to create a new log file each day
+    # Use a timed rotating file handler for full-fidelity DEBUG logs
     file_handler = logging.handlers.TimedRotatingFileHandler(
         log_file,
-        when="midnight",  # Rotate at midnight
-        backupCount=7,  # Keep 7 days of logs
-        utc=True,  # Use UTC for consistency
+        when="midnight",
+        backupCount=7,
+        utc=True,
     )
     file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    file_handler.setLevel(logging.DEBUG)  # Capture all debug messages in the file
 
-    # Use stderr for console logging
-    console_handler = logging.StreamHandler(sys.stderr)
-    console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    # Use a rich handler for user-facing console output (message-only)
+    console_handler = RichHandler(
+        show_time=False,
+        show_path=False,
+        rich_tracebacks=True,
+        show_level=True,
+        log_time_format="[%X]",
+    )
+    console_handler.setFormatter(logging.Formatter("%(message)s"))
+    console_handler.setLevel(LOG_LEVEL)  # Respect user-configured level
 
-    # Configure the root logger
+    # Configure the root logger to capture everything; handlers will filter
     root_logger = logging.getLogger()
-    root_logger.setLevel(getattr(logging, LOG_LEVEL))
+    root_logger.setLevel(logging.DEBUG)
     root_logger.addHandler(file_handler)
     root_logger.addHandler(console_handler)
 
@@ -89,6 +97,9 @@ def _setup_logging():
     logging.getLogger("pypdf").setLevel(logging.ERROR)
     logging.getLogger("pypdf.generic._base").setLevel(logging.ERROR)
 
+    # Capture warnings issued by the warnings module (e.g., from library deprecations)
+    logging.captureWarnings(True)
+
     _logging_configured = True
 
 
@@ -100,6 +111,52 @@ def get_logger(name: str) -> logging.Logger:
     if not _logging_configured:
         _setup_logging()
     return logging.getLogger(name)
+
+
+def set_log_level(level: str | None) -> None:
+    """
+    Set the log level for the root logger and console handler.
+    This function allows CLI tools to adjust verbosity dynamically.
+
+    Args:
+        level: The log level to set. Can be 'DEBUG', 'INFO', 'WARNING', 'ERROR', or 'CRITICAL'.
+               If None, empty, or invalid, defaults to 'INFO'.
+
+    Examples:
+        >>> set_log_level('DEBUG')  # Set to debug level
+        >>> set_log_level('WARNING')  # Set to warning level
+        >>> set_log_level(None)  # Default to INFO
+    """
+    if not _logging_configured:
+        _setup_logging()
+
+    # Input validation
+    if level is None or not isinstance(level, str) or not level.strip():
+        level = "INFO"
+    else:
+        level = level.strip().upper()
+
+    try:
+        log_level = getattr(logging, level)
+        root_logger = logging.getLogger()
+        root_logger.setLevel(log_level)
+
+        # Find the console handler and set its level explicitly
+        for handler in root_logger.handlers:
+            if isinstance(handler, RichHandler):
+                handler.setLevel(log_level)
+                break
+
+        # Log the change using the configured logger
+        logger = get_logger(__name__)
+        logger.debug("Log level set to %s", level)
+
+    except (ValueError, AttributeError):
+        # Use the configured logger for error reporting
+        logger = get_logger(__name__)
+        logger.warning("Invalid log level '%s'. Defaulting to INFO.", level)
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.INFO)
 
 
 # --- End Logging Configuration ---
