@@ -58,6 +58,5 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
     if not is_coverage_disabled:
         raise pytest.UsageError(
-            "UI tests cannot be run with coverage enabled. Please run with --no-cov. "
-            "Example: pytest tests/ui --no-cov"
+            "UI tests cannot be run with coverage enabled. Please run with --no-cov. Example: pytest tests/ui --no-cov"
         )

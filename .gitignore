@@ -58,6 +58,7 @@ google-cloud-sdk/
 
 # Large data files, assets, or logs
 .ollama_models/
+model_cache/
 data/
 .data/
 .weaviate_db/
