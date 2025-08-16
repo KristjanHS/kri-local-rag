@@ -38,30 +38,38 @@ Ready for new tasks
 
 #### P2 — Containerized CLI E2E copies (keep host-run E2E; add container-run twins)
 
-- Why: Host-run E2E miss packaging/runtime issues (entrypoint, PATH, env, OS libs). Twins validate the real image without replacing fast host tests.
+- **Why**: Host-run E2E miss packaging/runtime issues (entrypoint, PATH, env, OS libs). Twins validate the real image without replacing fast host tests.
+- **Current Approach**: Use the existing `app` container which can run both Streamlit (web UI) and CLI commands via `docker compose exec app`. This leverages the project's existing architecture where the `app` service is designed to handle multiple entry points.
+- **Key Insight**: The project already supports CLI commands in the app container (see README.md: `./scripts/cli.sh python -m backend.qa_loop --question "What is in my docs?"`). We extend this pattern for automated testing rather than creating a separate `cli` service.
+- **Benefits**: Simpler architecture, fewer services to maintain, aligns with existing project patterns, and leverages the same container that users interact with.
 
 - [x] Step 1 — Identify candidates
   - Action: List E2E tests invoking CLI in-process (e.g., `backend.qa_loop`) such as `tests/e2e/test_qa_real_end_to_end.py`.
   - Verify: Confirm they don't already run via container.
 
-- [x] Step 2 — Compose runner for CLI (no bind mounts)
-  - Action: Add `cli` service (profile `cli`) in `docker/docker-compose.yml` using `kri-local-rag-app`, no `volumes`, `working_dir: /app`, and env:
-    - `WEAVIATE_URL=http://weaviate:8080`, `OLLAMA_URL=http://ollama:11434`.
-  - Verify: `docker compose --profile cli run --rm cli python -m backend.qa_loop --help | cat` exits 0.
+- [x] Step 2 — Use existing app container for CLI testing
+  - Action: Leverage the existing `app` service which can run both Streamlit and CLI commands via `docker compose exec`.
+  - Verify: `docker compose exec app python -m backend.qa_loop --help` exits 0.
 
 - [x] Step 3 — Test helper
-  - Action: In `tests/e2e/conftest.py`, add `run_cli_in_container(args, env=None)` that runs `docker compose --profile cli run --rm cli ...`, returns `returncode/stdout/stderr`.
+  - Action: In `tests/e2e/conftest.py`, add `run_cli_in_container(args, env=None)` that uses `docker compose exec app ...`, returns `returncode/stdout/stderr`.
   - Verify: `--help` smoke passes.
 
 - [x] Step 3.1 — Review and validate implementation
-  - Action: Review the implementation of the `cli` service and the `run_cli_in_container` helper against best practices.
-  - Verify: Confirm that the implementation is correct and that no corrective actions are needed.
+  - Action: Review the implementation against best practices and simplify to use existing app container.
+  - Verify: Confirm that the simplified approach is correct and aligns with project structure.
 
-- [ ] Step 4 — Readiness and URLs
+- [ ] Step 3.2 — Clean up old complexity
+  - Action: Remove the separate `cli` service from `docker/docker-compose.yml` since we're using the existing `app` container.
+  - Action: Update `run_cli_in_container` fixture in `tests/e2e/conftest.py` to use `docker compose exec app` instead of the separate `cli` service.
+  - Action: Remove any references to the `cli` profile in documentation or scripts.
+  - Verify: Containerized tests still pass using the simplified approach.
+
+- [x] Step 4 — Readiness and URLs
   - Action: Use existing `weaviate_compose_up`/`ollama_compose_up`; ensure ingestion uses compose-internal URLs.
   - Verify: Readiness checks pass before CLI twin runs.
 
-- [ ] Step 5 — Create test twins
+- [x] Step 5 — Create test twins
   - Action: Add `_container_e2e.py` twins that call `run_cli_in_container([...])` with equivalent CLI subcommands; optionally mark with `@pytest.mark.docker`.
   - Verify: Single twin passes via `.venv/bin/python -m pytest -q tests/e2e/test_qa_real_end_to_end_container_e2e.py` after compose `--wait`.
 
@@ -169,4 +177,11 @@ Ready for new tasks
 - [ ] Version alignment and consistency
   - [ ] Pin the local `pyright` version (e.g., in `requirements-dev.txt`) to match CI
   - [ ] Ensure `ruff` version in pre-commit matches the CI action version (`0.5.3` today)
+
+#### P6 — Correct actionlint workflow
+
+- [x] Revert meta-linters.yml to use standard action
+  - Action: Change actionlint step to use `rhysd/actionlint@v1`.
+  - Verify: Local linting passes.
+  - Note: The file was already in the correct state. No changes were needed.
 

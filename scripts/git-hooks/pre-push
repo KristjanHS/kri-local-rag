@@ -57,7 +57,7 @@ if [[ "$SKIP_LINT" != "1" ]]; then
     log INFO "Running ruff check …" | tee -a "$LOG_FILE"
     .venv/bin/ruff check . 2>&1 | sed 's/^/[ruff] /' | tee -a "$LOG_FILE"
   else
-    log WARN "'.venv/bin/ruff' not found. Skipping ruff checks. Ensure dev deps are installed: 'pip install -e .[test,docs,cli]'" | tee -a "$LOG_FILE"
+    log WARN "'.venv/bin/ruff' not found. Skipping ruff checks. Ensure dev deps are installed: 'pip install -e .[test,docs]'" | tee -a "$LOG_FILE"
   fi
 else
   log INFO "Skipping ruff due to SKIP_LINT=1" | tee -a "$LOG_FILE"
