@@ -6,7 +6,7 @@ from sentence_transformers import CrossEncoder
 # Define the model name and the local cache directory
 MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 # Assumes the script is run from the project root
-CACHE_DIR = Path("tests/model_cache")
+CACHE_DIR = Path("model_cache")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

@@ -48,26 +48,40 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 ## Prioritized Backlog
 
-#### P0 — Refactor: Make CrossEncoder resilient and remove scoring fallback logic
+#### P0 — Epic: Harden CrossEncoder and Centralize Model Cache
 
-- **Context**: The current implementation in `backend/qa_loop.py` has a fallback mechanism in `_score_chunks()` if the `CrossEncoder` fails to load or score. This was likely added to handle cases where the model isn't downloaded, especially in network-restricted environments like unit tests. The goal is to remove this fallback, making the `CrossEncoder` a hard dependency. This requires ensuring it can be loaded reliably without network access during tests (using a local cache) and fails explicitly if the model is missing.
+- **High-Level Goal**: Refactor the CrossEncoder integration to be more resilient by removing the scoring fallback logic, and centralize the model cache to be shared between local tests and the containerized application.
 
+- **Context**: The current implementation in `backend/qa_loop.py` has a fallback mechanism in `_score_chunks()` if the 
+`CrossEncoder` fails to load or score. This was likely added to handle cases where the model isn't downloaded, especially in 
+network-restricted environments like unit tests. The goal is to remove this fallback, making the `CrossEncoder` a hard 
+dependency. This requires ensuring it can be loaded reliably without network access during tests (using a local cache) and 
+fails explicitly if the model is missing.
 - **Project Architecture & CrossEncoder Integration**:
-  - **Core Implementation**: `backend/qa_loop.py` - Contains `_get_cross_encoder()`, `_score_chunks()`, and `_rerank()` functions
-  - **CrossEncoder Model**: Uses `sentence-transformers.CrossEncoder` with model `"cross-encoder/ms-marco-MiniLM-L-6-v2"` for re-ranking search results
-  - **Lazy Loading Pattern**: `CrossEncoder = None` at module level, imported lazily in `_get_cross_encoder()` to avoid startup overhead
+  - **Core Implementation**: `backend/qa_loop.py` - Contains `_get_cross_encoder()`, `_score_chunks()`, and `_rerank()` 
+  functions
+  - **CrossEncoder Model**: Uses `sentence-transformers.CrossEncoder` with model `"cross-encoder/ms-marco-MiniLM-L-6-v2"` for 
+  re-ranking search results
+  - **Lazy Loading Pattern**: `CrossEncoder = None` at module level, imported lazily in `_get_cross_encoder()` to avoid 
+  startup overhead
   - **Caching Strategy**: `_cross_encoder` global variable caches the instance after first load for performance
-  - **Current Fallback Logic**: `_score_chunks()` has 3 strategies: 1) CrossEncoder scoring, 2) Keyword overlap scoring, 3) Neutral scores (0.0) as final fallback
+  - **Current Fallback Logic**: `_score_chunks()` has 3 strategies: 1) CrossEncoder scoring, 2) Keyword overlap scoring, 3) 
+  Neutral scores (0.0) as final fallback
   - **Dependencies**: `sentence-transformers==5.0.0` in `requirements.txt` (required for CrossEncoder functionality)
 
 - **Test Infrastructure & Current Issues**:
-  - **Unit Tests**: `tests/unit/test_qa_loop_logic.py` - Contains tests with complex mock context managers for `_get_cross_encoder`
-  - **Cross-Encoder Specific Tests**: `tests/unit/test_cross_encoder_optimizations.py` - Tests PyTorch optimizations and model loading
-  - **Integration Tests**: `tests/integration/test_cross_encoder_environment.py` - Tests real CrossEncoder loading in various environments
+  - **Unit Tests**: `tests/unit/test_qa_loop_logic.py` - Contains tests with complex mock context managers for 
+  `_get_cross_encoder`
+  - **Cross-Encoder Specific Tests**: `tests/unit/test_cross_encoder_optimizations.py` - Tests PyTorch optimizations and model 
+  loading
+  - **Integration Tests**: `tests/integration/test_cross_encoder_environment.py` - Tests real CrossEncoder loading in various 
+  environments
   - **Test Configuration**: `tests/unit/conftest.py` - Disables network access for unit tests (`@pytest.fixture(autouse=True)`)
   - **Global Test Config**: `tests/conftest.py` - Sets up logging and test environment
-  - **Environment Variables**: `RERANKER_CROSS_ENCODER_OPTIMIZATIONS=false` in test environment to disable PyTorch optimizations
-  - **Current Mock Strategy**: Tests use `patch("backend.qa_loop._get_cross_encoder")` and reset `qa_loop._cross_encoder = None`
+  - **Environment Variables**: `RERANKER_CROSS_ENCODER_OPTIMIZATIONS=false` in test environment to disable PyTorch 
+  optimizations
+  - **Current Mock Strategy**: Tests use `patch("backend.qa_loop._get_cross_encoder")` and reset `qa_loop._cross_encoder = 
+  None`
 
 - **Related Components & Dependencies**:
   - **Vector Search**: `backend/vector_search.py` - Handles Weaviate queries and chunk retrieval
@@ -78,7 +92,8 @@ This file tracks outstanding tasks and planned improvements for the project.
   - **Docker Environment**: `docker/docker-compose.yml` - Container orchestration for Weaviate, Ollama, and app services
 
 - **Current Problem Areas**:
-  - **Intermittent Test Failures**: `test_rerank_cross_encoder_success` fails with `AssertionError: assert 0.0 == 0.0` indicating fallback to neutral scores
+  - **Intermittent Test Failures**: `test_rerank_cross_encoder_success` fails with `AssertionError: assert 0.0 == 0.0` 
+  indicating fallback to neutral scores
   - **Mock Complexity**: Complex patching and state management in tests leads to race conditions
   - **Fallback Reliability**: The fallback mechanism sometimes triggers when CrossEncoder should work
   - **Network Dependencies**: Tests require network access for model download, conflicting with network restrictions
@@ -87,45 +102,44 @@ This file tracks outstanding tasks and planned improvements for the project.
   - **Single Scoring Path**: Only CrossEncoder scoring, no fallbacks
   - **Explicit Failures**: Clear exceptions when CrossEncoder cannot load or score
   - **Local Model Cache**: Pre-cached models for offline test environments
-  - **Simplified Tests**: A clear separation between mocked unit tests and integration tests that use a real `CrossEncoder` instance.
+  - **Simplified Tests**: A clear separation between mocked unit tests and integration tests that use a real `CrossEncoder` 
+  instance.
   - **Robust Loading**: Reliable model loading in all environments (dev, test, production)
 
-#### P0.5 — Refactor: Improve Robustness of Test Fixtures
+- **Phase 1: Centralize and Configure the Model Cache**
+  - **Context**: The model cache is currently located in `tests/model_cache`, which prevents the Docker container from using it. This phase moves the cache to the project root and configures both the test suite and Docker workflow to use the shared location.
+  - [x] **Task 1.1: Relocate `model_cache` to Project Root.**
+    - Action: Move the `tests/model_cache` directory to `model_cache` at the project root.
+    - Verify: The `model_cache` directory is located at the project root and no longer exists in `tests/`.
+  - [x] **Task 1.2: Update `.gitignore` and `.dockerignore`.**
+    - Action: Modify the `.gitignore` file to add `model_cache/` to the list of ignored directories, and add a `.gitkeep` file to the directory.
+    - Action: Remove `model_cache` from `.dockerignore` to ensure it's included in the build context.
+    - Verify: The `model_cache` is ignored by Git but included in the Docker build.
+  - [x] **Task 1.3: Reconfigure Scripts and Tests.**
+    - Action: Modify `scripts/setup/download_model.py` to use the new root-level `model_cache` path.
+    - Action: Update the `cross_encoder_cache_dir` fixture in `tests/conftest.py` to point to the new location.
+    - Verify: The download script and tests use the new path.
+  - [x] **Task 1.4: Update Dockerfile.**
+    - Action: Add a `COPY` instruction to the `Dockerfile` to copy the `model_cache` into the container.
+    - Action: Set the `SENTENCE_TRANSFORMERS_HOME` environment variable in the `Dockerfile` to the new cache path.
+    - Verify: The container builds successfully and uses the cached model.
 
-- **Context**: The `cross_encoder_cache_dir` fixture in `tests/conftest.py` currently has a hardcoded model path. This is brittle and will break if the model is ever updated. The fixture should be refactored to dynamically determine the model path from the application code itself.
+- **Phase 2: Refactor CrossEncoder Implementation and Remove Fallback Logic**
+  - **Context**: The current implementation in `backend/qa_loop.py` includes a fallback mechanism if the CrossEncoder fails. This phase will remove the fallback, making the CrossEncoder a hard dependency and simplifying the codebase.
+  - [x] **Task 2.1: Refactor `qa_loop.py`.**
+    - Action: Modify `_score_chunks()` in `backend/qa_loop.py` to remove the keyword-based and neutral-score fallbacks.
+    - Action: Ensure that if `_get_cross_encoder()` fails to load the model, it raises a clear `RuntimeError`.
+    - Verify: The code in `_score_chunks()` is simpler and contains only the `CrossEncoder` scoring path.
+  - [ ] **Task 2.2: Update Tests for New Behavior.**
+    - Action: In `tests/unit/test_qa_loop_logic.py`, remove the tests for fallback behavior.
+    - Action: Add a new unit test that mocks `_get_cross_encoder` to raise an exception and verifies that `_score_chunks` propagates it.
+    - Action: Update the integration test in `tests/integration/test_cross_encoder_environment.py` to confirm it works with the refactored code.
+    - Verify: Both unit and integration tests pass after the refactoring.
 
-- [ ] **Task 0.1: Decouple Fixture from Hardcoded Model Path.**
-  - Action: Modify `cross_encoder_cache_dir` in `tests/conftest.py` to programmatically read the default model name from the `_get_cross_encoder` function signature in `backend.qa_loop.py`.
-  - Action: Use this model name to dynamically construct the path to the cached model's `config.json` file for verification. This will involve replacing `/` with `--` in the model name to match the cache's directory naming convention.
-  - Verify: The fixture continues to work, and the integration tests can still locate the cached model without any hardcoded paths.
-
-  
-- [ ] **Task 1: Stabilize Unit Tests and Prepare for Integration Testing.**
-  - Action: Add a `pytest` fixture to `tests/unit/test_qa_loop_logic.py` that reliably resets `qa_loop._cross_encoder = None` before each test to prevent state leakage and ensure mocks are always used.
-  - Action: Verify the unit test `test_rerank_cross_encoder_success` uses a mock and asserts predictable, exact values.
-  - Action: Move the `cross_encoder_cache_dir` fixture from `tests/unit/conftest.py` to the root `tests/conftest.py` to make it available for integration tests.
-  - Verify: Unit tests in `test_qa_loop_logic.py` pass reliably with `pytest tests/unit/test_qa_loop_logic.py`.
-
-- [ ] **Task 2: Update Existing Integration Test for CrossEncoder.**
-  - Action: Modify the existing test `test_cross_encoder_is_loaded_and_used_for_reranking` in `tests/integration/test_cross_encoder_environment.py` to use the `cross_encoder_cache_dir` fixture for offline loading.
-  - Action: Update the test to fail explicitly if the real CrossEncoder cannot be loaded (remove the `pytest.importorskip` and make it a hard requirement).
-  - Action: Ensure the test verifies that the real model is used for scoring by checking that the scores are realistic (not fallback values).
-  - Verify: The updated integration test passes and correctly uses the real model to score chunks (`pytest tests/integration/test_cross_encoder_environment.py`).
-
-- [ ] **Task 3: Refactor `qa_loop.py` to remove fallback logic.**
-  - Action: Modify `_score_chunks()` in `backend/qa_loop.py` to remove the keyword-based and neutral-score fallbacks.
-  - Action: Ensure that if `_get_cross_encoder()` fails to load the model, it raises a clear `RuntimeError` or similar exception.
-  - Verify: The code in `_score_chunks()` is simpler and contains only the `CrossEncoder` scoring path.
-
-- [ ] **Task 4: Update Tests for New Behavior.**
-  - Action: In `tests/unit/test_qa_loop_logic.py`, remove the tests for fallback behavior (`test_rerank_fallback_to_keyword_overlap_on_predict_failure`, etc.).
-  - Action: Add a new unit test that mocks `_get_cross_encoder` to raise an exception and verifies that `_score_chunks` propagates it.
-  - Action: Update the existing integration test in `tests/integration/test_cross_encoder_environment.py` to confirm it works with the refactored `_score_chunks`.
-  - Verify: Both unit and integration tests pass after the refactoring.
-
-- [ ] **Task 5: Run Full Test Suite.**
-  - Action: Run the entire test suite (unit, integration, e2e) to ensure the refactoring hasn't caused regressions elsewhere.
-  - Verify: All tests pass (`.venv/bin/python -m pytest`).
+- **Phase 3: Final Validation**
+  - [ ] **Task 3.1: Run Full Test Suite.**
+    - Action: Run the entire test suite (unit, integration, e2e) to ensure the refactoring hasn't caused regressions.
+    - Verify: All tests pass (`.venv/bin/python -m pytest`).
 
 
 #### P1 — Containerized CLI E2E copies (keep host-run E2E; add container-run twins)
@@ -153,10 +167,7 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 - [x] Step 3.2 — Clean up old complexity
   - Action: Remove the separate `cli` service from `docker/docker-compose.yml` since we're using the existing `app` container.
-  - Action: Update `run_cli_in_container` fixture in `tests/e2e/conftest.py` to use `docker compose exec app` instead of the separate `cli` service.
-  - Action: Remove any references to the `cli` profile in documentation or scripts.
-  - Verify: Containerized tests still pass using the simplified approach.
-
+  - Action: Update `run_cli_in_container` fixture in `tests/e2e/conftest.py` to use `docker compose exec app`
 - [x] Step 4 — Readiness and URLs
   - Action: Use existing `weaviate_compose_up`/`ollama_compose_up`; ensure ingestion uses compose-internal URLs.
   - Verify: Readiness checks pass before CLI twin runs.

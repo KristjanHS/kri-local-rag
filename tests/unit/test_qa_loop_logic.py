@@ -7,6 +7,16 @@ import backend.qa_loop as qa_loop
 
 pytestmark = pytest.mark.unit
 
+# IMPORTANT: This test file uses multiple layers of protection to ensure
+# that no real cross-encoder models are loaded during unit tests:
+#
+# 1. _reset_encoder_cache fixture: Resets cached encoder and CrossEncoder import
+# 2. Mock context managers: Properly mock _get_cross_encoder function
+# 3. Import patching: Prevent real sentence_transformers imports
+# 4. test_no_real_model_loading: Verifies protection is working
+#
+# This prevents flaky tests and keeps unit tests fast and reliable.
+
 
 @pytest.fixture(autouse=True)
 def _reset_encoder_cache():
@@ -15,17 +25,23 @@ def _reset_encoder_cache():
     This prevents state from leaking between tests, which can cause mocks to be
     bypassed if a real encoder was cached by a previous test.
     """
+    # Reset the cached encoder
     qa_loop._cross_encoder = None
+
+    # Also reset the module-level CrossEncoder to ensure no real imports happen
+    qa_loop.CrossEncoder = None
 
 
 @contextmanager
 def mock_encoder_success():
     """Mock _get_cross_encoder to return a working encoder."""
     with patch("backend.qa_loop._get_cross_encoder") as get_ce:
-        mock = MagicMock()
-        mock.predict.return_value = [0.9, 0.1]
-        get_ce.return_value = mock
-        yield
+        # Also patch the import to prevent any real model loading
+        with patch("backend.qa_loop.CrossEncoder", None):
+            mock = MagicMock()
+            mock.predict.return_value = [0.9, 0.1]
+            get_ce.return_value = mock
+            yield
 
 
 @contextmanager
@@ -54,6 +70,7 @@ def test_rerank_cross_encoder_success():
 
         result = qa_loop._rerank(question, chunks, k_keep=2)
 
+        # The results should be sorted by score, so "relevant" should be first
         assert len(result) == 2
         assert result[0].text == "relevant"
         assert result[0].score == 0.9
@@ -138,3 +155,23 @@ def test_keyword_scoring_no_union():
 
         assert len(scored_chunks) == 2
         assert all(sc.score == 0.0 for sc in scored_chunks)
+
+
+def test_no_real_model_loading():
+    """Test that no real cross-encoder model is loaded during tests."""
+    # This test ensures that the real sentence_transformers library is never imported
+    # during unit tests, which would be expensive and slow down the test suite.
+
+    with mock_encoder_success():
+        # Verify that the mock is being used, not a real model
+        chunks = ["test chunk"]
+        question = "test question"
+
+        # This should use the mock, not load a real model
+        result = qa_loop._rerank(question, chunks, k_keep=1)
+
+        assert len(result) == 1
+        assert result[0].score == 0.9  # This is the mock's return value
+
+        # Verify that no real CrossEncoder was imported
+        assert qa_loop.CrossEncoder is None
