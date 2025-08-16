@@ -80,14 +80,15 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 
 @pytest.fixture(scope="session")
-def cross_encoder_cache_dir() -> str:
+def cross_encoder_cache_dir(project_root: Path) -> str:
     """Ensure the CrossEncoder model is cached locally and return the cache path."""
     import inspect
-    from pathlib import Path
 
-    # Assuming the project root is the parent of the 'tests' directory
-    project_root = Path(__file__).parent
-    cache_dir = project_root / "tests" / "model_cache"
+    from httpx import HTTPError as HttpxHTTPError
+    from huggingface_hub import snapshot_download
+    from requests.exceptions import HTTPError as RequestsHTTPError
+
+    cache_dir = project_root / "model_cache"
 
     # Dynamically read the default model name from the _get_cross_encoder function signature
     from backend.qa_loop import _get_cross_encoder
@@ -95,42 +96,25 @@ def cross_encoder_cache_dir() -> str:
     sig = inspect.signature(_get_cross_encoder)
     default_model_name = sig.parameters["model_name"].default
 
-    # Convert model name to cache directory format (replace / with --)
-    cache_model_name = default_model_name.replace("/", "--")
-
-    # Verify that the cache directory and a model config file exist
-    # The model is stored in snapshots with a commit hash
-    model_dir = cache_dir / f"models--{cache_model_name}"
-    if not model_dir.is_dir():
+    try:
+        # This will check the cache first and not make a network call.
+        # If the model is not in the cache, it will raise an exception because of local_files_only=True.
+        snapshot_download(
+            repo_id=default_model_name,
+            cache_dir=cache_dir,
+            local_files_only=True,
+        )
+    except (FileNotFoundError, HttpxHTTPError, RequestsHTTPError) as e:
+        # A more specific error could be raised if we know it's a "not found" error
+        # For now, a generic failure is fine. HfHubHTTPError is for network-related issues,
+        # but with local_files_only=True, it might be raised for cache lookup failures.
+        # FileNotFoundError is also a possibility.
         pytest.fail(
-            f"CrossEncoder model directory not found: {model_dir}. "
-            "Run '.venv/bin/python scripts/setup/download_model.py' to download it."
+            f"Failed to find CrossEncoder model '{default_model_name}' in local cache at '{cache_dir}'.\\n"
+            f"Please run '.venv/bin/python scripts/setup/download_model.py' to download it.\\n"
+            f"Original error: {e}"
         )
 
-    # Look for config.json in the snapshots directory
-    snapshots_dir = model_dir / "snapshots"
-    if not snapshots_dir.is_dir():
-        pytest.fail(
-            f"CrossEncoder model snapshots directory not found: {snapshots_dir}. "
-            "Run '.venv/bin/python scripts/setup/download_model.py' to download it."
-        )
-
-    # Find the first snapshot (there should be only one)
-    snapshot_dirs = list(snapshots_dir.iterdir())
-    if not snapshot_dirs:
-        pytest.fail(
-            f"No snapshots found in {snapshots_dir}. "
-            "Run '.venv/bin/python scripts/setup/download_model.py' to download it."
-        )
-
-    # Use the first snapshot directory
-    snapshot_dir = snapshot_dirs[0]
-    config_path = snapshot_dir / "config.json"
-    if not config_path.is_file():
-        pytest.fail(
-            f"CrossEncoder model config.json not found: {config_path}. "
-            "Run '.venv/bin/python scripts/setup/download_model.py' to download it."
-        )
     return str(cache_dir)
 
 

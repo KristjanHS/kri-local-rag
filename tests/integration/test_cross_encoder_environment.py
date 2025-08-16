@@ -13,38 +13,24 @@ import pytest
 pytestmark = [pytest.mark.slow]
 
 
-def test_cross_encoder_is_loaded_and_used_for_reranking():
-    # Require sentence_transformers; skip if not installed
-    pytest.importorskip("sentence_transformers")
-
+def test_cross_encoder_is_loaded_and_used_for_reranking(cross_encoder_cache_dir):
+    """Verify that the real CrossEncoder is loaded from the local cache and used for reranking."""
     # Ensure heavy compile optimizations are disabled for speed in tests
     os.environ["RERANKER_CROSS_ENCODER_OPTIMIZATIONS"] = "false"
+    # Point to the local cache for offline loading
+    os.environ["SENTENCE_TRANSFORMERS_HOME"] = cross_encoder_cache_dir
 
-    # Make sure sentence_transformers is actually imported and present in sys.modules
-
-    # Reload qa_loop with sentence_transformers present so its snapshot allows loading
+    # Reload qa_loop to ensure it picks up the changed environment variables
     if "backend.qa_loop" in sys.modules:
-        del sys.modules["backend.qa_loop"]
+        importlib.reload(sys.modules["backend.qa_loop"])
     qa_loop = importlib.import_module("backend.qa_loop")
 
-    # Reset cached encoder
-    qa_loop._cross_encoder = None  # type: ignore[attr-defined]
+    # Reset cached encoder to ensure a fresh load
+    qa_loop._cross_encoder = None
 
     # Load the encoder (real CrossEncoder should be returned)
     encoder = qa_loop._get_cross_encoder()
-    assert encoder is not None, "Expected real CrossEncoder to be loaded"
-    assert hasattr(encoder, "predict"), "CrossEncoder should expose a predict method"
-
-    # Wrap predict to count invocations while still calling the real implementation
-    call_count = {"n": 0}
-    real_predict = encoder.predict
-
-    def _wrapped_predict(pairs):  # type: ignore[no-redef]
-        call_count["n"] += 1
-        return real_predict(pairs)
-
-    # Monkey-patch the cached instance. _score_chunks will reuse the cached encoder.
-    encoder.predict = _wrapped_predict  # type: ignore[assignment]
+    assert encoder is not None, "Expected real CrossEncoder to be loaded from cache"
 
     # Drive scoring on two chunks
     question = "What is retrieval augmented generation?"
@@ -56,5 +42,8 @@ def test_cross_encoder_is_loaded_and_used_for_reranking():
     scored = qa_loop._score_chunks(question, chunks)
     assert len(scored) == 2
     assert all(hasattr(sc, "score") for sc in scored)
-    # Ensure CrossEncoder.predict was actually called
-    assert call_count["n"] == 1, "Expected CrossEncoder.predict to be used for scoring"
+
+    # Verify that the scores are realistic and not fallback values (e.g., 0.0 or keyword-based)
+    # A relevant chunk should have a significantly higher score than an irrelevant one.
+    assert scored[0].score > scored[1].score, "Expected relevant chunk to have a higher score"
+    assert scored[1].score < 0.1, "Expected irrelevant chunk to have a very low score"

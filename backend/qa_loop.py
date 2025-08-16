@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import os
-import re
 import sys
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
@@ -131,45 +130,18 @@ def _get_cross_encoder(
 
 # ---------- Scoring of retrieved chunks --------------------------------------------------
 def _score_chunks(question: str, chunks: List[str]) -> List[ScoredChunk]:
-    """Return *chunks* each paired with a relevance score for *question*."""
+    """Return *chunks* each paired with a relevance score for *question*.
 
-    # Strategy 1: Try cross-encoder (best quality)
-    try:
-        encoder = _get_cross_encoder()
-        if encoder is not None:
-            logger.debug("Attempting cross-encoder scoring.")
-            pairs: List[Tuple[str, str]] = [(question, c) for c in chunks]
-            scores = encoder.predict(pairs)  # logits, pos > relevant
-            return [ScoredChunk(text=c, score=float(s)) for c, s in zip(chunks, scores)]
-        else:
-            # This is a controlled fallback, not an exception.
-            logger.warning("Cross-encoder model not available, falling back.")
-            raise RuntimeError("Encoder not available")
-    except Exception as e:
-        logger.warning(f"Cross-encoder scoring failed: {e}, falling back to keyword overlap.")
+    Uses CrossEncoder for scoring. Raises RuntimeError if CrossEncoder is not available.
+    """
+    encoder = _get_cross_encoder()
+    if encoder is None:
+        raise RuntimeError("CrossEncoder model is not available. Ensure the model is downloaded and accessible.")
 
-    # Strategy 2: Fallback to keyword overlap
-    try:
-        logger.debug("Attempting keyword overlap scoring.")
-
-        def preprocess(text: str) -> set:
-            words = re.findall(r"\b\w+\b", text.lower())
-            return set(words)
-
-        question_words = preprocess(question)
-        scored_chunks = []
-        for chunk in chunks:
-            chunk_words = preprocess(chunk)
-            intersection = len(question_words.intersection(chunk_words))
-            union = len(question_words.union(chunk_words))
-            score = max(0.0, intersection / union if union > 0 else 0.0)
-            scored_chunks.append(ScoredChunk(text=chunk, score=score))
-        return scored_chunks
-    except Exception as e:
-        logger.error(f"Keyword overlap scoring failed: {e}. Returning neutral scores.")
-
-    # Final fallback: neutral scores
-    return [ScoredChunk(text=c, score=0.0) for c in chunks]
+    logger.debug("Scoring chunks using cross-encoder.")
+    pairs: List[Tuple[str, str]] = [(question, c) for c in chunks]
+    scores = encoder.predict(pairs)  # logits, pos > relevant
+    return [ScoredChunk(text=c, score=float(s)) for c, s in zip(chunks, scores)]
 
 
 # ---------- Reranking of retrieved chunks --------------------------------------------------
