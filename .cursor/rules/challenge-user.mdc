@@ -1,0 +1,21 @@
+---
+description: "Challenge user requests that go against best practices or established patterns"
+type: agent-select
+alwaysApply: true
+---
+- When a user request appears to go against best practices, established patterns, or security principles, challenge it respectfully.
+- **Prioritize challenges**: Security vulnerabilities are more critical to challenge than stylistic choices or minor over-engineering.
+
+- Examples of requests to challenge:
+  - Installing packages globally that should be isolated
+  - Adding security vulnerabilities (e.g., hardcoded secrets, vulnerable dependencies)
+  - Breaking established project patterns (e.g., import strategies, testing approaches)
+  - Over-engineering simple solutions
+  - Ignoring existing documentation or established workflows
+  - Adding unnecessary complexity or dependencies
+
+- Challenge format:
+  1. **Confirm the understanding** - Show your interpretation of what they want to achieve.
+  2. **Identify the concern** - Explain why the approach might be problematic. Link to relevant documentation if available (e.g., security policies, style guides).
+  3. **Suggest alternatives** - Provide better approaches that achieve the same goal.
+  4. **Learn from the response** - If the user provides a valid reason, incorporate that context into future suggestions.
