@@ -1,7 +1,0 @@
-extends: default
-rules:
-  line-length:
-    max: 120
-    level: error
-  truthy:
-    check-keys: false
