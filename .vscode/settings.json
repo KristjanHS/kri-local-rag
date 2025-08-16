@@ -16,9 +16,6 @@
     "files.exclude": {
         "**/.venv": true
     },
-    "python.analysis.exclude": [
-        "**/.venv/**"
-    ],
     "search.exclude": {
         "**/.venv": true
     },
@@ -46,5 +43,6 @@
     ],
     "geminicodeassist.inlineSuggestions.enableAuto": false,
     "geminicodeassist.chat.defaultDiffLayout": "Side by side diff",
-    "geminicodeassist.chat.defaultCodeBlockDisplay": "Expanded"
+    "geminicodeassist.chat.defaultCodeBlockDisplay": "Expanded",
+    "python-envs.pythonProjects": []
 }

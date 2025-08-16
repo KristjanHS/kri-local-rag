@@ -46,20 +46,17 @@ def mock_encoder_success():
 
 @contextmanager
 def mock_encoder_predict_failure():
-    """Mock _get_cross_encoder to return an encoder that fails on predict."""
-    with patch("backend.qa_loop._get_cross_encoder") as get_ce:
-        mock = MagicMock()
-        mock.predict.side_effect = Exception("Model prediction failure")
-        get_ce.return_value = mock
+    """Mock _score_chunks to simulate a failure in the cross-encoder."""
+    with patch("backend.qa_loop._score_chunks", side_effect=Exception("Model prediction failure")):
         yield
 
 
 @contextmanager
 def mock_encoder_unavailable():
-    """Mock _get_cross_encoder to return None (encoder unavailable)."""
-    with patch("backend.qa_loop._get_cross_encoder") as get_ce:
-        get_ce.return_value = None
-        yield
+    """Mock _get_cross_encoder to return None, and _score_chunks to raise a RuntimeError."""
+    with patch("backend.qa_loop._get_cross_encoder", return_value=None):
+        with patch("backend.qa_loop._score_chunks", side_effect=RuntimeError("CrossEncoder model is not available.")):
+            yield
 
 
 def test_rerank_cross_encoder_success():
