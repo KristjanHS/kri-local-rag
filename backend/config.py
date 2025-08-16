@@ -179,11 +179,6 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "cas/mistral-7b-instruct-v0.3")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
 
-# If running in a Docker container, use the service name
-if os.getenv("DOCKER_ENV"):
-    OLLAMA_URL = "http://ollama:11434"
-    WEAVIATE_URL = "http://weaviate:8080"
-
 # Default context window (max tokens) for Ollama LLM requests
 OLLAMA_CONTEXT_TOKENS = int(os.getenv("OLLAMA_CONTEXT_TOKENS", 8192))  # e.g. 4096, 8192, etc.
 
