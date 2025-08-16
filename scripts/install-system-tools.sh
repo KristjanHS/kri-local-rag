@@ -96,6 +96,8 @@ if ! file /usr/local/bin/yamlfmt | grep -q 'ELF'; then
   exit 1
 fi
 
+
+
 # pyright is installed via pip from requirements-dev.txt into the project's .venv.
 # This ensures it's version-pinned and isolated. No system-wide install needed.
 
@@ -105,6 +107,7 @@ echo "Installed versions:"
 echo -n "actionlint: " && actionlint -version | head -n 1
 echo -n "hadolint: " && hadolint --version
 echo -n "yamlfmt: " && yamlfmt --version
+
 echo -n "pyright: " && (
   if [ -f ".venv/bin/pyright" ]; then
     .venv/bin/pyright --version 2>/dev/null

@@ -42,15 +42,16 @@ WORKDIR /app
 # Security strategy: Use apt-get upgrade for security updates rather than pinning specific versions
 # This allows security patches while maintaining build reproducibility through base image pinning
 # hadolint ignore=DL3008
-RUN apt-get update \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
     libmagic1 \
     poppler-utils \
     tesseract-ocr tesseract-ocr-eng \
     libgl1 libglib2.0-0 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean
 
 # Bring in the prebuilt virtualenv from the builder stage
 COPY --from=builder ${VENV_PATH} ${VENV_PATH}

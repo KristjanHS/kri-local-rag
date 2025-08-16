@@ -101,7 +101,15 @@ def test_single_rich_handler_and_no_duplicate_stream_handlers():
     and one file handler, with no duplicate StreamHandlers on the root logger.
     """
     # Import the modules that might trigger logging setup
-    from backend import config, qa_loop, retriever  # noqa: F401
+    # These imports are used for their side effects to trigger logging configuration
+    import backend.config
+    import backend.qa_loop
+    import backend.retriever
+
+    # Access the modules to make the imports "used" for pyright
+    _ = backend.config
+    _ = backend.qa_loop
+    _ = backend.retriever
 
     # Trigger logging setup by getting a logger
     from backend.config import get_logger
