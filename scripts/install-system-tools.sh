@@ -8,7 +8,7 @@ else
     SUDO_CMD="sudo"
 fi
 
-# Debian Bullseye base (your image) — install yamllint via apt.
+# Debian Bullseye base (your image) — install system dependencies via apt.
 $SUDO_CMD apt-get update && $SUDO_CMD env DEBIAN_FRONTEND=noninteractive apt-get install -y \
   curl jq ca-certificates tar xz-utils python3 python3-pip file
 
