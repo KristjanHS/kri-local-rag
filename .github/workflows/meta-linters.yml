@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run actionlint
-        uses: rhysd/actionlint-github-actions@v1
+        uses: docker://rhysd/actionlint:latest
         with:
           args: -color
   yamlfmt:
