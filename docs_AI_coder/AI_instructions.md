@@ -86,6 +86,12 @@ Run the CLI QA loop:
 
 See below for Testing and Docker. For human-oriented docs, see `docs/DEVELOPMENT.md`.
 
+### Policies: Linters
+
+- **`yamlfmt`**: All YAML files are formatted by `yamlfmt`. The rules are in `.yamlfmt`.
+  - **Check**: `yamlfmt --lint "**/*.yaml" "**/*.yml"`
+  - **Fix**: `yamlfmt "**/*.yaml" "**/*.yml"`
+
 ---
 
 ## Orientation

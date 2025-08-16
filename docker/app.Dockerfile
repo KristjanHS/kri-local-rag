@@ -51,7 +51,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     poppler-utils \
     tesseract-ocr tesseract-ocr-eng \
     libgl1 libglib2.0-0 \
-    && apt-get clean
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Bring in the prebuilt virtualenv from the builder stage
 COPY --from=builder ${VENV_PATH} ${VENV_PATH}

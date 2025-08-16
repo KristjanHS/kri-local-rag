@@ -32,55 +32,30 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 ## Prioritized Backlog
 
+#### P1 — ...
 
-
-#### P1 — Final Verification of All Meta Linters
-
-- **Overall P1 Goal**: Confirm that all meta-linters pass after all preceding fixes and optimizations.
-
-#### P1.1 - [REVISED] Debug and Fix `yamlfmt` Failures
-- **Goal**: Ensure `yamlfmt --lint` runs without errors by leveraging the existing `.gitignore` to exclude irrelevant files and directories.
-- **Best Practice**: Use a single source of truth for ignored files (`.gitignore`) to avoid configuration drift and simplify maintenance. The `-gitignore_excludes` flag in `yamlfmt` is the ideal tool for this.
-
-- [x] **Task 1: Validate `.gitignore`**
-  - Action: Review the `.gitignore` file to confirm that it properly excludes virtual environment directories (`.venv/`, `tools/uv_sandbox/`) and other paths that might contain problematic YAML files.
-  - Verify: The `.gitignore` file should already contain the necessary exclusion patterns.
-
-- [x] **Task 2: Test `yamlfmt` with the correct glob pattern**
-  - Action: Run the command `yamlfmt --lint "**/*.yaml" "**/*.yml"` to test the linter with the correct glob pattern.
-  - Verify: The command should complete successfully.
-
-- [x] **Task 3: Update the `product_todo.md`**
-  - Action: Modify the original `P1` task to use the correct glob pattern for the `yamlfmt` command.
-  - Verify: The `P1` task in `product_odo.md` should be updated to `yamlfmt --lint "**/*.yaml" "**/*.yml"`.
-
-- [x] **Task 4: Final Verification**
-  - Action: Run the updated `P1` task's commands.
-  - Verify: All linter commands, including the revised `yamlfmt` command, should exit with code 0.
-
-- [ ] Action: Run all three meta linters:
-  - `actionlint -color`
-  - `yamlfmt --lint "**/*.yaml" "**/*.yml"`
-  - `hadolint docker/app.Dockerfile`
-
-- [ ] Verify: All commands exit with code 0 and report no errors.
+Ready for new tasks
 
 #### P2 — Containerized CLI E2E copies (keep host-run E2E; add container-run twins)
 
 - Why: Host-run E2E miss packaging/runtime issues (entrypoint, PATH, env, OS libs). Twins validate the real image without replacing fast host tests.
 
-- [ ] Step 1 — Identify candidates
+- [x] Step 1 — Identify candidates
   - Action: List E2E tests invoking CLI in-process (e.g., `backend.qa_loop`) such as `tests/e2e/test_qa_real_end_to_end.py`.
   - Verify: Confirm they don't already run via container.
 
-- [ ] Step 2 — Compose runner for CLI (no bind mounts)
+- [x] Step 2 — Compose runner for CLI (no bind mounts)
   - Action: Add `cli` service (profile `cli`) in `docker/docker-compose.yml` using `kri-local-rag-app`, no `volumes`, `working_dir: /app`, and env:
     - `WEAVIATE_URL=http://weaviate:8080`, `OLLAMA_URL=http://ollama:11434`.
   - Verify: `docker compose --profile cli run --rm cli python -m backend.qa_loop --help | cat` exits 0.
 
-- [ ] Step 3 — Test helper
+- [x] Step 3 — Test helper
   - Action: In `tests/e2e/conftest.py`, add `run_cli_in_container(args, env=None)` that runs `docker compose --profile cli run --rm cli ...`, returns `returncode/stdout/stderr`.
   - Verify: `--help` smoke passes.
+
+- [x] Step 3.1 — Review and validate implementation
+  - Action: Review the implementation of the `cli` service and the `run_cli_in_container` helper against best practices.
+  - Verify: Confirm that the implementation is correct and that no corrective actions are needed.
 
 - [ ] Step 4 — Readiness and URLs
   - Action: Use existing `weaviate_compose_up`/`ollama_compose_up`; ensure ingestion uses compose-internal URLs.
