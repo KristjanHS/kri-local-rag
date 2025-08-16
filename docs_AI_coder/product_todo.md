@@ -94,7 +94,7 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 - **Context**: The `cross_encoder_cache_dir` fixture in `tests/conftest.py` currently has a hardcoded model path. This is brittle and will break if the model is ever updated. The fixture should be refactored to dynamically determine the model path from the application code itself.
 
-- [ ] **Task 1: Decouple Fixture from Hardcoded Model Path.**
+- [ ] **Task 0.1: Decouple Fixture from Hardcoded Model Path.**
   - Action: Modify `cross_encoder_cache_dir` in `tests/conftest.py` to programmatically read the default model name from the `_get_cross_encoder` function signature in `backend.qa_loop.py`.
   - Action: Use this model name to dynamically construct the path to the cached model's `config.json` file for verification. This will involve replacing `/` with `--` in the model name to match the cache's directory naming convention.
   - Verify: The fixture continues to work, and the integration tests can still locate the cached model without any hardcoded paths.
