@@ -29,14 +29,14 @@ docker compose -f docker/docker-compose.yml logs -f app | cat
 - Run E2E tests (quiet, fail fast):
 
 ```bash
-.venv/bin/python -m pytest -q -m e2e --disable-warnings --maxfail=1
+.venv/bin/python -m pytest -q tests/e2e --disable-warnings --maxfail=1
 ```
 
 - All-in-one (build + wait + tests):
 
 ```bash
 ./scripts/docker-setup.sh && \
-.venv/bin/python -m pytest -q -m e2e --disable-warnings --maxfail=1
+.venv/bin/python -m pytest -q tests/e2e --disable-warnings --maxfail=1
 ```
 
 - Stop services:
@@ -113,13 +113,17 @@ Server-side Weaviate modules like `text2vec-huggingface` or `reranker-huggingfac
 
 ### Test Suites
 
-The test suite is organized with markers to control scope and speed:
+The test suite is organized by folder structure to control scope and speed:
 
-- **Unit Tests** (`@pytest.mark.unit`): Fast, isolated tests for individual functions/classes using mocking.
-- **Integration Tests** (`@pytest.mark.integration`): Validate interactions, sometimes with Testcontainers.
-- **End-to-End (E2E) Tests** (`@pytest.mark.e2e`): Full workflow; requires Docker stack.
+- **Unit Tests** (`tests/unit/`): Fast, isolated tests for individual functions/classes using mocking.
+- **Integration Tests** (`tests/integration/`): Validate interactions, sometimes with Testcontainers.
+- **End-to-End (E2E) Tests** (`tests/e2e/`): Full workflow; requires Docker stack.
+- **UI Tests** (`tests/ui/`): Streamlit UI and Playwright browser tests.
+
+Additional markers for specific behaviors:
 - **Docker-Dependent Tests** (`@pytest.mark.docker`): Require a running Docker daemon.
 - **Slow Tests** (`@pytest.mark.slow`): Long-running tests.
+- **External Tests** (`@pytest.mark.external`): Require external services (Weaviate, Ollama).
 - **Environment Tests** (`@pytest.mark.environment`): Validate local dev environment.
 
 ### Running Tests
@@ -149,7 +153,7 @@ The test suite is organized with markers to control scope and speed:
 - E2E and Docker only (slowest):
 
 ```bash
-.venv/bin/python -m pytest -v -m "e2e or docker"
+.venv/bin/python -m pytest -v tests/e2e -m "docker"
 ```
 
 - Environment sanity checks:
@@ -174,7 +178,7 @@ Coverage policy:
 
 - Allowing network in one test
   - Use the opt-in fixture on that test only: `def test_x(allow_network): ...`
-  - Prefer moving real-network tests to `tests/integration/` and marking `@pytest.mark.integration`
+  - Prefer moving real-network tests to `tests/integration/` (folder-based organization)
 
 - Quick verify
   - `.venv/bin/python -m pytest -q tests/unit/test_network_block_sentinel_unit.py` should pass
@@ -336,10 +340,20 @@ Commands:
 docker compose -f docker/docker-compose.yml logs -f app | cat
 ```
 
+### Docker Compose Troubleshooting
+
+**Path Issues**: `docker compose -f docker/docker-compose.yml` resolves paths relative to compose file location
+- Fix: Use `.env.docker` (not `./docker/.env.docker`) in compose files
+- Validate: `docker compose -f docker/docker-compose.yml config`
+
+**Env File Errors**: If "env file not found":
+1. `ls -la docker/.env.docker` (check exists)
+2. Fix path in docker-compose.yml (relative to compose file)
+3. `docker compose -f docker/docker-compose.yml config` (validate)
+
 ### Run end-to-end (E2E) tests
 
 Notes:
-- Pytest default in `pytest.ini` excludes `slow`; selecting `-m e2e` overrides this.
 - Tests use env hooks to stay fast/deterministic:
   - `RAG_SKIP_STARTUP_CHECKS=1`
   - `RAG_FAKE_ANSWER=...`
@@ -348,7 +362,7 @@ Notes:
 Command (from project root):
 
 ```bash
-.venv/bin/python -m pytest -q -m e2e --disable-warnings --maxfail=1
+.venv/bin/python -m pytest -q tests/e2e --disable-warnings --maxfail=1
 ```
 
 All-in-one (start + wait + tests):
@@ -356,7 +370,7 @@ All-in-one (start + wait + tests):
 ```bash
 docker compose -f docker/docker-compose.yml up -d --build && \
 for i in {1..60}; do curl -fsS http://localhost:8501 >/dev/null 2>&1 && echo ready && break || sleep 1; done && \
-.venv/bin/python -m pytest -q -m e2e --disable-warnings --maxfail=1
+.venv/bin/python -m pytest -q tests/e2e --disable-warnings --maxfail=1
 ```
 
 Stop services:

@@ -11,6 +11,22 @@ This file tracks outstanding tasks and planned improvements for the project.
 - **Vectorization**: Uses a local `SentenceTransformer` model for client-side embeddings. Weaviate is configured for manually provided vectors.
 - **Reranking**: A separate, local `CrossEncoder` model is used to re-score initial search results for relevance.
 
+## Common Pitfalls and Solutions
+
+### Docker Compose Path Resolution
+- **Issue**: `docker compose -f docker/docker-compose.yml` resolves paths relative to compose file location, not working directory
+- **Fix**: Use `.env.docker` (not `./docker/.env.docker`) in compose files
+- **Verify**: `docker compose -f docker/docker-compose.yml config`
+
+### CI Test Execution Strategy
+- **Issue**: Integration and E2E tests require the full Docker stack (Weaviate, Ollama) which cannot run reliably on GitHub CI runners
+- **Fix**: Integration and E2E tests are excluded from GitHub CI entirely and only execute locally via act (nektos/act) on manual `workflow_dispatch` or scheduled runs
+- **Verify**: Fast tests (unit tests only) run on every PR, while integration/E2E tests run only locally via act
+
+### Task Verification
+- **Issue**: File existence ≠ functional working
+- **Fix**: Test actual commands that were failing, not just file presence
+
 ## Conventions
 
 - **Commands are examples**: Any equivalent approach that achieves the same outcome is acceptable
@@ -32,6 +48,68 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 ## Prioritized Backlog
 
+#### P0 — Refactor: Make CrossEncoder resilient and remove scoring fallback logic
+
+- **Context**: The current implementation in `backend/qa_loop.py` has a fallback mechanism in `_score_chunks()` if the `CrossEncoder` fails to load or score. This was likely added to handle cases where the model isn't downloaded, especially in network-restricted environments like unit tests. The goal is to remove this fallback, making the `CrossEncoder` a hard dependency. This requires ensuring it can be loaded reliably without network access during tests (using a local cache) and fails explicitly if the model is missing.
+
+- **Project Architecture & CrossEncoder Integration**:
+  - **Core Implementation**: `backend/qa_loop.py` - Contains `_get_cross_encoder()`, `_score_chunks()`, and `_rerank()` functions
+  - **CrossEncoder Model**: Uses `sentence-transformers.CrossEncoder` with model `"cross-encoder/ms-marco-MiniLM-L-6-v2"` for re-ranking search results
+  - **Lazy Loading Pattern**: `CrossEncoder = None` at module level, imported lazily in `_get_cross_encoder()` to avoid startup overhead
+  - **Caching Strategy**: `_cross_encoder` global variable caches the instance after first load for performance
+  - **Current Fallback Logic**: `_score_chunks()` has 3 strategies: 1) CrossEncoder scoring, 2) Keyword overlap scoring, 3) Neutral scores (0.0) as final fallback
+  - **Dependencies**: `sentence-transformers==5.0.0` in `requirements.txt` (required for CrossEncoder functionality)
+
+- **Test Infrastructure & Current Issues**:
+  - **Unit Tests**: `tests/unit/test_qa_loop_logic.py` - Contains tests with complex mock context managers for `_get_cross_encoder`
+  - **Cross-Encoder Specific Tests**: `tests/unit/test_cross_encoder_optimizations.py` - Tests PyTorch optimizations and model loading
+  - **Integration Tests**: `tests/integration/test_cross_encoder_environment.py` - Tests real CrossEncoder loading in various environments
+  - **Test Configuration**: `tests/unit/conftest.py` - Disables network access for unit tests (`@pytest.fixture(autouse=True)`)
+  - **Global Test Config**: `tests/conftest.py` - Sets up logging and test environment
+  - **Environment Variables**: `RERANKER_CROSS_ENCODER_OPTIMIZATIONS=false` in test environment to disable PyTorch optimizations
+  - **Current Mock Strategy**: Tests use `patch("backend.qa_loop._get_cross_encoder")` and reset `qa_loop._cross_encoder = None`
+
+- **Related Components & Dependencies**:
+  - **Vector Search**: `backend/vector_search.py` - Handles Weaviate queries and chunk retrieval
+  - **Chunk Processing**: `backend/chunking.py` - Text chunking and preprocessing
+  - **Configuration**: `backend/config.py` - Environment variables and settings
+  - **Logging**: `backend/logging_config.py` - Logging setup and configuration
+  - **Model Cache**: `~/.cache/huggingface/hub/` - Default location for sentence-transformers model cache
+  - **Docker Environment**: `docker/docker-compose.yml` - Container orchestration for Weaviate, Ollama, and app services
+
+- **Current Problem Areas**:
+  - **Intermittent Test Failures**: `test_rerank_cross_encoder_success` fails with `AssertionError: assert 0.0 == 0.0` indicating fallback to neutral scores
+  - **Mock Complexity**: Complex patching and state management in tests leads to race conditions
+  - **Fallback Reliability**: The fallback mechanism sometimes triggers when CrossEncoder should work
+  - **Network Dependencies**: Tests require network access for model download, conflicting with network restrictions
+
+- **Target Architecture**:
+  - **Single Scoring Path**: Only CrossEncoder scoring, no fallbacks
+  - **Explicit Failures**: Clear exceptions when CrossEncoder cannot load or score
+  - **Local Model Cache**: Pre-cached models for offline test environments
+  - **Simplified Tests**: Real CrossEncoder instances or simple mocks, no complex patching
+  - **Robust Loading**: Reliable model loading in all environments (dev, test, production)
+
+- [ ] **Task 1: Investigate and ensure reliable local loading.**
+  - Action: Confirm how `sentence-transformers` handles model caching. Determine the correct way to ensure the model is pre-cached for offline use.
+  - Action: Modify the test setup (if needed) to ensure the required model is available to the test environment without network access. This might involve a setup script or a dedicated test fixture. The current mock will be insufficient, as we want to test the real object's resilience.
+  - Verify: The `CrossEncoder` can be instantiated in a network-disabled environment (like the unit tests) without errors.
+
+- [ ] **Task 2: Refactor `qa_loop.py` to remove fallback logic.**
+  - Action: Modify `_score_chunks()` and `_rerank()` in `backend/qa_loop.py` to remove the keyword-based and neutral-score fallbacks.
+  - Action: The code should now directly call the cross-encoder. If `_get_cross_encoder()` fails to load the model, it should raise an exception instead of allowing a fallback.
+  - Verify: The code is simpler and has no fallback paths for scoring.
+
+- [ ] **Task 3: Update unit tests to reflect new behavior.**
+  - Action: Remove the mock for `_get_cross_encoder` in `tests/unit/test_qa_loop_logic.py`. The test `test_rerank_cross_encoder_success` should be updated to use a real `CrossEncoder` instance on test data, or a mock that very closely mimics the real object without the complexity of the previous patching.
+  - Action: Add a test case to verify that an exception is raised if the cross-encoder model cannot be loaded.
+  - Action: Remove tests that were specifically testing the fallback behavior, as it no longer exists.
+  - Verify: All unit tests in `test_qa_loop_logic.py` pass, and the test coverage for `qa_loop.py` remains adequate.
+
+- [ ] **Task 4: Run full test suite.**
+  - Action: Run the entire test suite (unit, integration, e2e) to ensure the refactoring hasn't caused regressions elsewhere.
+  - Verify: All tests pass.
+
 #### P1 — Fix Environment Configuration Issues (from code review)
 
 - **Context**: Recent refactoring removed the `cli` service but introduced configuration issues that need immediate fixing.
@@ -49,7 +127,7 @@ This file tracks outstanding tasks and planned improvements for the project.
   - Action: Update `test_qa_real_end_to_end.py` to remove dependency on this fixture.
   - Verify: E2E tests can run without the obsolete fixture.
 
-- [ ] **Task 3: Verify containerized tests work**
+- [x] **Task 3: Verify containerized tests work**
   - Action: Run containerized E2E tests to ensure they work with the simplified configuration.
   - Verify: `tests/e2e/test_qa_real_end_to_end_container_e2e.py` passes.
 
