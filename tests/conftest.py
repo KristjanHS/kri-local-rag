@@ -82,17 +82,53 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 @pytest.fixture(scope="session")
 def cross_encoder_cache_dir() -> str:
     """Ensure the CrossEncoder model is cached locally and return the cache path."""
+    import inspect
     from pathlib import Path
 
     # Assuming the project root is the parent of the 'tests' directory
     project_root = Path(__file__).parent
     cache_dir = project_root / "tests" / "model_cache"
 
+    # Dynamically read the default model name from the _get_cross_encoder function signature
+    from backend.qa_loop import _get_cross_encoder
+
+    sig = inspect.signature(_get_cross_encoder)
+    default_model_name = sig.parameters["model_name"].default
+
+    # Convert model name to cache directory format (replace / with --)
+    cache_model_name = default_model_name.replace("/", "--")
+
     # Verify that the cache directory and a model config file exist
-    config_path = cache_dir / "models--cross-encoder--ms-marco-MiniLM-L-6-v2" / "config.json"
+    # The model is stored in snapshots with a commit hash
+    model_dir = cache_dir / f"models--{cache_model_name}"
+    if not model_dir.is_dir():
+        pytest.fail(
+            f"CrossEncoder model directory not found: {model_dir}. "
+            "Run '.venv/bin/python scripts/setup/download_model.py' to download it."
+        )
+
+    # Look for config.json in the snapshots directory
+    snapshots_dir = model_dir / "snapshots"
+    if not snapshots_dir.is_dir():
+        pytest.fail(
+            f"CrossEncoder model snapshots directory not found: {snapshots_dir}. "
+            "Run '.venv/bin/python scripts/setup/download_model.py' to download it."
+        )
+
+    # Find the first snapshot (there should be only one)
+    snapshot_dirs = list(snapshots_dir.iterdir())
+    if not snapshot_dirs:
+        pytest.fail(
+            f"No snapshots found in {snapshots_dir}. "
+            "Run '.venv/bin/python scripts/setup/download_model.py' to download it."
+        )
+
+    # Use the first snapshot directory
+    snapshot_dir = snapshot_dirs[0]
+    config_path = snapshot_dir / "config.json"
     if not config_path.is_file():
         pytest.fail(
-            f"CrossEncoder model not found in cache: {config_path}. "
+            f"CrossEncoder model config.json not found: {config_path}. "
             "Run '.venv/bin/python scripts/setup/download_model.py' to download it."
         )
     return str(cache_dir)
