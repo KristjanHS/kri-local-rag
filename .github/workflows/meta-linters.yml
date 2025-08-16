@@ -17,7 +17,7 @@ on:
       - "**/*.yaml"
       - "Dockerfile"
       - "docker/**"
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -33,18 +33,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run actionlint
-        uses: docker://rhysd/actionlint:latest
+        uses: rhysd/actionlint-github-actions@v1
         with:
           args: -color
-  yamllint:
-    name: Yamllint (repo YAML)
+  yamlfmt:
+    name: "Yamlfmt (repo YAML)"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ibiqlik/action-yamllint@v3
-        with:
-          format: github
-          strict: true
+      - name: "Install yamlfmt"
+        run: ./scripts/install-system-tools.sh
+      - name: "Run yamlfmt in lint mode"
+        run: yamlfmt --lint .
   hadolint:
     name: Hadolint (Dockerfiles)
     runs-on: ubuntu-latest

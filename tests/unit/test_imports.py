@@ -1,12 +1,9 @@
 import subprocess
 from pathlib import Path
 
-import pytest
-
 from backend.config import EMBEDDING_MODEL, OLLAMA_MODEL
 
 
-@pytest.mark.unit
 def test_relative_import_fails_when_run_as_script():
     """Verify that running the test file as a script fails due to relative imports."""
     # Create a temporary test file with a relative import
@@ -30,7 +27,6 @@ def test_relative_import_fails_when_run_as_script():
     ), "Script should raise an ImportError or ModuleNotFoundError"
 
 
-@pytest.mark.unit
 def test_absolute_imports_work():
     """Verify that absolute imports from the project root work correctly."""
     assert OLLAMA_MODEL, "OLLAMA_MODEL should be imported"

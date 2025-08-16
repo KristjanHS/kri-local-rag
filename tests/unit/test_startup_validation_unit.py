@@ -14,7 +14,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.unit
 class TestStartupValidationUnit:
     """Unit tests for startup validation - no external dependencies."""
 
@@ -174,7 +173,6 @@ class TestStartupValidationUnit:
 
         logger.info("=== SENTENCE_TRANSFORMERS FALLBACK TEST COMPLETED ===")
 
-    @pytest.mark.xfail(reason="Intermittent pytest-playwright teardown error (browser.close)", strict=False)
     def test_retriever_import_fallback_without_heavy_import(self):
         """Test that retriever can be imported even without heavy dependencies."""
         logger.info("\n=== TESTING RETRIEVER IMPORT FALLBACK ===")

@@ -14,14 +14,14 @@ import socket
 import subprocess
 import sys
 import time
+import urllib.parse
 from contextlib import closing
 
 import pytest
 import requests
 from playwright.sync_api import Page, expect
-import urllib.parse
 
-pytestmark = [pytest.mark.e2e, pytest.mark.ui, pytest.mark.slow]
+pytestmark = [pytest.mark.slow]
 
 
 def _wait_http_ready(url: str, timeout_s: float = 20.0) -> None:

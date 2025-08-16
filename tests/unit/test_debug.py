@@ -3,13 +3,10 @@
 
 import logging
 
-import pytest
-
 from backend.config import get_logger
 from backend.console import console
 
 
-@pytest.mark.unit
 def test_debug_logging():
     """Test debug logging with different log levels."""
 
