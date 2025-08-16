@@ -6,11 +6,11 @@ permissions:
 
 on:
   pull_request:
-    # Run on all PRs regardless of branch to cover Renovate updates
-    # (branch protection should require this check)
+  # Run on all PRs regardless of branch to cover Renovate updates
+  # (branch protection should require this check)
   schedule:
-    - cron: "0 2 * * 1"  # weekly, Mon 02:00 UTC
-  workflow_dispatch:  # Allow manual triggering
+    - cron: "0 2 * * 1" # weekly, Mon 02:00 UTC
+  workflow_dispatch: {} # Allow manual triggering
 
 jobs:
   codeql:
@@ -21,8 +21,7 @@ jobs:
     timeout-minutes: 360
 
     if: >-
-      ${{ github.event_name != 'pull_request' ||
-      github.actor != 'nektos/act' }}
+      ${{ github.event_name != 'pull_request' || github.actor != 'nektos/act' }}
     # Use concurrency to cancel in-progress jobs on new commits
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
@@ -55,9 +54,7 @@ jobs:
           category: "/language:${{ matrix.language }}"
           # Skip upload under Act and forked PRs; still produce SARIF locally
           upload: >-
-            ${{ github.actor != 'nektos/act' && (github.event_name != 'pull_request' ||
-            github.event.pull_request.head.repo.fork == false) }}
-
+            ${{ github.actor != 'nektos/act' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }} #magic___^_^___line
       - name: Summarize CodeQL findings (local only)
         if: ${{ github.actor == 'nektos/act' }}
         run: |

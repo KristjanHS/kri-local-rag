@@ -3,7 +3,7 @@ name: Local Semgrep
 on:
   workflow_dispatch: {}
 
-permissions: 
+permissions:
   contents: read
   security-events: write
 

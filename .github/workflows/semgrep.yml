@@ -4,7 +4,7 @@ on:
   pull_request:
   workflow_dispatch: # Allow manual triggering
 
-permissions: 
+permissions:
   contents: read
   security-events: write
 
@@ -14,21 +14,21 @@ jobs:
     # Do not run under local act; only on GitHub runners
     if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-latest
-        
+
     # Add timeout to prevent hanging jobs
     timeout-minutes: 30
-    
+
     # Use concurrency to cancel in-progress jobs on new commits
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
-    
+
     permissions:
       actions: read
       contents: read
       security-events: write
       pull-requests: write
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
         with:
           config: auto
           publishToken: ${{ secrets.SEMGREP_APP_TOKEN }}
-      
+
       - name: Summarize Semgrep findings to logs
         if: ${{ always() }}
         run: |
@@ -73,7 +73,7 @@ jobs:
           except Exception as e:
               print(f"Could not parse semgrep.sarif: {e}")
           PY
-      
+
       - name: Upload SARIF to code scanning
         # Always try to upload, but skip on forked PRs and under act
         if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) && github.actor != 'nektos/act' }}
@@ -81,7 +81,7 @@ jobs:
         with:
           sarif_file: semgrep.sarif
           category: "semgrep"
-      
+
       - name: Comment PR with findings
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
