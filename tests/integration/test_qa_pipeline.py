@@ -16,7 +16,6 @@ pytestmark = pytest.mark.slow
 # -----------------------------------------------------------------------------
 
 
-@pytest.mark.integration
 @patch("backend.qa_loop.generate_response")
 @patch("backend.qa_loop.get_top_k")
 def test_qa_pipeline_produces_answer(mock_get_top_k, mock_generate_response):
@@ -52,7 +51,6 @@ def test_qa_pipeline_produces_answer(mock_get_top_k, mock_generate_response):
 # -----------------------------------------------------------------------------
 
 
-@pytest.mark.integration
 @patch("backend.qa_loop.get_top_k")
 def test_qa_pipeline_no_context(mock_get_top_k):
     """`answer()` should return a graceful message when the retriever finds nothing."""
@@ -70,7 +68,6 @@ def test_qa_pipeline_no_context(mock_get_top_k):
 # -----------------------------------------------------------------------------
 
 
-@pytest.mark.integration
 @patch("weaviate.connect_to_custom")
 def test_get_top_k_hybrid_parameters(mock_connect):
     """Verify that `get_top_k` issues a `hybrid()` query with the expected parameters."""

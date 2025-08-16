@@ -56,7 +56,6 @@ def weaviate_collection_mock():
         yield mock_collection
 
 
-@pytest.mark.integration
 def test_ingest_pipeline_with_real_weaviate(docker_services, weaviate_client):
     """Test the full ingestion pipeline with a real Weaviate instance, using a local model."""
     # Run the ingestion process on the 'test_data' directory
@@ -69,7 +68,6 @@ def test_ingest_pipeline_with_real_weaviate(docker_services, weaviate_client):
     assert count.total_count >= 2  # test.md and test.pdf
 
 
-@pytest.mark.integration
 def test_ingest_pipeline_loads_and_embeds_data(docker_services, weaviate_collection_mock, sample_documents_path):
     """Test the full ingestion pipeline from loading docs to inserting into Weaviate with a local model."""
     # Provide a real embedding model for this integration test
@@ -105,7 +103,6 @@ def test_ingest_pipeline_loads_and_embeds_data(docker_services, weaviate_collect
     assert len(first_object["vector"]) == 384
 
 
-@pytest.mark.integration
 @patch("backend.ingest.get_embedding_model", return_value=None)
 def test_ingest_pipeline_handles_no_embedding_model(mock_get_model, weaviate_collection_mock, sample_documents_path):
     """Test that the ingestion pipeline exits gracefully if no local embedding model is available."""
@@ -117,7 +114,6 @@ def test_ingest_pipeline_handles_no_embedding_model(mock_get_model, weaviate_col
         )
 
 
-@pytest.mark.integration
 def test_ingest_pipeline_is_idempotent(docker_services, weaviate_collection_mock, sample_documents_path):
     """Test that running ingestion multiple times doesn't create duplicate data, using a local model."""
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
