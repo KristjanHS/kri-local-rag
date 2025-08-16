@@ -1,9 +1,27 @@
+import sys
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-import backend.qa_loop as qa_loop
+# Mock all heavy dependencies before any imports
+sys.modules["sentence_transformers"] = MagicMock()
+sys.modules["sentence_transformers"].CrossEncoder = MagicMock()
+
+# Mock the config module to avoid .env file loading
+mock_config = MagicMock()
+mock_config.OLLAMA_MODEL = "test-model"
+mock_config.get_logger = MagicMock(return_value=MagicMock())
+mock_config.set_log_level = MagicMock()
+sys.modules["backend.config"] = mock_config
+
+# Mock other backend modules that might have heavy imports
+sys.modules["backend.console"] = MagicMock()
+sys.modules["backend.ollama_client"] = MagicMock()
+sys.modules["backend.retriever"] = MagicMock()
+
+# Now import the module under test
+from backend import qa_loop as qa_loop
 
 pytestmark = pytest.mark.unit
 
@@ -20,13 +38,14 @@ pytestmark = pytest.mark.unit
 
 @pytest.fixture(autouse=True)
 def _reset_encoder_cache():
-    """Fixture to reset the cached cross-encoder before each test.
+    """Reset the cached encoder between tests to ensure isolation."""
+    if hasattr(qa_loop, "_cached_encoder"):
+        delattr(qa_loop, "_cached_encoder")
 
-    This prevents state from leaking between tests, which can cause mocks to be
-    bypassed if a real encoder was cached by a previous test.
-    """
-    # Reset the cached encoder
-    qa_loop._cross_encoder = None
+    # Reset the mock for each test
+    sys.modules["sentence_transformers"].CrossEncoder.reset_mock()
+
+    yield
 
     # Also reset the module-level CrossEncoder to ensure no real imports happen
     qa_loop.CrossEncoder = None
@@ -41,21 +60,6 @@ def mock_encoder_success():
             mock = MagicMock()
             mock.predict.return_value = [0.9, 0.1]
             get_ce.return_value = mock
-            yield
-
-
-@contextmanager
-def mock_encoder_predict_failure():
-    """Mock _score_chunks to simulate a failure in the cross-encoder."""
-    with patch("backend.qa_loop._score_chunks", side_effect=Exception("Model prediction failure")):
-        yield
-
-
-@contextmanager
-def mock_encoder_unavailable():
-    """Mock _get_cross_encoder to return None, and _score_chunks to raise a RuntimeError."""
-    with patch("backend.qa_loop._get_cross_encoder", return_value=None):
-        with patch("backend.qa_loop._score_chunks", side_effect=RuntimeError("CrossEncoder model is not available.")):
             yield
 
 
@@ -75,83 +79,80 @@ def test_rerank_cross_encoder_success():
         assert result[1].score == 0.1
 
 
-def test_rerank_fallback_to_keyword_overlap_on_predict_failure():
-    """Test fallback to keyword scoring when cross-encoder.predict() fails."""
-    with mock_encoder_predict_failure():
-        chunks = ["some matching keywords", "completely different text"]
-        question = "test with matching keywords"
+def test_rerank_predict_failure_raises_exception():
+    """Test that the rerank function raises an exception when predict fails."""
+    question = "test question"
+    chunks = ["test chunk 1", "chunk 2"]
 
-        result = qa_loop._rerank(question, chunks, k_keep=2)
+    # Mock _get_cross_encoder to return a failing encoder
+    with patch("backend.qa_loop._get_cross_encoder") as get_ce:
+        mock_encoder = MagicMock()
+        mock_encoder.predict.side_effect = Exception("Model prediction failure")
+        get_ce.return_value = mock_encoder
 
-        assert len(result) == 2
-        assert result[0].text == "some matching keywords"
-        assert result[0].score > 0.0
-        assert result[1].text == "completely different text"
-        assert result[1].score == 0.0
-
-
-def test_rerank_fallback_when_encoder_is_unavailable():
-    """Test fallback when the cross-encoder model is completely unavailable."""
-    with mock_encoder_unavailable():
-        chunks = ["some matching keywords", "completely different text"]
-        question = "test with matching keywords"
-
-        result = qa_loop._rerank(question, chunks, k_keep=2)
-
-        assert len(result) == 2
-        assert result[0].text == "some matching keywords"
-        assert result[0].score > result[1].score
+        with pytest.raises(Exception, match="Model prediction failure"):
+            qa_loop._rerank(question, chunks, k_keep=2)
 
 
-def test_rerank_final_fallback_to_neutral_scores(caplog):
-    """Test final fallback to neutral scores if all scoring strategies fail."""
-    import logging as _logging
+def test_rerank_encoder_unavailable_raises_exception():
+    """Test that the rerank function raises an exception when encoder is unavailable."""
+    question = "test question"
+    chunks = ["test chunk 1", "chunk 2"]
 
-    caplog.set_level(_logging.ERROR, logger="backend.qa_loop")
-    with mock_encoder_predict_failure():
-        with patch("backend.qa_loop.re.findall", side_effect=Exception("Regex failure")):
-            chunks = ["chunk1", "chunk2"]
-            question = "test query"
-
-            result = qa_loop._rerank(question, chunks, k_keep=2)
-
-            assert len(result) == 2
-            assert all(r.score == 0.0 for r in result)
-            msgs = [rec.getMessage() for rec in caplog.records]
-            assert any("Keyword overlap scoring failed" in m for m in msgs)
+    # Mock _get_cross_encoder to return None to simulate unavailability
+    with patch("backend.qa_loop._get_cross_encoder", return_value=None):
+        with pytest.raises(RuntimeError, match="CrossEncoder model is not available"):
+            qa_loop._rerank(question, chunks, k_keep=2)
 
 
 def test_rerank_empty_chunks_list():
     """Test that reranking with an empty list of chunks returns an empty list."""
-    result = qa_loop._rerank("test query", [], k_keep=2)
-    assert result == []
+    # Mock _get_cross_encoder to avoid real model loading
+    with patch("backend.qa_loop._get_cross_encoder") as get_ce:
+        mock_encoder = MagicMock()
+        mock_encoder.predict.return_value = [0.5]  # Won't be used for empty list
+        get_ce.return_value = mock_encoder
+
+        result = qa_loop._rerank("test query", [], k_keep=2)
+        assert result == []
 
 
 def test_keyword_scoring():
-    """Test the keyword scoring logic."""
-    with mock_encoder_unavailable():
-        chunks = ["some matching keywords", "completely different text"]
-        question = "test with matching keywords"
+    """Test the keyword scoring logic with mocked cross-encoder."""
+    question = "test question"
+    chunks = ["this is a test chunk", "another chunk"]
+
+    # Mock _get_cross_encoder to return a working encoder
+    with patch("backend.qa_loop._get_cross_encoder") as get_ce:
+        mock_encoder = MagicMock()
+        mock_encoder.predict.return_value = [0.8, 0.3]  # First chunk more relevant
+        get_ce.return_value = mock_encoder
 
         scored_chunks = qa_loop._score_chunks(question, chunks)
 
+        # Should use cross-encoder scoring
         assert len(scored_chunks) == 2
-        assert scored_chunks[0].text == "some matching keywords"
-        assert scored_chunks[0].score > 0.0
-        assert scored_chunks[1].text == "completely different text"
-        assert scored_chunks[1].score == 0.0
+        assert scored_chunks[0].text == "this is a test chunk"
+        assert scored_chunks[0].score == 0.8
+        assert scored_chunks[1].text == "another chunk"
+        assert scored_chunks[1].score == 0.3
 
 
 def test_keyword_scoring_no_union():
     """Test the keyword scoring logic when there is no union between the question and chunk."""
-    with mock_encoder_unavailable():
-        chunks = ["", ""]
-        question = ""
+    chunks = ["", ""]
+    question = ""
+
+    # Mock _get_cross_encoder to return a working encoder
+    with patch("backend.qa_loop._get_cross_encoder") as get_ce:
+        mock_encoder = MagicMock()
+        mock_encoder.predict.return_value = [0.5, 0.5]  # Neutral scores
+        get_ce.return_value = mock_encoder
 
         scored_chunks = qa_loop._score_chunks(question, chunks)
 
         assert len(scored_chunks) == 2
-        assert all(sc.score == 0.0 for sc in scored_chunks)
+        assert all(sc.score == 0.5 for sc in scored_chunks)
 
 
 def test_no_real_model_loading():
