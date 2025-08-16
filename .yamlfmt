@@ -2,6 +2,16 @@
 # Using minimal config to keep it simple.
 # The formatter is opinionated and doesn't need much tuning.
 
+# Exclude patterns to avoid processing files in virtual environments and other problematic locations
+exclude:
+  - ".venv/**"
+  - "tools/uv_sandbox/**"
+  - "**/__pycache__/**"
+  - "**/*.egg-info/**"
+
+# Use doublestar globs for include and exclude
+doublestar: true
+
 # Dumper config: https://pkg.go.dev/gopkg.in/yaml.v3#Encoder
 dumper:
   indent: 2

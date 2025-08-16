@@ -4,6 +4,43 @@ This file records tasks that have been completed and moved out of the active TOD
 
 ## Archived on 2025-01-27
 
+### P0 — Docker Build Optimizations ✅ COMPLETED
+
+- **Goal**: Improve Docker build performance by reducing the build context and leveraging BuildKit caching.
+
+- [x] **Step 1: Add `.dockerignore`** ✅ **COMPLETED**
+  - Action: Create a root `.dockerignore` file to exclude unnecessary files like `.git`, `.venv`, and `__pycache__` from the build context.
+  - Verify: Observe a smaller "Sending build context to Docker daemon" size during the next build.
+
+- [x] **Step 2: Use BuildKit Cache for `apt`** ✅ **COMPLETED**
+  - Action: Modify the `apt-get` layer in `docker/app.Dockerfile` to use a `--mount=type=cache`, which will speed up subsequent builds.
+  - Verify: Confirm that a second `docker build` run is significantly faster due to cache hits on `apt` downloads.
+
+- [x] **Step 3: Verify Optimization Effectiveness** ✅ **COMPLETED**
+  - Action: Run a second Docker build to measure cache effectiveness and document the performance improvement.
+  - Verify: Second build should be significantly faster, especially in the `apt` layer, and build context should remain small.
+  - **Result**: Second build completed in 32.663s (vs 100s+ first build), all layers cached, build context remains small at 1.54kB. Cache mounts working effectively.
+
+- [x] **Step 4: Security Validation** ✅ **COMPLETED**
+  - Action: Run security scans (Semgrep, Hadolint) to validate that optimizations don't introduce security vulnerabilities.
+  - Verify: All security scans pass with no findings.
+  - **Result**: Semgrep (1062 rules) and Hadolint found zero security issues. All changes follow security best practices.
+
+**Status**: All steps completed. Docker build optimizations have been successfully implemented with significant performance improvements (32.663s vs 100s+ first build), proper security validation, and effective BuildKit cache utilization.
+
+### P5 — Log File Cleanup and Standardization (Task 2) ✅ COMPLETED
+
+- **Goal**: Move all log files from project root to `logs/` directory and establish proper logging practices.
+
+- [x] **Task 2: Update logging rule enforcement** ✅ **COMPLETED**
+  - Action: Ensure the new logging rule (`.cursor/rules/logging.mdc`) is properly configured and applied.
+  - Action: Update any CI scripts or build processes to create logs in `logs/` directory.
+  - Verify: All new log files are created in the correct location.
+
+**Status**: Task 2 completed. Logging rule enforcement has been properly configured and applied, ensuring all new log files are created in the correct `logs/` directory location.
+
+## Archived on 2025-01-27
+
 ### P1 — Renovate Local Development Setup and Validation ✅ COMPLETED
 
 - **Goal**: Establish proper local development workflow for Renovate configuration validation and testing to prevent future configuration errors.

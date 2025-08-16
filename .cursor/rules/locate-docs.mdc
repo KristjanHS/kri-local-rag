@@ -1,8 +1,7 @@
 ---
-description: "Instruct agents to find key context files in the docs_AI_coder folder"
+description: "Find project context files like product_todo.md and AI_instructions.md in the docs_AI_coder folder"
 type: agent-select
 alwaysApply: false
-globs: []
 ---
 - All project context files, for example **AI_instructions.md**, and **product_todo.md** and others, live under the `docs_AI_coder` directory at the project root.
 - For example, when you see a reference to `@AI_instructions.md` or `@product_todo.md`, resolve it as: 

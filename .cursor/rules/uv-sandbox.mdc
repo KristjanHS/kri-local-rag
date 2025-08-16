@@ -2,7 +2,6 @@
 description: "Rules for using the UV sandbox for dependency resolution"
 type: agent-select
 alwaysApply: false
-globs: []
 ---
 - Use pip for app/CI; use `tools/uv_sandbox/` only to resolve complex pins.
 - Use when: major/risky upgrades (Protobuf ≥5, gRPC series changes, `torch` 2.7.x, `sentence-transformers` 5.x) or conflicts before changing `requirements*.txt`.
