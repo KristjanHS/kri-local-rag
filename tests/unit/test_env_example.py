@@ -8,10 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 
-
-@pytest.mark.unit
 def test_env_example_exists_and_has_minimal_keys() -> None:
     project_root = Path(__file__).resolve().parents[2]
     env_example = project_root / ".env.example"

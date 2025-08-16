@@ -66,8 +66,8 @@ jobs:
             requirements-dev.txt
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Verify dependency health
         run: |
           python -m pip check
@@ -107,8 +107,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Pyright type checking
         run: pyright
         
@@ -131,8 +131,8 @@ jobs:
             requirements-dev.txt
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Prepare reports directories
         run: mkdir -p reports
       - name: Run integration tests
@@ -165,8 +165,8 @@ jobs:
             requirements-dev.txt
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Build and start services
         run: docker compose -f docker/docker-compose.yml up -d --build
       - name: Wait for services to be ready
@@ -210,8 +210,8 @@ jobs:
             requirements-dev.txt
       - name: Install dev test dependencies on host
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Build app image (docker-compose)
         run: |
           docker compose -f docker/docker-compose.yml build app
@@ -249,8 +249,8 @@ jobs:
             requirements-dev.txt
       - name: Install UI dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e .[ui]
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -e .[ui] --root-user-action=ignore
       - name: Install Playwright browsers
         run: |
           python -m playwright install --with-deps
@@ -312,8 +312,8 @@ jobs:
           cache-dependency-path: "requirements-dev.txt"
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Install Playwright browsers (for UI/E2E if selected)
         run: |
           python -m playwright install --with-deps
@@ -356,8 +356,8 @@ jobs:
             requirements-dev.txt
       - name: Install dev test dependencies on host
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Install Playwright browsers
         run: |
           python -m playwright install --with-deps

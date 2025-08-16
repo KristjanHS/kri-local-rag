@@ -34,15 +34,16 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 #### P0
 
-- [ ] Fix pytest mark warnings (180 warnings in pre-push checks)
-  - Action: Register the `unit` mark in `pyproject.toml` or `pytest.ini` to eliminate the 180 PytestUnknownMarkWarning messages
-  - Action: Add `[tool.pytest.ini_options]` section with `markers = ["unit: marks tests as unit tests"]` or similar configuration
-  - Verify: Run pre-push checks and confirm no more "Unknown pytest.mark.unit" warnings appear in test output
-  - Verify: All existing tests still pass with the new configuration
+- [x] Fix pytest mark warnings by removing `@pytest.mark.unit` and its registration
+  - Rationale: Migrating to folder-based test bundles where test type is derived from path. Explicit `unit` markers are being removed.
+  - Action: Find all Python test files using the `@pytest.mark.unit` decorator.
+  - Action: Remove the `@pytest.mark.unit` line from each identified test.
+  - Action: Remove the `"unit: marks tests as unit tests"` line from the `markers` array in `pyproject.toml`.
+  - Verify: Run pre-push checks (`scripts/git-hooks/pre-push.sh`) and confirm "PytestUnknownMarkWarning: Unknown pytest.mark.unit" warnings are no longer present.
+  - Verify: All existing tests still pass.
 
-- [ ] Document pip root user warnings (expected in CI)
-  - Action: Add note in CI documentation that pip root user warnings are expected when running in Docker containers via act
-  - Action: Consider adding `--root-user-action=ignore` to pip commands in CI if warnings become too noisy
+- [x] Document pip root user warnings (expected in CI)
+  - Action: Add `--root-user-action=ignore` to pip commands in CI if warnings become too noisy
   - Verify: CI documentation clearly explains these warnings are not actionable and expected behavior
 
 #### P1 — CLI/QA Loop UX and Logging Cleanup (reduce clutter, keep essentials)

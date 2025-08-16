@@ -7,11 +7,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 import yaml
 
 
-@pytest.mark.unit
 def test_compose_service_ports_binding_security() -> None:
     project_root = Path(__file__).resolve().parents[2]
     compose_path = project_root / "docker" / "docker-compose.yml"

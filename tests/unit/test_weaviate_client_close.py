@@ -1,11 +1,8 @@
 import types
 
-import pytest
-
 import backend.qa_loop as qa_loop
 
 
-@pytest.mark.unit
 def test_ensure_weaviate_ready_and_populated_closes_client(monkeypatch):
     class FakeCollections:
         def exists(self, name: str) -> bool:
