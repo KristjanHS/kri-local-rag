@@ -6,18 +6,8 @@ globs:
 alwaysApply: false
 ---
 - Use Ruff for all Python linting and formatting.
-- Ruff runs automatically on save (via the Ruff editor extension) and on commit (via pre-commit).
-- CI enforces Ruff (lint and format checks) in PRs.
-- Do not manually run Ruff after each edit; rely on the editor and pre-commit. If working headless or fixing CI, use:
+- Ruff runs automatically on save and on commit. If working headless or fixing CI, use:
   - `ruff check . --fix`
   - `ruff format .`
-
-# Printing and user output
-- Avoid using `print` (Ruff rule T201). Prefer:
-  - `logging` for application and tests
-  - `rich.console.Console.print` for user-facing CLI messages
-
-## Type checking (Pyright)
-- Use Pyright/BasedPyright for static type checking.
-- Pyright runs automatically in-editor (Cursor/VS Code) via the Pyright/BasedPyright extension, using `[tool.pyright]` in `pyproject.toml`.
-- Use `# type: ignore[...]` sparingly with a brief justification.
+- Avoid using `print` (Ruff rule T201). Prefer `logging` for application and tests.
+- Use Pyright for static type checking. Use `# type: ignore[...]` sparingly with justification.

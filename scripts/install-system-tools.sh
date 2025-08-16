@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Detect if we're running as root (devcontainer) or need sudo (host)
+if [ "$(id -u)" -eq 0 ]; then
+    SUDO_CMD=""
+else
+    SUDO_CMD="sudo"
+fi
+
 # Debian Bullseye base (your image) — install yamllint via apt.
-sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+$SUDO_CMD apt-get update && $SUDO_CMD DEBIAN_FRONTEND=noninteractive apt-get install -y \
   curl jq ca-certificates tar xz-utils python3 python3-pip yamllint file
 
 
@@ -25,9 +32,9 @@ else
 fi
 
 # Replace any old/corrupt binary, download fresh, make executable, and validate
-sudo rm -f /usr/local/bin/hadolint
-sudo curl -fLso /usr/local/bin/hadolint "${HL_URL}"
-sudo chmod +x /usr/local/bin/hadolint
+$SUDO_CMD rm -f /usr/local/bin/hadolint
+$SUDO_CMD curl -fLso /usr/local/bin/hadolint "${HL_URL}"
+$SUDO_CMD chmod +x /usr/local/bin/hadolint
 if ! file /usr/local/bin/hadolint | grep -q 'ELF'; then
   echo "Downloaded hadolint is not a valid ELF. URL: ${HL_URL}" >&2
   exit 1
@@ -39,9 +46,9 @@ fi
 
 # Download and install actionlint system-wide (Codespaces-compatible: avoid process substitution).
 TMP_SCRIPT="$(mktemp)"
+trap 'rm -f "$TMP_SCRIPT"' EXIT
 curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash -o "$TMP_SCRIPT"
-sudo bash "$TMP_SCRIPT" "${ACTIONLINT_VERSION}" "/usr/local/bin"
-rm -f "$TMP_SCRIPT"
+$SUDO_CMD bash "$TMP_SCRIPT" "${ACTIONLINT_VERSION}" "/usr/local/bin"
 
 # pyright is installed via pip from requirements-dev.txt into the project's .venv.
 # This ensures it's version-pinned and isolated. No system-wide install needed.
