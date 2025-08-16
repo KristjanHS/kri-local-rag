@@ -10,8 +10,12 @@ requires-python = ">=3.12"
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-include = ["backend*"]
+[tool.setuptools]
+py-modules = ["cli"]
+packages = ["backend", "frontend"]
+
+[project.scripts]
+kri-local-rag = "cli:main"
 
 [tool.ruff]
 line-length = 120
