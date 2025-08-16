@@ -14,7 +14,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.unit
 class TestStartupValidationUnit:
     """Unit tests for startup validation - no external dependencies."""
 

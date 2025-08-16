@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 from typing import Any, Dict
 
-import pytest
-
 from backend import ingest as ing
 
 
-@pytest.mark.unit
 def test_safe_created_at_handles_missing(tmp_path):
     # None or missing path should not raise and should return ISO string
     ts1 = ing._safe_created_at(None)
@@ -18,7 +15,6 @@ def test_safe_created_at_handles_missing(tmp_path):
     assert isinstance(ts2, str) and "T" in ts2
 
 
-@pytest.mark.unit
 def test_deterministic_uuid_stable():
     class Doc:
         page_content: str
