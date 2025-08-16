@@ -2,6 +2,54 @@
 
 This file records tasks that have been completed and moved out of the active TODO backlog.
 
+## Archived on 2025-08-16
+
+#### P1 — Final Verification of All Meta Linters
+
+- **Overall P1 Goal**: Confirm that all meta-linters pass after all preceding fixes and optimizations.
+
+#### P1.1 - [REVISED] Debug and Fix `yamlfmt` Failures
+- **Goal**: Ensure `yamlfmt --lint` runs without errors by leveraging the existing `.gitignore` to exclude irrelevant files and directories.
+- **Best Practice**: Use a single source of truth for ignored files (`.gitignore`) to avoid configuration drift and simplify maintenance. The `-gitignore_excludes` flag in `yamlfmt` is the ideal tool for this.
+
+- [x] **Task 1: Validate `.gitignore`**
+  - Action: Review the `.gitignore` file to confirm that it properly excludes virtual environment directories (`.venv/`, `tools/uv_sandbox/`) and other paths that might contain problematic YAML files.
+  - Verify: The `.gitignore` file should already contain the necessary exclusion patterns.
+
+- [x] **Task 2: Test `yamlfmt` with the correct glob pattern**
+  - Action: Run the command `yamlfmt --lint "**/*.yaml" "**/*.yml"` to test the linter with the correct glob pattern.
+  - Verify: The command should complete successfully.
+
+- [x] **Task 3: Update the `product_todo.md`**
+  - Action: Modify the original `P1` task to use the correct glob pattern for the `yamlfmt` command.
+  - Verify: The `P1` task in `product_odo.md` should be updated to `yamlfmt --lint "**/*.yaml" "**/*.yml"`.
+
+- [x] **Task 4: Final Verification**
+  - Action: Run the updated `P1` task's commands.
+  - Verify: All linter commands, including the revised `yamlfmt` command, should exit with code 0.
+
+#### P1.2 — Fix `yamlfmt` Formatting Automatically
+
+- **Goal**: Apply `yamlfmt` formatting rules directly to fix the `docker-compose.yml` file.
+- **Best Practice**: Let the formatting tool manage the file's contents to ensure it conforms to all configured rules, including line length, quoting, and indentation.
+
+- [x] **Action**: Run `yamlfmt` on the specific file that is causing issues, letting it automatically apply the correct formatting based on the rules in `.yamlfmt`.
+  - Command: `yamlfmt docker/docker-compose.yml`
+- [x] **Verify**: Run the linter check again to confirm that the file now passes.
+  - Command: `yamlfmt --lint docker/docker-compose.yml`
+- [x] **Verify**: Run the full linter suite again to ensure all meta-linters pass.
+  - `actionlint -color`
+  - `yamlfmt --lint "**/*.yaml" "**/*.yml"`
+  - `hadolint docker/app.Dockerfile`
+
+
+- [x] Action: Run all three meta linters:
+  - `actionlint -color`
+  - `yamlfmt --lint "**/*.yaml" "**/*.yml"`
+  - `hadolint docker/app.Dockerfile`
+
+- [x] Verify: All commands exit with code 0 and report no errors.
+
 ## Archived on 2025-01-27
 
 ### P0 — Docker Build Optimizations ✅ COMPLETED
@@ -18,8 +66,7 @@ This file records tasks that have been completed and moved out of the active TOD
 
 - [x] **Step 3: Verify Optimization Effectiveness** ✅ **COMPLETED**
   - Action: Run a second Docker build to measure cache effectiveness and document the performance improvement.
-  - Verify: Second build should be significantly faster, especially in the `apt` layer, and build context should remain small.
-  - **Result**: Second build completed in 32.663s (vs 100s+ first build), all layers cached, build context remains small at 1.54kB. Cache mounts working effectively.
+  - Verify: Second build should be significantly faster, especially in the `apt` layer, and build context should remain small at 1.54kB. Cache mounts working effectively.
 
 - [x] **Step 4: Security Validation** ✅ **COMPLETED**
   - Action: Run security scans (Semgrep, Hadolint) to validate that optimizations don't introduce security vulnerabilities.
@@ -845,7 +892,7 @@ This file records tasks that have been completed and moved out of the active TOD
 - Follow-up corrections (best-practice alignment)
       - [x] Update unit tests to assert `pytest_socket.SocketBlockedError` explicitly instead of generic `Exception`
       - [x] Reduce `UnitNetGuard` diagnostic log level from WARNING to INFO to avoid noisy test output
-- Skeptic checks considered: ensured detection isn’t masked by OS errors; reviewed shared fixtures; verified serial vs. parallel behavior
+- Skeptic checks considered: ensured detection isn't masked by OS errors; reviewed shared fixtures; verified serial vs. parallel behavior
 
 #### P1 — Stabilization and Finalization
  

@@ -87,3 +87,38 @@ def ollama_compose_up():  # type: ignore[no-redef]
     compose_file = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
     subprocess.run(["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "ollama"], check=True)
     yield
+
+
+@pytest.fixture(scope="session")
+def run_cli_in_container():  # type: ignore[no-redef]
+    """
+    Returns a callable that executes a command in the 'cli' docker-compose service.
+    The service is defined in `docker/docker-compose.yml` and uses the `cli` profile.
+    """
+    compose_file = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
+
+    def _run_cli(args: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+        """
+        Runs a command in the 'cli' service. The entrypoint is `python -m backend.qa_loop`.
+
+        Args:
+            args: Command-line arguments to pass to the python qa_loop entrypoint.
+            env: Optional dictionary of environment variables to set in the container.
+
+        Returns:
+            A subprocess.CompletedProcess instance with stdout, stderr, and returncode.
+        """
+        base_command = ["docker", "compose", "-f", compose_file, "--profile", "cli", "run", "--rm"]
+
+        env_vars = []
+        if env:
+            for key, value in env.items():
+                env_vars.extend(["-e", f"{key}={value}"])
+
+        # The container's command is `python -m backend.qa_loop` followed by args
+        full_command = base_command + env_vars + ["cli", "python", "-m", "backend.qa_loop"] + args
+
+        result = subprocess.run(full_command, capture_output=True, text=True, check=False)
+        return result
+
+    return _run_cli
