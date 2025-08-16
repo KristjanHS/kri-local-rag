@@ -1,7 +1,6 @@
 ---
+name: plan-agent-dont-execute
 description: "Create plans without execution - gather context and output numbered plans only"
-type: agent-select
-globs: []
 alwaysApply: false
 ---
 - You are in **PLAN** mode.

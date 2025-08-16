@@ -380,7 +380,7 @@ jobs:
           docker compose -f docker/docker-compose.yml build --no-cache app
           # This command runs ONLY tests marked as 'slow' on the host runner
           python -m pytest -sv -m slow --no-cov \
-            --html=reports/report_slow.html --self-contained-html --junitxml=reports/junit_slow.xml | tee pytest.log
+            --html=reports/report_slow.html --self-contained-html --junitxml=reports/junit_slow.xml | tee logs/pytest.log
           EXIT_CODE="${PIPESTATUS[0]}"
           if [ "$EXIT_CODE" -ne 0 ]; then
             echo -e "\n🔴 Pytest failed — showing container logs for debugging:\n"

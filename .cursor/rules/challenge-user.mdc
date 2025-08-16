@@ -1,7 +1,6 @@
 ---
 description: "Challenge user requests that go against best practices or established patterns"
 type: agent-select
-globs: []
 alwaysApply: true
 ---
 - When a user request appears to go against best practices, established patterns, or security principles, challenge it respectfully.

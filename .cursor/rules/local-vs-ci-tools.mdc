@@ -1,8 +1,7 @@
 ---
 description: "Prefer local tools over Docker/CI approaches for local development"
 type: agent-select
-globs: []
-alwaysApply: false
+alwaysApply: true
 ---
 
 When running tools locally that are also used in CI/CD workflows:
