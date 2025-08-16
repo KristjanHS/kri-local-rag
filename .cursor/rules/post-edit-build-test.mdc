@@ -1,8 +1,11 @@
 ---
-description: Run build and test suite after edits to catch regressions
+description: "Run build and test suite after edits to catch regressions and handle failures appropriately"
 type: agent-select
 globs: []
 alwaysApply: false
 ---
 - After completing edits, run the project's test command via `shell`.
-- If tests fail, revert changes and output failure logs.
+- On test failures:
+  - For first-time failures: Stop and output failure logs (see error-handling rule)
+  - For repeated failures after 3 attempts: Revert changes and apply problem-solving approach
+- This rule works in sequence with error-handling and problem-solving rules.

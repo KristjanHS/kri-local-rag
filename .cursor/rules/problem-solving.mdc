@@ -1,9 +1,12 @@
 ---
-description: "Rules when AI agent is stuck with solving an error or problem"
+description: "Apply systematic problem-solving approach after multiple failure attempts"
 type: agent-select
-globs: [] 
+globs: []
 alwaysApply: true
 ---
-- When trying to solve an error or problem has failed for 3 times (the tests still fail):
-  1. Check all the code changes made in this chat session, search for the best practices for cases that were solved here, validate all code changes against these best practices (explaining why you think they were right, or admitting the problem), and make a simplest possible plan to only correct the code changes that went in the wrong direction. Add the plan as tasks to product_todo.md, then execute the plan. 
-  2. Take a step back, focus only on one top problem, search for best practice solution option for this, then make a plan how to debug and solve it in small incremental steps. Add the plan as tasks to product_todo.md, then execute the correction plan. 
+- When trying to solve an error or problem has failed for 3 times:
+  1. Review code changes made in this session and create a plan to correct wrong directions
+  2. Focus on one top problem and create incremental debugging steps
+  3. Add plans to product_todo.md and execute them
+- This rule takes precedence over error-handling rules (see `error-handling.mdc`) after 3 failed attempts.
+- Sequence: First apply error-handling (stop on failure), then after 3 attempts apply problem-solving (create plan and execute). 
