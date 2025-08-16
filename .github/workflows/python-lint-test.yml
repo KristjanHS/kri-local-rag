@@ -49,6 +49,7 @@ jobs:
           version: "0.5.3"
           args: format --check .
 
+
   fast_tests:
     name: Fast Tests
     runs-on: ubuntu-latest

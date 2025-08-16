@@ -107,6 +107,7 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 - Detailed guidance used mostly by AI coder: `docs_AI_coder/AI_instructions.md`
 - Docker management and troubleshooting: `docs/docker-management.md`
 
+
 ## Helper scripts
 
 - `scripts/docker-setup.sh`: one-time Docker environment bootstrap.

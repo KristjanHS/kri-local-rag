@@ -4,6 +4,110 @@ This file records tasks that have been completed and moved out of the active TOD
 
 ## Archived on 2025-01-27
 
+### P1 — Renovate Local Development Setup and Validation ✅ COMPLETED
+
+- **Goal**: Establish proper local development workflow for Renovate configuration validation and testing to prevent future configuration errors.
+
+- [x] **Step 1: Install Renovate CLI and Validation Tools** ✅ **COMPLETED**
+  - Action: Install Renovate CLI globally or ensure it's available via npx for local validation.
+  - Action: Test the `renovate-config-validator` tool: `npx --package renovate renovate-config-validator renovate.json`
+  - Verify: Validator runs without errors and confirms configuration is valid.
+
+- [x] **Step 2: Set Up Local Authentication for Testing** ✅ **COMPLETED**
+  - Action: Create a GitHub Personal Access Token (PAT) with minimal permissions (repo scope) for local testing.
+  - Action: Set up environment variable: `export GITHUB_TOKEN=your_test_token`
+  - Action: Create a dedicated test repository or fork for Renovate testing.
+  - Verify: Can run Renovate CLI with authentication: `npx renovate --help` (should not show auth errors).
+
+- [x] **Step 3: Implement Local Dry-Run Testing** ✅ **COMPLETED**
+  - Action: Create a test script `scripts/test-renovate-config.sh` that runs:
+    ```bash
+    LOG_LEVEL=debug npx renovate --platform=local --dry-run=full --require-config=ignored --token=$GITHUB_TOKEN .
+    ```
+  - Action: Add the script to the project's development workflow.
+  - Verify: Dry-run completes successfully and shows expected behavior without creating actual PRs.
+
+- [x] **Step 4: Add Configuration Validation to CI/CD** ✅ **COMPLETED**
+  - Action: Add a GitHub Action step to validate `renovate.json` before deployment.
+  - Action: Use `renovate-config-validator` in the CI pipeline.
+  - Verify: CI fails if Renovate configuration is invalid, preventing deployment of broken configs.
+
+- [x] **Step 5: Create Configuration Testing Documentation** ✅ **COMPLETED**
+  - Action: Document the local Renovate testing workflow in `docs/DEVELOPMENT.md`.
+  - Action: Include troubleshooting guide for common Renovate configuration issues.
+  - Action: Add examples of valid configuration patterns and common pitfalls.
+  - Verify: Documentation provides clear guidance for future Renovate configuration changes.
+
+- [x] **Step 6: Implement Configuration Migration Checks** ✅ **COMPLETED**
+  - Action: Add `--strict` flag to validation to catch deprecated options and suggest migrations.
+  - Action: Set up periodic checks for configuration updates and deprecation warnings.
+  - Verify: System proactively identifies configuration issues before they cause failures.
+
+**Status**: All steps completed. Renovate local development setup and validation workflow has been established with secure npx-based validation, local authentication, dry-run testing, CI/CD integration, comprehensive documentation, and migration checks.
+
+### P2 — Fix Renovate Security and Best Practice Issues ✅ COMPLETED
+
+- **Goal**: Revert problematic changes that violate security and best practices, while maintaining the working validation functionality.
+
+- [x] **Step 1: Remove Renovate from System Tools Installation** ✅ **COMPLETED**
+  - Action: Remove the Renovate installation section from `scripts/install-system-tools.sh`
+  - Action: Remove Renovate version check from the installed versions list
+  - Verify: System tools script no longer installs Renovate globally
+
+- [x] **Step 2: Revert CI Workflow to Use npx** ✅ **COMPLETED**
+  - Action: Change CI workflow back to use `npx --package renovate renovate-config-validator`
+  - Action: Ensure both basic and strict validation use npx approach
+  - Verify: CI uses npx instead of assuming global installation
+
+- [x] **Step 3: Update Documentation to Reflect npx Approach** ✅ **COMPLETED**
+  - Action: Update `docs/DEVELOPMENT.md` to use npx commands
+  - Action: Remove reference to system tools installation
+  - Action: Add note about why npx is preferred over global installation
+  - Verify: Documentation consistently recommends npx approach
+
+- [x] **Step 4: Test the Corrected Approach** ✅ **COMPLETED**
+  - Action: Test local validation using npx approach
+  - Action: Verify CI workflow changes work correctly
+  - Action: Confirm no security vulnerabilities are introduced
+  - Verify: All validation functionality works without global installation
+
+**Status**: All steps completed. Renovate security and best practice issues have been resolved by reverting to npx-based validation, removing global installation, updating documentation, and maintaining all validation functionality without security vulnerabilities.
+
+### P3 — Cursor Rules Enhancement: Challenge User Requests ✅ COMPLETED
+
+- **Goal**: Create a new Cursor rule that enables AI agents to challenge user requests that go against best practices, ensuring better code quality and adherence to project standards.
+
+- [x] **Step 1: Create Challenge User Requests Rule** ✅ **COMPLETED**
+  - Action: Create `.cursor/rules/challenge-user-requests.mdc` with comprehensive guidance for challenging user requests
+  - Action: Include examples of requests to challenge (security vulnerabilities, breaking patterns, over-engineering)
+  - Action: Define clear challenge format with acknowledgment, concern identification, alternatives, and clarification
+  - Verify: Rule file exists with proper YAML frontmatter and comprehensive content
+
+- [x] **Step 2: Refine Rule Format and Content** ✅ **COMPLETED**
+  - Action: Fix YAML frontmatter to match other `.mdc` files format
+  - Action: Remove unnecessary noise and make challenge format more concise
+  - Action: Add prioritization guidance for security vulnerabilities
+  - Action: Include documentation linking and learning from user feedback
+  - Verify: Rule is concise, actionable, and follows best practices for constructive feedback
+
+- [x] **Step 3: Review Against Best Practices** ✅ **COMPLETED**
+  - Action: Review the rule against established best practices for AI agent behavior
+  - Action: Ensure the rule promotes respectful and constructive dialogue
+  - Action: Verify the rule helps maintain code quality without being overly prescriptive
+  - Verify: Rule is comprehensive, well-structured, and follows best practices for constructive feedback
+
+**Status**: All steps completed. The challenge-user-requests rule has been created, refined, and reviewed. It provides clear guidance for AI agents to challenge user requests that go against best practices while maintaining respectful and constructive dialogue.
+
+### P4 — Fix Pyright Warnings ✅ COMPLETED
+
+- **Goal**: Resolve code quality issues identified by the Pyright type checker.
+
+- [x] **Fix unused imports in test file** ✅ **COMPLETED**
+  - Action: Fix pyright warnings for unused imports in `tests/unit/test_logging_config.py`
+  - Verify: Pyright runs without warnings for the test file
+
+## Archived on 2025-01-27
+
 ### P1 — Fix Meta Linter Errors (YAML, Docker, GitHub Actions) ✅ COMPLETED
 
 - **Goal**: Fix all meta linter errors found by actionlint, yamlfmt, and hadolint to ensure CI passes and code quality standards are met.
