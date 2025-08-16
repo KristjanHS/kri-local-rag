@@ -61,7 +61,7 @@ class ScoredChunk:
 CrossEncoder = None  # type: ignore
 
 # Cache the cross-encoder instance after first load to avoid re-loading on every question
-_cross_encoder: "CrossEncoder | None" = None  # type: ignore
+_cross_encoder: Any = None  # type: ignore
 
 # Keep Ollama context tokens between calls so the model retains conversation state
 _ollama_context: list[int] | None = None
@@ -95,7 +95,7 @@ def _get_cross_encoder(
         try:
             # Pass cache_folder to the constructor if it's provided
             kwargs = {"cache_folder": cache_folder} if cache_folder else {}
-            _cross_encoder = ctor(model_name, **kwargs)
+            _cross_encoder = ctor(model_name, **kwargs)  # type: ignore[reportArgumentType]
 
             # Apply PyTorch CPU optimizations (skip in testing environments)
             # New preferred flag: RERANKER_CROSS_ENCODER_OPTIMIZATIONS (true enables opts)
