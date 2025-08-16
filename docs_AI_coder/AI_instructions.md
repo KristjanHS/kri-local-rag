@@ -74,6 +74,16 @@ Run the CLI QA loop:
   - Correct: `.venv/bin/python -m backend.qa_loop`
   - Incorrect: `.venv/bin/python backend/qa_loop.py`
 
+### Policies: Renovate configuration validation
+
+- Always validate Renovate configuration changes before committing:
+  ```bash
+  npx --package renovate renovate-config-validator renovate.json
+  npx --package renovate renovate-config-validator --strict renovate.json
+  ```
+- Use `npx` approach (not global installation) to avoid security vulnerabilities
+- Validate locally before committing (CI focuses on code quality)
+
 See below for Testing and Docker. For human-oriented docs, see `docs/DEVELOPMENT.md`.
 
 ---

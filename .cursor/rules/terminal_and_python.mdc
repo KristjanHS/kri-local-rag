@@ -1,12 +1,10 @@
 ---
 description: "Execute terminal commands with consistent Python environment and proper output handling"
 type: agent-select
-globs: []
-alwaysApply: false
+alwaysApply: true
 ---
 - **Run commands from the project root.**
 - **Use `.venv/bin/python` for Python execution** to ensure consistent virtual environment usage.
-- **Run Pytest as a module:** `.venv/bin/python -m pytest tests/` to avoid `ImportError` issues.
 - **NEVER use PYTHONPATH.** It can break virtual environment detection.
 
 - If a command may invoke a pager or hide output in non-interactive mode (e.g., `git log`, `git diff`), append `| cat` to force full output to the chat/logs.

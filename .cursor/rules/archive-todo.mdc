@@ -1,7 +1,6 @@
 ---
 description: "Archive completed task groups from product_todo.md"
 type: agent-select
-globs: []
 alwaysApply: false
 ---
 - Archive when a task group in `docs_AI_coder/product_todo.md` is fully done.

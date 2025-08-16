@@ -75,6 +75,9 @@ reports/
 # Coverage artifacts
 .coverage*
 
+# Analysis & Scan Reports
+*.sarif
+
 # Third-party libraries you've vendored/included
 vendor/
 third_party/

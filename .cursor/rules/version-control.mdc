@@ -1,8 +1,9 @@
 ---
-description: "Rules for version control with Git"
+description: "How to use Git for version control: use Conventional Commits and work on the dev branch"
 type: agent-select
 alwaysApply: false
 ---
 - Use Git for version control.
 - Use Conventional Commits.
 - Use dev branch for new features and bug fixes.
+- To avoid the interactive pager that you get with `git log`, use `git --no-pager log`
