@@ -35,8 +35,48 @@ This file tracks outstanding tasks and planned improvements for the project.
 #### P0 — In-progress Agent Session
 
 - [x] Fix pyright warnings for unused imports in `tests/unit/test_logging_config.py`.
+- [x] Fix Renovate configuration error: `dependencyDashboardClose` → `dependencyDashboardAutoclose`
 
-#### P1 - ...
+#### P1 — Renovate Local Development Setup and Validation
+
+- **Goal**: Establish proper local development workflow for Renovate configuration validation and testing to prevent future configuration errors.
+
+- [ ] **Step 1: Install Renovate CLI and Validation Tools**
+  - Action: Install Renovate CLI globally or ensure it's available via npx for local validation.
+  - Action: Test the `renovate-config-validator` tool: `npx --package renovate renovate-config-validator renovate.json`
+  - Verify: Validator runs without errors and confirms configuration is valid.
+
+- [ ] **Step 2: Set Up Local Authentication for Testing**
+  - Action: Create a GitHub Personal Access Token (PAT) with minimal permissions (repo scope) for local testing.
+  - Action: Set up environment variable: `export GITHUB_TOKEN=your_test_token`
+  - Action: Create a dedicated test repository or fork for Renovate testing.
+  - Verify: Can run Renovate CLI with authentication: `npx renovate --help` (should not show auth errors).
+
+- [ ] **Step 3: Implement Local Dry-Run Testing**
+  - Action: Create a test script `scripts/test-renovate-config.sh` that runs:
+    ```bash
+    LOG_LEVEL=debug npx renovate --platform=local --dry-run=full --require-config=ignored --token=$GITHUB_TOKEN .
+    ```
+  - Action: Add the script to the project's development workflow.
+  - Verify: Dry-run completes successfully and shows expected behavior without creating actual PRs.
+
+- [ ] **Step 4: Add Configuration Validation to CI/CD**
+  - Action: Add a GitHub Action step to validate `renovate.json` before deployment.
+  - Action: Use `renovate-config-validator` in the CI pipeline.
+  - Verify: CI fails if Renovate configuration is invalid, preventing deployment of broken configs.
+
+- [ ] **Step 5: Create Configuration Testing Documentation**
+  - Action: Document the local Renovate testing workflow in `docs/DEVELOPMENT.md`.
+  - Action: Include troubleshooting guide for common Renovate configuration issues.
+  - Action: Add examples of valid configuration patterns and common pitfalls.
+  - Verify: Documentation provides clear guidance for future Renovate configuration changes.
+
+- [ ] **Step 6: Implement Configuration Migration Checks**
+  - Action: Add `--strict` flag to validation to catch deprecated options and suggest migrations.
+  - Action: Set up periodic checks for configuration updates and deprecation warnings.
+  - Verify: System proactively identifies configuration issues before they cause failures.
+
+#### P2 - ...
 
 place new topic goal+tasks here
 
