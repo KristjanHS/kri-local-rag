@@ -47,6 +47,19 @@ docker compose restart weaviate && docker compose logs -f weaviate | cat
 docker compose exec -e LOG_LEVEL=DEBUG app bash
 ```
 
+## Docker Image Security
+
+### OS Package Security Strategy
+
+The project's `app.Dockerfile` uses a security strategy that balances reproducibility and receiving timely security updates.
+
+- **Pinned Base Image**: The `FROM python:3.12.3-slim` line uses a specific, immutable tag. This ensures that the foundational OS layer is consistent and reproducible across all builds.
+- **Security Updates on Build**: The `RUN apt-get update && apt-get upgrade -y` command is intentionally included. It applies the latest available security patches for the OS packages provided by the base image's distribution (`debian:bookworm` in this case).
+
+This approach is preferred over pinning individual `apt` package versions (e.g., `apt-get install <package>=<version>`). While package pinning offers maximum reproducibility, it prevents automatic security patches and creates a significant maintenance burden to manually track and update dozens of packages for vulnerabilities.
+
+The `hadolint` linter may flag this as a warning (DL3008), which is why it is explicitly ignored with an inline comment (`# hadolint ignore=DL3008`) in the Dockerfile.
+
 ## Troubleshooting
 
 ### Port Conflicts

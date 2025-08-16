@@ -31,7 +31,7 @@ def _get_ollama_base_url() -> str:
     return OLLAMA_URL
 
 
-def _detect_ollama_model() -> str | None:
+def _detect_ollama_model() -> Optional[str]:
     """Return the first available model reported by the Ollama server or None."""
     try:
         # /api/tags lists all pulled models

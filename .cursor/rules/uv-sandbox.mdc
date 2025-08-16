@@ -6,24 +6,5 @@ globs: []
 ---
 - Use pip for app/CI; use `tools/uv_sandbox/` only to resolve complex pins.
 - Use when: major/risky upgrades (Protobuf ≥5, gRPC series changes, `torch` 2.7.x, `sentence-transformers` 5.x) or conflicts before changing `requirements*.txt`.
-- Steps:
-  1) Edit `tools/uv_sandbox/pyproject.toml` targets
-  2) Run:
-     ```bash
-     cd tools/uv_sandbox
-     ./run.sh
-     ```
-  3) Verify:
-     ```bash
-     uv tree | head -200 | cat
-     uv pip check
-     ```
-  4) If clean, copy direct pins to `requirements.txt`/`requirements-dev.txt`
-  5) Reinstall and verify:
-     ```bash
-     export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
-     .venv/bin/python -m pip install -r requirements-dev.txt
-     .venv/bin/python -m pip check
-     .venv/bin/python -m pytest --test-core -q
-     ```
-- Guardrails: no `uv` in app/CI; use `uv lock --check` + `uv sync --frozen`; do not track `tools/uv_sandbox/.venv/`; commit `pyproject.toml`/`uv.lock`; prefer CPU wheels unless CUDA/ROCm needed.
+- Follow the steps in `tools/uv_sandbox/run.sh` and verify with `uv tree` and `uv pip check`.
+- Guardrails: no `uv` in app/CI; prefer CPU wheels unless CUDA/ROCm needed.

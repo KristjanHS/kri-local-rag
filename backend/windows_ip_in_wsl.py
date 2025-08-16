@@ -1,3 +1,5 @@
+from typing import Optional
+
 #!/usr/bin/env python3
 """
 Utility to retrieve the Windows host's private IP address from WSL.
@@ -13,7 +15,7 @@ import subprocess
 from backend.console import console
 
 
-def get_windows_host_ip() -> str | None:
+def get_windows_host_ip() -> Optional[str]:
     """
     Retrieves the Windows host's private IP address from within WSL.
 

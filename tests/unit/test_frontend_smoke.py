@@ -11,8 +11,6 @@ from types import ModuleType
 from typing import Any
 from unittest.mock import patch
 
-import pytest
-
 
 class _StubSidebar:
     def __getattr__(self, name: str) -> Any:  # slider, number_input, markdown, expander, etc.
@@ -93,7 +91,6 @@ class _StubSessionState:
             self._data[name] = value
 
 
-@pytest.mark.unit
 def test_frontend_module_imports_with_stub(monkeypatch) -> None:
     """Test that frontend module can be imported without making real connections."""
     # Inject stubbed streamlit before importing the app

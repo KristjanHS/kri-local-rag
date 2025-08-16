@@ -48,13 +48,14 @@ docker compose -f docker/docker-compose.yml down
 Ports: app `http://localhost:8501`, Weaviate `http://localhost:8080`, Ollama `http://localhost:11434`.
 
 ### Local dev quick setup
-
+To set up your local development environment, including the Python virtualenv, all dependencies, and system tools, run the unified setup script:
 ```bash
-python -m venv .venv
+bash scripts/setup-dev-env.sh
+```
+
+After setup is complete, activate the virtual environment:
+```bash
 source .venv/bin/activate
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements-dev.txt
-.venv/bin/python -m pip install -e .
 ```
 
 Run the CLI QA loop:
