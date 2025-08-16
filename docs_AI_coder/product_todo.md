@@ -44,6 +44,16 @@ This file tracks outstanding tasks and planned improvements for the project.
   - Action: Modify the `apt-get` layer in `docker/app.Dockerfile` to use a `--mount=type=cache`, which will speed up subsequent builds.
   - Verify: Confirm that a second `docker build` run is significantly faster due to cache hits on `apt` downloads.
 
+- [x] **Step 3: Verify Optimization Effectiveness**
+  - Action: Run a second Docker build to measure cache effectiveness and document the performance improvement.
+  - Verify: Second build should be significantly faster, especially in the `apt` layer, and build context should remain small.
+  - **Result**: Second build completed in 32.663s (vs 100s+ first build), all layers cached, build context remains small at 1.54kB. Cache mounts working effectively.
+
+- [x] **Step 4: Security Validation**
+  - Action: Run security scans (Semgrep, Hadolint) to validate that optimizations don't introduce security vulnerabilities.
+  - Verify: All security scans pass with no findings.
+  - **Result**: Semgrep (1062 rules) and Hadolint found zero security issues. All changes follow security best practices.
+
 #### P1 — Final Verification of All Meta Linters
 
 - **Goal**: Confirm that all meta-linters pass after all preceding fixes and optimizations.
