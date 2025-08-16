@@ -1,4 +1,3 @@
----
 # Default configuration: https://github.com/google/yamlfmt/blob/main/docs/config.md
 # Using minimal config to keep it simple.
 # The formatter is opinionated and doesn't need much tuning.
