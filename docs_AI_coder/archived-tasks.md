@@ -86,8 +86,6 @@ This file records tasks that have been completed and moved out of the active TOD
 
 **Status**: Task 2 completed. Logging rule enforcement has been properly configured and applied, ensuring all new log files are created in the correct `logs/` directory location.
 
-## Archived on 2025-01-27
-
 ### P1 — Renovate Local Development Setup and Validation ✅ COMPLETED
 
 - **Goal**: Establish proper local development workflow for Renovate configuration validation and testing to prevent future configuration errors.
@@ -1032,3 +1030,46 @@ This file records tasks that have been completed and moved out of the active TOD
   - [x] Document the guard and prerequisites in `docs/DEVELOPMENT.md`
 - Repo protection
   - [x] Configure branch protection to require "Code scanning results / CodeQL" and Semgrep check on PRs
+
+### P1 — Fix Environment Configuration Issues ✅ COMPLETED
+
+- **Context**: Recent refactoring removed the `cli` service but introduced configuration issues that need immediate fixing.
+
+- [x] **Task 1: Create missing .env.docker file**
+  - Action: Create `docker/.env.docker` file with container-internal URLs:
+    ```
+    OLLAMA_URL=http://ollama:11434
+    WEAVIATE_URL=http://weaviate:8080
+    ```
+  - Verify: `docker compose -f docker/docker-compose.yml config` shows no errors.
+
+- [x] **Task 2: Remove obsolete container_internal_urls fixture**
+  - Action: Remove the `container_internal_urls` fixture from `tests/e2e/conftest.py` since `DOCKER_ENV` logic was removed.
+  - Action: Update `test_qa_real_end_to_end.py` to remove dependency on this fixture.
+  - Verify: E2E tests can run without the obsolete fixture.
+
+- [x] **Task 3: Verify containerized tests work**
+  - Action: Run containerized E2E tests to ensure they work with the simplified configuration.
+  - Verify: `tests/e2e/test_qa_real_end_to_end_container_e2e.py` passes.
+
+**Status**: All tasks completed. Environment configuration issues have been resolved, including the creation of the missing .env.docker file, removal of obsolete fixtures, and verification that containerized tests work correctly.
+
+#### P5 — Fix yamlfmt CI Job and Local Pre-push Hook ✅ COMPLETED
+
+- **Context**: The `yamlfmt` CI job was failing due to formatting issues in `docker/docker-compose.yml`. The goal is to ensure that `yamlfmt` runs correctly in the CI pipeline and that there is a local pre-push hook to catch formatting issues before they are pushed.
+
+- [x] **Task 1: Correct Formatting in `docker/docker-compose.yml`**
+  - Action: Manually run `yamlfmt docker/docker-compose.yml` to fix the formatting issues.
+  - Verify: Run `yamlfmt --lint docker/docker-compose.yml` and confirm that it passes.
+
+- [x] **Task 2: Verify `meta-linters.yml` Workflow**
+  - Action: Ensure the `yamlfmt` job in `.github/workflows/meta-linters.yml` is configured to run `yamlfmt --lint "**/*.yml" "**/*.yaml"`.
+  - Verify: The CI job should fail if there are any YAML formatting issues.
+
+- [x] **Task 3: Add `yamlfmt` to Pre-commit Hook**
+  - Action: Add a `yamlfmt` hook to `.pre-commit-config.yaml` to automatically format YAML files.
+  - Action: Run `pre-commit autoupdate` to refresh the hooks.
+  - Action: Run `pre-commit run --all-files` to apply the formatting to all existing files.
+  - Verify: Committing a poorly formatted YAML file should trigger the hook and fix it automatically.
+
+**Status**: All tasks completed. The yamlfmt CI job and local pre-push hook are now properly configured and working. YAML formatting is automatically applied and validated both locally and in CI.

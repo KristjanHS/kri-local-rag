@@ -59,13 +59,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--keep-docker-up",
         action="store_true",
         default=False,
-        help=("Do not tear down docker compose services after tests. " "Equivalent to setting KEEP_DOCKER_UP=1"),
+        help=("Do not tear down docker compose services after tests. Equivalent to setting KEEP_DOCKER_UP=1"),
     )
     docker_group.addoption(
         "--teardown-docker",
         action="store_true",
         default=False,
-        help=("Force tear down docker compose services after tests. " "Equivalent to setting TEARDOWN_DOCKER=1"),
+        help=("Force tear down docker compose services after tests. Equivalent to setting TEARDOWN_DOCKER=1"),
     )
 
 
@@ -77,6 +77,25 @@ def pytest_configure(config: pytest.Config) -> None:  # noqa: D401
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """No custom collection filtering; selection is by directory paths."""
     return
+
+
+@pytest.fixture(scope="session")
+def cross_encoder_cache_dir() -> str:
+    """Ensure the CrossEncoder model is cached locally and return the cache path."""
+    from pathlib import Path
+
+    # Assuming the project root is the parent of the 'tests' directory
+    project_root = Path(__file__).parent
+    cache_dir = project_root / "tests" / "model_cache"
+
+    # Verify that the cache directory and a model config file exist
+    config_path = cache_dir / "models--cross-encoder--ms-marco-MiniLM-L-6-v2" / "config.json"
+    if not config_path.is_file():
+        pytest.fail(
+            f"CrossEncoder model not found in cache: {config_path}. "
+            "Run '.venv/bin/python scripts/setup/download_model.py' to download it."
+        )
+    return str(cache_dir)
 
 
 @pytest.fixture(scope="session")

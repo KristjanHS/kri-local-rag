@@ -8,17 +8,19 @@ import backend.qa_loop as qa_loop
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def _reset_encoder_cache():
+    """Fixture to reset the cached cross-encoder before each test.
+
+    This prevents state from leaking between tests, which can cause mocks to be
+    bypassed if a real encoder was cached by a previous test.
+    """
+    qa_loop._cross_encoder = None
+
+
 @contextmanager
 def mock_encoder_success():
-    """Mock _get_cross_encoder to return a working encoder.
-
-    Also resets any cached encoder to avoid cross-test interference.
-    """
-    # Ensure no cached encoder leaks from previous tests
-    try:
-        qa_loop._cross_encoder = None  # type: ignore[attr-defined]
-    except Exception:
-        pass
+    """Mock _get_cross_encoder to return a working encoder."""
     with patch("backend.qa_loop._get_cross_encoder") as get_ce:
         mock = MagicMock()
         mock.predict.return_value = [0.9, 0.1]
@@ -28,14 +30,7 @@ def mock_encoder_success():
 
 @contextmanager
 def mock_encoder_predict_failure():
-    """Mock _get_cross_encoder to return an encoder that fails on predict.
-
-    Also resets any cached encoder to avoid cross-test interference.
-    """
-    try:
-        qa_loop._cross_encoder = None  # type: ignore[attr-defined]
-    except Exception:
-        pass
+    """Mock _get_cross_encoder to return an encoder that fails on predict."""
     with patch("backend.qa_loop._get_cross_encoder") as get_ce:
         mock = MagicMock()
         mock.predict.side_effect = Exception("Model prediction failure")
@@ -45,14 +40,7 @@ def mock_encoder_predict_failure():
 
 @contextmanager
 def mock_encoder_unavailable():
-    """Mock _get_cross_encoder to return None (encoder unavailable).
-
-    Also resets any cached encoder to avoid cross-test interference.
-    """
-    try:
-        qa_loop._cross_encoder = None  # type: ignore[attr-defined]
-    except Exception:
-        pass
+    """Mock _get_cross_encoder to return None (encoder unavailable)."""
     with patch("backend.qa_loop._get_cross_encoder") as get_ce:
         get_ce.return_value = None
         yield

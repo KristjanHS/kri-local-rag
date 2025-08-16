@@ -115,10 +115,7 @@ if submitted and question.strip():
         answer_tokens.append(token)
         # Render with a stable locator for Playwright and include both label and content
         answer_html = (
-            "<div data-testid='answer'>"
-            "<h3>Answer</h3>"
-            f"<div class='answer-content'>{''.join(answer_tokens)}</div>"
-            "</div>"
+            f"<div data-testid='answer'><h3>Answer</h3><div class='answer-content'>{''.join(answer_tokens)}</div></div>"
         )
         answer_placeholder.markdown(answer_html, unsafe_allow_html=True)
 
@@ -133,10 +130,7 @@ if submitted and question.strip():
             on_token(ch)
         # Ensure final full content is rendered for visibility tests
         final_html = (
-            "<div data-testid='answer'>"
-            "<h3>Answer</h3>"
-            f"<div class='answer-content'>{''.join(answer_tokens)}</div>"
-            "</div>"
+            f"<div data-testid='answer'><h3>Answer</h3><div class='answer-content'>{''.join(answer_tokens)}</div></div>"
         )
         answer_placeholder.markdown(final_html, unsafe_allow_html=True)
         # Explicit marker for fake-mode to help E2E tests verify bypassed backend

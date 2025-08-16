@@ -87,51 +87,48 @@ This file tracks outstanding tasks and planned improvements for the project.
   - **Single Scoring Path**: Only CrossEncoder scoring, no fallbacks
   - **Explicit Failures**: Clear exceptions when CrossEncoder cannot load or score
   - **Local Model Cache**: Pre-cached models for offline test environments
-  - **Simplified Tests**: Real CrossEncoder instances or simple mocks, no complex patching
+  - **Simplified Tests**: A clear separation between mocked unit tests and integration tests that use a real `CrossEncoder` instance.
   - **Robust Loading**: Reliable model loading in all environments (dev, test, production)
 
-- [ ] **Task 1: Investigate and ensure reliable local loading.**
-  - Action: Confirm how `sentence-transformers` handles model caching. Determine the correct way to ensure the model is pre-cached for offline use.
-  - Action: Modify the test setup (if needed) to ensure the required model is available to the test environment without network access. This might involve a setup script or a dedicated test fixture. The current mock will be insufficient, as we want to test the real object's resilience.
-  - Verify: The `CrossEncoder` can be instantiated in a network-disabled environment (like the unit tests) without errors.
+#### P0.5 — Refactor: Improve Robustness of Test Fixtures
 
-- [ ] **Task 2: Refactor `qa_loop.py` to remove fallback logic.**
-  - Action: Modify `_score_chunks()` and `_rerank()` in `backend/qa_loop.py` to remove the keyword-based and neutral-score fallbacks.
-  - Action: The code should now directly call the cross-encoder. If `_get_cross_encoder()` fails to load the model, it should raise an exception instead of allowing a fallback.
-  - Verify: The code is simpler and has no fallback paths for scoring.
+- **Context**: The `cross_encoder_cache_dir` fixture in `tests/conftest.py` currently has a hardcoded model path. This is brittle and will break if the model is ever updated. The fixture should be refactored to dynamically determine the model path from the application code itself.
 
-- [ ] **Task 3: Update unit tests to reflect new behavior.**
-  - Action: Remove the mock for `_get_cross_encoder` in `tests/unit/test_qa_loop_logic.py`. The test `test_rerank_cross_encoder_success` should be updated to use a real `CrossEncoder` instance on test data, or a mock that very closely mimics the real object without the complexity of the previous patching.
-  - Action: Add a test case to verify that an exception is raised if the cross-encoder model cannot be loaded.
-  - Action: Remove tests that were specifically testing the fallback behavior, as it no longer exists.
-  - Verify: All unit tests in `test_qa_loop_logic.py` pass, and the test coverage for `qa_loop.py` remains adequate.
+- [ ] **Task 1: Decouple Fixture from Hardcoded Model Path.**
+  - Action: Modify `cross_encoder_cache_dir` in `tests/conftest.py` to programmatically read the default model name from the `_get_cross_encoder` function signature in `backend.qa_loop.py`.
+  - Action: Use this model name to dynamically construct the path to the cached model's `config.json` file for verification. This will involve replacing `/` with `--` in the model name to match the cache's directory naming convention.
+  - Verify: The fixture continues to work, and the integration tests can still locate the cached model without any hardcoded paths.
 
-- [ ] **Task 4: Run full test suite.**
+  
+- [ ] **Task 1: Stabilize Unit Tests and Prepare for Integration Testing.**
+  - Action: Add a `pytest` fixture to `tests/unit/test_qa_loop_logic.py` that reliably resets `qa_loop._cross_encoder = None` before each test to prevent state leakage and ensure mocks are always used.
+  - Action: Verify the unit test `test_rerank_cross_encoder_success` uses a mock and asserts predictable, exact values.
+  - Action: Move the `cross_encoder_cache_dir` fixture from `tests/unit/conftest.py` to the root `tests/conftest.py` to make it available for integration tests.
+  - Verify: Unit tests in `test_qa_loop_logic.py` pass reliably with `pytest tests/unit/test_qa_loop_logic.py`.
+
+- [ ] **Task 2: Update Existing Integration Test for CrossEncoder.**
+  - Action: Modify the existing test `test_cross_encoder_is_loaded_and_used_for_reranking` in `tests/integration/test_cross_encoder_environment.py` to use the `cross_encoder_cache_dir` fixture for offline loading.
+  - Action: Update the test to fail explicitly if the real CrossEncoder cannot be loaded (remove the `pytest.importorskip` and make it a hard requirement).
+  - Action: Ensure the test verifies that the real model is used for scoring by checking that the scores are realistic (not fallback values).
+  - Verify: The updated integration test passes and correctly uses the real model to score chunks (`pytest tests/integration/test_cross_encoder_environment.py`).
+
+- [ ] **Task 3: Refactor `qa_loop.py` to remove fallback logic.**
+  - Action: Modify `_score_chunks()` in `backend/qa_loop.py` to remove the keyword-based and neutral-score fallbacks.
+  - Action: Ensure that if `_get_cross_encoder()` fails to load the model, it raises a clear `RuntimeError` or similar exception.
+  - Verify: The code in `_score_chunks()` is simpler and contains only the `CrossEncoder` scoring path.
+
+- [ ] **Task 4: Update Tests for New Behavior.**
+  - Action: In `tests/unit/test_qa_loop_logic.py`, remove the tests for fallback behavior (`test_rerank_fallback_to_keyword_overlap_on_predict_failure`, etc.).
+  - Action: Add a new unit test that mocks `_get_cross_encoder` to raise an exception and verifies that `_score_chunks` propagates it.
+  - Action: Update the existing integration test in `tests/integration/test_cross_encoder_environment.py` to confirm it works with the refactored `_score_chunks`.
+  - Verify: Both unit and integration tests pass after the refactoring.
+
+- [ ] **Task 5: Run Full Test Suite.**
   - Action: Run the entire test suite (unit, integration, e2e) to ensure the refactoring hasn't caused regressions elsewhere.
-  - Verify: All tests pass.
+  - Verify: All tests pass (`.venv/bin/python -m pytest`).
 
-#### P1 — Fix Environment Configuration Issues (from code review)
 
-- **Context**: Recent refactoring removed the `cli` service but introduced configuration issues that need immediate fixing.
-
-- [x] **Task 1: Create missing .env.docker file**
-  - Action: Create `docker/.env.docker` file with container-internal URLs:
-    ```
-    OLLAMA_URL=http://ollama:11434
-    WEAVIATE_URL=http://weaviate:8080
-    ```
-  - Verify: `docker compose -f docker/docker-compose.yml config` shows no errors.
-
-- [x] **Task 2: Remove obsolete container_internal_urls fixture**
-  - Action: Remove the `container_internal_urls` fixture from `tests/e2e/conftest.py` since `DOCKER_ENV` logic was removed.
-  - Action: Update `test_qa_real_end_to_end.py` to remove dependency on this fixture.
-  - Verify: E2E tests can run without the obsolete fixture.
-
-- [x] **Task 3: Verify containerized tests work**
-  - Action: Run containerized E2E tests to ensure they work with the simplified configuration.
-  - Verify: `tests/e2e/test_qa_real_end_to_end_container_e2e.py` passes.
-
-#### P2 — Containerized CLI E2E copies (keep host-run E2E; add container-run twins)
+#### P1 — Containerized CLI E2E copies (keep host-run E2E; add container-run twins)
 
 - **Why**: Host-run E2E miss packaging/runtime issues (entrypoint, PATH, env, OS libs). Twins validate the real image without replacing fast host tests.
 - **Current Approach**: Use the existing `app` container which can run both Streamlit (web UI) and CLI commands via `docker compose exec app`. This leverages the project's existing architecture where the `app` service is designed to handle multiple entry points.
@@ -180,7 +177,7 @@ This file tracks outstanding tasks and planned improvements for the project.
   - Action: Document commands in `docs/DEVELOPMENT.md` and `AI_instructions.md`; mention in `scripts/test.sh e2e` help; add a CI job for the containerized CLI subset.
   - Verify: Fresh env runs `tests/e2e/*_container_e2e.py` green; CI job passes locally under `act` and on hosted runners.
 
-#### P3 — E2E retrieval failure: QA test returns no context (Weaviate)
+#### P2 — E2E retrieval failure: QA test returns no context (Weaviate)
 
  - Context and goal
    - Failing test returns no context from Weaviate. Likely mismatch between collection name used by retrieval and the one populated by ingestion, or ingestion not executed.
@@ -206,7 +203,9 @@ This file tracks outstanding tasks and planned improvements for the project.
  - [ ] Task 7 — Add minimal guardrails
    - Log the active collection name in the e2e fixture and add a small test ensuring graceful behavior when empty.
 
-#### P4 — Minimalist Scripts Directory Cleanup
+
+
+#### P3 — Minimalist Scripts Directory Cleanup
 
 - **Goal**: Reorganize the `scripts/` directory for better clarity with minimal effort. Group related scripts into subdirectories. Avoid complex refactoring or new patterns like dispatchers.
 
