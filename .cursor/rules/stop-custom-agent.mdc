@@ -1,8 +1,7 @@
 ---
 description: "Terminate agent response with <END> marker when all required tasks are completed"
 type: agent-select
-globs: []
-alwaysApply: false
+alwaysApply: true
 ---
 - If all required steps are done, emit exactly "<END>" and stop.  
 - Do **not** generate any text after "<END>".  

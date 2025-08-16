@@ -1,5 +1,5 @@
 ---
-description: "Rules for version control with Git"
+description: "How to use Git for version control: use Conventional Commits and work on the dev branch"
 type: agent-select
 alwaysApply: false
 ---

@@ -15,7 +15,7 @@ services:
       ENABLE_MODULES: 'text2vec-huggingface,reranker-huggingface' # Still needed for reranker
       CLUSTER_HOSTNAME: 'node1'
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1"]
+      test: [ "CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,13 +30,13 @@ services:
           devices:
             - driver: nvidia
               count: all
-              capabilities: [gpu]
+              capabilities: [ gpu ]
     volumes:
       - ollama_models:/root/.ollama
     ports:
       - "127.0.0.1:11434:11434"
     healthcheck:
-      test: ["CMD", "ollama", "list"]
+      test: [ "CMD", "ollama", "list" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -61,7 +61,7 @@ services:
       - hf_cache:/root/.cache/huggingface
     working_dir: /app
     # Auto-start Streamlit when container starts
-    command: ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    command: [ "streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0" ]
     environment:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
@@ -69,7 +69,7 @@ services:
 
   # ---------- One-off Ingestion Utility -----------------------------------------
   ingester:
-    profiles: ["ingest"]
+    profiles: [ "ingest" ]
     image: kri-local-rag-app # reuse the APP image
     depends_on:
       - weaviate
@@ -80,7 +80,16 @@ services:
       - ../logs:/app/logs # Live log access
       - ../tests:/app/tests # Mount tests for in-container testing
       - hf_cache:/root/.cache/huggingface
-    command: ["python", "backend/ingest.py", "/app/data"]
+    command: [ "python", "backend/ingest.py", "/app/data" ]
+
+  # ---------- CLI Service -----------------------------------------
+  cli:
+    image: kri-local-rag-app # reuse the APP image
+    profiles: [ "cli" ]
+    working_dir: /app
+    environment:
+      - WEAVIATE_URL=http://weaviate:8080
+      - OLLAMA_URL=http://ollama:11434
 
 volumes:
   weaviate_db:
