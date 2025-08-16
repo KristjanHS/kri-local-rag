@@ -90,21 +90,18 @@ def ollama_compose_up():  # type: ignore[no-redef]
 
 
 @pytest.fixture(scope="session")
-def container_internal_urls():
-    """Temporarily sets the DOCKER_ENV environment variable for the test session."""
-    import os
-
-    original_docker_env = os.getenv("DOCKER_ENV")
-    os.environ["DOCKER_ENV"] = "1"
+def app_compose_up(weaviate_compose_up, ollama_compose_up):  # type: ignore[no-redef]
+    """Ensure compose app is up for e2e tests needing the full stack."""
+    compose_file = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
+    subprocess.run(
+        ["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "app"],
+        check=True,
+    )
     yield
-    if original_docker_env is None:
-        del os.environ["DOCKER_ENV"]
-    else:
-        os.environ["DOCKER_ENV"] = original_docker_env
 
 
 @pytest.fixture(scope="session")
-def run_cli_in_container():
+def run_cli_in_container(app_compose_up):
     """
     Returns a callable that executes a command in the 'app' docker-compose service.
     Uses the existing app container which can run both Streamlit and CLI commands.

@@ -16,7 +16,12 @@ from backend.qa_loop import answer
 pytestmark = [pytest.mark.e2e, pytest.mark.integration, pytest.mark.slow, pytest.mark.external]
 
 
-def test_e2e_answer_with_real_services(docker_services_ready, weaviate_compose_up, ollama_compose_up):  # noqa: ANN001
+@pytest.mark.external
+def test_e2e_answer_with_real_services(docker_services_ready):  # noqa: ANN001
+    """
+    Asks a generic question; retrieval should find some context from example_data
+    and the LLM should provide a coherent answer based on it.
+    """
     # Ensure the required model is available (will download with visible progress if missing)
     assert ensure_model_available(OLLAMA_MODEL) is True
     # Ensure fake-answer mode is not active

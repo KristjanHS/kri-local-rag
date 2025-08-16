@@ -32,9 +32,26 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 ## Prioritized Backlog
 
-#### P1 — ...
+#### P1 — Fix Environment Configuration Issues (from code review)
 
-Ready for new tasks
+- **Context**: Recent refactoring removed the `cli` service but introduced configuration issues that need immediate fixing.
+
+- [x] **Task 1: Create missing .env.docker file**
+  - Action: Create `docker/.env.docker` file with container-internal URLs:
+    ```
+    OLLAMA_URL=http://ollama:11434
+    WEAVIATE_URL=http://weaviate:8080
+    ```
+  - Verify: `docker compose -f docker/docker-compose.yml config` shows no errors.
+
+- [x] **Task 2: Remove obsolete container_internal_urls fixture**
+  - Action: Remove the `container_internal_urls` fixture from `tests/e2e/conftest.py` since `DOCKER_ENV` logic was removed.
+  - Action: Update `test_qa_real_end_to_end.py` to remove dependency on this fixture.
+  - Verify: E2E tests can run without the obsolete fixture.
+
+- [ ] **Task 3: Verify containerized tests work**
+  - Action: Run containerized E2E tests to ensure they work with the simplified configuration.
+  - Verify: `tests/e2e/test_qa_real_end_to_end_container_e2e.py` passes.
 
 #### P2 — Containerized CLI E2E copies (keep host-run E2E; add container-run twins)
 
@@ -59,7 +76,7 @@ Ready for new tasks
   - Action: Review the implementation against best practices and simplify to use existing app container.
   - Verify: Confirm that the simplified approach is correct and aligns with project structure.
 
-- [ ] Step 3.2 — Clean up old complexity
+- [x] Step 3.2 — Clean up old complexity
   - Action: Remove the separate `cli` service from `docker/docker-compose.yml` since we're using the existing `app` container.
   - Action: Update `run_cli_in_container` fixture in `tests/e2e/conftest.py` to use `docker compose exec app` instead of the separate `cli` service.
   - Action: Remove any references to the `cli` profile in documentation or scripts.
@@ -118,70 +135,4 @@ Ready for new tasks
 - [ ] **Phase 1: Create Grouping Directories and a `common.sh`**
   - Action: Create the new directory structure: `scripts/test/`, `scripts/lint/`, `scripts/docker/`, `scripts/ci/`, `scripts/dev/`.
   - Action: Create a single `scripts/common.sh` file. Initially, it will only contain `set -euo pipefail` and basic color variables for logging.
-  - Verify: The new directories and the `common.sh` file exist.
-
-- [ ] **Phase 2: Move All Scripts into Logical Groups**
-  - Action: Move existing scripts into their new homes.
-    - **test/**: `test_unit.sh`, `test_integration.sh`, `test_e2e.sh`, `test_ui.sh`, `test.sh` (old), `pytest_with_cleanup.sh`
-    - **lint/**: `lint.sh` (old), `semgrep_local.sh`
-    - **docker/**: `build_app.sh`, `docker-setup.sh`, `docker-reset.sh`, `cleanup_docker_and_ci_cache.sh`
-    - **ci/**: `pre_push.sh`, `pre-commit.sh`, `ci_local_fast.sh`, `ci_act.sh`
-    - **dev/**: `setup-dev-env.sh`, `install-system-tools.sh`, `promote_dev_to_main.sh`, `clean_artifacts.sh`, `monitor_gpu.sh`
-  - Action: Keep top-level, user-facing scripts as they are: `ingest.sh`, `cli.sh`, `config.sh`.
-  - Verify: `ls scripts/` is clean. `ls scripts/test/` (and others) contain the moved scripts.
-
-- [ ] **Phase 3: Update Script Paths in a Few Key Places**
-  - Action: Add `source "$(dirname "$0")/../common.sh"` to the top of the moved scripts.
-  - Action: Update the paths in `scripts/git-hooks/` to point to the new locations (e.g., `scripts/ci/pre-push.sh`).
-  - Action: Update the paths in `.github/workflows/` to point to the new script locations.
-  - Verify: Git hooks and CI workflows continue to work correctly.
-
-- [ ] **Phase 4: Document the New (Simpler) Structure**
-  - Action: Add a `scripts/README.md` that briefly explains the purpose of each subdirectory.
-  - Verify: The documentation provides a clear map of the new structure.
-
-#### P5 — Log File Cleanup and Standardization
-
-- **Goal**: Move all log files from project root to `logs/` directory and establish proper logging practices.
-
-- [x] **Task 1: Move existing log files from project root** ✅ **COMPLETED**
-  - Action: Move the following files from project root to `logs/` directory:
-    - `docker-build-baseline.log` → `logs/docker-build-baseline.log`
-    - `docker-build-verification.log` → `logs/docker-build-verification.log`
-    - `docker-build-optimized.log` → `logs/docker-build-optimized.log`
-    - `.verify_integration.log` → `logs/verify_integration.log`
-    - `.ci_run_slow_tests.log` → `logs/ci_run_slow_tests.log`
-  - Action: Update any references to these files in scripts or documentation.
-  - Verify: No `.log` files remain in project root.
-  - **Result**: All log files successfully moved to logs directory. No log files remain in project root.
-
-
-
-- [ ] **Task 3: Clean up old log files**
-  - Action: Review and clean up old log files in `logs/` directory that are no longer needed.
-  - Action: Implement log rotation or cleanup policies if needed.
-  - Verify: Log directory is organized and contains only relevant files.
-
-#### P5 — Pre-push performance optimizations (local DX) — remaining tasks
-
-- [ ] Pre-commit integration for changed-files speedups
-  - [ ] Add `.pre-commit-config.yaml` with `ruff` (lint + format) and optional `pyright` hooks
-  - [ ] Install hooks (`pre-commit install`) and document usage
-  - [ ] Configure to run only on changed files to keep local runs snappy
-
-- [ ] Documentation updates
-  - [ ] Document all local toggles in `docs/DEVELOPMENT.md` (e.g., `SKIP_LINT`, `SKIP_PYRIGHT`, `SKIP_TESTS`, and `SKIP_LOCAL_SEC_SCANS`)
-  - [ ] Provide a "fast push" recipe, e.g.: ``SKIP_PYRIGHT=1 SKIP_LOCAL_SEC_SCANS=1 git push``
-  - [ ] Note how to opt-in to CodeQL locally: ``SKIP_LOCAL_SEC_SCANS=0 git push``
-
-- [ ] Version alignment and consistency
-  - [ ] Pin the local `pyright` version (e.g., in `requirements-dev.txt`) to match CI
-  - [ ] Ensure `ruff` version in pre-commit matches the CI action version (`0.5.3` today)
-
-#### P6 — Correct actionlint workflow
-
-- [x] Revert meta-linters.yml to use standard action
-  - Action: Change actionlint step to use `rhysd/actionlint@v1`.
-  - Verify: Local linting passes.
-  - Note: The file was already in the correct state. No changes were needed.
-
+  - Verify: The new directories and the `
