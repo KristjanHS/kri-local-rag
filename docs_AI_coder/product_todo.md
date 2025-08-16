@@ -32,6 +32,10 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 ## Prioritized Backlog
 
+#### P0 — In-progress Agent Session
+
+- [x] Fix pyright warnings for unused imports in `tests/unit/test_logging_config.py`.
+
 #### P1 - ...
 
 place new topic goal+tasks here
