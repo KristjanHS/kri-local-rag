@@ -48,7 +48,113 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 ## Prioritized Backlog
 
-#### P0 — Epic: Harden CrossEncoder and Centralize Model Cache
+#### P0a — Epic: Refactor Mocking Strategy and Test Isolation to Follow Best Practices
+
+- **High-Level Goal**: Eliminate the current anti-patterns in mocking and test isolation that cause intermittent failures, complex state management, and maintenance burden. Replace with clean dependency injection and proper test boundaries.
+
+- **Context**: The current test suite uses multiple anti-patterns that violate testing best practices:
+  - **Module-level mocking**: `sys.modules["sentence_transformers"] = MagicMock()` pollutes global state
+  - **Direct state manipulation**: `retriever._embedding_model = None` depends on implementation details
+  - **Complex setup/teardown**: Multiple layers of mocking and state reset create race conditions
+  - **Test interference**: Tests fail when run in suite but pass individually due to shared state
+  - **Over-engineering**: Multiple redundant mocking strategies for the same functionality
+
+- **Current Anti-Patterns Identified**:
+  - **Module-Level Mocking**: Tests mock `sys.modules` before imports, affecting all subsequent tests
+  - **Global State Pollution**: Direct manipulation of module-level variables like `_cross_encoder` and `_embedding_model`
+  - **Complex Mocking Layers**: Multiple `@patch` decorators and manual state resets for the same functionality
+  - **Import Order Dependencies**: Tests must be structured to avoid real imports during collection
+  - **Brittle State Management**: Tests manually reset state that could change with implementation
+
+- **Target Architecture**:
+  - **Dependency Injection**: Functions accept dependencies as parameters rather than importing them
+  - **Clean Test Boundaries**: Each test is isolated and doesn't affect others
+  - **Simple Mocking**: Single, clear mocking strategy per test
+  - **Behavior Testing**: Tests focus on what functions do, not how they do it
+  - **Proper Fixtures**: Reusable, isolated test setup using pytest fixtures
+
+- **Phase 1: Refactor Code to Support Dependency Injection**
+  - **Context**: The current code uses lazy imports and global state, making it difficult to test properly. This phase refactors the code to accept dependencies as parameters, enabling clean testing.
+  - [ ] **Task 1.1: Refactor `_get_cross_encoder` for Dependency Injection.**
+    - Action: Modify `_get_cross_encoder()` in `backend/qa_loop.py` to accept an optional `cross_encoder_constructor` parameter.
+    - Action: Update the function to use the injected constructor if provided, otherwise fall back to lazy import.
+    - Action: Add type hints and documentation for the new parameter.
+    - Verify: The function works identically when called without the parameter, but can accept a mock constructor for testing.
+  - [ ] **Task 1.2: Refactor `_get_embedding_model` for Dependency Injection.**
+    - Action: Modify `_get_embedding_model()` in `backend/retriever.py` to accept an optional `sentence_transformer_constructor` parameter.
+    - Action: Update the function to use the injected constructor if provided, otherwise fall back to lazy import.
+    - Action: Add type hints and documentation for the new parameter.
+    - Verify: The function works identically when called without the parameter, but can accept a mock constructor for testing.
+  - [ ] **Task 1.3: Update Calling Functions to Support Injection.**
+    - Action: Modify `_score_chunks()` and `_rerank()` in `backend/qa_loop.py` to accept and pass through the constructor parameter.
+    - Action: Modify `get_top_k()` in `backend/retriever.py` to accept and pass through the constructor parameter.
+    - Action: Ensure all public APIs maintain backward compatibility.
+    - Verify: All existing functionality works unchanged, but functions can now accept injected dependencies.
+
+- **Phase 2: Simplify Test Infrastructure**
+  - **Context**: The current test setup is overly complex with multiple mocking layers and state management. This phase simplifies the test infrastructure to use clean, isolated tests.
+  - [ ] **Task 2.1: Remove Module-Level Mocking.**
+    - Action: Remove all `sys.modules` mocking from test files.
+    - Action: Remove module-level `MagicMock()` assignments.
+    - Action: Update imports to happen normally without special handling.
+    - Verify: Tests can import modules normally without side effects.
+  - [ ] **Task 2.2: Create Clean Test Fixtures.**
+    - Action: Create `mock_cross_encoder` fixture in `tests/unit/conftest.py` that provides a properly configured mock.
+    - Action: Create `mock_sentence_transformer` fixture in `tests/unit/conftest.py` that provides a properly configured mock.
+    - Action: Ensure fixtures are isolated and don't affect other tests.
+    - Verify: Tests can use these fixtures to get clean, isolated mocks.
+  - [ ] **Task 2.3: Simplify Test Classes.**
+    - Action: Remove complex `setup_method()` functions that manipulate global state.
+    - Action: Remove redundant state reset logic from individual tests.
+    - Action: Simplify test methods to focus on behavior testing.
+    - Verify: Tests are simpler, more readable, and less prone to interference.
+
+- **Phase 3: Rewrite Tests with Clean Architecture**
+  - **Context**: The current tests are complex and brittle due to the anti-patterns. This phase rewrites the tests to use the new dependency injection and clean fixtures.
+  - [ ] **Task 3.1: Rewrite QA Loop Tests.**
+    - Action: Rewrite `tests/unit/test_qa_loop_logic.py` to use dependency injection instead of complex mocking.
+    - Action: Use the `mock_cross_encoder` fixture for tests that need a cross-encoder mock.
+    - Action: Focus tests on behavior (e.g., "rerank returns sorted results") rather than implementation details.
+    - Action: Remove tests that verify internal state or mocking behavior.
+    - Verify: Tests are simpler, more reliable, and test actual functionality.
+  - [ ] **Task 3.2: Rewrite Search Logic Tests.**
+    - Action: Rewrite `tests/unit/test_search_logic.py` to use dependency injection instead of complex mocking.
+    - Action: Use the `mock_sentence_transformer` fixture for tests that need an embedding model mock.
+    - Action: Focus tests on behavior (e.g., "search returns relevant results") rather than implementation details.
+    - Action: Remove tests that verify internal state or mocking behavior.
+    - Verify: Tests are simpler, more reliable, and test actual functionality.
+  - [ ] **Task 3.3: Update Integration Tests.**
+    - Action: Update integration tests to use the new dependency injection parameters where appropriate.
+    - Action: Ensure integration tests still test real functionality with actual models.
+    - Action: Remove any complex mocking from integration tests that should use real dependencies.
+    - Verify: Integration tests work with both real and mocked dependencies as appropriate.
+
+- **Phase 4: Validation and Cleanup**
+  - **Context**: After refactoring, we need to ensure everything works correctly and clean up any remaining anti-patterns.
+  - [ ] **Task 4.1: Run Full Test Suite.**
+    - Action: Run the entire test suite to ensure no regressions.
+    - Action: Verify that tests run consistently (no more "passes individually but fails in suite").
+    - Action: Check that test execution time is reasonable.
+    - Verify: All tests pass consistently and performance is acceptable.
+  - [ ] **Task 4.2: Remove Dead Code and Anti-Patterns.**
+    - Action: Remove any remaining module-level mocking code.
+    - Action: Remove any remaining direct state manipulation in tests.
+    - Action: Clean up any unused imports or variables related to the old mocking strategy.
+    - Verify: Codebase is clean and follows best practices.
+  - [ ] **Task 4.3: Update Documentation.**
+    - Action: Update test documentation to reflect the new clean architecture.
+    - Action: Add examples of how to write new tests using the dependency injection pattern.
+    - Action: Document the fixtures available for common testing scenarios.
+    - Verify: Documentation is clear and helpful for future development.
+
+- **Benefits of This Refactoring**:
+  - **Reliability**: Tests will no longer have intermittent failures due to shared state
+  - **Maintainability**: Simpler test code that's easier to understand and modify
+  - **Performance**: Faster test execution due to reduced setup/teardown complexity
+  - **Best Practices**: Code follows established testing patterns and principles
+  - **Future-Proof**: New tests can be written easily using the established patterns
+
+#### P0b — Epic: Harden CrossEncoder and Centralize Model Cache
 
 - **High-Level Goal**: Refactor the CrossEncoder integration to be more resilient by removing the scoring fallback logic, and centralize the model cache to be shared between local tests and the containerized application.
 

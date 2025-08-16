@@ -39,137 +39,152 @@ pytestmark = pytest.mark.unit
 @pytest.fixture(autouse=True)
 def _reset_encoder_cache():
     """Reset the cached encoder between tests to ensure isolation."""
-    if hasattr(qa_loop, "_cached_encoder"):
-        delattr(qa_loop, "_cached_encoder")
+    # Reset the global encoder cache
+    qa_loop._cross_encoder = None
+
+    # Reset the module-level CrossEncoder to prevent real imports
+    qa_loop.CrossEncoder = None
 
     # Reset the mock for each test
     sys.modules["sentence_transformers"].CrossEncoder.reset_mock()
 
     yield
 
-    # Also reset the module-level CrossEncoder to ensure no real imports happen
+    # Clean up after test
+    qa_loop._cross_encoder = None
     qa_loop.CrossEncoder = None
 
 
-@contextmanager
-def mock_encoder_success():
-    """Mock _get_cross_encoder to return a working encoder."""
-    with patch("backend.qa_loop._get_cross_encoder") as get_ce:
-        # Also patch the import to prevent any real model loading
-        with patch("backend.qa_loop.CrossEncoder", None):
-            mock = MagicMock()
-            mock.predict.return_value = [0.9, 0.1]
-            get_ce.return_value = mock
-            yield
+class TestQALoopLogic:
+    """Test QA loop logic with proper isolation."""
 
+    def setup_method(self):
+        """Reset global state before each test to ensure isolation."""
+        # Reset all global state that could interfere between tests
+        qa_loop._cross_encoder = None
+        qa_loop.CrossEncoder = None
 
-def test_rerank_cross_encoder_success():
-    """Test reranking with a successful cross-encoder prediction."""
-    with mock_encoder_success():
-        chunks = ["relevant", "irrelevant"]
-        question = "test query"
+        # Reset the mock for each test
+        if "sentence_transformers" in sys.modules:
+            sys.modules["sentence_transformers"].CrossEncoder.reset_mock()
 
-        result = qa_loop._rerank(question, chunks, k_keep=2)
+    @contextmanager
+    def mock_encoder_success(self):
+        """Mock _get_cross_encoder to return a working encoder."""
+        with patch("backend.qa_loop._get_cross_encoder") as get_ce:
+            # Also patch the import to prevent any real model loading
+            with patch("backend.qa_loop.CrossEncoder", None):
+                mock = MagicMock()
+                mock.predict.return_value = [0.9, 0.1]
+                get_ce.return_value = mock
+                yield
 
-        # The results should be sorted by score, so "relevant" should be first
-        assert len(result) == 2
-        assert result[0].text == "relevant"
-        assert result[0].score == 0.9
-        assert result[1].text == "irrelevant"
-        assert result[1].score == 0.1
+    def test_rerank_cross_encoder_success(self):
+        """Test reranking with a successful cross-encoder prediction."""
+        with self.mock_encoder_success():
+            chunks = ["relevant", "irrelevant"]
+            question = "test query"
 
+            result = qa_loop._rerank(question, chunks, k_keep=2)
 
-def test_rerank_predict_failure_raises_exception():
-    """Test that the rerank function raises an exception when predict fails."""
-    question = "test question"
-    chunks = ["test chunk 1", "chunk 2"]
+            # The results should be sorted by score, so "relevant" should be first
+            assert len(result) == 2
+            assert result[0].text == "relevant"
+            assert result[0].score == 0.9
+            assert result[1].text == "irrelevant"
+            assert result[1].score == 0.1
 
-    # Mock _get_cross_encoder to return a failing encoder
-    with patch("backend.qa_loop._get_cross_encoder") as get_ce:
-        mock_encoder = MagicMock()
-        mock_encoder.predict.side_effect = Exception("Model prediction failure")
-        get_ce.return_value = mock_encoder
-
-        with pytest.raises(Exception, match="Model prediction failure"):
-            qa_loop._rerank(question, chunks, k_keep=2)
-
-
-def test_rerank_encoder_unavailable_raises_exception():
-    """Test that the rerank function raises an exception when encoder is unavailable."""
-    question = "test question"
-    chunks = ["test chunk 1", "chunk 2"]
-
-    # Mock _get_cross_encoder to return None to simulate unavailability
-    with patch("backend.qa_loop._get_cross_encoder", return_value=None):
-        with pytest.raises(RuntimeError, match="CrossEncoder model is not available"):
-            qa_loop._rerank(question, chunks, k_keep=2)
-
-
-def test_rerank_empty_chunks_list():
-    """Test that reranking with an empty list of chunks returns an empty list."""
-    # Mock _get_cross_encoder to avoid real model loading
-    with patch("backend.qa_loop._get_cross_encoder") as get_ce:
-        mock_encoder = MagicMock()
-        mock_encoder.predict.return_value = [0.5]  # Won't be used for empty list
-        get_ce.return_value = mock_encoder
-
-        result = qa_loop._rerank("test query", [], k_keep=2)
-        assert result == []
-
-
-def test_keyword_scoring():
-    """Test the keyword scoring logic with mocked cross-encoder."""
-    question = "test question"
-    chunks = ["this is a test chunk", "another chunk"]
-
-    # Mock _get_cross_encoder to return a working encoder
-    with patch("backend.qa_loop._get_cross_encoder") as get_ce:
-        mock_encoder = MagicMock()
-        mock_encoder.predict.return_value = [0.8, 0.3]  # First chunk more relevant
-        get_ce.return_value = mock_encoder
-
-        scored_chunks = qa_loop._score_chunks(question, chunks)
-
-        # Should use cross-encoder scoring
-        assert len(scored_chunks) == 2
-        assert scored_chunks[0].text == "this is a test chunk"
-        assert scored_chunks[0].score == 0.8
-        assert scored_chunks[1].text == "another chunk"
-        assert scored_chunks[1].score == 0.3
-
-
-def test_keyword_scoring_no_union():
-    """Test the keyword scoring logic when there is no union between the question and chunk."""
-    chunks = ["", ""]
-    question = ""
-
-    # Mock _get_cross_encoder to return a working encoder
-    with patch("backend.qa_loop._get_cross_encoder") as get_ce:
-        mock_encoder = MagicMock()
-        mock_encoder.predict.return_value = [0.5, 0.5]  # Neutral scores
-        get_ce.return_value = mock_encoder
-
-        scored_chunks = qa_loop._score_chunks(question, chunks)
-
-        assert len(scored_chunks) == 2
-        assert all(sc.score == 0.5 for sc in scored_chunks)
-
-
-def test_no_real_model_loading():
-    """Test that no real cross-encoder model is loaded during tests."""
-    # This test ensures that the real sentence_transformers library is never imported
-    # during unit tests, which would be expensive and slow down the test suite.
-
-    with mock_encoder_success():
-        # Verify that the mock is being used, not a real model
-        chunks = ["test chunk"]
+    def test_rerank_predict_failure_raises_exception(self):
+        """Test that the rerank function raises an exception when predict fails."""
         question = "test question"
+        chunks = ["test chunk 1", "chunk 2"]
 
-        # This should use the mock, not load a real model
-        result = qa_loop._rerank(question, chunks, k_keep=1)
+        # Mock _get_cross_encoder to return a failing encoder
+        with patch("backend.qa_loop._get_cross_encoder") as get_ce:
+            mock_encoder = MagicMock()
+            mock_encoder.predict.side_effect = Exception("Model prediction failure")
+            get_ce.return_value = mock_encoder
 
-        assert len(result) == 1
-        assert result[0].score == 0.9  # This is the mock's return value
+            with pytest.raises(Exception, match="Model prediction failure"):
+                qa_loop._rerank(question, chunks, k_keep=2)
 
-        # Verify that no real CrossEncoder was imported
-        assert qa_loop.CrossEncoder is None
+    def test_rerank_encoder_unavailable_raises_exception(self):
+        """Test that the rerank function raises an exception when encoder is unavailable."""
+        question = "test question"
+        chunks = ["test chunk 1", "chunk 2"]
+
+        # Mock _get_cross_encoder to return None to simulate unavailability
+        with patch("backend.qa_loop._get_cross_encoder", return_value=None):
+            with pytest.raises(RuntimeError, match="CrossEncoder model is not available"):
+                qa_loop._rerank(question, chunks, k_keep=2)
+
+    def test_rerank_empty_chunks_list(self):
+        """Test that reranking with an empty list of chunks returns an empty list."""
+        # Mock _get_cross_encoder to avoid real model loading
+        with patch("backend.qa_loop._get_cross_encoder") as get_ce:
+            mock_encoder = MagicMock()
+            mock_encoder.predict.return_value = [0.5]  # Won't be used for empty list
+            get_ce.return_value = mock_encoder
+
+            result = qa_loop._rerank("test query", [], k_keep=2)
+            assert result == []
+
+    def test_keyword_scoring(self):
+        """Test the keyword scoring logic with mocked cross-encoder."""
+        question = "test question"
+        chunks = ["this is a test chunk", "another chunk"]
+
+        # Mock _get_cross_encoder to return a working encoder
+        with patch("backend.qa_loop._get_cross_encoder") as get_ce:
+            mock_encoder = MagicMock()
+            mock_encoder.predict.return_value = [0.8, 0.3]  # First chunk more relevant
+            get_ce.return_value = mock_encoder
+
+            scored_chunks = qa_loop._score_chunks(question, chunks)
+
+            # Should use cross-encoder scoring
+            assert len(scored_chunks) == 2
+            assert scored_chunks[0].text == "this is a test chunk"
+            assert scored_chunks[0].score == 0.8
+            assert scored_chunks[1].text == "another chunk"
+            assert scored_chunks[1].score == 0.3
+
+    def test_score_chunks_with_empty_inputs(self):
+        """Test that cross-encoder scoring works correctly with empty question and chunks."""
+        chunks = ["", ""]
+        question = ""
+
+        # Mock _get_cross_encoder to return a working encoder
+        with patch("backend.qa_loop._get_cross_encoder") as get_ce:
+            mock_encoder = MagicMock()
+            mock_encoder.predict.return_value = [0.5, 0.5]  # Neutral scores
+            get_ce.return_value = mock_encoder
+
+            # Ensure the mock is being used by verifying it's called
+            scored_chunks = qa_loop._score_chunks(question, chunks)
+
+            # Verify the mock was called
+            get_ce.assert_called_once()
+            mock_encoder.predict.assert_called_once()
+
+            assert len(scored_chunks) == 2
+            assert all(sc.score == 0.5 for sc in scored_chunks)
+
+    def test_no_real_model_loading(self):
+        """Test that no real cross-encoder model is loaded during tests."""
+        # This test ensures that the real sentence_transformers library is never imported
+        # during unit tests, which would be expensive and slow down the test suite.
+
+        with self.mock_encoder_success():
+            # Verify that the mock is being used, not a real model
+            chunks = ["test chunk"]
+            question = "test question"
+
+            # This should use the mock, not load a real model
+            result = qa_loop._rerank(question, chunks, k_keep=1)
+
+            assert len(result) == 1
+            assert result[0].score == 0.9  # This is the mock's return value
+
+            # Verify that no real CrossEncoder was imported
+            assert qa_loop.CrossEncoder is None

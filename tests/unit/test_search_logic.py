@@ -2,6 +2,7 @@
 """Test to verify hybrid search works with manual vectorization."""
 
 import os
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,6 +12,10 @@ os.environ["RETRIEVER_EMBEDDING_TORCH_COMPILE"] = "false"
 
 pytestmark = pytest.mark.unit
 
+# Mock sentence_transformers at module level to prevent real imports
+sys.modules["sentence_transformers"] = MagicMock()
+sys.modules["sentence_transformers"].SentenceTransformer = MagicMock()
+
 # Note: The main 'from retriever import ...' is moved inside the test functions
 # to prevent hanging during pytest collection.
 
@@ -18,18 +23,32 @@ pytestmark = pytest.mark.unit
 class TestHybridSearchFix:
     """Test hybrid search with manual vectorization and error scenarios."""
 
+    def setup_method(self):
+        """Reset global state before each test to ensure isolation."""
+        # Import here to avoid module-level import issues
+        from backend import retriever
+
+        # Reset all global state that could interfere between tests
+        retriever._embedding_model = None
+        retriever.SentenceTransformer = None
+
     @patch("backend.retriever.SentenceTransformer")
     def test_embedding_model_loading(self, mock_st):
         """Test that embedding model can be loaded."""
-        # Reset the global cache
+        # Import inside test to ensure fresh state
         from backend import retriever
         from backend.retriever import _get_embedding_model
 
+        # Ensure clean state
         retriever._embedding_model = None
+        retriever.SentenceTransformer = None
 
         # Mock SentenceTransformer
         mock_model_instance = MagicMock()
         mock_st.return_value = mock_model_instance
+
+        # Set the module-level SentenceTransformer to our mock
+        retriever.SentenceTransformer = mock_st
 
         # Test loading
         model = _get_embedding_model()
@@ -43,10 +62,15 @@ class TestHybridSearchFix:
         from backend import retriever
         from backend.retriever import _get_embedding_model
 
+        # Ensure clean state
         retriever._embedding_model = None
+        retriever.SentenceTransformer = None
 
         mock_model_instance = MagicMock()
         mock_st.return_value = mock_model_instance
+
+        # Set the module-level SentenceTransformer to our mock
+        retriever.SentenceTransformer = mock_st
 
         # First call should create model
         model1 = _get_embedding_model()
@@ -58,12 +82,13 @@ class TestHybridSearchFix:
 
     def test_embedding_model_unavailable(self):
         """Test behavior when SentenceTransformer is not available."""
+        from backend import retriever
+
+        # Ensure clean state
+        retriever._embedding_model = None
+        retriever.SentenceTransformer = None
+
         with patch.dict("sys.modules", {"sentence_transformers": None}):
-            import importlib
-
-            from backend import retriever
-
-            importlib.reload(retriever)
             model = retriever._get_embedding_model()
             assert model is None
 
