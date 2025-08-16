@@ -46,14 +46,5 @@
     ],
     "geminicodeassist.inlineSuggestions.enableAuto": false,
     "geminicodeassist.chat.defaultDiffLayout": "Side by side diff",
-    "geminicodeassist.chat.defaultCodeBlockDisplay": "Expanded",
-    "cursorpyright.analysis.diagnosticSeverityOverrides": {},
-    "cursorpyright.analysis.extraPaths": [
-        "backend"
-    ],
-    "cursorpyright.analysis.exclude": [
-        "**/.venv/**",
-        "**/node_modules/**",
-        "**/__pycache__/**"
-    ]
+    "geminicodeassist.chat.defaultCodeBlockDisplay": "Expanded"
 }
