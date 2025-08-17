@@ -48,8 +48,52 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 ## Prioritized Backlog
 
+#### P0 — Migrate Integration Tests to Target Approach (Solve P4 MagicMock Detection)
 
+- **Why**: Integration tests currently use `@patch` decorators that can leak MagicMock instances into normal app usage, causing the P4 torch.compile optimization issue. Migrating to pytest-native fixtures will provide better isolation and solve the MagicMock detection problem.
 
+- **Context**: Current integration tests in `tests/integration/` use `unittest.mock.patch` decorators that patch module-level functions like `backend.retriever._get_embedding_model`. These patches can persist beyond test boundaries and cause MagicMock instances to leak into the `_embedding_model` cache, triggering the "Skipping torch.compile optimization (tests or MagicMock instance)" debug message during normal app usage.
+
+- **Target Approach**: Follow the testing strategy document's recommendation to use pytest-native fixtures instead of `@patch` decorators for better test isolation and state management.
+
+- [ ] **Task 1 — Create managed_embedding_model Fixture**
+  - **Action**: Add a `managed_embedding_model` fixture to `tests/integration/conftest.py` similar to the `managed_cross_encoder` fixture in unit tests.
+  - **Action**: The fixture should mock `backend.retriever._get_embedding_model` and return a MagicMock instance with proper cleanup.
+  - **Verify**: The fixture works correctly and provides the same functionality as the current `@patch` decorators.
+
+- [ ] **Task 2 — Migrate test_startup_validation_integration.py**
+  - **Action**: Replace `@patch("backend.retriever._get_embedding_model")` decorators with the new `managed_embedding_model` fixture.
+  - **Action**: Update test methods to use the fixture parameter instead of the patched mock.
+  - **Verify**: All tests in this file pass with the new fixture approach.
+
+- [ ] **Task 3 — Migrate test_qa_pipeline.py**
+  - **Action**: Replace `@patch("backend.qa_loop.generate_response")` and `@patch("backend.qa_loop.get_top_k")` decorators with appropriate fixtures.
+  - **Action**: Create a `managed_qa_functions` fixture if needed for multiple QA-related mocks.
+  - **Verify**: All tests in this file pass with the new fixture approach.
+
+- [ ] **Task 4 — Migrate test_answer_streaming_integration.py**
+  - **Action**: Replace the `@patch` decorators with appropriate fixtures.
+  - **Action**: Ensure streaming functionality is properly mocked.
+  - **Verify**: All tests in this file pass with the new fixture approach.
+
+- [ ] **Task 5 — Migrate test_ingest_pipeline.py**
+  - **Action**: Replace `@patch("backend.ingest.get_embedding_model")` with the `managed_embedding_model` fixture.
+  - **Action**: Update test logic to work with the fixture approach.
+  - **Verify**: All tests in this file pass with the new fixture approach.
+
+- [ ] **Task 6 — Migrate test_qa_real_ollama.py**
+  - **Action**: Replace `@patch("backend.qa_loop.get_top_k")` with appropriate fixture.
+  - **Verify**: All tests in this file pass with the new fixture approach.
+
+- [ ] **Task 7 — Verify P4 Problem Resolution**
+  - **Action**: Run normal CLI commands (e.g., `./scripts/cli.sh python -m backend.qa_loop --question "test"`) to check if the MagicMock detection debug message still appears.
+  - **Action**: Run integration tests to ensure they still pass and don't interfere with normal app usage.
+  - **Verify**: The "Skipping torch.compile optimization (tests or MagicMock instance)" debug message no longer appears during normal CLI usage.
+
+- [ ] **Task 8 — Update Testing Strategy Documentation**
+  - **Action**: Update `docs/testing_strategy.md` to reflect that integration tests now follow the target approach.
+  - **Action**: Add examples of the new fixture usage for integration tests.
+  - **Verify**: Documentation accurately reflects the current testing approach and provides clear guidance for future development.
 
 #### P1 — Containerized CLI E2E copies (keep host-run E2E; add container-run twins)
 
@@ -112,4 +156,46 @@ This file tracks outstanding tasks and planned improvements for the project.
 - [ ] **Phase 1: Create Grouping Directories and a `common.sh`**
   - Action: Create the new directory structure: `scripts/test/`, `scripts/lint/`, `scripts/docker/`, `scripts/ci/`, `scripts/dev/`.
   - Action: Create a single `scripts/common.sh` file. Initially, it will only contain `set -euo pipefail` and basic color variables for logging.
-  - Verify: The new directories and the `
+  - Verify: The new directories and the `common.sh` file exist and are accessible.
+
+#### P4 — Torch.compile Optimization Debugging and Performance
+
+- **Context**: During CLI usage, torch.compile optimization messages appear every time the script runs, and there's a suspicious debug message about "Skipping torch.compile optimization (tests or MagicMock instance)" appearing during normal app usage.
+
+- **Root Cause Analysis**:
+  - **torch.compile is not persistent**: Optimizations are lost when Python processes restart (expected behavior)
+  - **CLI script starts new process**: Each `./scripts/cli.sh` run creates a fresh Python process, resetting global caches
+  - **MagicMock detection issue**: Debug message suggests test-related mocking is active during normal app usage
+  - **Environment configuration**: `.env` file had Docker service URLs instead of localhost URLs for local development
+
+- **Current Status**: 
+  - ✅ Fixed `.env` configuration (localhost URLs for local CLI, Docker service URLs for containers)
+  - ✅ Reduced torch.compile verbosity to DEBUG level in `qa_loop.py`
+  - ✅ Added re-compilation prevention check within same process
+  - 🔍 **PENDING**: Investigate why MagicMock detection triggers during normal app usage
+
+- [ ] **Task 1 — Investigate MagicMock Detection in Normal Usage**
+  - **Action**: Add detailed logging to `backend/retriever.py` to trace the exact condition that triggers the "Skipping torch.compile optimization (tests or MagicMock instance)" message.
+  - **Action**: Check if any test configuration or environment variables are leaking into normal app usage.
+  - **Verify**: The debug message only appears during actual test runs, not during normal CLI usage.
+
+- [ ] **Task 2 — Optimize torch.compile Application Strategy**
+  - **Action**: Review if torch.compile should be applied to both embedding model and cross-encoder, or if one is sufficient.
+  - **Action**: Consider adding environment variable to control torch.compile application (e.g., `TORCH_COMPILE_ENABLED=false` for development).
+  - **Verify**: Performance is maintained while reducing unnecessary re-compilation overhead.
+
+- [ ] **Task 3 — Add Performance Monitoring**
+  - **Action**: Add timing measurements around torch.compile operations to quantify the optimization overhead.
+  - **Action**: Create a simple benchmark to measure the impact of torch.compile on inference speed.
+  - **Verify**: Clear metrics showing the trade-off between compilation time and inference performance.
+
+- [ ] **Task 4 — Improve Error Handling and User Experience**
+  - **Action**: Add more informative messages about torch.compile status (e.g., "Model optimization in progress..." with progress indicators).
+  - **Action**: Consider caching compiled models to disk if possible to avoid re-compilation across process restarts.
+  - **Verify**: Users understand what's happening during model optimization and the process feels responsive.
+
+- **Key Learnings**:
+  - torch.compile optimizations are process-local and cannot be persisted across restarts
+  - CLI script architecture (new process per run) inherently requires re-optimization
+  - Test mocking infrastructure can leak into normal app usage if not properly isolated
+  - Environment configuration needs to distinguish between local development and containerized usage
