@@ -66,7 +66,7 @@ class _FakeCollection:
             def __init__(self, owner):
                 self._owner = owner
 
-            def dynamic(self):
+            def fixed_size(self, batch_size, concurrent_requests):
                 return _FakeBatchCtx(collection=self._owner)
 
         self.batch = _Batch(self)

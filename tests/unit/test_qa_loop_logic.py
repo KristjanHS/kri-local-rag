@@ -19,7 +19,7 @@ def test_rerank_cross_encoder_success(managed_cross_encoder: MagicMock):
     chunks = ["relevant", "irrelevant"]
     question = "test query"
 
-    result = qa_loop._rerank(question, chunks, k_keep=2)
+    result = qa_loop._rerank(question, chunks, k_keep=2, cross_encoder=managed_cross_encoder)
 
     assert len(result) == 2
     assert result[0].text == "relevant"
@@ -31,14 +31,12 @@ def test_rerank_cross_encoder_success(managed_cross_encoder: MagicMock):
 
 def test_rerank_empty_chunks_list(managed_cross_encoder: MagicMock):
     """Test that reranking with an empty list of chunks returns an empty list."""
-    result = qa_loop._rerank("test query", [], k_keep=2)
+    result = qa_loop._rerank("test query", [], k_keep=2, cross_encoder=managed_cross_encoder)
     assert result == []
     managed_cross_encoder.predict.assert_not_called()
 
 
-def test_rerank_model_load_failure_raises_runtime_error(mocker):
-    """Test that a RuntimeError is raised if the CrossEncoder fails to load."""
-    mocker.patch("backend.qa_loop._get_cross_encoder", return_value=None)
-
+def test_rerank_model_load_failure_raises_runtime_error():
+    """Test that a RuntimeError is raised if the CrossEncoder is not available."""
     with pytest.raises(RuntimeError, match="CrossEncoder model is not available"):
-        qa_loop._rerank("test query", ["chunk1"], k_keep=1)
+        qa_loop._rerank("test query", ["chunk1"], k_keep=1, cross_encoder=None)

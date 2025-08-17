@@ -57,17 +57,9 @@ def mock_embedding_model(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     return mock
 
 
-@pytest.fixture(autouse=True)
-def reset_cross_encoder_cache():
-    """Fixture to automatically reset the cross-encoder cache before each test."""
-    from backend import qa_loop
-
-    qa_loop._cross_encoder = None
-
-
 @pytest.fixture
 def managed_cross_encoder(mocker):
-    """Fixture to mock _get_cross_encoder, returning a MagicMock instance."""
+    """Fixture to mock the CrossEncoder class, returning a MagicMock instance."""
     mock_encoder_instance = MagicMock()
-    mocker.patch("backend.qa_loop._get_cross_encoder", return_value=mock_encoder_instance)
+    mocker.patch("sentence_transformers.CrossEncoder", return_value=mock_encoder_instance)
     yield mock_encoder_instance
