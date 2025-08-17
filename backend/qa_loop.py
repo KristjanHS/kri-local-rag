@@ -83,7 +83,7 @@ def _get_cross_encoder(
             from sentence_transformers import CrossEncoder as _CE
 
             kwargs = {"cache_folder": cache_folder} if cache_folder else {}
-            _cross_encoder = _CE(model_name, **kwargs)
+            _cross_encoder = _CE(model_name, **kwargs)  # type: ignore[arg-type]
             logger.info("CrossEncoder model '%s' loaded successfully.", model_name)
 
             # Apply optimizations
