@@ -40,7 +40,15 @@ def test_e2e_ingest_with_heavy_optimizations_into_real_weaviate(caplog):
         # Point to the built-in test data used by other tests
         data_dir = os.path.join("test_data")
 
-        ingest.ingest(directory=data_dir, collection_name=collection_name, client=client)
+        from backend.retriever import _get_embedding_model
+
+        embedding_model = _get_embedding_model()
+        ingest.ingest(
+            directory=data_dir,
+            collection_name=collection_name,
+            weaviate_client=client,
+            embedding_model=embedding_model,
+        )
 
     # Verify data was ingested
     collection = client.collections.get(collection_name)

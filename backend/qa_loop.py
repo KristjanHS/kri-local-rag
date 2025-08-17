@@ -289,7 +289,15 @@ def ensure_weaviate_ready_and_populated():
 
             logger.info("   → Ingesting example test PDF from %s", test_pdf_path)
             # Reuse the already connected client to avoid separate gRPC/port issues in tests
-            ingest(test_pdf_path, collection_name=collection_name, client=client)
+            from backend.retriever import _get_embedding_model
+
+            embedding_model = _get_embedding_model()
+            ingest(
+                test_pdf_path,
+                collection_name=collection_name,
+                weaviate_client=client,
+                embedding_model=embedding_model,
+            )
 
             # Clean up the example data now that the schema is created.
             # This check is important in case the example_data folder was empty.
