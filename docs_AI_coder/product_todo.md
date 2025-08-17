@@ -101,6 +101,19 @@ This file tracks outstanding tasks and planned improvements for the project.
 - **Key Insight**: The project already supports CLI commands in the app container (see README.md: `./scripts/cli.sh python -m backend.qa_loop --question "What is in my docs?"`). We extend this pattern for automated testing rather than creating a separate `cli` service.
 - **Benefits**: Simpler architecture, fewer services to maintain, aligns with existing project patterns, and leverages the same container that users interact with.
 
+- [x] **Task: Resolve Flaky Unit Tests with Improved Mocking Strategy**
+  - **Overall Problem Description:** The unit tests for the cross-encoder logic in `backend/qa_loop.py` are flaky. Specifically, `test_rerank_cross_encoder_success` and `test_cross_encoder_enables_heavy_optimizations_when_allowed` fail when run as part of the full test suite, but succeed when run in isolation. This indicates a state leakage problem, where the cached global `_cross_encoder` object is being modified by one test and not properly reset before the next, causing unexpected failures. The current mocking strategy, which relies on `unittest.mock.patch`, is proving difficult to debug and is not robust enough to prevent this state pollution. The goal is to implement a more reliable, `pytest`-native mocking and state management strategy to ensure all unit tests are deterministic and isolated.
+  - **Action Plan:**
+    1.  **Install `pytest-mock`:** Ensure the `pytest-mock` plugin is included in the project's development dependencies.
+        -   **Verify:** The command `.venv/bin/python -m pip show pytest-mock` confirms the package is installed.
+    2.  **Create a `managed_cross_encoder` Fixture:** In `tests/unit/conftest.py`, create a new `pytest` fixture named `managed_cross_encoder`. This fixture will use the `mocker` fixture to patch `backend.qa_loop._get_cross_encoder`. It will be function-scoped to ensure cleanup after every test.
+        -   **Verify:** The new fixture is available to the test suite without causing errors.
+    3.  **Refactor `test_qa_loop_logic.py`:** Update the failing tests in this file to use the new `managed_cross_encoder` fixture instead of the `@patch` decorator.
+        -   **Verify:** The tests in `tests/unit/test_qa_loop_logic.py` pass consistently, both when run in isolation and as part of the full suite.
+    4.  **Refactor `test_cross_encoder_optimizations.py`:** Update this test to use the `managed_cross_encoder` fixture as well, removing any direct patching.
+        -   **Verify:** The test in `tests/unit/test_cross_encoder_optimizations.py` passes consistently.
+    5.  **Long-Term Consideration (No Immediate Action):** Evaluate the feasibility of refactoring `backend/qa_loop.py` to use dependency injection. This would involve passing the cross-encoder as an explicit argument to the functions that need it, which would make the code more testable and reduce the need for mocking. This is a larger architectural change and should be considered for future development.
+
 - [x] Step 1 — Identify candidates
   - Action: List E2E tests invoking CLI in-process (e.g., `backend.qa_loop`) such as `tests/e2e/test_qa_real_end_to_end.py`.
   - Verify: Confirm they don't already run via container.
