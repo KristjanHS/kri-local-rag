@@ -1,6 +1,6 @@
 """Integration tests for the QA pipeline and retriever."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -16,12 +16,10 @@ pytestmark = pytest.mark.slow
 # -----------------------------------------------------------------------------
 
 
-@patch("backend.qa_loop.generate_response")
-@patch("backend.qa_loop.get_top_k")
-def test_qa_pipeline_produces_answer(mock_get_top_k, mock_generate_response):
+def test_qa_pipeline_produces_answer(managed_qa_functions):
     """Ensure `answer()` returns a meaningful response and embeds context chunks in the prompt."""
     context_chunk = "France is a country in Western Europe."
-    mock_get_top_k.return_value = [context_chunk]
+    managed_qa_functions["get_top_k"].return_value = [context_chunk]
 
     captured_prompt: list[str] = []
 
@@ -29,15 +27,15 @@ def test_qa_pipeline_produces_answer(mock_get_top_k, mock_generate_response):
         captured_prompt.append(prompt)
         return ("The capital of France is Paris.", None)
 
-    mock_generate_response.side_effect = _fake_generate_response
+    managed_qa_functions["generate_response"].side_effect = _fake_generate_response
 
     question = "What is the capital of France?"
     result = answer(question)
 
     # ─── Assertions ──────────────────────────────────────────────────────────
     assert "Paris" in result
-    mock_get_top_k.assert_called_once_with(question, k=60, metadata_filter=None)
-    mock_generate_response.assert_called_once()
+    managed_qa_functions["get_top_k"].assert_called_once_with(question, k=60, metadata_filter=None)
+    managed_qa_functions["generate_response"].assert_called_once()
 
     # Prompt should contain both the question and the retrieved context
     assert captured_prompt, "Prompt was not captured via generate_response side-effect."
@@ -51,16 +49,15 @@ def test_qa_pipeline_produces_answer(mock_get_top_k, mock_generate_response):
 # -----------------------------------------------------------------------------
 
 
-@patch("backend.qa_loop.get_top_k")
-def test_qa_pipeline_no_context(mock_get_top_k):
+def test_qa_pipeline_no_context(managed_qa_functions):
     """`answer()` should return a graceful message when the retriever finds nothing."""
-    mock_get_top_k.return_value = []
+    managed_qa_functions["get_top_k"].return_value = []
 
     question = "What is the capital of France?"
     result = answer(question)
 
     assert "I found no relevant context" in result
-    mock_get_top_k.assert_called_once()
+    managed_qa_functions["get_top_k"].assert_called_once()
 
 
 # -----------------------------------------------------------------------------
@@ -68,8 +65,7 @@ def test_qa_pipeline_no_context(mock_get_top_k):
 # -----------------------------------------------------------------------------
 
 
-@patch("weaviate.connect_to_custom")
-def test_get_top_k_hybrid_parameters(mock_connect):
+def test_get_top_k_hybrid_parameters(mock_weaviate_connect):
     """Verify that `get_top_k` issues a `hybrid()` query with the expected parameters."""
     # Build a fake Weaviate client->collection->query chain
     mock_client = MagicMock()
@@ -84,7 +80,7 @@ def test_get_top_k_hybrid_parameters(mock_connect):
     mock_query.hybrid.return_value = mock_result
     mock_collection.query = mock_query
     mock_client.collections.get.return_value = mock_collection
-    mock_connect.return_value = mock_client
+    mock_weaviate_connect.return_value = mock_client
 
     question = "What is the capital of France?"
     _ = get_top_k(question, k=2)

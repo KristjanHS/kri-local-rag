@@ -56,46 +56,74 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 - **Target Approach**: Follow the testing strategy document's recommendation to use pytest-native fixtures instead of `@patch` decorators for better test isolation and state management.
 
-- [ ] **Task 1 — Create managed_embedding_model Fixture**
+- [x] **Task 0 — Run Linters and Type Checkers**
+  - **Action**: Run `pyright` and `ruff` to ensure the current codebase passes static analysis checks before making changes. This establishes a clean baseline.
+  - **Verify**: The commands `pyright` and `ruff check .` complete without reporting any errors.
+
+- [x] **Task 1 — Run Integration Tests to Confirm Current Failures**
+  - **Action**: Run the integration test suite using `bash scripts/test_integration.sh`.
+  - **Verify**: Observe the specific test failures related to the `MagicMock` detection or other issues that the migration is intended to solve. This confirms the problem exists before attempting a fix.
+
+- [x] **Task 2 — Create managed_embedding_model Fixture**
   - **Action**: Add a `managed_embedding_model` fixture to `tests/integration/conftest.py` similar to the `managed_cross_encoder` fixture in unit tests.
   - **Action**: The fixture should mock `backend.retriever._get_embedding_model` and return a MagicMock instance with proper cleanup.
   - **Verify**: The fixture works correctly and provides the same functionality as the current `@patch` decorators.
 
-- [ ] **Task 2 — Migrate test_startup_validation_integration.py**
+- [x] **Task 3 — Migrate test_startup_validation_integration.py**
   - **Action**: Replace `@patch("backend.retriever._get_embedding_model")` decorators with the new `managed_embedding_model` fixture.
   - **Action**: Update test methods to use the fixture parameter instead of the patched mock.
   - **Verify**: All tests in this file pass with the new fixture approach.
 
-- [ ] **Task 3 — Migrate test_qa_pipeline.py**
+- [x] **Task 4 — Migrate test_qa_pipeline.py**
   - **Action**: Replace `@patch("backend.qa_loop.generate_response")` and `@patch("backend.qa_loop.get_top_k")` decorators with appropriate fixtures.
   - **Action**: Create a `managed_qa_functions` fixture if needed for multiple QA-related mocks.
   - **Verify**: All tests in this file pass with the new fixture approach.
 
-- [ ] **Task 4 — Migrate test_answer_streaming_integration.py**
+- [x] **Task 5 — Migrate test_answer_streaming_integration.py**
   - **Action**: Replace the `@patch` decorators with appropriate fixtures.
   - **Action**: Ensure streaming functionality is properly mocked.
   - **Verify**: All tests in this file pass with the new fixture approach.
 
-- [ ] **Task 5 — Migrate test_ingest_pipeline.py**
+- [x] **Task 6 — Migrate test_ingest_pipeline.py**
   - **Action**: Replace `@patch("backend.ingest.get_embedding_model")` with the `managed_embedding_model` fixture.
   - **Action**: Update test logic to work with the fixture approach.
   - **Verify**: All tests in this file pass with the new fixture approach.
 
-- [ ] **Task 6 — Migrate test_qa_real_ollama.py**
+- [x] **Task 7 — Migrate test_qa_real_ollama.py**
   - **Action**: Replace `@patch("backend.qa_loop.get_top_k")` with appropriate fixture.
   - **Verify**: All tests in this file pass with the new fixture approach.
 
-- [ ] **Task 7 — Verify P4 Problem Resolution**
+- [x] **Task 8 — Verify P4 Problem Resolution**
   - **Action**: Run normal CLI commands (e.g., `./scripts/cli.sh python -m backend.qa_loop --question "test"`) to check if the MagicMock detection debug message still appears.
   - **Action**: Run integration tests to ensure they still pass and don't interfere with normal app usage.
   - **Verify**: The "Skipping torch.compile optimization (tests or MagicMock instance)" debug message no longer appears during normal CLI usage.
 
-- [ ] **Task 8 — Update Testing Strategy Documentation**
+- [x] **Task 9 — Update Testing Strategy Documentation**
   - **Action**: Update `docs/testing_strategy.md` to reflect that integration tests now follow the target approach.
   - **Action**: Add examples of the new fixture usage for integration tests.
   - **Verify**: Documentation accurately reflects the current testing approach and provides clear guidance for future development.
 
-#### P1 — Containerized CLI E2E copies (keep host-run E2E; add container-run twins)
+#### P1 — Refactor Core Logic to Use Dependency Injection
+
+- **Why**: The current application logic relies on global, module-level caches for heavy objects like embedding models. This forces tests to use monkeypatching (`@patch` or fixtures that patch) to isolate components. Refactoring to a Dependency Injection (DI) pattern will make the code more modular, easier to test without patching, and eliminate the root cause of mock leakage issues.
+- **Target Approach**: Modify key functions and classes to accept dependencies (like the embedding model or the Weaviate client) as explicit arguments. The application's entry point (e.g., the CLI or UI) will be responsible for creating these objects and "injecting" them into the functions that need them.
+
+- [ ] **Task 1 — Refactor `qa_loop.py`**
+  - **Action**: Modify the `answer` function to accept `embedding_model` and `cross_encoder` objects as optional arguments.
+  - **Action**: Update the CLI entry point to create these models once and pass them into the `qa_loop`.
+  - **Verify**: The CLI functionality remains unchanged. Unit and integration tests are updated to pass the models directly instead of using fixtures that patch.
+
+- [ ] **Task 2 — Refactor `ingest.py`**
+  - **Action**: Modify the `ingest` function to accept the `embedding_model` and `weaviate_client` as arguments.
+  - **Action**: Update the `ingest.sh` script and any other callers to create and pass these dependencies.
+  - **Verify**: The ingestion process works as before. Tests are updated to inject mock dependencies directly.
+
+- [ ] **Task 3 — Remove Patching from Tests**
+  - **Action**: With DI in place, review all tests in `tests/integration` and `tests/unit`.
+  - **Action**: Remove any remaining `pytest.mark.patch` or `mocker.patch` calls that are no longer necessary. Fixtures should now be used to *create* mock objects, not to patch them into the application's namespace.
+  - **Verify**: The test suite passes, and the use of patching is significantly reduced or eliminated.
+
+#### P2 — Containerized CLI E2E copies (keep host-run E2E; add container-run twins)
 
 - **Why**: Host-run E2E miss packaging/runtime issues (entrypoint, PATH, env, OS libs). Twins validate the real image without replacing fast host tests.
 - **Current Approach**: Use the existing `app` container which can run both Streamlit (web UI) and CLI commands via `docker compose exec app`. This leverages the project's existing architecture where the `app` service is designed to handle multiple entry points.
@@ -114,7 +142,13 @@ This file tracks outstanding tasks and planned improvements for the project.
   - Action: Document commands in `docs/DEVELOPMENT.md` and `AI_instructions.md`; mention in `scripts/test.sh e2e` help; add a CI job for the containerized CLI subset.
   - Verify: Fresh env runs `tests/e2e/*_container_e2e.py` green; CI job passes locally under `act` and on hosted runners.
 
-#### P2 — E2E retrieval failure: QA test returns no context (Weaviate)
+#### P2 — Align Testcontainer Weaviate Version with Docker Compose
+- **Why**: An integration test (`test_weaviate_integration.py`) uses the `testcontainers` library, which defaults to an older Weaviate version (`1.24.5`) than the one specified in `docker-compose.yml` (`1.32.0`). This discrepancy can lead to tests passing with an old version but the app failing with the new one, or vice-versa.
+- **Best Practice**: Test environments should match the application's environment as closely as possible to ensure test results are reliable.
+- **Action**: Modify `tests/integration/test_weaviate_integration.py` to explicitly configure the `WeaviateContainer` with the same image tag used in `docker/docker-compose.yml`.
+- **Verify**: When the test runs, the logs show it is pulling and starting the correct Weaviate version (`1.32.0`).
+
+#### P3 — E2E retrieval failure: QA test returns no context (Weaviate)
 
  - Context and goal
    - Failing test returns no context from Weaviate. Likely mismatch between collection name used by retrieval and the one populated by ingestion, or ingestion not executed.
