@@ -35,6 +35,8 @@ FROM python:3.12.3-slim
 ENV VENV_PATH=/opt/venv
 ENV PATH="${VENV_PATH}/bin:${PATH}"
 ENV NLTK_DATA=/opt/venv/nltk_data
+ENV SENTENCE_TRANSFORMERS_HOME=/app/model_cache
+ENV CROSS_ENCODER_CACHE_DIR=/app/model_cache
 
 WORKDIR /app
 
@@ -51,7 +53,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     poppler-utils \
     tesseract-ocr tesseract-ocr-eng \
     libgl1 libglib2.0-0 \
-    && apt-get clean
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Bring in the prebuilt virtualenv from the builder stage
 COPY --from=builder ${VENV_PATH} ${VENV_PATH}
@@ -59,6 +62,7 @@ COPY --from=builder ${VENV_PATH} ${VENV_PATH}
 # Copy application assets that are not part of the Python package
 COPY frontend/ /app/frontend/
 COPY example_data/ /app/example_data/
+COPY model_cache/ /app/model_cache/
 
 # Pre-download required NLTK data for Unstructured markdown parsing.
 # The NLTK downloader can be flaky; wrap in a check to avoid failing the build
@@ -76,7 +80,7 @@ EXPOSE 8501
 
 # Non-root user and permissions
 RUN useradd -ms /bin/bash appuser \
-    && chown -R appuser:appuser /app /app/example_data /opt/venv/nltk_data
+    && chown -R appuser:appuser /app /app/example_data /app/model_cache /opt/venv/nltk_data
 USER appuser
 
 CMD ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]

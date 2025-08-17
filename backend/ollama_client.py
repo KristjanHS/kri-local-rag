@@ -141,26 +141,48 @@ def ensure_model_available(model_name: str) -> bool:
         base_url = _get_ollama_base_url()
 
         # Check if model exists
-        resp = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=2)
-        resp.raise_for_status()
-        models = resp.json().get("models", [])
+        try:
+            resp = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=2)
+            resp.raise_for_status()
+            models = resp.json().get("models", [])
+        except httpx.ConnectError as e:
+            logger.error(
+                "Cannot connect to Ollama server at %s. Please ensure Ollama is running and accessible.", base_url
+            )
+            logger.debug("Connection error details: %s", e)
+            return False
+        except httpx.TimeoutException:
+            logger.error("Timeout connecting to Ollama server at %s. Please check if Ollama is running.", base_url)
+            return False
+        except Exception as e:
+            logger.error("Unexpected error connecting to Ollama server: %s", e)
+            return False
 
         # Check if our model is in the list
         model_exists = _check_model_exists(model_name, models)
 
         if not model_exists:
+            logger.info("Model '%s' not found in Ollama. Attempting to download...", model_name)
             # Download the model with progress tracking
             if not _download_model_with_progress(model_name, base_url):
+                logger.error(
+                    "Failed to download model '%s'. Please check your internet connection and try again.", model_name
+                )
                 return False
 
             # Verify the download was successful
-            return _verify_model_download(model_name, base_url)
+            if not _verify_model_download(model_name, base_url):
+                logger.error("Model '%s' download verification failed.", model_name)
+                return False
+
+            logger.info("Model '%s' successfully downloaded and verified.", model_name)
+            return True
         else:
             logger.info("Model '%s' is already available.", model_name)
             return True
 
     except Exception as e:
-        logger.error("Error ensuring model availability: %s", e)
+        logger.error("Unexpected error ensuring model availability: %s", e)
         return False
 
 

@@ -57,10 +57,22 @@ if [[ "$SKIP_LINT" != "1" ]]; then
     log INFO "Running ruff check …" | tee -a "$LOG_FILE"
     .venv/bin/ruff check . 2>&1 | sed 's/^/[ruff] /' | tee -a "$LOG_FILE"
   else
-    log WARN "'.venv/bin/ruff' not found. Skipping ruff checks. Ensure dev deps are installed: 'pip install -e .[test,docs,cli]'" | tee -a "$LOG_FILE"
+    log WARN "'.venv/bin/ruff' not found. Skipping ruff checks. Ensure dev deps are installed: 'pip install -e .[test,docs]'" | tee -a "$LOG_FILE"
   fi
 else
   log INFO "Skipping ruff due to SKIP_LINT=1" | tee -a "$LOG_FILE"
+fi
+
+# Run yamlfmt (YAML formatting) natively
+if [[ "$SKIP_LINT" != "1" ]]; then
+  if command -v yamlfmt >/dev/null 2>&1; then
+    log INFO "Running yamlfmt --lint …" | tee -a "$LOG_FILE"
+    yamlfmt --lint "**/*.yml" "**/*.yaml" 2>&1 | sed 's/^/[yamlfmt] /' | tee -a "$LOG_FILE"
+  else
+    log WARN "'yamlfmt' not found. Skipping YAML formatting checks. Install: './scripts/install-system-tools.sh'" | tee -a "$LOG_FILE"
+  fi
+else
+  log INFO "Skipping yamlfmt due to SKIP_LINT=1" | tee -a "$LOG_FILE"
 fi
 
 # Run pyright (type checking) natively from the project venv

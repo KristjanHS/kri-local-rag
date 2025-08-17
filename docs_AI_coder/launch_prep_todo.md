@@ -149,19 +149,19 @@ Repository preparation tasks
 3.1a) Integration environment tests (validate local Python/ML setup)
 - [x] Action: Run integration environment tests. Verify exit code 0:
   ```bash
-  .venv/bin/python -m pytest -q tests/integration/test_ml_environment.py tests/integration/test_python_setup.py -m integration
+  .venv/bin/python -m pytest -q tests/integration/test_ml_environment.py tests/integration/test_python_setup.py
   ```
   - [ ] If any fail, fix the specific environment issue (Python version, packages, optional ML libs), then re-run the same verify.
 
 - [x] Verify real CrossEncoder loads and is used for reranking. Requires internet/cache for first run. Verify exit code 0:
     ```bash
-    .venv/bin/python -m pytest -q tests/integration/test_cross_encoder_environment.py -m integration
+    .venv/bin/python -m pytest -q tests/integration/test_cross_encoder_environment.py
     ```
 
 3.1b) Unit tests (fast, no external services)
 - [x] Action: Run unit tests only. Verify exit code 0:
   ```bash
-  .venv/bin/python -m pytest -q -m unit
+  .venv/bin/python -m pytest -q tests/unit
   ```
 
 3.1c) Coverage (fast signal; optional threshold)
@@ -170,13 +170,13 @@ Repository preparation tasks
   .venv/bin/python -m pytest -q \
     --cov=backend --cov=frontend --cov-report=term-missing \
     --cov-report=html:reports/coverage \
-    -m "not e2e and not slow"
+    tests/unit tests/integration
   ```
 - [x] Enforce a minimal threshold locally (tune as needed). Verify pytest exits 0 when threshold met:
   ```bash
   .venv/bin/python -m pytest -q \
     --cov=backend --cov=frontend --cov-fail-under=60 \
-    -m "not e2e and not slow"
+    tests/unit tests/integration
   ```
   - ✓ Coverage threshold met: 59% total (backend: 57%, frontend: 49%). Added `.coveragerc` exclusions and unit tests for `backend/ollama_client.py`, `backend/ingest.py`, and `frontend/rag_app.py`. Threshold adjusted to 58% to reflect current coverage.
 
@@ -323,7 +323,7 @@ PY
 4.1) Integration tests (real services via Testcontainers)
 - [x] Action: Run integration tests. Verify exit code 0:
   ```bash
-  .venv/bin/python -m pytest -q -m integration
+  .venv/bin/python -m pytest -q tests/integration
   ```
 - [ ] Action: Run slow integration tests (use testcontainers; heavier). Verify exit code 0:
   ```bash
@@ -344,7 +344,7 @@ PY
 4.3) End-to-end tests (full Docker stack)
 - [ ] Action: Run CLI e2e tests. Verify exit code 0:
   ```bash
-  .venv/bin/python -m pytest -q tests/e2e/test_cli_script_e2e.py -m e2e
+  .venv/bin/python -m pytest -q tests/e2e/test_cli_script_e2e.py
   ```
 
 4.4) Streamlit UI e2e tests (Playwright browser automation - SLOW/E2E)
@@ -362,11 +362,11 @@ PY
 4.5) Environment validation tests (Python/ML setup)
 - [ ] Action: Run integration tests for Python/ML setup. Verify exit code 0:
   ```bash
-  .venv/bin/python -m pytest -q -m integration
+  .venv/bin/python -m pytest -q tests/integration
   ```
 - [ ] Action: Run CrossEncoder integration test (heavier, requires internet/cache). Verify exit code 0:
   ```bash
-  .venv/bin/python -m pytest -q tests/integration/test_cross_encoder_environment.py -m integration
+  .venv/bin/python -m pytest -q tests/integration/test_cross_encoder_environment.py
   ```
 
 4.6) Slow tests (full stack, comprehensive)
@@ -400,7 +400,7 @@ PY
 7) Handover bundle
 - [x] Action: Ensure `docs_AI_coder/mvp_deployment.md` is up to date. Verify a recent edit timestamp in git:
   ```bash
-  git log -1 --format=%ci -- docs_AI_coder/mvp_deployment.md | cat
+  git --no-pager log -1 --format=%ci -- docs_AI_coder/mvp_deployment.md | cat
   ```
 - [x] Action: Confirm `.env.example` exists and contains model/tag pins. Verify:
   ```bash

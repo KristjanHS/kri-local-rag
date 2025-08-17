@@ -1,7 +1,7 @@
 ---
-description: "Terminate agent response with <END> marker when all required tasks are completed"
+description: "Gemini Pro agent: terminate response with <END> marker when all required tasks are completed"
 type: agent-select
-alwaysApply: true
+alwaysApply: false
 ---
 - If all required steps are done, emit exactly "<END>" and stop.  
 - Do **not** generate any text after "<END>".  

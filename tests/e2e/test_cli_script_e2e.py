@@ -17,7 +17,6 @@ import pytest
 pytestmark = pytest.mark.slow
 
 
-@pytest.mark.e2e
 def test_cli_interactive_mode():
     """Interactive mode: provide a question and then quit.
 
@@ -51,7 +50,6 @@ def test_cli_interactive_mode():
     assert result.returncode == 0
 
 
-@pytest.mark.e2e
 def test_cli_single_question_mode():
     """Single-question mode with a deterministic fake answer."""
     env = {
