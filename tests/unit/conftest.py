@@ -44,3 +44,22 @@ def _enforce_blocked_sockets(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(_socket.socket, "connect", _blocked_connect, raising=True)
     monkeypatch.setattr(_socket, "create_connection", _blocked_create_connection, raising=True)
+
+
+from unittest.mock import MagicMock
+
+
+@pytest.fixture
+def mock_embedding_model(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Fixture to mock the SentenceTransformer, preventing model downloads."""
+    mock = MagicMock()
+    monkeypatch.setattr("backend.retriever.SentenceTransformer", mock)
+    return mock
+
+
+@pytest.fixture
+def managed_cross_encoder(mocker):
+    """Fixture to mock the CrossEncoder class, returning a MagicMock instance."""
+    mock_encoder_instance = MagicMock()
+    mocker.patch("sentence_transformers.CrossEncoder", return_value=mock_encoder_instance)
+    yield mock_encoder_instance

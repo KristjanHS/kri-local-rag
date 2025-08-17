@@ -12,7 +12,7 @@ services:
       QUERY_DEFAULTS_LIMIT: 25
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
       DEFAULT_VECTORIZER_MODULE: 'none' # We are providing vectors manually
-      ENABLE_MODULES: 'text2vec-huggingface,reranker-huggingface' # Still needed for reranker
+      # ENABLE_MODULES: 'text2vec-huggingface,reranker-huggingface' # Still needed for reranker
       CLUSTER_HOSTNAME: 'node1'
     healthcheck:
       test: [ "CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1" ]
@@ -62,6 +62,8 @@ services:
     working_dir: /app
     # Auto-start Streamlit when container starts
     command: [ "streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0" ]
+    env_file:
+      - .env.docker
     environment:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
@@ -80,16 +82,9 @@ services:
       - ../logs:/app/logs # Live log access
       - ../tests:/app/tests # Mount tests for in-container testing
       - hf_cache:/root/.cache/huggingface
+    env_file:
+      - .env.docker
     command: [ "python", "backend/ingest.py", "/app/data" ]
-
-  # ---------- CLI Service -----------------------------------------
-  cli:
-    image: kri-local-rag-app # reuse the APP image
-    profiles: [ "cli" ]
-    working_dir: /app
-    environment:
-      - WEAVIATE_URL=http://weaviate:8080
-      - OLLAMA_URL=http://ollama:11434
 
 volumes:
   weaviate_db:

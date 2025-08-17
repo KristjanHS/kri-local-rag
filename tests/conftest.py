@@ -15,7 +15,11 @@ LOGS_DIR = REPORTS_DIR / "logs"
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: D401
-    """Ensure report directories exist before any logging is configured."""
+    """Ensure report directories exist and unset conflicting env vars."""
+    # Unset environment variables that might conflict with host-based testing
+    os.environ.pop("WEAVIATE_URL", None)
+    os.environ.pop("OLLAMA_URL", None)
+
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -59,13 +63,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--keep-docker-up",
         action="store_true",
         default=False,
-        help=("Do not tear down docker compose services after tests. " "Equivalent to setting KEEP_DOCKER_UP=1"),
+        help=("Do not tear down docker compose services after tests. Equivalent to setting KEEP_DOCKER_UP=1"),
     )
     docker_group.addoption(
         "--teardown-docker",
         action="store_true",
         default=False,
-        help=("Force tear down docker compose services after tests. " "Equivalent to setting TEARDOWN_DOCKER=1"),
+        help=("Force tear down docker compose services after tests. Equivalent to setting TEARDOWN_DOCKER=1"),
     )
 
 
@@ -77,6 +81,45 @@ def pytest_configure(config: pytest.Config) -> None:  # noqa: D401
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """No custom collection filtering; selection is by directory paths."""
     return
+
+
+@pytest.fixture(scope="session")
+def cross_encoder_cache_dir(project_root: Path) -> str:
+    """Ensure the CrossEncoder model is cached locally and return the cache path."""
+    import inspect
+
+    from httpx import HTTPError as HttpxHTTPError
+    from huggingface_hub import snapshot_download
+    from requests.exceptions import HTTPError as RequestsHTTPError
+
+    cache_dir = project_root / "model_cache"
+
+    # Dynamically read the default model name from the _get_cross_encoder function signature
+    from backend.qa_loop import _get_cross_encoder
+
+    sig = inspect.signature(_get_cross_encoder)
+    default_model_name = sig.parameters["model_name"].default
+
+    try:
+        # This will check the cache first and not make a network call.
+        # If the model is not in the cache, it will raise an exception because of local_files_only=True.
+        snapshot_download(
+            repo_id=default_model_name,
+            cache_dir=cache_dir,
+            local_files_only=True,
+        )
+    except (FileNotFoundError, HttpxHTTPError, RequestsHTTPError) as e:
+        # A more specific error could be raised if we know it's a "not found" error
+        # For now, a generic failure is fine. HfHubHTTPError is for network-related issues,
+        # but with local_files_only=True, it might be raised for cache lookup failures.
+        # FileNotFoundError is also a possibility.
+        pytest.fail(
+            f"Failed to find CrossEncoder model '{default_model_name}' in local cache at '{cache_dir}'.\\n"
+            f"Please run '.venv/bin/python scripts/setup/download_model.py' to download it.\\n"
+            f"Original error: {e}"
+        )
+
+    return str(cache_dir)
 
 
 @pytest.fixture(scope="session")
@@ -93,18 +136,10 @@ def test_log_file(tmp_path_factory):
 def docker_services(request, test_log_file):
     """
     Manages the Docker environment for the test session.
-
-    This fixture will:
-    1. Check if Docker is available.
-    2. Start all services using `docker compose up -d --wait`.
-    3. Yield control to the tests.
-    4. Shut down all services with `docker compose down -v` after the session.
     """
     # If running inside a Docker container, assume services are already managed
     if Path("/.dockerenv").exists():
-        console.print("\\n--- Running inside Docker, skipping Docker service management. ---")
-        # In a Docker environment, we just need to ensure Weaviate is ready.
-        # The services themselves are managed by the CI workflow's docker-compose.
+        console.print("\n--- Running inside Docker, skipping Docker service management. ---")
         yield
         return
 
@@ -113,156 +148,57 @@ def docker_services(request, test_log_file):
 
     # Check for Docker
     try:
-        # Add a timeout to prevent hanging if Docker daemon is unresponsive
         subprocess.run(["docker", "info"], check=True, capture_output=True, timeout=5)
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as e:
-        # If Docker is not running, not installed, or times out, FAIL clearly for non-unit suites
-        if isinstance(e, subprocess.TimeoutExpired):
-            console.print("\n--- Docker daemon is unresponsive. Docker is REQUIRED for these tests. ---")
-        else:
-            console.print("\n--- Docker is not running or not installed. Docker is REQUIRED for these tests. ---")
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        pytest.fail("Docker is required for integration tests. Please ensure it is running.")
 
-        pytest.fail(
-            "Docker is required for docker/integration/e2e tests. Start the Docker daemon, "
-            "or deselect these tests (e.g., -m 'not docker')."
-        )
-
-    # Docker is available, manage the services
     console.print("\n--- Setting up Docker services for testing ---")
 
-    # Sockets are allowed by default in non-unit suites; no explicit toggling needed
-
     with open(test_log_file, "a") as log:
-        # --- Configure a file handler for the test-specific log file ---
-        # Remove any existing handlers to avoid duplicate logs
-        for handler in logging.root.handlers[:]:
-            logging.root.removeHandler(handler)
-
-        # Add a new handler pointing to the unique test log file
-        file_handler = logging.FileHandler(test_log_file)
-        file_handler.setLevel(logging.INFO)
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        file_handler.setFormatter(formatter)
-        logging.root.addHandler(file_handler)
-        logging.root.setLevel(logging.INFO)
-
-        log.write("--- Docker Setup Logs ---\n")
-
-        # Start services and wait for them to be healthy
         try:
-            # We use Popen to stream output in real-time
-            process = subprocess.Popen(
+            subprocess.run(
                 ["docker", "compose", "-f", str(compose_file), "up", "-d", "--wait"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                check=True,
+                capture_output=True,
                 text=True,
+                timeout=300,
             )
-
-            # Stream stdout
-            if process.stdout is not None:
-                for line in process.stdout:
-                    log.write(line)
-                    logger.info(line.strip())  # Also log to terminal for visibility
-
-            # Wait for the process to complete and get the return code
-            process.wait(timeout=300)
-
-            if process.returncode != 0:
-                # Capture and log any remaining stderr
-                stderr_output = process.stderr.read() if process.stderr is not None else ""
-                log.write("\n--- Docker Error Logs ---\n")
-                log.write(stderr_output)
-                pytest.fail(f"Failed to start Docker services. See logs at {test_log_file}")
-
             console.print("✓ Docker services are up and healthy.")
             log.write("✓ Docker services are up and healthy.\n")
 
             # --- Ensure Weaviate database is populated for tests ---
             try:
-                import sys
-
-                backend_path = project_root / "backend"
-                if str(backend_path) not in sys.path:
-                    sys.path.insert(0, str(backend_path))
                 from backend.qa_loop import ensure_weaviate_ready_and_populated
 
                 ensure_weaviate_ready_and_populated()
-
-                # After the standard readiness check, ensure the collection is *not* empty for tests.
-                from urllib.parse import urlparse
-
-                import weaviate
-
-                from backend.config import COLLECTION_NAME, WEAVIATE_URL
-                from backend.ingest import ingest
-
-                parsed = urlparse(WEAVIATE_URL)
-                client = weaviate.connect_to_custom(
-                    http_host=parsed.hostname or "localhost",
-                    http_port=parsed.port or 80,
-                    grpc_host=parsed.hostname or "localhost",
-                    grpc_port=50051,
-                    http_secure=parsed.scheme == "https",
-                    grpc_secure=parsed.scheme == "https",
-                )
-                try:
-                    collection = client.collections.get(COLLECTION_NAME)
-                    try:
-                        next(collection.iterator())
-                        has_data = True
-                    except StopIteration:
-                        has_data = False
-
-                    if not has_data:
-                        # Ingest the bundled example data *without* deleting it afterwards
-                        data_dir = project_root / "example_data"
-                        ingest(str(data_dir))
-                        console.print("✓ Example data ingested for tests.")
-                        log.write("✓ Example data ingested for tests.\n")
-                    else:
-                        console.print("✓ Weaviate collection already populated.")
-                        log.write("✓ Weaviate collection already populated.\n")
-                finally:
-                    client.close()
-
                 console.print("✓ Weaviate database ready for tests.")
                 log.write("✓ Weaviate database ready for tests.\n")
             except Exception as e:
                 console.print(f"✗ Failed to verify/populate Weaviate: {e}")
                 log.write(f"✗ Failed to verify/populate Weaviate: {e}\\n")
 
-        except subprocess.TimeoutExpired:
-            pytest.fail(f"Timed out waiting for Docker services. See logs at {test_log_file}")
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+            stderr = e.stderr if hasattr(e, "stderr") else str(e)
+            log.write("\n--- Docker Error Logs ---\n")
+            log.write(str(stderr))
+            pytest.fail(f"Failed to start Docker services. See logs at {test_log_file}")
         except Exception as e:
             pytest.fail(f"An unexpected error occurred during Docker setup: {e}")
 
     # Yield to let the tests run
     yield
 
-    # Controlled teardown based on flags or environment variables
-    keep_up_flag = bool(getattr(request.config.option, "keep_docker_up", False))
-    teardown_flag = bool(getattr(request.config.option, "teardown_docker", False))
-    keep_up_env = os.environ.get("KEEP_DOCKER_UP", "").strip() not in ("", "0", "false", "False")
-    teardown_env = os.environ.get("TEARDOWN_DOCKER", "").strip() not in ("", "0", "false", "False")
-
-    # Default: keep containers up for fast iterations unless teardown is explicitly requested
-    teardown_requested = teardown_flag or teardown_env
-    keep_requested = keep_up_flag or keep_up_env
-
-    if not teardown_requested:
-        console.print("\n--- Docker services left running (default for fast iterations) ---")
-        if keep_requested:
-            console.print("    note: explicit keep requested via flag/env")
+    # Controlled teardown
+    keep_up = request.config.getoption("--keep-docker-up") or os.getenv("KEEP_DOCKER_UP")
+    if keep_up:
+        console.print("\n--- Docker services left running as requested ---")
         return
 
-    compose_file = Path(__file__).parent.parent / "docker" / "docker-compose.yml"
-    console.print("\n--- Tearing down Docker services (docker compose down -v) ---")
+    console.print("--- Tearing down Docker services (preserving volumes) ---")
     try:
-        subprocess.run(["docker", "compose", "-f", str(compose_file), "down", "-v"], check=True)
+        subprocess.run(["docker", "compose", "-f", str(compose_file), "down"], check=True)
     except Exception as e:
         console.print(f"✗ Failed to tear down Docker services: {e}")
-    finally:
-        pass
 
 
 @pytest.fixture(scope="session")
@@ -290,14 +226,15 @@ def docker_services_ready():  # noqa: D401
 
 @pytest.fixture(autouse=True)
 def _guard_against_real_external_services(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest):
-    """Block real Weaviate and Ollama connections in light tests.
+    """Block real Weaviate and Ollama connections for unit tests.
 
-    Applies to any test that is NOT marked as one of: integration, slow, docker.
-    Such tests must stub or monkeypatch external service connections.
+    Applies to any test that is located in the 'tests/unit' directory.
     """
-    marker_names = {m.name for m in request.node.iter_markers()}
-    # Allow network for any non-unit suite: integration, slow, docker, e2e, ui, environment
-    if {"integration", "slow", "docker", "e2e", "ui", "environment"} & marker_names:
+    # Get the path of the test being run
+    test_path = Path(request.node.fspath)
+
+    # Apply the guard only if the test is inside the 'tests/unit' directory
+    if "tests/unit" not in str(test_path.parent):
         return
 
     # ---- Weaviate guard ----

@@ -5,8 +5,10 @@
     "description": "Drafts a step-by-step plan but does not start to execute on it",
     "model": "gemini-2.5-pro",
     "temperature": 0.8,
-    "max_tokens": 8192,
-    "stopSequences": ["<END>"],
+    "max_tokens": 16384,
+    "stopSequences": [
+      "<END>"
+    ],
     "tools": [
       "mcp-search",
       "cursor-complete"
@@ -19,8 +21,10 @@
     "description": "Follows the approved plan deterministically to apply edits",
     "model": "gemini-2.5-pro",
     "temperature": 0.2,
-    "max_tokens": 4096,
-    "stopSequences": ["<END>"],
+    "max_tokens": 8192,
+    "stopSequences": [
+      "<END>"
+    ],
     "tools": [
       "cursor-complete",
       "cursor-edit",

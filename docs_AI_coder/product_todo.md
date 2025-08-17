@@ -11,6 +11,22 @@ This file tracks outstanding tasks and planned improvements for the project.
 - **Vectorization**: Uses a local `SentenceTransformer` model for client-side embeddings. Weaviate is configured for manually provided vectors.
 - **Reranking**: A separate, local `CrossEncoder` model is used to re-score initial search results for relevance.
 
+## Common Pitfalls and Solutions
+
+### Docker Compose Path Resolution
+- **Issue**: `docker compose -f docker/docker-compose.yml` resolves paths relative to compose file location, not working directory
+- **Fix**: Use `.env.docker` (not `./docker/.env.docker`) in compose files
+- **Verify**: `docker compose -f docker/docker-compose.yml config`
+
+### CI Test Execution Strategy
+- **Issue**: Integration and E2E tests require the full Docker stack (Weaviate, Ollama) which cannot run reliably on GitHub CI runners
+- **Fix**: Integration and E2E tests are excluded from GitHub CI entirely and only execute locally via act (nektos/act) on manual `workflow_dispatch` or scheduled runs
+- **Verify**: Fast tests (unit tests only) run on every PR, while integration/E2E tests run only locally via act
+
+### Task Verification
+- **Issue**: File existence ≠ functional working
+- **Fix**: Test actual commands that were failing, not just file presence
+
 ## Conventions
 
 - **Commands are examples**: Any equivalent approach that achieves the same outcome is acceptable
@@ -32,63 +48,87 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 ## Prioritized Backlog
 
+#### P0 — Migrate Integration Tests to Target Approach (Solve P4 MagicMock Detection)
 
+- **Why**: Integration tests currently use `@patch` decorators that can leak MagicMock instances into normal app usage, causing the P4 torch.compile optimization issue. Migrating to pytest-native fixtures will provide better isolation and solve the MagicMock detection problem.
 
-#### P1 — Final Verification of All Meta Linters
+- **Context**: Current integration tests in `tests/integration/` use `unittest.mock.patch` decorators that patch module-level functions like `backend.retriever._get_embedding_model`. These patches can persist beyond test boundaries and cause MagicMock instances to leak into the `_embedding_model` cache, triggering the "Skipping torch.compile optimization (tests or MagicMock instance)" debug message during normal app usage.
 
-- **Overall P1 Goal**: Confirm that all meta-linters pass after all preceding fixes and optimizations.
+- **Target Approach**: Follow the testing strategy document's recommendation to use pytest-native fixtures instead of `@patch` decorators for better test isolation and state management.
 
-#### P1.1 - [REVISED] Debug and Fix `yamlfmt` Failures
-- **Goal**: Ensure `yamlfmt --lint` runs without errors by leveraging the existing `.gitignore` to exclude irrelevant files and directories.
-- **Best Practice**: Use a single source of truth for ignored files (`.gitignore`) to avoid configuration drift and simplify maintenance. The `-gitignore_excludes` flag in `yamlfmt` is the ideal tool for this.
+- [x] **Task 0 — Run Linters and Type Checkers**
+  - **Action**: Run `pyright` and `ruff` to ensure the current codebase passes static analysis checks before making changes. This establishes a clean baseline.
+  - **Verify**: The commands `pyright` and `ruff check .` complete without reporting any errors.
 
-- [x] **Task 1: Validate `.gitignore`**
-  - Action: Review the `.gitignore` file to confirm that it properly excludes virtual environment directories (`.venv/`, `tools/uv_sandbox/`) and other paths that might contain problematic YAML files.
-  - Verify: The `.gitignore` file should already contain the necessary exclusion patterns.
+- [x] **Task 1 — Run Integration Tests to Confirm Current Failures**
+  - **Action**: Run the integration test suite using `bash scripts/test_integration.sh`.
+  - **Verify**: Observe the specific test failures related to the `MagicMock` detection or other issues that the migration is intended to solve. This confirms the problem exists before attempting a fix.
 
-- [x] **Task 2: Test `yamlfmt` with the correct glob pattern**
-  - Action: Run the command `yamlfmt --lint "**/*.yaml" "**/*.yml"` to test the linter with the correct glob pattern.
-  - Verify: The command should complete successfully.
+- [x] **Task 2 — Create managed_embedding_model Fixture**
+  - **Action**: Add a `managed_embedding_model` fixture to `tests/integration/conftest.py` similar to the `managed_cross_encoder` fixture in unit tests.
+  - **Action**: The fixture should mock `backend.retriever._get_embedding_model` and return a MagicMock instance with proper cleanup.
+  - **Verify**: The fixture works correctly and provides the same functionality as the current `@patch` decorators.
 
-- [x] **Task 3: Update the `product_todo.md`**
-  - Action: Modify the original `P1` task to use the correct glob pattern for the `yamlfmt` command.
-  - Verify: The `P1` task in `product_odo.md` should be updated to `yamlfmt --lint "**/*.yaml" "**/*.yml"`.
+- [x] **Task 3 — Migrate test_startup_validation_integration.py**
+  - **Action**: Replace `@patch("backend.retriever._get_embedding_model")` decorators with the new `managed_embedding_model` fixture.
+  - **Action**: Update test methods to use the fixture parameter instead of the patched mock.
+  - **Verify**: All tests in this file pass with the new fixture approach.
 
-- [x] **Task 4: Final Verification**
-  - Action: Run the updated `P1` task's commands.
-  - Verify: All linter commands, including the revised `yamlfmt` command, should exit with code 0.
+- [x] **Task 4 — Migrate test_qa_pipeline.py**
+  - **Action**: Replace `@patch("backend.qa_loop.generate_response")` and `@patch("backend.qa_loop.get_top_k")` decorators with appropriate fixtures.
+  - **Action**: Create a `managed_qa_functions` fixture if needed for multiple QA-related mocks.
+  - **Verify**: All tests in this file pass with the new fixture approach.
 
-- [ ] Action: Run all three meta linters:
-  - `actionlint -color`
-  - `yamlfmt --lint "**/*.yaml" "**/*.yml"`
-  - `hadolint docker/app.Dockerfile`
+- [x] **Task 5 — Migrate test_answer_streaming_integration.py**
+  - **Action**: Replace the `@patch` decorators with appropriate fixtures.
+  - **Action**: Ensure streaming functionality is properly mocked.
+  - **Verify**: All tests in this file pass with the new fixture approach.
 
-- [ ] Verify: All commands exit with code 0 and report no errors.
+- [x] **Task 6 — Migrate test_ingest_pipeline.py**
+  - **Action**: Replace `@patch("backend.ingest.get_embedding_model")` with the `managed_embedding_model` fixture.
+  - **Action**: Update test logic to work with the fixture approach.
+  - **Verify**: All tests in this file pass with the new fixture approach.
+
+- [x] **Task 7 — Migrate test_qa_real_ollama.py**
+  - **Action**: Replace `@patch("backend.qa_loop.get_top_k")` with appropriate fixture.
+  - **Verify**: All tests in this file pass with the new fixture approach.
+
+- [x] **Task 8 — Verify P4 Problem Resolution**
+  - **Action**: Run normal CLI commands (e.g., `./scripts/cli.sh python -m backend.qa_loop --question "test"`) to check if the MagicMock detection debug message still appears.
+  - **Action**: Run integration tests to ensure they still pass and don't interfere with normal app usage.
+  - **Verify**: The "Skipping torch.compile optimization (tests or MagicMock instance)" debug message no longer appears during normal CLI usage.
+
+- [x] **Task 9 — Update Testing Strategy Documentation**
+  - **Action**: Update `docs/testing_strategy.md` to reflect that integration tests now follow the target approach.
+  - **Action**: Add examples of the new fixture usage for integration tests.
+  - **Verify**: Documentation accurately reflects the current testing approach and provides clear guidance for future development.
+
+#### P1 — Refactor Core Logic to Use Dependency Injection
+
+- **Why**: The current application logic relies on global, module-level caches for heavy objects like embedding models. This forces tests to use monkeypatching (`@patch` or fixtures that patch) to isolate components. Refactoring to a Dependency Injection (DI) pattern will make the code more modular, easier to test without patching, and eliminate the root cause of mock leakage issues.
+- **Target Approach**: Modify key functions and classes to accept dependencies (like the embedding model or the Weaviate client) as explicit arguments. The application's entry point (e.g., the CLI or UI) will be responsible for creating these objects and "injecting" them into the functions that need them.
+
+- [x] **Task 1 — Refactor `qa_loop.py`**
+  - **Action**: Modify the `answer` function to accept `embedding_model` and `cross_encoder` objects as optional arguments.
+  - **Action**: Update the CLI entry point to create these models once and pass them into the `qa_loop`.
+  - **Verify**: The CLI functionality remains unchanged. Unit and integration tests are updated to pass the models directly instead of using fixtures that patch.
+
+- [x] **Task 2 — Refactor `ingest.py`**
+  - **Action**: Modify the `ingest` function to accept the `embedding_model` and `weaviate_client` as arguments.
+  - **Action**: Update the `ingest.sh` script and any other callers to create and pass these dependencies.
+  - **Verify**: The ingestion process works as before. Tests are updated to inject mock dependencies directly.
+
+- [ ] **Task 3 — Remove Patching from Tests**
+  - **Action**: With DI in place, review all tests in `tests/integration` and `tests/unit`.
+  - **Action**: Remove any remaining `pytest.mark.patch` or `mocker.patch` calls that are no longer necessary. Fixtures should now be used to *create* mock objects, not to patch them into the application's namespace.
+  - **Verify**: The test suite passes, and the use of patching is significantly reduced or eliminated.
 
 #### P2 — Containerized CLI E2E copies (keep host-run E2E; add container-run twins)
 
-- Why: Host-run E2E miss packaging/runtime issues (entrypoint, PATH, env, OS libs). Twins validate the real image without replacing fast host tests.
-
-- [ ] Step 1 — Identify candidates
-  - Action: List E2E tests invoking CLI in-process (e.g., `backend.qa_loop`) such as `tests/e2e/test_qa_real_end_to_end.py`.
-  - Verify: Confirm they don't already run via container.
-
-- [ ] Step 2 — Compose runner for CLI (no bind mounts)
-  - Action: Add `cli` service (profile `cli`) in `docker/docker-compose.yml` using `kri-local-rag-app`, no `volumes`, `working_dir: /app`, and env:
-    - `WEAVIATE_URL=http://weaviate:8080`, `OLLAMA_URL=http://ollama:11434`.
-  - Verify: `docker compose --profile cli run --rm cli python -m backend.qa_loop --help | cat` exits 0.
-
-- [ ] Step 3 — Test helper
-  - Action: In `tests/e2e/conftest.py`, add `run_cli_in_container(args, env=None)` that runs `docker compose --profile cli run --rm cli ...`, returns `returncode/stdout/stderr`.
-  - Verify: `--help` smoke passes.
-
-- [ ] Step 4 — Readiness and URLs
-  - Action: Use existing `weaviate_compose_up`/`ollama_compose_up`; ensure ingestion uses compose-internal URLs.
-  - Verify: Readiness checks pass before CLI twin runs.
-
-- [ ] Step 5 — Create test twins
-  - Action: Add `_container_e2e.py` twins that call `run_cli_in_container([...])` with equivalent CLI subcommands; optionally mark with `@pytest.mark.docker`.
-  - Verify: Single twin passes via `.venv/bin/python -m pytest -q tests/e2e/test_qa_real_end_to_end_container_e2e.py` after compose `--wait`.
+- **Why**: Host-run E2E miss packaging/runtime issues (entrypoint, PATH, env, OS libs). Twins validate the real image without replacing fast host tests.
+- **Current Approach**: Use the existing `app` container which can run both Streamlit (web UI) and CLI commands via `docker compose exec app`. This leverages the project's existing architecture where the `app` service is designed to handle multiple entry points.
+- **Key Insight**: The project already supports CLI commands in the app container (see README.md: `./scripts/cli.sh python -m backend.qa_loop --question "What is in my docs?"`). We extend this pattern for automated testing rather than creating a separate `cli` service.
+- **Benefits**: Simpler architecture, fewer services to maintain, aligns with existing project patterns, and leverages the same container that users interact with.
 
 - [ ] Step 6 — Build outside tests
   - Action: Ensure scripts/CI build `kri-local-rag-app` once; helper should raise `pytest.UsageError` if image missing.
@@ -102,96 +142,94 @@ This file tracks outstanding tasks and planned improvements for the project.
   - Action: Document commands in `docs/DEVELOPMENT.md` and `AI_instructions.md`; mention in `scripts/test.sh e2e` help; add a CI job for the containerized CLI subset.
   - Verify: Fresh env runs `tests/e2e/*_container_e2e.py` green; CI job passes locally under `act` and on hosted runners.
 
+#### P2 — Align Testcontainer Weaviate Version with Docker Compose
+- **Why**: An integration test (`test_weaviate_integration.py`) uses the `testcontainers` library, which defaults to an older Weaviate version (`1.24.5`) than the one specified in `docker-compose.yml` (`1.32.0`). This discrepancy can lead to tests passing with an old version but the app failing with the new one, or vice-versa.
+- **Best Practice**: Test environments should match the application's environment as closely as possible to ensure test results are reliable.
+- **Action**: Modify `tests/integration/test_weaviate_integration.py` to explicitly configure the `WeaviateContainer` with the same image tag used in `docker/docker-compose.yml`.
+- **Verify**: When the test runs, the logs show it is pulling and starting the correct Weaviate version (`1.32.0`).
+
 #### P3 — E2E retrieval failure: QA test returns no context (Weaviate)
 
  - Context and goal
    - Failing test returns no context from Weaviate. Likely mismatch between collection name used by retrieval and the one populated by ingestion, or ingestion not executed.
 
- - [ ] Task 1 — Reproduce quickly
-   - Run only the failing test to confirm the symptom.
+ - [ ] **Task 1 — Reproduce quickly**
+   - **Action**: Run only the failing test to confirm the symptom (e.g., `pytest tests/e2e/test_qa_real_end_to_end.py`).
+   - **Verify**: The test fails with an assertion related to empty context, confirming the issue is reproducible.
 
- - [ ] Task 2 — Check config and schema
-   - Confirm effective `COLLECTION_NAME` and that the corresponding collection exists in Weaviate.
+ - [ ] **Task 2 — Check config and schema**
+   - **Action**: Inspect `docker-compose.yml`, `.env` files, and test fixtures to find the `COLLECTION_NAME` being used. Connect to the Weaviate console and list collections.
+   - **Verify**: The collection name used in the test exists in Weaviate, and its schema is as expected.
 
- - [ ] Task 3 — Confirm data population
-   - Ensure the ingestion fixture ran and that the target collection contains objects.
+ - [ ] **Task 3 — Confirm data population**
+   - **Action**: Add a breakpoint or logging in the ingestion fixture (`tests/e2e/fixtures_ingestion.py`) to confirm it runs. Query the collection in Weaviate to count its objects.
+   - **Verify**: The ingestion fixture executes successfully, and the target collection in Weaviate contains more than zero objects.
 
- - [ ] Task 4 — Probe retrieval directly
-   - Call the retriever to verify it returns non-empty results when data is present.
+ - [ ] **Task 4 — Probe retrieval directly**
+   - **Action**: Add a temporary test case that directly calls the `retrieve_chunks` function against the populated collection.
+   - **Verify**: The direct call to the retriever returns a non-empty list of documents, proving the retrieval logic is functional.
 
- - [ ] Task 5 — Standardize collection naming
-   - Decide one collection name for E2E and apply consistently (tests, fixtures, and config).
+ - [ ] **Task 5 — Standardize collection naming**
+   - **Action**: Choose a single collection name for all E2E tests (e.g., `TestCollectionE2E`) and apply it consistently across tests, fixtures, and configurations.
+   - **Verify**: A global search for the old collection name in the `tests/` directory yields no results.
 
- - [ ] Task 6 — Implement and verify
-   - Apply the change, re-run E2E, and confirm the QA test passes.
+ - [ ] **Task 6 — Implement and verify**
+   - **Action**: With the standardized name in place, re-run the full E2E test suite.
+   - **Verify**: The originally failing QA test now passes successfully.
 
- - [ ] Task 7 — Add minimal guardrails
-   - Log the active collection name in the e2e fixture and add a small test ensuring graceful behavior when empty.
+ - [ ] **Task 7 — Add minimal guardrails**
+   - **Action**: In the E2E setup fixture, add a log statement for the collection name being used. Create a new, small test that intentionally queries a non-existent collection.
+   - **Verify**: The test logs show the correct collection name, and the new test confirms that querying an empty/non-existent collection returns an empty list rather than crashing.
 
-#### P4 — Minimalist Scripts Directory Cleanup
+
+
+#### P3 — Minimalist Scripts Directory Cleanup
 
 - **Goal**: Reorganize the `scripts/` directory for better clarity with minimal effort. Group related scripts into subdirectories. Avoid complex refactoring or new patterns like dispatchers.
 
 - [ ] **Phase 1: Create Grouping Directories and a `common.sh`**
   - Action: Create the new directory structure: `scripts/test/`, `scripts/lint/`, `scripts/docker/`, `scripts/ci/`, `scripts/dev/`.
   - Action: Create a single `scripts/common.sh` file. Initially, it will only contain `set -euo pipefail` and basic color variables for logging.
-  - Verify: The new directories and the `common.sh` file exist.
+  - Verify: The new directories and the `common.sh` file exist and are accessible.
 
-- [ ] **Phase 2: Move All Scripts into Logical Groups**
-  - Action: Move existing scripts into their new homes.
-    - **test/**: `test_unit.sh`, `test_integration.sh`, `test_e2e.sh`, `test_ui.sh`, `test.sh` (old), `pytest_with_cleanup.sh`
-    - **lint/**: `lint.sh` (old), `semgrep_local.sh`
-    - **docker/**: `build_app.sh`, `docker-setup.sh`, `docker-reset.sh`, `cleanup_docker_and_ci_cache.sh`
-    - **ci/**: `pre_push.sh`, `pre-commit.sh`, `ci_local_fast.sh`, `ci_act.sh`
-    - **dev/**: `setup-dev-env.sh`, `install-system-tools.sh`, `promote_dev_to_main.sh`, `clean_artifacts.sh`, `monitor_gpu.sh`
-  - Action: Keep top-level, user-facing scripts as they are: `ingest.sh`, `cli.sh`, `config.sh`.
-  - Verify: `ls scripts/` is clean. `ls scripts/test/` (and others) contain the moved scripts.
+#### P4 — Torch.compile Optimization Debugging and Performance
 
-- [ ] **Phase 3: Update Script Paths in a Few Key Places**
-  - Action: Add `source "$(dirname "$0")/../common.sh"` to the top of the moved scripts.
-  - Action: Update the paths in `scripts/git-hooks/` to point to the new locations (e.g., `scripts/ci/pre-push.sh`).
-  - Action: Update the paths in `.github/workflows/` to point to the new script locations.
-  - Verify: Git hooks and CI workflows continue to work correctly.
+- **Context**: During CLI usage, torch.compile optimization messages appear every time the script runs, and there's a suspicious debug message about "Skipping torch.compile optimization (tests or MagicMock instance)" appearing during normal app usage.
 
-- [ ] **Phase 4: Document the New (Simpler) Structure**
-  - Action: Add a `scripts/README.md` that briefly explains the purpose of each subdirectory.
-  - Verify: The documentation provides a clear map of the new structure.
+- **Root Cause Analysis**:
+  - **torch.compile is not persistent**: Optimizations are lost when Python processes restart (expected behavior)
+  - **CLI script starts new process**: Each `./scripts/cli.sh` run creates a fresh Python process, resetting global caches
+  - **MagicMock detection issue**: Debug message suggests test-related mocking is active during normal app usage
+  - **Environment configuration**: `.env` file had Docker service URLs instead of localhost URLs for local development
 
-#### P5 — Log File Cleanup and Standardization
+- **Current Status**: 
+  - ✅ Fixed `.env` configuration (localhost URLs for local CLI, Docker service URLs for containers)
+  - ✅ Reduced torch.compile verbosity to DEBUG level in `qa_loop.py`
+  - ✅ Added re-compilation prevention check within same process
+  - 🔍 **PENDING**: Investigate why MagicMock detection triggers during normal app usage
 
-- **Goal**: Move all log files from project root to `logs/` directory and establish proper logging practices.
+- [ ] **Task 1 — Investigate MagicMock Detection in Normal Usage**
+  - **Action**: Add detailed logging to `backend/retriever.py` to trace the exact condition that triggers the "Skipping torch.compile optimization (tests or MagicMock instance)" message.
+  - **Action**: Check if any test configuration or environment variables are leaking into normal app usage.
+  - **Verify**: The debug message only appears during actual test runs, not during normal CLI usage.
 
-- [x] **Task 1: Move existing log files from project root** ✅ **COMPLETED**
-  - Action: Move the following files from project root to `logs/` directory:
-    - `docker-build-baseline.log` → `logs/docker-build-baseline.log`
-    - `docker-build-verification.log` → `logs/docker-build-verification.log`
-    - `docker-build-optimized.log` → `logs/docker-build-optimized.log`
-    - `.verify_integration.log` → `logs/verify_integration.log`
-    - `.ci_run_slow_tests.log` → `logs/ci_run_slow_tests.log`
-  - Action: Update any references to these files in scripts or documentation.
-  - Verify: No `.log` files remain in project root.
-  - **Result**: All log files successfully moved to logs directory. No log files remain in project root.
+- [ ] **Task 2 — Optimize torch.compile Application Strategy**
+  - **Action**: Review if torch.compile should be applied to both embedding model and cross-encoder, or if one is sufficient.
+  - **Action**: Consider adding environment variable to control torch.compile application (e.g., `TORCH_COMPILE_ENABLED=false` for development).
+  - **Verify**: Performance is maintained while reducing unnecessary re-compilation overhead.
 
+- [ ] **Task 3 — Add Performance Monitoring**
+  - **Action**: Add timing measurements around torch.compile operations to quantify the optimization overhead.
+  - **Action**: Create a simple benchmark to measure the impact of torch.compile on inference speed.
+  - **Verify**: Clear metrics showing the trade-off between compilation time and inference performance.
 
+- [ ] **Task 4 — Improve Error Handling and User Experience**
+  - **Action**: Add more informative messages about torch.compile status (e.g., "Model optimization in progress..." with progress indicators).
+  - **Action**: Consider caching compiled models to disk if possible to avoid re-compilation across process restarts.
+  - **Verify**: Users understand what's happening during model optimization and the process feels responsive.
 
-- [ ] **Task 3: Clean up old log files**
-  - Action: Review and clean up old log files in `logs/` directory that are no longer needed.
-  - Action: Implement log rotation or cleanup policies if needed.
-  - Verify: Log directory is organized and contains only relevant files.
-
-#### P5 — Pre-push performance optimizations (local DX) — remaining tasks
-
-- [ ] Pre-commit integration for changed-files speedups
-  - [ ] Add `.pre-commit-config.yaml` with `ruff` (lint + format) and optional `pyright` hooks
-  - [ ] Install hooks (`pre-commit install`) and document usage
-  - [ ] Configure to run only on changed files to keep local runs snappy
-
-- [ ] Documentation updates
-  - [ ] Document all local toggles in `docs/DEVELOPMENT.md` (e.g., `SKIP_LINT`, `SKIP_PYRIGHT`, `SKIP_TESTS`, and `SKIP_LOCAL_SEC_SCANS`)
-  - [ ] Provide a "fast push" recipe, e.g.: ``SKIP_PYRIGHT=1 SKIP_LOCAL_SEC_SCANS=1 git push``
-  - [ ] Note how to opt-in to CodeQL locally: ``SKIP_LOCAL_SEC_SCANS=0 git push``
-
-- [ ] Version alignment and consistency
-  - [ ] Pin the local `pyright` version (e.g., in `requirements-dev.txt`) to match CI
-  - [ ] Ensure `ruff` version in pre-commit matches the CI action version (`0.5.3` today)
-
+- **Key Learnings**:
+  - torch.compile optimizations are process-local and cannot be persisted across restarts
+  - CLI script architecture (new process per run) inherently requires re-optimization
+  - Test mocking infrastructure can leak into normal app usage if not properly isolated
+  - Environment configuration needs to distinguish between local development and containerized usage
