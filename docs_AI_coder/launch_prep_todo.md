@@ -400,7 +400,7 @@ PY
 7) Handover bundle
 - [x] Action: Ensure `docs_AI_coder/mvp_deployment.md` is up to date. Verify a recent edit timestamp in git:
   ```bash
-  git log -1 --format=%ci -- docs_AI_coder/mvp_deployment.md | cat
+  git --no-pager log -1 --format=%ci -- docs_AI_coder/mvp_deployment.md | cat
   ```
 - [x] Action: Confirm `.env.example` exists and contains model/tag pins. Verify:
   ```bash

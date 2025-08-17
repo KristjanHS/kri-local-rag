@@ -374,7 +374,9 @@ def qa_loop(question: str, k: int = 3, metadata_filter: Optional[Dict[str, Any]]
 
         # Ensure the required Ollama model is available locally before accepting questions
         if not ensure_model_available(OLLAMA_MODEL):
-            logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
+            logger.error(
+                "Failed to ensure Ollama model %s is available. Check the logs above for details.", OLLAMA_MODEL
+            )
             sys.exit(1)
 
     result = answer(question, k=k, metadata_filter=metadata_filter)
@@ -422,7 +424,9 @@ if __name__ == "__main__":
     with console.status("[bold green]Verifying backend services...", spinner="dots"):
         ensure_weaviate_ready_and_populated()
         if not ensure_model_available(OLLAMA_MODEL):
-            logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
+            logger.error(
+                "Failed to ensure Ollama model %s is available. Check the logs above for details.", OLLAMA_MODEL
+            )
             sys.exit(1)
 
     console.print(Rule(style="blue"))
