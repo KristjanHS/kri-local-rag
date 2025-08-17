@@ -47,6 +47,7 @@ def test_cross_encoder_compiles_once_and_caches(mocker):
     encoder1 = qa_loop._get_cross_encoder(model_name="dummy-model")
 
     # Assertions for the first call
+    assert encoder1 is not None, "The encoder should be a mock instance, not None"
     mock_compile.assert_called_once_with(mock_model_instance, backend="inductor", mode="max-autotune")
     assert encoder1 is mock_ce_instance, "Should return the main encoder instance"
     assert encoder1.model is mock_compiled_model, "Model should be the compiled version"
