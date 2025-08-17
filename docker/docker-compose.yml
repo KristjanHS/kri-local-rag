@@ -12,10 +12,10 @@ services:
       QUERY_DEFAULTS_LIMIT: 25
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
       DEFAULT_VECTORIZER_MODULE: 'none' # We are providing vectors manually
-      ENABLE_MODULES: 'text2vec-huggingface,reranker-huggingface' # Still needed for reranker
+      # ENABLE_MODULES: 'text2vec-huggingface,reranker-huggingface' # Still needed for reranker
       CLUSTER_HOSTNAME: 'node1'
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1"]
+      test: [ "CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,13 +30,13 @@ services:
           devices:
             - driver: nvidia
               count: all
-              capabilities: [gpu]
+              capabilities: [ gpu ]
     volumes:
       - ollama_models:/root/.ollama
     ports:
       - "127.0.0.1:11434:11434"
     healthcheck:
-      test: ["CMD", "ollama", "list"]
+      test: [ "CMD", "ollama", "list" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -61,7 +61,7 @@ services:
       - hf_cache:/root/.cache/huggingface
     working_dir: /app
     # Auto-start Streamlit when container starts
-    command: ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    command: [ "streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0" ]
     env_file:
       - .env.docker
     environment:
@@ -71,7 +71,7 @@ services:
 
   # ---------- One-off Ingestion Utility -----------------------------------------
   ingester:
-    profiles: ["ingest"]
+    profiles: [ "ingest" ]
     image: kri-local-rag-app # reuse the APP image
     depends_on:
       - weaviate
@@ -84,7 +84,7 @@ services:
       - hf_cache:/root/.cache/huggingface
     env_file:
       - .env.docker
-    command: ["python", "backend/ingest.py", "/app/data"]
+    command: [ "python", "backend/ingest.py", "/app/data" ]
 
 volumes:
   weaviate_db:

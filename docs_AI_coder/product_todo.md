@@ -69,11 +69,11 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 - **Phase 2: Refactor Unit Tests with Pytest Fixtures**
   - **Context**: With a hardened application and stable environment, we can now refactor the unit tests to use modern, simple mocking patterns. This phase replaces all global, stateful mocking with scoped pytest fixtures.
-  - [ ] **Task 2.1: Create Mocking Fixtures in `conftest.py`.**
+  - [x] **Task 2.1: Create Mocking Fixtures in `conftest.py`.**
     - **Action**: In `tests/unit/conftest.py`, create a fixture named `mock_cross_encoder` that uses `monkeypatch.setattr()` to replace `backend.qa_loop.CrossEncoder` with a `MagicMock`.
     - **Action**: Create a similar fixture named `mock_embedding_model` that patches `backend.retriever.SentenceTransformer`.
     - **Verify**: The new fixtures are available to the test suite without causing errors.
-  - [ ] **Task 2.2: Refactor QA Loop Unit Tests.**
+  - [x] **Task 2.2: Refactor QA Loop Unit Tests.**
     - **Action**: In `tests/unit/test_qa_loop_logic.py`, remove all `sys.modules` manipulation and old setup/teardown logic (e.g., `setup_method`, `_reset_encoder_cache`).
     - **Action**: Update test function signatures to accept the `mock_cross_encoder` fixture.
     - **Action**: Delete all tests for the now-removed keyword-scoring fallback mechanism.
