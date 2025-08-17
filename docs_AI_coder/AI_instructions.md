@@ -195,12 +195,12 @@ Coverage policy:
 - Likely causes: cached globals (`qa_loop._cross_encoder`, `qa_loop._ollama_context`, `retriever._embedding_model`), leftover `RAG_FAKE_ANSWER`, importing target modules inside fixtures before `@patch` runs.
 
 - Fix quickly:
-  1) Unit tests: Use the provided fixtures in `tests/unit/conftest.py`:
-     - `managed_cross_encoder` for cross-encoder mocking
-     - `mock_embedding_model` for embedding model mocking
+  1) **Unit tests (TARGET APPROACH)**: Use the modern fixtures in `tests/unit/conftest.py`:
+     - `managed_cross_encoder` for cross-encoder mocking (preferred)
+     - `mock_embedding_model` for embedding model mocking (preferred)
      - `reset_cross_encoder_cache` (autouse) handles cache cleanup
 
-  2) Integration: autouse fixture (no imports; use sys.modules)
+  2) **Integration tests (CURRENT AS-IS)**: Use autouse fixture for state reset:
   ```python
   import sys, pytest
   @pytest.fixture(autouse=True)
