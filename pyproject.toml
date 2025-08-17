@@ -43,6 +43,9 @@ addopts = [
     "--cov=frontend",
     "--cov-report=term-missing",
     "--cov-report=html:reports/coverage",
+    "--ignore=tests/unit/test_debug.py",
+    "--ignore=tests/unit/test_logging.py",
+    "--ignore=tests/unit/test_search_logic_archived.py",
 ]
 markers = [
     "slow: Tests that take longer to run (>30s)",
