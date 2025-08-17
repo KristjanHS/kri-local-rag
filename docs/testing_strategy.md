@@ -8,21 +8,20 @@ This document outlines the strategy for testing and mocking in this project, foc
 2.  **Readability:** Tests should be easy to understand. The setup, action, and assertion phases of a test should be clearly discernible.
 3.  **`pytest`-Native Tooling:** We prefer using `pytest`-native features and plugins (like `pytest-mock`) over the standard `unittest.mock` library where possible, as they provide a more idiomatic and often cleaner testing experience.
 
-## Mocking Dependencies
+## Mocking Strategy
 
-### The `mocker` Fixture
+### Target Approach: Modern Pytest Fixtures (Recommended)
 
-For most mocking scenarios, we use the `mocker` fixture from the `pytest-mock` plugin. It provides a clean, function-scoped way to patch objects and assert calls.
+**For new unit tests, use the modern pytest-native fixture approach:**
 
-## Mocking Fixtures
+#### The `managed_cross_encoder` Fixture
 
-### The `managed_cross_encoder` Fixture
-
-For unit tests that need to mock the cross-encoder functionality, use the `managed_cross_encoder` fixture in `tests/unit/conftest.py`.
+This is the **target approach** for mocking cross-encoder functionality in unit tests. Use the `managed_cross_encoder` fixture in `tests/unit/conftest.py`.
 
 **Purpose:**
 - Provides a reliable, isolated mock of the `_get_cross_encoder` function for unit tests
 - Prevents state leakage caused by the global `_cross_encoder` cache
+- Uses pytest-native `mocker` fixture for clean, function-scoped patching
 
 **Usage:**
 ```python
@@ -32,9 +31,9 @@ def test_rerank_cross_encoder_success(managed_cross_encoder: MagicMock):
     # ... rest of the test
 ```
 
-### The `mock_embedding_model` Fixture
+#### The `mock_embedding_model` Fixture
 
-For unit tests that need to mock the embedding model functionality, use the `mock_embedding_model` fixture.
+This is the **target approach** for mocking embedding model functionality in unit tests.
 
 **Usage:**
 ```python
@@ -43,6 +42,31 @@ def test_embedding_model_loading(self, mock_embedding_model: MagicMock):
     mock_model_instance = MagicMock()
     mock_embedding_model.return_value = mock_model_instance
     # ... rest of the test
+```
+
+### Current AS-IS Approaches (Legacy)
+
+**These approaches are currently used in existing tests but are NOT the target for new development:**
+
+#### Integration Tests: `@patch` Decorators
+
+Integration tests in `tests/integration/` still use `unittest.mock.patch` decorators. This is acceptable for integration tests where the scope is broader, but unit tests should prefer the fixture approach.
+
+```python
+@patch("backend.qa_loop.generate_response")
+@patch("backend.qa_loop.get_top_k")
+def test_integration_scenario(mock_get_top_k, mock_generate_response):
+    # ... test implementation
+```
+
+#### The `mocker` Fixture (General Purpose)
+
+For general mocking scenarios not covered by specific fixtures, the `mocker` fixture from `pytest-mock` is available:
+
+```python
+def test_general_mocking(mocker):
+    mock_obj = mocker.patch("module.function", return_value="mocked")
+    # ... test implementation
 ```
 
 ### State Management and Test Isolation
