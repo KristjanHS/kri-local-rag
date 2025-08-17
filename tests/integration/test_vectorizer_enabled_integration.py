@@ -25,7 +25,7 @@ from weaviate.classes.config import Configure, DataType, Property
 import backend.retriever as retriever
 from backend.config import EMBEDDING_MODEL
 
-pytestmark = [pytest.mark.integration, pytest.mark.slow]
+pytestmark = pytest.mark.slow
 
 
 def _connect_client(headers: dict[str, str] | None = None) -> weaviate.WeaviateClient:

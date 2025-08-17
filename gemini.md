@@ -1,3 +1,5 @@
 # Gemini Guidelines
 
-- after code change, always run linters to check if some lint errors need manual fixing
+- after each major code change, run linters to check if some lint errors need manual fixing:
+ ruff check . --fix 
+ pyright

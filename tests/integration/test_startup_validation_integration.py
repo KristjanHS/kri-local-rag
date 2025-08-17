@@ -54,17 +54,14 @@ class TestHybridSearchIntegration:
     """Integration tests for hybrid search with real service interactions."""
 
     @patch("backend.retriever.weaviate.connect_to_custom")
-    @patch("backend.retriever._get_embedding_model")
-    def test_retrieval_with_local_vectorization(self, mock_get_model, mock_connect):
+    def test_retrieval_with_local_vectorization(self, mock_connect, managed_embedding_model):
         """Integration test for retriever ensuring it uses the local embedding model."""
         from backend.retriever import get_top_k
 
-        # Setup embedding model mock
-        mock_model = MagicMock()
+        # Setup embedding model mock behavior via the fixture
         mock_array = MagicMock()
         mock_array.tolist.return_value = [0.1, 0.2, 0.3]
-        mock_model.encode.return_value = mock_array
-        mock_get_model.return_value = mock_model
+        managed_embedding_model.encode.return_value = mock_array
 
         # Setup Weaviate mock
         mock_client = MagicMock()
@@ -89,8 +86,8 @@ class TestHybridSearchIntegration:
         result = get_top_k("test question", k=5)
 
         # Verify the flow
-        mock_get_model.assert_called_once()
-        mock_model.encode.assert_called_once_with("test question")
+        # The fixture handles the patching, so we just check the model's methods
+        managed_embedding_model.encode.assert_called_once_with("test question")
         mock_query.hybrid.assert_called_once_with(vector=[0.1, 0.2, 0.3], query="test question", alpha=0.5, limit=5)
 
         assert result == ["Test content 1", "Test content 2"]

@@ -1,6 +1,6 @@
 """Test the full document ingestion pipeline."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from sentence_transformers import SentenceTransformer
@@ -53,14 +53,13 @@ def weaviate_client():
 
 
 @pytest.fixture
-def weaviate_collection_mock():
+def weaviate_collection_mock(mock_weaviate_connect):
     """Fixture for mocking the Weaviate collection."""
-    with patch("weaviate.connect_to_custom") as mock_connect:
-        mock_client = MagicMock()
-        mock_collection = MagicMock()
-        mock_client.collections.create.return_value = mock_collection
-        mock_connect.return_value = mock_client
-        yield mock_collection
+    mock_client = MagicMock()
+    mock_collection = MagicMock()
+    mock_client.collections.create.return_value = mock_collection
+    mock_weaviate_connect.return_value = mock_client
+    yield mock_collection
 
 
 def test_ingest_pipeline_with_real_weaviate(docker_services, weaviate_client):
@@ -75,18 +74,20 @@ def test_ingest_pipeline_with_real_weaviate(docker_services, weaviate_client):
     assert count.total_count >= 2  # test.md and test.pdf
 
 
-def test_ingest_pipeline_loads_and_embeds_data(docker_services, weaviate_collection_mock, sample_documents_path):
+def test_ingest_pipeline_loads_and_embeds_data(
+    docker_services, weaviate_collection_mock, sample_documents_path, managed_ingest_embedding_model
+):
     """Test the full ingestion pipeline from loading docs to inserting into Weaviate with a local model."""
     # Provide a real embedding model for this integration test
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
+    managed_ingest_embedding_model.return_value = embedding_model
 
-    with patch("backend.ingest.get_embedding_model", return_value=embedding_model):
-        # Run the ingestion process
-        ingest.ingest_documents(
-            collection_name=COLLECTION_NAME,
-            data_path=sample_documents_path,
-            weaviate_client=weaviate_collection_mock._client,
-        )
+    # Run the ingestion process
+    ingest.ingest_documents(
+        collection_name=COLLECTION_NAME,
+        data_path=sample_documents_path,
+        weaviate_client=weaviate_collection_mock._client,
+    )
 
     # --- Assertions ---
     # Check that documents were loaded correctly
@@ -110,9 +111,11 @@ def test_ingest_pipeline_loads_and_embeds_data(docker_services, weaviate_collect
     assert len(first_object["vector"]) == 384
 
 
-@patch("backend.ingest.get_embedding_model", return_value=None)
-def test_ingest_pipeline_handles_no_embedding_model(mock_get_model, weaviate_collection_mock, sample_documents_path):
+def test_ingest_pipeline_handles_no_embedding_model(
+    managed_ingest_embedding_model, weaviate_collection_mock, sample_documents_path
+):
     """Test that the ingestion pipeline exits gracefully if no local embedding model is available."""
+    managed_ingest_embedding_model.return_value = None
     with pytest.raises(ValueError, match="Embedding model not available"):
         ingest.ingest_documents(
             collection_name=COLLECTION_NAME,
@@ -121,22 +124,25 @@ def test_ingest_pipeline_handles_no_embedding_model(mock_get_model, weaviate_col
         )
 
 
-def test_ingest_pipeline_is_idempotent(docker_services, weaviate_collection_mock, sample_documents_path):
+def test_ingest_pipeline_is_idempotent(
+    docker_services, weaviate_collection_mock, sample_documents_path, managed_ingest_embedding_model
+):
     """Test that running ingestion multiple times doesn't create duplicate data, using a local model."""
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
-    with patch("backend.ingest.get_embedding_model", return_value=embedding_model):
-        # Run ingestion once
-        ingest.ingest_documents(
-            collection_name=COLLECTION_NAME,
-            data_path=sample_documents_path,
-            weaviate_client=weaviate_collection_mock._client,
-        )
-        # Run ingestion a second time
-        ingest.ingest_documents(
-            collection_name=COLLECTION_NAME,
-            data_path=sample_documents_path,
-            weaviate_client=weaviate_collection_mock._client,
-        )
+    managed_ingest_embedding_model.return_value = embedding_model
+
+    # Run ingestion once
+    ingest.ingest_documents(
+        collection_name=COLLECTION_NAME,
+        data_path=sample_documents_path,
+        weaviate_client=weaviate_collection_mock._client,
+    )
+    # Run ingestion a second time
+    ingest.ingest_documents(
+        collection_name=COLLECTION_NAME,
+        data_path=sample_documents_path,
+        weaviate_client=weaviate_collection_mock._client,
+    )
 
     # Assert that the creation and insertion logic was accessed correctly,
     # but Weaviate's internal mechanisms should handle idempotency.

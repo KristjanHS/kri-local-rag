@@ -8,10 +8,6 @@ CPU settings and runs a minimal ingestion flow using a mocked Weaviate client.
 import sys
 import types
 
-import pytest
-
-pytestmark = pytest.mark.integration
-
 
 class _FakeTorch:
     def __init__(self):

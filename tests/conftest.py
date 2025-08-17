@@ -226,14 +226,15 @@ def docker_services_ready():  # noqa: D401
 
 @pytest.fixture(autouse=True)
 def _guard_against_real_external_services(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest):
-    """Block real Weaviate and Ollama connections in light tests.
+    """Block real Weaviate and Ollama connections for unit tests.
 
-    Applies to any test that is NOT marked as one of: integration, slow, docker.
-    Such tests must stub or monkeypatch external service connections.
+    Applies to any test that is located in the 'tests/unit' directory.
     """
-    marker_names = {m.name for m in request.node.iter_markers()}
-    # Allow network for any non-unit suite: integration, slow, docker, e2e, ui, environment
-    if {"integration", "slow", "docker", "e2e", "ui", "environment"} & marker_names:
+    # Get the path of the test being run
+    test_path = Path(request.node.fspath)
+
+    # Apply the guard only if the test is inside the 'tests/unit' directory
+    if "tests/unit" not in str(test_path.parent):
         return
 
     # ---- Weaviate guard ----
