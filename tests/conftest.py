@@ -180,7 +180,7 @@ def docker_services(request, test_log_file):
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
             stderr = e.stderr if hasattr(e, "stderr") else str(e)
             log.write("\n--- Docker Error Logs ---\n")
-            log.write(stderr)
+            log.write(str(stderr))
             pytest.fail(f"Failed to start Docker services. See logs at {test_log_file}")
         except Exception as e:
             pytest.fail(f"An unexpected error occurred during Docker setup: {e}")
