@@ -22,7 +22,7 @@ pytest_plugins = ["tests.e2e.conftest"]
 
 
 @pytest.fixture(scope="session")
-def docker_services_ready(weaviate_compose_up, ollama_compose_up, container_internal_urls):
+def docker_services_ready(weaviate_compose_up, ollama_compose_up):
     """
     Ensures that Docker services are ready and populated with initial data from test_data/.
     Uses pytest-docker to manage lifecycle. Ingests only when empty.
