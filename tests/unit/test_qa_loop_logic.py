@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import MagicMock
 
 import pytest
@@ -6,10 +7,15 @@ from backend import qa_loop
 
 pytestmark = pytest.mark.unit
 
+# Create a logger for this test file
+logger = logging.getLogger(__name__)
 
-def test_rerank_cross_encoder_success(mock_cross_encoder: MagicMock):
+
+def test_rerank_cross_encoder_success(managed_cross_encoder: MagicMock):
     """Test reranking with a successful cross-encoder prediction."""
-    mock_cross_encoder.return_value.predict.return_value = [0.9, 0.1]
+    logger.debug("--- Running test_rerank_cross_encoder_success ---")
+    managed_cross_encoder.predict.return_value = [0.9, 0.1]
+
     chunks = ["relevant", "irrelevant"]
     question = "test query"
 
@@ -20,25 +26,19 @@ def test_rerank_cross_encoder_success(mock_cross_encoder: MagicMock):
     assert result[0].score == 0.9
     assert result[1].text == "irrelevant"
     assert result[1].score == 0.1
-    mock_cross_encoder.return_value.predict.assert_called_once()
+    managed_cross_encoder.predict.assert_called_once()
 
 
-def test_rerank_empty_chunks_list(mock_cross_encoder: MagicMock):
+def test_rerank_empty_chunks_list(managed_cross_encoder: MagicMock):
     """Test that reranking with an empty list of chunks returns an empty list."""
     result = qa_loop._rerank("test query", [], k_keep=2)
     assert result == []
-    mock_cross_encoder.return_value.predict.assert_not_called()
+    managed_cross_encoder.predict.assert_not_called()
 
 
-def test_rerank_model_load_failure_raises_runtime_error(mock_cross_encoder: MagicMock):
+def test_rerank_model_load_failure_raises_runtime_error(mocker):
     """Test that a RuntimeError is raised if the CrossEncoder fails to load."""
-    mock_cross_encoder.side_effect = RuntimeError("Failed to load model")
+    mocker.patch("backend.qa_loop._get_cross_encoder", return_value=None)
 
-    # Reset the cache to ensure the side_effect is triggered
-    qa_loop._cross_encoder = None
-
-    with pytest.raises(RuntimeError, match="Failed to load model"):
+    with pytest.raises(RuntimeError, match="CrossEncoder model is not available"):
         qa_loop._rerank("test query", ["chunk1"], k_keep=1)
-
-    # Restore the cache to avoid side effects on other tests
-    qa_loop._cross_encoder = None

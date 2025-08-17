@@ -73,58 +73,39 @@ def _get_cross_encoder(
     model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
     cache_folder: Optional[str] = os.getenv("CROSS_ENCODER_CACHE_DIR"),
 ):
-    """Return a (cached) CrossEncoder instance or ``None`` if the library is unavailable.
-
-    If ``sentence_transformers`` is not installed, the function returns ``None`` so that the
-    calling code can gracefully fall back to vector-search ordering.
-    """
+    """Return a (cached) CrossEncoder instance or ``None`` if the library is unavailable."""
     global _cross_encoder
-    # Lazily attempt to import the cross-encoder implementation; if unavailable, return None.
+    logger.debug("Entering _get_cross_encoder. Current cached _cross_encoder: %s", _cross_encoder)
 
-    # Determine constructor: prefer patched module-level `CrossEncoder` if provided
-    ctor = CrossEncoder
-    if ctor is None:
-        try:
-            from sentence_transformers import CrossEncoder as _CE  # type: ignore
-
-            ctor = _CE
-        except Exception:
-            return None
     if _cross_encoder is None:
+        logger.debug("Cache is empty. Attempting to load CrossEncoder.")
         try:
-            # Pass cache_folder to the constructor if it's provided
+            from sentence_transformers import CrossEncoder as _CE
+
             kwargs = {"cache_folder": cache_folder} if cache_folder else {}
-            _cross_encoder = ctor(model_name, **kwargs)  # type: ignore[reportArgumentType]
+            _cross_encoder = _CE(model_name, **kwargs)
+            logger.info("CrossEncoder model '%s' loaded successfully.", model_name)
 
-            # Apply PyTorch CPU optimizations (skip in testing environments)
-            # New preferred flag: RERANKER_CROSS_ENCODER_OPTIMIZATIONS (true enables opts)
-            enable_opts_str = os.getenv("RERANKER_CROSS_ENCODER_OPTIMIZATIONS", "true").lower()
-            enable_opts = enable_opts_str == "true"
-            skip_optimization = ("pytest" in sys.modules) or (not enable_opts)
+            # Apply optimizations
+            try:
+                import torch
 
-            if not skip_optimization:
-                # Set optimal threading for current environment
-                try:
-                    import torch  # defer heavy import
+                logger.info("Applying torch.compile optimization to cross-encoder...")
+                _cross_encoder.model = torch.compile(_cross_encoder.model, backend="inductor", mode="max-autotune")
+                logger.info("torch.compile optimization completed.")
+            except Exception as e:
+                logger.warning("Failed to apply torch.compile optimization: %s", e)
+        except ImportError:
+            logger.warning("sentence_transformers library not found. CrossEncoder is unavailable.")
+            _cross_encoder = "unavailable"  # Explicitly mark as unavailable
+        except Exception as e:
+            logger.error("Failed to load CrossEncoder model '%s': %s", model_name, e)
+            _cross_encoder = "unavailable"  # Explicitly mark as unavailable on loading failure
+    else:
+        logger.debug("Returning cached CrossEncoder instance.")
 
-                    torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
-                except Exception as _threads_e:  # noqa: F841
-                    pass
-                # Apply torch.compile with max-autotune for 5-25% speed-ups on CPU GEMM-heavy models
-                try:
-                    import torch  # defer heavy import
-
-                    logger.info("torch.compile: optimizing cross-encoder – first run may take ~1 min…")
-                    _cross_encoder = torch.compile(_cross_encoder, backend="inductor", mode="max-autotune")
-                    logger.info("torch.compile optimization completed for cross-encoder")
-                except Exception as compile_e:
-                    logger.warning("Failed to apply torch.compile optimization to cross-encoder: %s", compile_e)
-            else:
-                logger.debug("Skipping torch optimizations (test environment detected)")
-
-        except Exception:
-            # Any issue loading the model (e.g. no internet) – skip re-ranking.
-            _cross_encoder = None
+    if _cross_encoder == "unavailable":
+        return None
     return _cross_encoder
 
 
@@ -134,8 +115,11 @@ def _score_chunks(question: str, chunks: List[str]) -> List[ScoredChunk]:
 
     Uses CrossEncoder for scoring. Raises RuntimeError if CrossEncoder is not available.
     """
+    logger.debug("Attempting to get cross-encoder...")
     encoder = _get_cross_encoder()
+    logger.debug("Received encoder from _get_cross_encoder: %s", encoder)
     if encoder is None:
+        logger.error("Encoder is None, raising RuntimeError.")
         raise RuntimeError("CrossEncoder model is not available. Ensure the model is downloaded and accessible.")
 
     logger.debug("Scoring chunks using cross-encoder.")
