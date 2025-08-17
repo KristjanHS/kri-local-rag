@@ -1,6 +1,7 @@
 """Tests for the CLI logging configuration."""
 
 import logging
+import os
 from unittest.mock import patch
 
 import pytest
@@ -15,11 +16,14 @@ def reset_logging_state():
     # Store original state
     original_handlers = logging.root.handlers[:]
     original_level = logging.root.level
+    original_log_level_env = os.environ.get("LOG_LEVEL")
 
     # Reset to clean state
     logging.shutdown()
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
+    if "LOG_LEVEL" in os.environ:
+        del os.environ["LOG_LEVEL"]
 
     # Reset the global configuration flag
     import backend.config
@@ -36,10 +40,16 @@ def reset_logging_state():
     for handler in original_handlers:
         logging.root.addHandler(handler)
     logging.root.level = original_level
+    if original_log_level_env is not None:
+        os.environ["LOG_LEVEL"] = original_log_level_env
 
 
 def test_cli_logging_setup_with_different_flags():
     """Test that CLI logging setup correctly interprets different flag combinations."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     test_cases = [
         # (log_level, verbose_count, quiet_count, expected_level)
         (None, 0, 0, "INFO"),  # Default
@@ -58,6 +68,16 @@ def test_cli_logging_setup_with_different_flags():
         # Verify the level was set correctly
         root_logger = logging.getLogger()
         expected_logging_level = getattr(logging, expected_level)
+
+        logger.debug(
+            "Testing flags: log_level=%s, verbose=%d, quiet=%d. Expected: %s, Got: %s",
+            log_level,
+            verbose_count,
+            quiet_count,
+            expected_level,
+            logging.getLevelName(root_logger.level),
+        )
+
         assert (
             root_logger.level == expected_logging_level
         ), f"Expected {expected_level} for flags: log_level={log_level}, verbose={verbose_count}, quiet={quiet_count}"

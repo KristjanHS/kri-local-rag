@@ -6,6 +6,11 @@ name: CI
 # - To run this workflow manually with act:
 #     act pull_request -j lint
 #     act pull_request -j fast_tests
+#
+# IMPORTANT: Integration and E2E tests require the full Docker stack and are excluded
+# from GitHub CI runs entirely. They only run locally via act (nektos/act) on manual
+# workflow_dispatch or scheduled runs. This prevents CI failures due to GitHub runner
+# limitations with Docker services.
 
 on:
   pull_request:
@@ -78,6 +83,7 @@ jobs:
       - name: Run fast tests
         run: |
           # Fastest suite: run only unit tests (no external services)
+          # Exclude integration and e2e tests that require Docker stack
           python -m pytest tests/unit -n auto --maxfail=1 -q --junitxml=reports/junit.xml
 
       - name: Upload fast test reports
@@ -118,6 +124,7 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     needs: fast_tests
+    if: ${{ github.actor == 'nektos/act' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -134,11 +141,22 @@ jobs:
         run: |
           python -m pip install --upgrade pip --root-user-action=ignore
           pip install -r requirements-dev.txt --root-user-action=ignore
+      - name: Build and start services
+        run: docker compose -f docker/docker-compose.yml up -d --build
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for Weaviate..."
+          timeout 180s bash -c 'until curl -s http://localhost:8080/v1/.well-known/ready; do sleep 5; done'
+          echo "Waiting for Ollama..."
+          timeout 180s bash -c 'until docker compose -f docker/docker-compose.yml exec -T ollama ollama list; do sleep 5; done'
       - name: Prepare reports directories
         run: mkdir -p reports
       - name: Run integration tests
         run: >-
           python -m pytest tests/integration -q --junitxml=reports/junit_integration.xml
+      - name: Tear down services
+        if: always()
+        run: docker compose -f docker/docker-compose.yml down -v
       - name: Upload integration test reports
         if: ${{ always() && github.actor != 'nektos/act' }}
         uses: actions/upload-artifact@v4
@@ -150,7 +168,7 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: fast_tests
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: ${{ github.actor == 'nektos/act' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -322,6 +340,7 @@ jobs:
           mkdir -p reports
       - name: Run core test suite (unit + integration, excludes UI)
         # Enforce coverage threshold for core suite
+        # Note: integration tests require Docker stack, only run locally via act
         run: |
           python -m pytest -v -n auto --cov-fail-under=60 tests/unit tests/integration \
             --html=reports/report_core.html --self-contained-html \

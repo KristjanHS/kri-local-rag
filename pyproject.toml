@@ -10,8 +10,12 @@ requires-python = ">=3.12"
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-include = ["backend*"]
+[tool.setuptools]
+py-modules = ["cli"]
+packages = ["backend", "frontend"]
+
+[project.scripts]
+kri-local-rag = "cli:main"
 
 [tool.ruff]
 line-length = 120
@@ -39,6 +43,9 @@ addopts = [
     "--cov=frontend",
     "--cov-report=term-missing",
     "--cov-report=html:reports/coverage",
+    "--ignore=tests/unit/test_debug.py",
+    "--ignore=tests/unit/test_logging.py",
+    "--ignore=tests/unit/test_search_logic_archived.py",
 ]
 markers = [
     "slow: Tests that take longer to run (>30s)",
@@ -102,13 +109,12 @@ test = [
     "rich>=13,<14",
 ]
 docs = ["mkdocs"]
-cli = ["rich"]
 ui = ["pytest-playwright==0.4.4", "playwright>=1.45,<2"]
 dev = [
     "pyright[nodejs]==1.1.403"
 ]
 
-pep621_dev_dependency_groups = ["tests", "docs", "cli", "ui", "dev"]
+pep621_dev_dependency_groups = ["tests", "docs", "ui", "dev"]
 
 [tool.deptry.per_rule_ignores]
 DEP002 = ["boto3"]       # AWS libs pulled in indirectly

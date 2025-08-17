@@ -18,9 +18,11 @@ from backend.qa_loop import ensure_weaviate_ready_and_populated
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+pytest_plugins = ["tests.e2e.conftest"]
+
 
 @pytest.fixture(scope="session")
-def docker_services_ready(docker_services):
+def docker_services_ready(weaviate_compose_up, ollama_compose_up):
     """
     Ensures that Docker services are ready and populated with initial data from test_data/.
     Uses pytest-docker to manage lifecycle. Ingests only when empty.
@@ -52,7 +54,15 @@ def docker_services_ready(docker_services):
             if not collection_exists or not has_data:
                 logger.info(f"--- Weaviate collection '{COLLECTION_NAME}' is empty. Ingesting test data. ---")
                 data_dir = Path(__file__).parent.parent / "test_data"
-                ingest(str(data_dir))
+                from backend.retriever import _get_embedding_model
+
+                embedding_model = _get_embedding_model()
+                ingest(
+                    str(data_dir),
+                    collection_name=COLLECTION_NAME,
+                    weaviate_client=client,
+                    embedding_model=embedding_model,
+                )
                 logger.info("--- Test data ingested for tests. ---")
             else:
                 logger.info(f"--- Weaviate collection '{COLLECTION_NAME}' already populated. Skipping ingestion. ---")

@@ -2,6 +2,165 @@
 
 This file records tasks that have been completed and moved out of the active TODO backlog.
 
+## Archived on 2025-01-28
+
+#### P0 — Epic: Refactor Testing Strategy for Robustness and Simplicity ✅ COMPLETED
+
+- **High-Level Goal**: Overhaul the testing strategy to align with modern best practices. This involved centralizing the model cache for reliable offline testing, hardening the application's model-loading logic, and replacing fragile, module-level mocks with clean, scoped pytest fixtures.
+
+- **Benefits Achieved**:
+  - **Simplicity & Readability**: Tests became much easier to read, understand, and maintain.
+  - **Reliability**: `monkeypatch` and fixtures provided robust test isolation, preventing tests from interfering with each other.
+  - **Robustness**: Application logic was hardened by removing silent fallbacks in favor of explicit, predictable errors.
+  - **Maintainability**: Followed standard pytest patterns, making it easier for new developers to contribute.
+
+- **Phase 1: Harden Application Code and Centralize Model Cache** ✅ **COMPLETED**
+  - **Context**: Before refactoring the tests, the application itself was made robust and the testing environment was stabilized. This involved making the CrossEncoder a hard dependency and ensuring models were cached for offline use.
+  - [x] **Task 1.1: Centralize and Configure the Model Cache.**
+    - **Action**: Ensured the `model_cache` directory was at the project root, ignored by Git, included in the Docker build context, and copied into the container with the `SENTENCE_TRANSFORMERS_HOME` environment variable correctly set.
+    - **Verify**: The command `./scripts/test.sh integration` passed without requiring network access to download models.
+  - [x] **Task 1.2: Remove Cross-Encoder Fallback Logic.**
+    - **Action**: Modified `_score_chunks()` in `backend/qa_loop.py` to remove the keyword-based and neutral-score fallbacks. If the CrossEncoder model failed to load, the function raised a clear `RuntimeError`.
+    - **Verify**: The code in `_score_chunks()` was simplified, containing only the CrossEncoder scoring path. The test suite had failures that the next phase addressed.
+
+- **Phase 2: Refactor Unit Tests with Pytest Fixtures** ✅ **COMPLETED**
+  - **Context**: With a hardened application and stable environment, the unit tests were refactored to use modern, simple mocking patterns. This phase replaced all global, stateful mocking with scoped pytest fixtures.
+  - **Target Approach**: Modern pytest fixtures (`managed_cross_encoder`, `mock_embedding_model`) became the preferred method for unit tests.
+  - [x] **Task 2.1: Create Mocking Fixtures in `conftest.py`.**
+    - **Action**: Created `managed_cross_encoder` fixture that patched `backend.qa_loop._get_cross_encoder` (TARGET APPROACH).
+    - **Action**: Created `mock_embedding_model` fixture that patched `backend.retriever.SentenceTransformer` (TARGET APPROACH).
+    - **Action**: Created `reset_cross_encoder_cache` autouse fixture for state management.
+    - **Verify**: The fixtures were available and working in the test suite.
+  - [x] **Task 2.2: Refactor QA Loop Unit Tests.**
+    - **Action**: Updated `tests/unit/test_qa_loop_logic.py` to use `managed_cross_encoder` fixture (TARGET APPROACH).
+    - **Action**: Removed old setup/teardown logic and manual state manipulation.
+    - **Action**: Tests now used modern pytest-native mocking patterns.
+    - **Verify**: QA loop unit tests were stable and used the new fixture-based approach.
+  - [x] **Task 2.3: Refactor Search Logic Unit Tests.**
+    - **Action**: Updated `tests/unit/test_search_logic.py` to use `mock_embedding_model` fixture (TARGET APPROACH).
+    - **Action**: Removed manual state manipulation.
+    - **Verify**: Search logic unit tests passed using the new fixture-based mocking.
+
+- **Phase 3: Full Suite Validation and Cleanup** ✅ **COMPLETED**
+  - **Context**: After refactoring, the entire suite was validated to ensure it was stable, clean, and that no regressions were introduced.
+  - [x] **Task 3.1: Run Full Test Suite.**
+    - **Action**: Ran the entire test suite, including unit, integration, and E2E tests.
+    - **Verify**: All tests passed (`.venv/bin/python -m pytest`).
+  - [x] **Task 3.2: Remove Dead Code.**
+    - **Action**: Removed any unused imports, variables, or helper functions related to the old mocking strategy from the test files.
+    - **Verify**: The test codebase was clean, simpler, and followed a consistent, modern pattern.
+
+**Status**: All phases completed. The testing strategy has been successfully refactored to use modern pytest fixtures, providing robust test isolation, improved maintainability, and hardened application logic.
+
+#### P1 — Containerized CLI E2E copies (Partial Completion) ✅ PARTIALLY COMPLETED
+
+- **Why**: Host-run E2E miss packaging/runtime issues (entrypoint, PATH, env, OS libs). Twins validate the real image without replacing fast host tests.
+- **Current Approach**: Used the existing `app` container which can run both Streamlit (web UI) and CLI commands via `docker compose exec app`. This leveraged the project's existing architecture where the `app` service is designed to handle multiple entry points.
+- **Key Insight**: The project already supports CLI commands in the app container (see README.md: `./scripts/cli.sh python -m backend.qa_loop --question "What is in my docs?"`). This pattern was extended for automated testing rather than creating a separate `cli` service.
+- **Benefits**: Simpler architecture, fewer services to maintain, aligns with existing project patterns, and leverages the same container that users interact with.
+
+- [x] **Task: Resolve Flaky Unit Tests with Improved Mocking Strategy** ✅ **COMPLETED**
+  - **Overall Problem Description:** The unit tests for the cross-encoder logic in `backend/qa_loop.py` were flaky. Specifically, `test_rerank_cross_encoder_success` and `test_cross_encoder_enables_heavy_optimizations_when_allowed` failed when run as part of the full test suite, but succeeded when run in isolation. This indicated a state leakage problem, where the cached global `_cross_encoder` object was being modified by one test and not properly reset before the next, causing unexpected failures. The current mocking strategy, which relied on `unittest.mock.patch`, was proving difficult to debug and was not robust enough to prevent this state pollution. The goal was to implement a more reliable, `pytest`-native mocking and state management strategy to ensure all unit tests were deterministic and isolated.
+  - **Action Plan:**
+    1.  **Install `pytest-mock`:** Ensured the `pytest-mock` plugin was included in the project's development dependencies.
+        -   **Verify:** The command `.venv/bin/python -m pip show pytest-mock` confirmed the package was installed.
+    2.  **Create a `managed_cross_encoder` Fixture:** In `tests/unit/conftest.py`, created a new `pytest` fixture named `managed_cross_encoder`. This fixture used the `mocker` fixture to patch `backend.qa_loop._get_cross_encoder`. It was function-scoped to ensure cleanup after every test.
+        -   **Verify:** The new fixture was available to the test suite without causing errors.
+    3.  **Refactor `test_qa_loop_logic.py`:** Updated the failing tests in this file to use the new `managed_cross_encoder` fixture instead of the `@patch` decorator.
+        -   **Verify:** The tests in `tests/unit/test_qa_loop_logic.py` passed consistently, both when run in isolation and as part of the full suite.
+    4.  **Refactor `test_cross_encoder_optimizations.py`:** Updated this test to use the `managed_cross_encoder` fixture as well, removing any direct patching.
+        -   **Verify:** The test in `tests/unit/test_cross_encoder_optimizations.py` passed consistently.
+    5.  **Long-Term Consideration (No Immediate Action):** Evaluated the feasibility of refactoring `backend/qa_loop.py` to use dependency injection. This would involve passing the cross-encoder as an explicit argument to the functions that need it, which would make the code more testable and reduce the need for mocking. This is a larger architectural change and should be considered for future development.
+
+- [x] Step 1 — Identify candidates ✅ **COMPLETED**
+  - Action: Listed E2E tests invoking CLI in-process (e.g., `backend.qa_loop`) such as `tests/e2e/test_qa_real_end_to_end.py`.
+  - Verify: Confirmed they don't already run via container.
+
+- [x] Step 2 — Use existing app container for CLI testing ✅ **COMPLETED**
+  - Action: Leveraged the existing `app` service which can run both Streamlit and CLI commands via `docker compose exec`.
+  - Verify: `docker compose exec app python -m backend.qa_loop --help` exited 0.
+
+- [x] Step 3 — Test helper ✅ **COMPLETED**
+  - Action: In `tests/e2e/conftest.py`, added `run_cli_in_container(args, env=None)` that uses `docker compose exec app ...`, returns `returncode/stdout/stderr`.
+  - Verify: `--help` smoke passed.
+
+- [x] Step 3.1 — Review and validate implementation ✅ **COMPLETED**
+  - Action: Reviewed the implementation against best practices and simplified to use existing app container.
+  - Verify: Confirmed that the simplified approach was correct and aligned with project structure.
+
+- [x] Step 3.2 — Clean up old complexity ✅ **COMPLETED**
+  - Action: Removed the separate `cli` service from `docker/docker-compose.yml` since we're using the existing `app` container.
+  - Action: Updated `run_cli_in_container` fixture in `tests/e2e/conftest.py` to use `docker compose exec app`
+- [x] Step 4 — Readiness and URLs ✅ **COMPLETED**
+  - Action: Used existing `weaviate_compose_up`/`ollama_compose_up`; ensured ingestion uses compose-internal URLs.
+  - Verify: Readiness checks passed before CLI twin runs.
+
+- [x] Step 5 — Create test twins ✅ **COMPLETED**
+  - Action: Added `_container_e2e.py` twins that call `run_cli_in_container([...])` with equivalent CLI subcommands; optionally marked with `@pytest.mark.docker`.
+  - Verify: Single twin passed via `.venv/bin/python -m pytest -q tests/e2e/test_qa_real_end_to_end_container_e2e.py` after compose `--wait`.
+
+- [ ] Step 6 — Build outside tests (PENDING)
+  - Action: Ensure scripts/CI build `kri-local-rag-app` once; helper should raise `pytest.UsageError` if image missing.
+  - Verify: Second run is faster due to image reuse.
+
+- [ ] Step 7 — Diagnostics and isolation (PENDING)
+  - Action: On failure, print exit code, last 200 lines of app logs, and tails of `weaviate`/`ollama` logs; use ephemeral dirs/volumes.
+  - Verify: Failures are actionable; runs are deterministic and isolated.
+
+- [ ] Step 8 — Wire into scripts/docs/CI (PENDING)
+  - Action: Document commands in `docs/DEVELOPMENT.md` and `AI_instructions.md`; mention in `scripts/test.sh e2e` help; add a CI job for the containerized CLI subset.
+  - Verify: Fresh env runs `tests/e2e/*_container_e2e.py` green; CI job passes locally under `act` and on hosted runners.
+
+**Status**: Steps 1-5 completed. Containerized CLI E2E testing infrastructure has been established using the existing app container. The foundation is in place for the remaining steps (6-8) which involve build optimization, diagnostics, and CI integration.
+
+## Archived on 2025-08-16
+
+#### P1 — Final Verification of All Meta Linters
+
+- **Overall P1 Goal**: Confirm that all meta-linters pass after all preceding fixes and optimizations.
+
+#### P1.1 - [REVISED] Debug and Fix `yamlfmt` Failures
+- **Goal**: Ensure `yamlfmt --lint` runs without errors by leveraging the existing `.gitignore` to exclude irrelevant files and directories.
+- **Best Practice**: Use a single source of truth for ignored files (`.gitignore`) to avoid configuration drift and simplify maintenance. The `-gitignore_excludes` flag in `yamlfmt` is the ideal tool for this.
+
+- [x] **Task 1: Validate `.gitignore`**
+  - Action: Review the `.gitignore` file to confirm that it properly excludes virtual environment directories (`.venv/`, `tools/uv_sandbox/`) and other paths that might contain problematic YAML files.
+  - Verify: The `.gitignore` file should already contain the necessary exclusion patterns.
+
+- [x] **Task 2: Test `yamlfmt` with the correct glob pattern**
+  - Action: Run the command `yamlfmt --lint "**/*.yaml" "**/*.yml"` to test the linter with the correct glob pattern.
+  - Verify: The command should complete successfully.
+
+- [x] **Task 3: Update the `product_todo.md`**
+  - Action: Modify the original `P1` task to use the correct glob pattern for the `yamlfmt` command.
+  - Verify: The `P1` task in `product_odo.md` should be updated to `yamlfmt --lint "**/*.yaml" "**/*.yml"`.
+
+- [x] **Task 4: Final Verification**
+  - Action: Run the updated `P1` task's commands.
+  - Verify: All linter commands, including the revised `yamlfmt` command, should exit with code 0.
+
+#### P1.2 — Fix `yamlfmt` Formatting Automatically
+
+- **Goal**: Apply `yamlfmt` formatting rules directly to fix the `docker-compose.yml` file.
+- **Best Practice**: Let the formatting tool manage the file's contents to ensure it conforms to all configured rules, including line length, quoting, and indentation.
+
+- [x] **Action**: Run `yamlfmt` on the specific file that is causing issues, letting it automatically apply the correct formatting based on the rules in `.yamlfmt`.
+  - Command: `yamlfmt docker/docker-compose.yml`
+- [x] **Verify**: Run the linter check again to confirm that the file now passes.
+  - Command: `yamlfmt --lint docker/docker-compose.yml`
+- [x] **Verify**: Run the full linter suite again to ensure all meta-linters pass.
+  - `actionlint -color`
+  - `yamlfmt --lint "**/*.yaml" "**/*.yml"`
+  - `hadolint docker/app.Dockerfile`
+
+
+- [x] Action: Run all three meta linters:
+  - `actionlint -color`
+  - `yamlfmt --lint "**/*.yaml" "**/*.yml"`
+  - `hadolint docker/app.Dockerfile`
+
+- [x] Verify: All commands exit with code 0 and report no errors.
+
 ## Archived on 2025-01-27
 
 ### P0 — Docker Build Optimizations ✅ COMPLETED
@@ -18,8 +177,7 @@ This file records tasks that have been completed and moved out of the active TOD
 
 - [x] **Step 3: Verify Optimization Effectiveness** ✅ **COMPLETED**
   - Action: Run a second Docker build to measure cache effectiveness and document the performance improvement.
-  - Verify: Second build should be significantly faster, especially in the `apt` layer, and build context should remain small.
-  - **Result**: Second build completed in 32.663s (vs 100s+ first build), all layers cached, build context remains small at 1.54kB. Cache mounts working effectively.
+  - Verify: Second build should be significantly faster, especially in the `apt` layer, and build context should remain small at 1.54kB. Cache mounts working effectively.
 
 - [x] **Step 4: Security Validation** ✅ **COMPLETED**
   - Action: Run security scans (Semgrep, Hadolint) to validate that optimizations don't introduce security vulnerabilities.
@@ -38,8 +196,6 @@ This file records tasks that have been completed and moved out of the active TOD
   - Verify: All new log files are created in the correct location.
 
 **Status**: Task 2 completed. Logging rule enforcement has been properly configured and applied, ensuring all new log files are created in the correct `logs/` directory location.
-
-## Archived on 2025-01-27
 
 ### P1 — Renovate Local Development Setup and Validation ✅ COMPLETED
 
@@ -823,7 +979,7 @@ This file records tasks that have been completed and moved out of the active TOD
 - Add an `autouse=True` session fixture to call `disable_socket(allow_unix_socket=True)` — done
 - Replace connection-based self-check in session fixture with a lightweight assert — done
 - Drop per-test re-disable once the offender was disproven — done
-- Provide `allow_network` opt-in fixture (function scope) for rare cases; ensure any such tests are moved to `tests/integration/` or marked `@pytest.mark.integration` — done
+- Provide `allow_network` opt-in fixture (function scope) for rare cases; ensure any such tests are moved to `tests/integration/` — done
 - Keep root guards against real Weaviate/Ollama calls; reconciled with pytest-socket to avoid duplicate/confusing messages — done
 
 - Verify: a unit test attempting `httpx.get("http://example.com")` fails with a clear error — `tests/unit/test_network_block_httpx_unit.py` covers this; passes in isolation and in suite.
@@ -845,7 +1001,7 @@ This file records tasks that have been completed and moved out of the active TOD
 - Follow-up corrections (best-practice alignment)
       - [x] Update unit tests to assert `pytest_socket.SocketBlockedError` explicitly instead of generic `Exception`
       - [x] Reduce `UnitNetGuard` diagnostic log level from WARNING to INFO to avoid noisy test output
-- Skeptic checks considered: ensured detection isn’t masked by OS errors; reviewed shared fixtures; verified serial vs. parallel behavior
+- Skeptic checks considered: ensured detection isn't masked by OS errors; reviewed shared fixtures; verified serial vs. parallel behavior
 
 #### P1 — Stabilization and Finalization
  
@@ -935,7 +1091,7 @@ This file records tasks that have been completed and moved out of the active TOD
       - [x] Verify: CI logs show `docker compose down -v` after tests; no leftover CI containers/volumes.
     - [x] Document fast-iteration defaults and the wrapper script
       - [x] Action: Add a short section to `docs/DEVELOPMENT.md` describing: default keep-up policy, `--teardown-docker` and env toggles (`KEEP_DOCKER_UP`, `TEARDOWN_DOCKER`), and usage of `scripts/pytest_with_cleanup.sh`.
-      - [x] Verify: Follow the doc steps locally to run `scripts/pytest_with_cleanup.sh -m integration` (keeps up by default) and with `--teardown-docker` (cleans up compose and Testcontainers).
+      - [x] Verify: Follow the doc steps locally to run `scripts/pytest_with_cleanup.sh tests/integration` (keeps up by default) and with `--teardown-docker` (cleans up compose and Testcontainers).
     - [x] Ensure sockets are enabled per-suite for all non-unit tests
       - [x] Action: Confirm we have autouse fixtures that temporarily `enable_socket()` in `tests/integration/`, `tests/environment/`, and `tests/e2e/` (added). No suite should rely on global allow-all.
       - [x] Verify: Representative tests in each suite can reach real services without `SocketBlockedError` while unit tests remain blocked by default.
@@ -945,12 +1101,12 @@ This file records tasks that have been completed and moved out of the active TOD
 - [x] Simplify unit-only socket blocking configuration
   - [x] Action: In `tests/unit/conftest.py`, remove the `markexpr` heuristic from `_disable_network_for_unit_tests` (unit scope already limits it to unit tests).
   - [x] Action: Remove stack-based exceptions in `_guard_against_enable_socket_misuse`; keep a simple guard that allows `allow_network` only.
-  - [x] Verify: `pytest -q -k network_block_unit` shows unit blocking still enforced; `-m integration` remains green.
+        - [x] Verify: `pytest -q -k network_block_unit` shows unit blocking still enforced; `pytest -q tests/integration` remains green.
 
 - [x] Remove unnecessary socket toggles in non-unit fixtures
   - [x] Action: In `tests/conftest.py::docker_services`, drop temporary `enable_socket()/disable_socket()` — sockets are allowed by default now.
   - [x] Action: Remove no-op network fixtures/comments in `tests/integration/`, `tests/environment/`, and `tests/e2e/` where not needed.
-  - [x] Verify: `pytest -q -m integration`, `-m environment`, and E2E single tests still pass locally.
+        - [x] Verify: `pytest -q tests/integration`, `pytest -q tests/environment`, and E2E single tests still pass locally.
 
 ### P3 — Semgrep blocking findings visibility and triage (local)
 
@@ -985,3 +1141,46 @@ This file records tasks that have been completed and moved out of the active TOD
   - [x] Document the guard and prerequisites in `docs/DEVELOPMENT.md`
 - Repo protection
   - [x] Configure branch protection to require "Code scanning results / CodeQL" and Semgrep check on PRs
+
+### P1 — Fix Environment Configuration Issues ✅ COMPLETED
+
+- **Context**: Recent refactoring removed the `cli` service but introduced configuration issues that need immediate fixing.
+
+- [x] **Task 1: Create missing .env.docker file**
+  - Action: Create `docker/.env.docker` file with container-internal URLs:
+    ```
+    OLLAMA_URL=http://ollama:11434
+    WEAVIATE_URL=http://weaviate:8080
+    ```
+  - Verify: `docker compose -f docker/docker-compose.yml config` shows no errors.
+
+- [x] **Task 2: Remove obsolete container_internal_urls fixture**
+  - Action: Remove the `container_internal_urls` fixture from `tests/e2e/conftest.py` since `DOCKER_ENV` logic was removed.
+  - Action: Update `test_qa_real_end_to_end.py` to remove dependency on this fixture.
+  - Verify: E2E tests can run without the obsolete fixture.
+
+- [x] **Task 3: Verify containerized tests work**
+  - Action: Run containerized E2E tests to ensure they work with the simplified configuration.
+  - Verify: `tests/e2e/test_qa_real_end_to_end_container_e2e.py` passes.
+
+**Status**: All tasks completed. Environment configuration issues have been resolved, including the creation of the missing .env.docker file, removal of obsolete fixtures, and verification that containerized tests work correctly.
+
+#### P5 — Fix yamlfmt CI Job and Local Pre-push Hook ✅ COMPLETED
+
+- **Context**: The `yamlfmt` CI job was failing due to formatting issues in `docker/docker-compose.yml`. The goal is to ensure that `yamlfmt` runs correctly in the CI pipeline and that there is a local pre-push hook to catch formatting issues before they are pushed.
+
+- [x] **Task 1: Correct Formatting in `docker/docker-compose.yml`**
+  - Action: Manually run `yamlfmt docker/docker-compose.yml` to fix the formatting issues.
+  - Verify: Run `yamlfmt --lint docker/docker-compose.yml` and confirm that it passes.
+
+- [x] **Task 2: Verify `meta-linters.yml` Workflow**
+  - Action: Ensure the `yamlfmt` job in `.github/workflows/meta-linters.yml` is configured to run `yamlfmt --lint "**/*.yml" "**/*.yaml"`.
+  - Verify: The CI job should fail if there are any YAML formatting issues.
+
+- [x] **Task 3: Add `yamlfmt` to Pre-commit Hook**
+  - Action: Add a `yamlfmt` hook to `.pre-commit-config.yaml` to automatically format YAML files.
+  - Action: Run `pre-commit autoupdate` to refresh the hooks.
+  - Action: Run `pre-commit run --all-files` to apply the formatting to all existing files.
+  - Verify: Committing a poorly formatted YAML file should trigger the hook and fix it automatically.
+
+**Status**: All tasks completed. The yamlfmt CI job and local pre-push hook are now properly configured and working. YAML formatting is automatically applied and validated both locally and in CI.

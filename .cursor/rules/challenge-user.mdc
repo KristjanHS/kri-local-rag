@@ -19,3 +19,4 @@ alwaysApply: true
   2. **Identify the concern** - Explain why the approach might be problematic. Link to relevant documentation if available (e.g., security policies, style guides).
   3. **Suggest alternatives** - Provide better approaches that achieve the same goal.
   4. **Learn from the response** - If the user provides a valid reason, incorporate that context into future suggestions.
+  
