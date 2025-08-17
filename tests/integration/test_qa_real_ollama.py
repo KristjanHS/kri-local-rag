@@ -19,5 +19,8 @@ def test_answer_uses_real_ollama(managed_get_top_k, docker_services):
     assert ensure_model_available(OLLAMA_MODEL) is True
     question = "What is the capital of France?"
     # Use a small k to keep the prompt minimal; actual generation length is controlled by server/model
-    out = answer(question, k=1)
+    from backend.qa_loop import _get_cross_encoder
+
+    cross_encoder = _get_cross_encoder()
+    out = answer(question, k=1, cross_encoder=cross_encoder)
     assert isinstance(out, str) and out.strip(), "Expected a non-empty answer from the real model"

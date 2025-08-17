@@ -55,13 +55,6 @@ class ScoredChunk:
 # Note: Do not eagerly check/import heavy deps at module import time. We'll lazily
 # attempt to import inside the getter and gracefully fall back if unavailable.
 
-# Cross-encoder is optional and heavy; import lazily inside the getter.
-# Provide a patch seam for tests.
-CrossEncoder = None  # type: ignore
-
-# Cache the cross-encoder instance after first load to avoid re-loading on every question
-_cross_encoder: Any = None  # type: ignore
-
 # Keep Ollama context tokens between calls so the model retains conversation state
 _ollama_context: list[int] | None = None
 
@@ -73,74 +66,41 @@ def _get_cross_encoder(
     model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
     cache_folder: Optional[str] = os.getenv("CROSS_ENCODER_CACHE_DIR"),
 ):
-    """Return a (cached) CrossEncoder instance or ``None`` if the library is unavailable."""
-    global _cross_encoder
-    logger.debug("Entering _get_cross_encoder. Current cached _cross_encoder: %s", _cross_encoder)
+    """Return a new CrossEncoder instance."""
+    try:
+        from sentence_transformers import CrossEncoder
 
-    if _cross_encoder is None:
-        logger.debug("Cache is empty. Attempting to load CrossEncoder.")
-        try:
-            from sentence_transformers import CrossEncoder as _CE
-
-            kwargs = {"cache_folder": cache_folder} if cache_folder else {}
-            _cross_encoder = _CE(model_name, **kwargs)  # type: ignore[arg-type]
-            logger.info("CrossEncoder model '%s' loaded successfully.", model_name)
-
-            # Apply optimizations
-            try:
-                import torch
-
-                # Check if model is already compiled to avoid re-compilation
-                if not hasattr(_cross_encoder.model, "_orig_mod"):
-                    logger.debug("Applying torch.compile optimization to cross-encoder...")
-                    _cross_encoder.model = torch.compile(_cross_encoder.model, backend="inductor", mode="max-autotune")
-                    logger.debug("torch.compile optimization completed.")
-                else:
-                    logger.debug("Cross-encoder model already compiled, skipping optimization.")
-            except Exception as e:
-                logger.warning("Failed to apply torch.compile optimization: %s", e)
-        except ImportError:
-            logger.warning("sentence_transformers library not found. CrossEncoder is unavailable.")
-            _cross_encoder = "unavailable"  # Explicitly mark as unavailable
-        except Exception as e:
-            logger.error("Failed to load CrossEncoder model '%s': %s", model_name, e)
-            _cross_encoder = "unavailable"  # Explicitly mark as unavailable on loading failure
-    else:
-        logger.debug("Returning cached CrossEncoder instance.")
-
-    if _cross_encoder == "unavailable":
+        cross_encoder = CrossEncoder(model_name, cache_folder=cache_folder)
+        logger.info("CrossEncoder model '%s' loaded successfully.", model_name)
+        return cross_encoder
+    except Exception as e:
+        logger.error("Failed to load CrossEncoder model '%s': %s", model_name, e)
         return None
-    return _cross_encoder
 
 
-# ---------- Scoring of retrieved chunks --------------------------------------------------
-def _score_chunks(question: str, chunks: List[str]) -> List[ScoredChunk]:
+def _score_chunks(question: str, chunks: List[str], cross_encoder: Any) -> List[ScoredChunk]:
     """Return *chunks* each paired with a relevance score for *question*.
 
     Uses CrossEncoder for scoring. Raises RuntimeError if CrossEncoder is not available.
     """
-    logger.debug("Attempting to get cross-encoder...")
-    encoder = _get_cross_encoder()
-    logger.debug("Received encoder from _get_cross_encoder: %s", encoder)
-    if encoder is None:
-        logger.error("Encoder is None, raising RuntimeError.")
+    if cross_encoder is None:
         raise RuntimeError("CrossEncoder model is not available. Ensure the model is downloaded and accessible.")
 
     logger.debug("Scoring chunks using cross-encoder.")
     pairs: List[Tuple[str, str]] = [(question, c) for c in chunks]
-    scores = encoder.predict(pairs)  # logits, pos > relevant
+    scores = cross_encoder.predict(pairs)  # logits, pos > relevant
     return [ScoredChunk(text=c, score=float(s)) for c, s in zip(chunks, scores)]
 
 
 # ---------- Reranking of retrieved chunks --------------------------------------------------
-def _rerank(question: str, chunks: List[str], k_keep: int) -> List[ScoredChunk]:
+def _rerank(question: str, chunks: List[str], k_keep: int, cross_encoder: Any) -> List[ScoredChunk]:
     """Return the top *k_keep* chunks from *chunks* after re-ranking by relevance to *question*."""
 
     if not chunks:
         return []
 
     # Score all chunks
-    scored_chunks = _score_chunks(question, chunks)
+    scored_chunks = _score_chunks(question, chunks, cross_encoder)
 
     # Sort by score (higher = more relevant) and keep top k
     scored_chunks.sort(key=lambda sc: sc.score, reverse=True)
@@ -161,6 +121,8 @@ def build_prompt(question: str, context_chunks: list[str]) -> str:
 # ---------- Answer generation --------------------------------------------------
 def answer(
     question: str,
+    embedding_model: Optional[Any] = None,
+    cross_encoder: Optional[Any] = None,
     k: int = 3,
     *,
     metadata_filter: Optional[Dict[str, Any]] = None,
@@ -189,13 +151,13 @@ def answer(
     # ---------- 1) Retrieve -----------------------------------------------------
     # Ask vector DB for more than we eventually keep to improve re-ranking quality
     initial_k = k * 20
-    candidates = get_top_k(question, k=initial_k, metadata_filter=metadata_filter)
+    candidates = get_top_k(question, k=initial_k, metadata_filter=metadata_filter, embedding_model=embedding_model)
     if not candidates:
         return "I found no relevant context to answer that question. The database may be empty. Ingest a PDF first."
 
     # ---------- 2) Re-rank ------------------------------------------------------
     logger.debug("Re-ranking the top %d candidates...", len(candidates))
-    scored_chunks = _rerank(question, candidates, k_keep=k)
+    scored_chunks = _rerank(question, candidates, k_keep=k, cross_encoder=cross_encoder)
 
     logger.debug("Reranked context chunks:")
     for idx, sc in enumerate(scored_chunks, 1):
@@ -368,7 +330,13 @@ def ensure_weaviate_ready_and_populated():
             pass
 
 
-def qa_loop(question: str, k: int = 3, metadata_filter: Optional[Dict[str, Any]] = None):
+def qa_loop(
+    question: str,
+    embedding_model: Any,
+    cross_encoder: Any,
+    k: int = 3,
+    metadata_filter: Optional[Dict[str, Any]] = None,
+):
     """
     Perform a single question-answering loop.
     This function is a refactoring of the original __main__ block to be reusable.
@@ -383,7 +351,13 @@ def qa_loop(question: str, k: int = 3, metadata_filter: Optional[Dict[str, Any]]
             )
             sys.exit(1)
 
-    result = answer(question, k=k, metadata_filter=metadata_filter)
+    result = answer(
+        question,
+        embedding_model=embedding_model,
+        cross_encoder=cross_encoder,
+        k=k,
+        metadata_filter=metadata_filter,
+    )
     return result
 
 
@@ -420,8 +394,20 @@ if __name__ == "__main__":
         else:
             meta_filter = {"operator": "And", "operands": clauses}
 
+    # Load models once
+    from backend.retriever import _get_embedding_model
+
+    embedding_model = _get_embedding_model()
+    cross_encoder = _get_cross_encoder()
+
     if args.question:
-        qa_loop(args.question, k=args.k, metadata_filter=meta_filter)
+        qa_loop(
+            args.question,
+            embedding_model=embedding_model,
+            cross_encoder=cross_encoder,
+            k=args.k,
+            metadata_filter=meta_filter,
+        )
         sys.exit(0)
 
     # Interactive loop - show readiness spinners and then the prompt
@@ -443,7 +429,13 @@ if __name__ == "__main__":
             if not question.strip():
                 continue
 
-            qa_loop(question, k=args.k, metadata_filter=meta_filter)
+            qa_loop(
+                question,
+                embedding_model=embedding_model,
+                cross_encoder=cross_encoder,
+                k=args.k,
+                metadata_filter=meta_filter,
+            )
             console.print()  # Add a blank line for readability before the next prompt
 
     except (EOFError, KeyboardInterrupt):

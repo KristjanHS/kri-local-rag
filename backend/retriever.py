@@ -114,6 +114,7 @@ def get_top_k(
     *,
     metadata_filter: Optional[Dict[str, Any]] = None,
     alpha: float = DEFAULT_HYBRID_ALPHA,  # 0 → pure BM25 search, 1 → pure vector search
+    embedding_model: Optional[Any] = None,
 ) -> List[str]:
     """Return the *content* strings of the **k** chunks most relevant to *question*.
 
@@ -143,7 +144,9 @@ def get_top_k(
 
         try:
             # For manual vectorization, we need to provide the vector ourselves
-            embedding_model = _get_embedding_model()
+            if embedding_model is None:
+                embedding_model = _get_embedding_model()
+
             if embedding_model is not None:
                 # Vectorize the query using the same model as ingestion
                 query_vector_raw = embedding_model.encode(question)

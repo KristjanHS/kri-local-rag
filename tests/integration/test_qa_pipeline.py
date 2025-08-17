@@ -30,11 +30,16 @@ def test_qa_pipeline_produces_answer(managed_qa_functions):
     managed_qa_functions["generate_response"].side_effect = _fake_generate_response
 
     question = "What is the capital of France?"
-    result = answer(question)
+    from backend.qa_loop import _get_cross_encoder
+
+    cross_encoder = _get_cross_encoder()
+    result = answer(question, cross_encoder=cross_encoder)
 
     # ─── Assertions ──────────────────────────────────────────────────────────
     assert "Paris" in result
-    managed_qa_functions["get_top_k"].assert_called_once_with(question, k=60, metadata_filter=None)
+    managed_qa_functions["get_top_k"].assert_called_once_with(
+        question, k=60, metadata_filter=None, embedding_model=None
+    )
     managed_qa_functions["generate_response"].assert_called_once()
 
     # Prompt should contain both the question and the retrieved context
@@ -54,7 +59,10 @@ def test_qa_pipeline_no_context(managed_qa_functions):
     managed_qa_functions["get_top_k"].return_value = []
 
     question = "What is the capital of France?"
-    result = answer(question)
+    from backend.qa_loop import _get_cross_encoder
+
+    cross_encoder = _get_cross_encoder()
+    result = answer(question, cross_encoder=cross_encoder)
 
     assert "I found no relevant context" in result
     managed_qa_functions["get_top_k"].assert_called_once()

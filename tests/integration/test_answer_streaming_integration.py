@@ -20,6 +20,7 @@ def test_answer_streaming_output_integration(managed_qa_functions, capsys, caplo
 
     caplog.set_level(_logging.ERROR, logger="backend.qa_loop")
 
-    qa_loop.answer("test question")
+    cross_encoder = qa_loop._get_cross_encoder()
+    qa_loop.answer("test question", cross_encoder=cross_encoder)
     captured = capsys.readouterr()
     assert captured.out == "Answer: Hello World\n"
