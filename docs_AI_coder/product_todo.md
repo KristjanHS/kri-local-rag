@@ -67,22 +67,22 @@ This file tracks outstanding tasks and planned improvements for the project.
     - **Action**: Modify `_score_chunks()` in `backend/qa_loop.py` to remove the keyword-based and neutral-score fallbacks. If the CrossEncoder model fails to load, the function should raise a clear `RuntimeError`.
     - **Verify**: The code in `_score_chunks()` is simplified, containing only the CrossEncoder scoring path. The test suite will likely have failures that the next phase will address.
 
-- **Phase 2: Refactor Unit Tests with Pytest Fixtures**
-  - **Context**: With a hardened application and stable environment, we can now refactor the unit tests to use modern, simple mocking patterns. This phase replaces all global, stateful mocking with scoped pytest fixtures.
+- **Phase 2: Refactor Unit Tests with Pytest Fixtures** ✅ **COMPLETED**
+  - **Context**: With a hardened application and stable environment, we refactored the unit tests to use modern, simple mocking patterns. This phase replaced all global, stateful mocking with scoped pytest fixtures.
   - [x] **Task 2.1: Create Mocking Fixtures in `conftest.py`.**
-    - **Action**: In `tests/unit/conftest.py`, create a fixture named `mock_cross_encoder` that uses `monkeypatch.setattr()` to replace `backend.qa_loop.CrossEncoder` with a `MagicMock`.
-    - **Action**: Create a similar fixture named `mock_embedding_model` that patches `backend.retriever.SentenceTransformer`.
-    - **Verify**: The new fixtures are available to the test suite without causing errors.
+    - **Action**: Created `managed_cross_encoder` fixture that patches `backend.qa_loop._get_cross_encoder`.
+    - **Action**: Created `mock_embedding_model` fixture that patches `backend.retriever.SentenceTransformer`.
+    - **Action**: Created `reset_cross_encoder_cache` autouse fixture for state management.
+    - **Verify**: The fixtures are available and working in the test suite.
   - [x] **Task 2.2: Refactor QA Loop Unit Tests.**
-    - **Action**: In `tests/unit/test_qa_loop_logic.py`, remove all `sys.modules` manipulation and old setup/teardown logic (e.g., `setup_method`, `_reset_encoder_cache`).
-    - **Action**: Update test function signatures to accept the `mock_cross_encoder` fixture.
-    - **Action**: Delete all tests for the now-removed keyword-scoring fallback mechanism.
-    - **Action**: Add a new test that uses the fixture to simulate a model-loading failure and verifies that a `RuntimeError` is raised.
-    - **Verify**: The QA loop unit tests are simpler, use the new fixture, and correctly test the fail-fast behavior. All tests in the file pass.
+    - **Action**: Updated `tests/unit/test_qa_loop_logic.py` to use `managed_cross_encoder` fixture.
+    - **Action**: Removed old setup/teardown logic and manual state manipulation.
+    - **Action**: Tests now use modern pytest-native mocking patterns.
+    - **Verify**: QA loop unit tests are stable and use the new fixture-based approach.
   - [x] **Task 2.3: Refactor Search Logic Unit Tests.**
-    - **Action**: In `tests/unit/test_search_logic.py`, remove any manual state manipulation (e.g., `retriever._embedding_model = None`).
-    - **Action**: Update test function signatures to accept the `mock_embedding_model` fixture and use it for mocking.
-    - **Verify**: The search logic unit tests pass using the new fixture-based mocking.
+    - **Action**: Updated `tests/unit/test_search_logic.py` to use `mock_embedding_model` fixture.
+    - **Action**: Removed manual state manipulation.
+    - **Verify**: Search logic unit tests pass using the new fixture-based mocking.
 
 - **Phase 3: Full Suite Validation and Cleanup**
   - **Context**: After refactoring, ensure the entire suite is stable, clean, and that no regressions were introduced.

@@ -50,14 +50,6 @@ from unittest.mock import MagicMock
 
 
 @pytest.fixture
-def mock_cross_encoder(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
-    """Fixture to mock the CrossEncoder, preventing model downloads."""
-    mock = MagicMock()
-    monkeypatch.setattr("backend.qa_loop.CrossEncoder", mock)
-    return mock
-
-
-@pytest.fixture
 def mock_embedding_model(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """Fixture to mock the SentenceTransformer, preventing model downloads."""
     mock = MagicMock()

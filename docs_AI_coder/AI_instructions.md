@@ -195,13 +195,10 @@ Coverage policy:
 - Likely causes: cached globals (`qa_loop._cross_encoder`, `qa_loop._ollama_context`, `retriever._embedding_model`), leftover `RAG_FAKE_ANSWER`, importing target modules inside fixtures before `@patch` runs.
 
 - Fix quickly:
-  1) Unit: reset cache before mocking
-  ```python
-  import backend.qa_loop as qa_loop
-  qa_loop._cross_encoder = None
-  with patch("backend.qa_loop._get_cross_encoder") as get_ce:
-      get_ce.return_value = MagicMock(predict=lambda pairs: [0.9, 0.1])
-  ```
+  1) Unit tests: Use the provided fixtures in `tests/unit/conftest.py`:
+     - `managed_cross_encoder` for cross-encoder mocking
+     - `mock_embedding_model` for embedding model mocking
+     - `reset_cross_encoder_cache` (autouse) handles cache cleanup
 
   2) Integration: autouse fixture (no imports; use sys.modules)
   ```python
