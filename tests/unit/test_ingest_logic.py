@@ -64,7 +64,8 @@ def test_batch_upload_is_used(mock_weaviate, mock_docs):
     # Arrange
     mock_client = mock_weaviate.connect_to_custom.return_value
     mock_collection = mock_client.collections.get.return_value
-    mock_batch_cm = mock_collection.batch.dynamic.return_value
+    # The new mock target
+    mock_batch_cm = mock_collection.batch.fixed_size.return_value
     mock_batch_cm.__enter__.return_value = mock_batch_cm
     mock_model = MagicMock()
 
@@ -72,8 +73,8 @@ def test_batch_upload_is_used(mock_weaviate, mock_docs):
     process_and_upload_chunks(mock_client, mock_docs, mock_model, "test_collection")
 
     # Assert
+    assert mock_collection.batch.fixed_size.call_count == 1
     assert mock_batch_cm.__enter__.called
-    assert mock_collection.batch.dynamic.call_count == 1
 
 
 @patch("backend.ingest.weaviate")
@@ -82,7 +83,7 @@ def test_object_properties_are_correct(mock_weaviate, mock_docs):
     # Arrange
     mock_client = mock_weaviate.connect_to_custom.return_value
     mock_collection = mock_client.collections.get.return_value
-    mock_batch_cm = mock_collection.batch.dynamic.return_value
+    mock_batch_cm = mock_collection.batch.fixed_size.return_value
     mock_batch_cm.__enter__.return_value = mock_batch_cm
     mock_model = MagicMock()
     mock_model.encode.return_value = [0.1, 0.2, 0.3]
@@ -91,11 +92,15 @@ def test_object_properties_are_correct(mock_weaviate, mock_docs):
     process_and_upload_chunks(mock_client, mock_docs, mock_model, "test_collection")
 
     # Assert
-    _, first_call_kwargs = mock_batch_cm.add_object.call_args_list[0]
+    # Check the calls to add_object made on the context manager
+    call_list = mock_batch_cm.add_object.call_args_list
+    assert len(call_list) == 2, "add_object should be called for each document"
+
+    first_call_kwargs = call_list[0].kwargs
     assert "content" in first_call_kwargs["properties"]
     assert first_call_kwargs["properties"]["source_file"] == "test.pdf"
 
-    _, second_call_kwargs = mock_batch_cm.add_object.call_args_list[1]
+    second_call_kwargs = call_list[1].kwargs
     assert second_call_kwargs["properties"]["source_file"] == "test.md"
 
 
@@ -105,7 +110,7 @@ def test_vectors_are_generated_and_added(mock_weaviate, mock_docs):
     # Arrange
     mock_client = mock_weaviate.connect_to_custom.return_value
     mock_collection = mock_client.collections.get.return_value
-    mock_batch_cm = mock_collection.batch.dynamic.return_value
+    mock_batch_cm = mock_collection.batch.fixed_size.return_value
     mock_batch_cm.__enter__.return_value = mock_batch_cm
     mock_model = MagicMock()
     mock_model.encode.return_value = [0.1, 0.2, 0.3]
@@ -116,6 +121,8 @@ def test_vectors_are_generated_and_added(mock_weaviate, mock_docs):
     # Assert
     assert mock_model.encode.call_count == len(mock_docs)
     assert mock_batch_cm.add_object.call_count == len(mock_docs)
+
+    # Check the vector in the first call
     _, first_call_kwargs = mock_batch_cm.add_object.call_args_list[0]
     assert "vector" in first_call_kwargs
     assert first_call_kwargs["vector"] == [0.1, 0.2, 0.3]
