@@ -36,18 +36,6 @@ def managed_embedding_model(mocker) -> MagicMock:
 
 
 @pytest.fixture
-def managed_ingest_embedding_model(mocker):
-    """
-    Fixture to mock backend.ingest.get_embedding_model.
-
-    It patches the function and yields the patch object, allowing tests to
-    control the return value.
-    """
-    patcher = mocker.patch("backend.ingest.get_embedding_model")
-    yield patcher
-
-
-@pytest.fixture
 def managed_qa_functions(mocker):
     """
     Fixture to mock key functions in the QA pipeline.

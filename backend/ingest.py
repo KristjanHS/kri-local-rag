@@ -222,29 +222,11 @@ def process_and_upload_chunks(
     return stats
 
 
-"""
-Test-only hooks (re-exported for integration tests)
-These are re-exported from backend._test_support so tests can patch via
-backend.ingest.get_embedding_model / backend.ingest.ingest_documents
-without changing their import paths.
-"""
-try:  # pragma: no cover - optional in production
-    from backend._test_support import (  # type: ignore
-        get_embedding_model as get_embedding_model,
-    )
-    from backend._test_support import (
-        ingest_documents as ingest_documents,
-    )
-except Exception:  # pragma: no cover
-    pass
-
-
 def ingest(
     directory: str,
-    collection_name: str = COLLECTION_NAME,
-    *,
-    embedding_model: Optional[SentenceTransformer] = None,
-    client: Optional[weaviate.WeaviateClient] = None,
+    collection_name: str,
+    weaviate_client: weaviate.WeaviateClient,
+    embedding_model: SentenceTransformer,
 ):
     """Main ingestion pipeline."""
     start_time = time.time()
@@ -253,31 +235,8 @@ def ingest(
     if not chunked_docs:
         return
 
-    # Resolve embedding model (allow DI for tests)
-    if embedding_model is None:
-        logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
-        model = SentenceTransformer(EMBEDDING_MODEL)
-        try:
-            logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
-            compiled_model = torch.compile(model, backend="inductor", mode="max-autotune")  # type: ignore[attr-defined]
-            model = cast(SentenceTransformer, compiled_model)
-            logger.info("torch.compile optimization completed.")
-        except Exception as e:
-            logger.warning(f"Could not apply torch.compile: {e}")
-    else:
-        model = embedding_model
-
-    # Resolve client (allow DI for tests)
-    created_client = False
-    if client is None:
-        client = connect_to_weaviate()
-        created_client = True
-    try:
-        create_collection_if_not_exists(client, collection_name)
-        process_and_upload_chunks(client, chunked_docs, model, collection_name)
-    finally:
-        if created_client and hasattr(client, "close"):
-            client.close()
+    create_collection_if_not_exists(weaviate_client, collection_name)
+    process_and_upload_chunks(weaviate_client, chunked_docs, embedding_model, collection_name)
 
     elapsed = time.time() - start_time
     logger.info("── Summary ─────────────────────────────")
@@ -290,4 +249,27 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Ingest documents (.pdf, .md) into Weaviate.")
     parser.add_argument("--data-dir", default="../data", help="Directory with document files.")
     args = parser.parse_args()
-    ingest(str(args.data_dir))
+
+    # Create a single Weaviate client instance
+    client = connect_to_weaviate()
+
+    # Load the embedding model once
+    logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
+    model = SentenceTransformer(EMBEDDING_MODEL)
+    try:
+        logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
+        compiled_model = torch.compile(model, backend="inductor", mode="max-autotune")
+        model = cast(SentenceTransformer, compiled_model)
+        logger.info("torch.compile optimization completed.")
+    except Exception as e:
+        logger.warning(f"Could not apply torch.compile: {e}")
+
+    try:
+        ingest(
+            directory=str(args.data_dir),
+            collection_name=COLLECTION_NAME,
+            weaviate_client=client,
+            embedding_model=model,
+        )
+    finally:
+        client.close()
