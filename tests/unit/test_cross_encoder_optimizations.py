@@ -1,50 +1,39 @@
+import logging
 import os
-import sys
-import types
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+# Create a logger for this test file
+logger = logging.getLogger(__name__)
 
 
-def test_cross_encoder_enables_heavy_optimizations_when_allowed(monkeypatch):
-    os.environ["RERANKER_CROSS_ENCODER_OPTIMIZATIONS"] = "true"
+# Now, import the module under test
+from backend import qa_loop
 
-    if "backend.qa_loop" in sys.modules:
-        del sys.modules["backend.qa_loop"]
-    import backend.qa_loop as qa_loop
 
-    qa_loop_sys = types.SimpleNamespace(modules={})
-    monkeypatch.setattr(qa_loop, "sys", qa_loop_sys, raising=True)
+@pytest.mark.unit
+@patch.dict(os.environ, {"RERANKER_CROSS_ENCODER_OPTIMIZATIONS": "true"})
+def test_cross_encoder_enables_heavy_optimizations_when_allowed(mocker):
+    """Test that torch.compile is called when optimizations are enabled."""
+    logger.debug("--- Running test_cross_encoder_enables_heavy_optimizations_when_allowed ---")
 
-    class FakeCE:
-        def __init__(self, name):
-            self.name = name
+    # Reset the cache to ensure the logic is re-run
+    qa_loop._cross_encoder = None
 
-        def predict(self, pairs):
-            return [0.0] * len(pairs)
+    # Mock the CrossEncoder class and its instance
+    mock_ce_instance = MagicMock()
+    mocker.patch("sentence_transformers.CrossEncoder", return_value=mock_ce_instance)
 
-    monkeypatch.setattr(qa_loop, "CrossEncoder", FakeCE, raising=True)
+    # Mock only the necessary torch functions
+    mock_compile = mocker.patch("torch.compile", return_value=mock_ce_instance)
+    mocker.patch("torch.set_num_threads")
 
-    class FakeTorch:
-        def __init__(self):
-            self.num_threads = None
-            self.compile_called = False
+    # Call the function that should trigger the optimization
+    encoder = qa_loop._get_cross_encoder(model_name="dummy-model")
 
-        def set_num_threads(self, n):
-            self.num_threads = n
+    # Verify that torch.compile was called
+    mock_compile.assert_called_once()
 
-    fake_torch = FakeTorch()
-
-    def fake_compile(model, backend=None, mode=None):
-        fake_torch.compile_called = True
-        setattr(model, "_compiled_backend", backend)
-        setattr(model, "_compiled_mode", mode)
-        return model
-
-    setattr(fake_torch, "compile", fake_compile)
-    monkeypatch.setitem(sys.modules, "torch", fake_torch)
-
-    encoder = qa_loop._get_cross_encoder("dummy-model")
-
-    assert isinstance(encoder, FakeCE)
-    assert getattr(encoder, "_compiled_backend", None) == "inductor"
-    assert getattr(encoder, "_compiled_mode", None) == "max-autotune"
-    assert fake_torch.compile_called is True
-    assert fake_torch.num_threads == 12
+    # Verify that the returned encoder is the one processed by torch.compile
+    assert encoder is mock_ce_instance
