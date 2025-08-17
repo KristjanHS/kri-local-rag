@@ -108,12 +108,12 @@ This file tracks outstanding tasks and planned improvements for the project.
 - **Why**: The current application logic relies on global, module-level caches for heavy objects like embedding models. This forces tests to use monkeypatching (`@patch` or fixtures that patch) to isolate components. Refactoring to a Dependency Injection (DI) pattern will make the code more modular, easier to test without patching, and eliminate the root cause of mock leakage issues.
 - **Target Approach**: Modify key functions and classes to accept dependencies (like the embedding model or the Weaviate client) as explicit arguments. The application's entry point (e.g., the CLI or UI) will be responsible for creating these objects and "injecting" them into the functions that need them.
 
-- [ ] **Task 1 — Refactor `qa_loop.py`**
+- [x] **Task 1 — Refactor `qa_loop.py`**
   - **Action**: Modify the `answer` function to accept `embedding_model` and `cross_encoder` objects as optional arguments.
   - **Action**: Update the CLI entry point to create these models once and pass them into the `qa_loop`.
   - **Verify**: The CLI functionality remains unchanged. Unit and integration tests are updated to pass the models directly instead of using fixtures that patch.
 
-- [ ] **Task 2 — Refactor `ingest.py`**
+- [x] **Task 2 — Refactor `ingest.py`**
   - **Action**: Modify the `ingest` function to accept the `embedding_model` and `weaviate_client` as arguments.
   - **Action**: Update the `ingest.sh` script and any other callers to create and pass these dependencies.
   - **Verify**: The ingestion process works as before. Tests are updated to inject mock dependencies directly.
