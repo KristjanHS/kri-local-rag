@@ -33,6 +33,8 @@ from backend.config import (
     CHUNK_SIZE,
     COLLECTION_NAME,
     EMBEDDING_MODEL,
+    WEAVIATE_BATCH_SIZE,
+    WEAVIATE_CONCURRENT_REQUESTS,
     WEAVIATE_URL,
     get_logger,
 )
@@ -171,7 +173,10 @@ def process_and_upload_chunks(
     start_ts = time.time()
     last_log_ts = start_ts
 
-    with collection.batch.dynamic() as batch:
+    with collection.batch.fixed_size(
+        batch_size=WEAVIATE_BATCH_SIZE,
+        concurrent_requests=WEAVIATE_CONCURRENT_REQUESTS,
+    ) as batch:
         for idx, doc in enumerate(docs, start=1):
             uuid = deterministic_uuid(doc)
             vector_tensor = model.encode(doc.page_content)
@@ -285,4 +290,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Ingest documents (.pdf, .md) into Weaviate.")
     parser.add_argument("--data-dir", default="../data", help="Directory with document files.")
     args = parser.parse_args()
-    ingest(args.data_dir)
+    ingest(str(args.data_dir))

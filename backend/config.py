@@ -179,6 +179,13 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "cas/mistral-7b-instruct-v0.3")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
 
+# Weaviate batching settings (tune for performance)
+# Larger batches can be faster but use more memory.
+WEAVIATE_BATCH_SIZE = int(os.getenv("WEAVIATE_BATCH_SIZE", 100))
+# Concurrent requests can speed up ingestion on multi-core machines.
+WEAVIATE_CONCURRENT_REQUESTS = int(os.getenv("WEAVIATE_CONCURRENT_REQUESTS", 2))
+
+
 # Default context window (max tokens) for Ollama LLM requests
 OLLAMA_CONTEXT_TOKENS = int(os.getenv("OLLAMA_CONTEXT_TOKENS", 8192))  # e.g. 4096, 8192, etc.
 

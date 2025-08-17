@@ -90,9 +90,13 @@ def _get_cross_encoder(
             try:
                 import torch
 
-                logger.info("Applying torch.compile optimization to cross-encoder...")
-                _cross_encoder.model = torch.compile(_cross_encoder.model, backend="inductor", mode="max-autotune")
-                logger.info("torch.compile optimization completed.")
+                # Check if model is already compiled to avoid re-compilation
+                if not hasattr(_cross_encoder.model, "_orig_mod"):
+                    logger.debug("Applying torch.compile optimization to cross-encoder...")
+                    _cross_encoder.model = torch.compile(_cross_encoder.model, backend="inductor", mode="max-autotune")
+                    logger.debug("torch.compile optimization completed.")
+                else:
+                    logger.debug("Cross-encoder model already compiled, skipping optimization.")
             except Exception as e:
                 logger.warning("Failed to apply torch.compile optimization: %s", e)
         except ImportError:
