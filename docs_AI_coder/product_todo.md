@@ -79,17 +79,17 @@ This file tracks outstanding tasks and planned improvements for the project.
     - **Action**: Delete all tests for the now-removed keyword-scoring fallback mechanism.
     - **Action**: Add a new test that uses the fixture to simulate a model-loading failure and verifies that a `RuntimeError` is raised.
     - **Verify**: The QA loop unit tests are simpler, use the new fixture, and correctly test the fail-fast behavior. All tests in the file pass.
-  - [ ] **Task 2.3: Refactor Search Logic Unit Tests.**
+  - [x] **Task 2.3: Refactor Search Logic Unit Tests.**
     - **Action**: In `tests/unit/test_search_logic.py`, remove any manual state manipulation (e.g., `retriever._embedding_model = None`).
     - **Action**: Update test function signatures to accept the `mock_embedding_model` fixture and use it for mocking.
     - **Verify**: The search logic unit tests pass using the new fixture-based mocking.
 
 - **Phase 3: Full Suite Validation and Cleanup**
   - **Context**: After refactoring, ensure the entire suite is stable, clean, and that no regressions were introduced.
-  - [ ] **Task 3.1: Run Full Test Suite.**
+  - [x] **Task 3.1: Run Full Test Suite.**
     - **Action**: Run the entire test suite, including unit, integration, and E2E tests.
     - **Verify**: All tests pass (`.venv/bin/python -m pytest`).
-  - [ ] **Task 3.2: Remove Dead Code.**
+  - [x] **Task 3.2: Remove Dead Code.**
     - **Action**: Remove any unused imports, variables, or helper functions related to the old mocking strategy from the test files.
     - **Verify**: The test codebase is clean, simpler, and follows a consistent, modern pattern.
 
