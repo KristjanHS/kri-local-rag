@@ -69,18 +69,19 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 - **Phase 2: Refactor Unit Tests with Pytest Fixtures** ✅ **COMPLETED**
   - **Context**: With a hardened application and stable environment, we refactored the unit tests to use modern, simple mocking patterns. This phase replaced all global, stateful mocking with scoped pytest fixtures.
+  - **Target Approach**: Modern pytest fixtures (`managed_cross_encoder`, `mock_embedding_model`) are now the preferred method for unit tests.
   - [x] **Task 2.1: Create Mocking Fixtures in `conftest.py`.**
-    - **Action**: Created `managed_cross_encoder` fixture that patches `backend.qa_loop._get_cross_encoder`.
-    - **Action**: Created `mock_embedding_model` fixture that patches `backend.retriever.SentenceTransformer`.
+    - **Action**: Created `managed_cross_encoder` fixture that patches `backend.qa_loop._get_cross_encoder` (TARGET APPROACH).
+    - **Action**: Created `mock_embedding_model` fixture that patches `backend.retriever.SentenceTransformer` (TARGET APPROACH).
     - **Action**: Created `reset_cross_encoder_cache` autouse fixture for state management.
     - **Verify**: The fixtures are available and working in the test suite.
   - [x] **Task 2.2: Refactor QA Loop Unit Tests.**
-    - **Action**: Updated `tests/unit/test_qa_loop_logic.py` to use `managed_cross_encoder` fixture.
+    - **Action**: Updated `tests/unit/test_qa_loop_logic.py` to use `managed_cross_encoder` fixture (TARGET APPROACH).
     - **Action**: Removed old setup/teardown logic and manual state manipulation.
     - **Action**: Tests now use modern pytest-native mocking patterns.
     - **Verify**: QA loop unit tests are stable and use the new fixture-based approach.
   - [x] **Task 2.3: Refactor Search Logic Unit Tests.**
-    - **Action**: Updated `tests/unit/test_search_logic.py` to use `mock_embedding_model` fixture.
+    - **Action**: Updated `tests/unit/test_search_logic.py` to use `mock_embedding_model` fixture (TARGET APPROACH).
     - **Action**: Removed manual state manipulation.
     - **Verify**: Search logic unit tests pass using the new fixture-based mocking.
 
