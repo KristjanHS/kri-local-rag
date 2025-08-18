@@ -70,7 +70,7 @@ def _get_embedding_model(model_name: str = EMBEDDING_MODEL):
 
                 torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
             except Exception as _threads_e:  # noqa: F841
-                pass
+                logger.debug("Failed to set torch threads: %s", _threads_e)
 
             # Apply torch.compile for production performance, but allow skipping for tests
             from unittest.mock import MagicMock  # type: ignore

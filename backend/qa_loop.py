@@ -336,8 +336,8 @@ def ensure_weaviate_ready_and_populated():
         try:
             if client is not None and hasattr(client, "is_connected") and client.is_connected():
                 client.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to close Weaviate client gracefully: %s", e)
 
 
 def qa_loop(

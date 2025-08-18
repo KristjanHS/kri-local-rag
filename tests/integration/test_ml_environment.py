@@ -43,9 +43,9 @@ def test_pytorch_is_cpu_only():
         "Test failed: PyTorch was built with CUDA support (torch.version.cuda is not None), "
         "but a CPU-only build is expected. Please reinstall PyTorch from the CPU wheel."
     )
-    assert (
-        not torch.backends.mps.is_available()
-    ), "Test failed: PyTorch has access to an MPS device, but it should be CPU-only."
+    assert not torch.backends.mps.is_available(), (
+        "Test failed: PyTorch has access to an MPS device, but it should be CPU-only."
+    )
 
 
 def test_pytorch_cpu_optimizations_are_available():
