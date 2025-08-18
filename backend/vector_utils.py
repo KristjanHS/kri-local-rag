@@ -9,6 +9,10 @@ from __future__ import annotations
 import numbers
 from typing import Any, Sequence
 
+from backend.config import get_logger
+
+logger = get_logger(__name__)
+
 
 def to_float_list(vector_like: Any) -> list[float]:
     """Convert a vector-like object to a ``list[float]``.
@@ -60,8 +64,8 @@ def to_float_list(vector_like: Any) -> list[float]:
             return [float(x) for x in as_list]
         try:
             return [float(x) for x in list(as_list)]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not convert to_list() result to list of floats: %s", e)
 
     # Last resort: attempt to iterate and coerce to float
     iterable_candidate: Any = vector_like

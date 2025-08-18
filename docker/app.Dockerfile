@@ -26,6 +26,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Install our backend package (non-editable) into the venv
 COPY pyproject.toml ./
 COPY backend/ /app/backend/
+COPY frontend/ /app/frontend/
 RUN ${VENV_PATH}/bin/pip install .
 
 
