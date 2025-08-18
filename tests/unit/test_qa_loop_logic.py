@@ -5,7 +5,6 @@ import pytest
 
 from backend import qa_loop
 
-pytestmark = pytest.mark.unit
 
 # Create a logger for this test file
 logger = logging.getLogger(__name__)

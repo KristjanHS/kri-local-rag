@@ -16,10 +16,10 @@ pytestmark = pytest.mark.slow
 # -----------------------------------------------------------------------------
 
 
-def test_qa_pipeline_produces_answer(managed_qa_functions):
+def test_qa_pipeline_produces_answer():
     """Ensure `answer()` returns a meaningful response and embeds context chunks in the prompt."""
     context_chunk = "France is a country in Western Europe."
-    managed_qa_functions["get_top_k"].return_value = [context_chunk]
+    mock_get_top_k = MagicMock(return_value=[context_chunk])
 
     captured_prompt: list[str] = []
 
@@ -27,20 +27,23 @@ def test_qa_pipeline_produces_answer(managed_qa_functions):
         captured_prompt.append(prompt)
         return ("The capital of France is Paris.", None)
 
-    managed_qa_functions["generate_response"].side_effect = _fake_generate_response
+    mock_generate_response = MagicMock(side_effect=_fake_generate_response)
 
     question = "What is the capital of France?"
     from backend.qa_loop import _get_cross_encoder
 
     cross_encoder = _get_cross_encoder()
-    result = answer(question, cross_encoder=cross_encoder)
+    result = answer(
+        question,
+        cross_encoder=cross_encoder,
+        get_top_k_func=mock_get_top_k,
+        generate_response_func=mock_generate_response,
+    )
 
     # ─── Assertions ──────────────────────────────────────────────────────────
     assert "Paris" in result
-    managed_qa_functions["get_top_k"].assert_called_once_with(
-        question, k=60, metadata_filter=None, embedding_model=None
-    )
-    managed_qa_functions["generate_response"].assert_called_once()
+    mock_get_top_k.assert_called_once_with(question, k=60, metadata_filter=None, embedding_model=None)
+    mock_generate_response.assert_called_once()
 
     # Prompt should contain both the question and the retrieved context
     assert captured_prompt, "Prompt was not captured via generate_response side-effect."
@@ -54,18 +57,18 @@ def test_qa_pipeline_produces_answer(managed_qa_functions):
 # -----------------------------------------------------------------------------
 
 
-def test_qa_pipeline_no_context(managed_qa_functions):
+def test_qa_pipeline_no_context():
     """`answer()` should return a graceful message when the retriever finds nothing."""
-    managed_qa_functions["get_top_k"].return_value = []
+    mock_get_top_k = MagicMock(return_value=[])
 
     question = "What is the capital of France?"
     from backend.qa_loop import _get_cross_encoder
 
     cross_encoder = _get_cross_encoder()
-    result = answer(question, cross_encoder=cross_encoder)
+    result = answer(question, cross_encoder=cross_encoder, get_top_k_func=mock_get_top_k)
 
     assert "I found no relevant context" in result
-    managed_qa_functions["get_top_k"].assert_called_once()
+    mock_get_top_k.assert_called_once()
 
 
 # -----------------------------------------------------------------------------

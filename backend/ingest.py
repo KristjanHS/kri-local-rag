@@ -141,9 +141,10 @@ def _safe_created_at(source_path: Optional[str]) -> str:
 
 def deterministic_uuid(doc: Document) -> str:
     """Generate a deterministic UUID for a document chunk."""
-    content_hash = hashlib.md5(doc.page_content.encode("utf-8")).hexdigest()
+    # usedforsecurity=False is not available in all python versions, nosec is safer
+    content_hash = hashlib.md5(doc.page_content.encode("utf-8")).hexdigest()  # nosec B324
     source_file = os.path.basename(doc.metadata.get("source", "unknown"))
-    return hashlib.md5(f"{source_file}:{content_hash}".encode("utf-8")).hexdigest()
+    return hashlib.md5(f"{source_file}:{content_hash}".encode("utf-8")).hexdigest()  # nosec B324
 
 
 def create_collection_if_not_exists(client: weaviate.WeaviateClient, collection_name: str):

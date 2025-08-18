@@ -56,9 +56,24 @@ with st.sidebar.expander("Ingest PDFs"):
 
             with st.spinner("Ingesting ..."):
                 # Ingest operates on a directory; use the save directory
-                from backend.ingest import ingest  # lazy import to avoid heavy deps during module import
+                from backend.config import COLLECTION_NAME, EMBEDDING_MODEL
+                from backend.ingest import (
+                    connect_to_weaviate,
+                    ingest,
+                )
+                from sentence_transformers import SentenceTransformer
 
-                ingest(save_dir)
+                client = connect_to_weaviate()
+                try:
+                    model = SentenceTransformer(EMBEDDING_MODEL)
+                    ingest(
+                        directory=save_dir,
+                        collection_name=COLLECTION_NAME,
+                        weaviate_client=client,
+                        embedding_model=model,
+                    )
+                finally:
+                    client.close()
             st.success(f"Ingested {len(saved_paths)} file(s).")
 
 with st.form("question_form"):

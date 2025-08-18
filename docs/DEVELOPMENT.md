@@ -61,7 +61,7 @@ docker compose -f docker/docker-compose.yml down -v
 
 - Pre-push fast path (runs unit bundle by default; respects SKIP_TESTS=1):
 ```bash
-scripts/pre_push.sh
+scripts/git-hooks/pre-push
 ```
 
 
