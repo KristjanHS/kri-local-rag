@@ -85,8 +85,8 @@ Examples:
                 # Ensure output is flushed promptly in test environments
                 try:
                     sys.stdout.flush()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to flush stdout: %s", e)
                 return 0
             else:
                 # Real path streams tokens to stdout; no extra final print to avoid duplication
@@ -95,8 +95,8 @@ Examples:
                 qa.answer(args.question, k=args.k)
                 try:
                     sys.stdout.flush()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to flush stdout: %s", e)
                 return 0
         else:
             # Interactive mode
@@ -112,8 +112,8 @@ Examples:
                     try:
                         sys.stdout.write("\nQuestion: ")
                         sys.stdout.flush()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Failed to flush stdout: %s", e)
                     question = input().strip()
 
                     if question.lower() in ["quit", "exit", "q"]:
@@ -129,8 +129,8 @@ Examples:
                         console.print(fake_answer)
                         try:
                             sys.stdout.flush()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug("Failed to flush stdout: %s", e)
                     else:
                         # Real path streams tokens to stdout via qa.answer
                         import backend.qa_loop as qa
@@ -138,8 +138,8 @@ Examples:
                         qa.answer(question, k=args.k)
                         try:
                             sys.stdout.flush()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug("Failed to flush stdout: %s", e)
                 except KeyboardInterrupt:
                     console.print("\nGoodbye!")
                     break

@@ -130,6 +130,9 @@ def answer(
     on_debug=None,
     stop_event=None,
     context_tokens: int = 8192,
+    collection_name: Optional[str] = None,
+    get_top_k_func=get_top_k,
+    generate_response_func=generate_response,
 ) -> str:
     """Return an answer from the LLM using RAG with optional debug output and streaming callbacks.
     Can be interrupted with stop_event.
@@ -151,7 +154,13 @@ def answer(
     # ---------- 1) Retrieve -----------------------------------------------------
     # Ask vector DB for more than we eventually keep to improve re-ranking quality
     initial_k = k * 20
-    candidates = get_top_k(question, k=initial_k, metadata_filter=metadata_filter, embedding_model=embedding_model)
+    candidates = get_top_k_func(
+        question,
+        k=initial_k,
+        metadata_filter=metadata_filter,
+        embedding_model=embedding_model,
+        collection_name=collection_name,
+    )
     if not candidates:
         return "I found no relevant context to answer that question. The database may be empty. Ingest a PDF first."
 
@@ -204,7 +213,7 @@ def answer(
     if on_token is not None:
         console.print("Answer: ", end="")
 
-    answer_text, updated_context = generate_response(
+    answer_text, updated_context = generate_response_func(
         prompt_text,
         OLLAMA_MODEL,
         _ollama_context,
@@ -334,8 +343,8 @@ def ensure_weaviate_ready_and_populated():
         try:
             if client is not None and hasattr(client, "is_connected") and client.is_connected():
                 client.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to close Weaviate client gracefully: %s", e)
 
 
 def qa_loop(

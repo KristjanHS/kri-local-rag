@@ -10,7 +10,7 @@ In WSL, the windows host IP is typically the default gateway.
 """
 
 import re
-import subprocess
+import subprocess  # nosec B404
 
 from backend.console import console
 
@@ -29,7 +29,9 @@ def get_windows_host_ip() -> Optional[str]:
     """
     try:
         # Run `ip route` and get output, using text=True for automatic decoding.
-        result = subprocess.check_output(["ip", "route"], text=True, stderr=subprocess.DEVNULL)
+        result = subprocess.check_output(  # nosec B603 B607
+            ["ip", "route"], text=True, stderr=subprocess.DEVNULL
+        )
 
         # Look for the 'default via' line, which usually contains the host IP in WSL.
         for line in result.splitlines():

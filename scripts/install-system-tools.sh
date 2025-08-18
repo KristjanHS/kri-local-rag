@@ -98,8 +98,8 @@ fi
 
 
 
-# pyright is installed via pip from requirements-dev.txt into the project's .venv.
-# This ensures it's version-pinned and isolated. No system-wide install needed.
+# pyright and bandit are installed via pip from requirements-dev.txt into the project's .venv.
+# This ensures they're version-pinned and isolated. No system-wide install needed.
 
 # Show versions for a quick sanity check.
 echo "Installed versions:"
@@ -111,6 +111,14 @@ echo -n "yamlfmt: " && yamlfmt --version
 echo -n "pyright: " && (
   if [ -f ".venv/bin/pyright" ]; then
     .venv/bin/pyright --version 2>/dev/null
+  else
+    echo "not installed (run pip install -r requirements-dev.txt)"
+  fi
+)
+
+echo -n "bandit: " && (
+  if [ -f ".venv/bin/bandit" ]; then
+    .venv/bin/bandit --version 2>/dev/null
   else
     echo "not installed (run pip install -r requirements-dev.txt)"
   fi

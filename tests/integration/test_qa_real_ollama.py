@@ -8,7 +8,7 @@ from backend.config import OLLAMA_MODEL
 from backend.ollama_client import ensure_model_available
 from backend.qa_loop import answer
 
-# pytestmark = [pytest.mark.integration, pytest.mark.slow, pytest.mark.external]
+# pytestmark = [pytest.mark.slow, pytest.mark.external]
 
 
 def test_answer_uses_real_ollama(managed_get_top_k, docker_services):

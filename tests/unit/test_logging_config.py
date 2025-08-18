@@ -60,9 +60,9 @@ def test_set_log_level_configures_handlers_correctly():
         # Verify console handler level
         rich_handlers = [h for h in root_logger.handlers if isinstance(h, RichHandler)]
         assert len(rich_handlers) == 1, "Should have exactly one RichHandler"
-        assert (
-            rich_handlers[0].level == expected_level
-        ), f"Console handler level should be {expected_level} for {level_name}"
+        assert rich_handlers[0].level == expected_level, (
+            f"Console handler level should be {expected_level} for {level_name}"
+        )
 
 
 def test_set_log_level_handles_invalid_level():
