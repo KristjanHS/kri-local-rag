@@ -1,6 +1,7 @@
 import logging
 import logging.handlers
 import os
+import tempfile
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -22,14 +23,17 @@ def _resolve_log_dir() -> Path:
     2) LOG_DIR env
     3) /app/logs (Docker runtime)
     4) CWD/logs (dev)
-    5) /tmp/logs (always writable)
+    5) System temp dir (e.g., /tmp/kri-local-rag-logs)
     """
+    # Securely create a temporary directory as a fallback
+    fallback_dir = Path(tempfile.gettempdir()) / "kri-local-rag-logs"
+
     candidate_strings = [
         os.getenv("APP_LOG_DIR"),
         os.getenv("LOG_DIR"),
         "/app/logs",
         str(Path.cwd() / "logs"),
-        "/tmp/logs",
+        str(fallback_dir),
     ]
 
     for candidate in candidate_strings:
@@ -38,14 +42,27 @@ def _resolve_log_dir() -> Path:
         candidate_path = Path(candidate)
         try:
             candidate_path.mkdir(parents=True, exist_ok=True)
+            # Check if the directory is writable
+            test_file = candidate_path / ".writable_test"
+            test_file.touch()
+            test_file.unlink()
             return candidate_path
-        except PermissionError:
+        except (PermissionError, OSError):
             continue
 
-    # Fallback that should always work
-    fallback = Path("/tmp/logs")
-    fallback.mkdir(parents=True, exist_ok=True)
-    return fallback
+    # This part should ideally not be reached if the temp dir is writable,
+    # but it's a safeguard.
+    try:
+        fallback_dir.mkdir(parents=True, exist_ok=True)
+        return fallback_dir
+    except (PermissionError, OSError) as e:
+        # If even the temp dir isn't writable, something is seriously wrong.
+        # Log to stderr as a last resort.
+        import sys
+
+        print(f"FATAL: Could not create any log directory. Error: {e}", file=sys.stderr)  # noqa: T201
+        # Exit or raise, as logging is critical and non-functional.
+        raise SystemExit(1) from e
 
 
 def _setup_logging():

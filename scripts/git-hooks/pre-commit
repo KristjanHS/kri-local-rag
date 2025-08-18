@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# .git/hooks/pre-commit - Run auto-formatter and stage any changes.
+# .git/hooks/pre-commit - Run pre-commit framework with advanced options
 set -Eeuo pipefail
 
 # Source the shared config file
@@ -15,20 +15,31 @@ enable_error_trap "$LOG_FILE" "$script_name"
 # Ensure we are in the project root
 cd "$(git rev-parse --show-toplevel)"
 
-log INFO "⏳ Running pre-commit auto-formatter..."
-./scripts/lint.sh 2>&1 | tee -a "$LOG_FILE"
-EXIT_CODE=${PIPESTATUS[0]}
+log INFO "⏳ Running pre-commit framework with advanced checks..."
 
-if [ $EXIT_CODE -ne 0 ]; then
-    log ERROR "❌ An unexpected error occurred during formatting. Commit aborted."
+# Check if pre-commit is installed
+if ! command -v pre-commit >/dev/null 2>&1; then
+    log ERROR "❌ pre-commit framework not found. Install with: pip install pre-commit"
+    log INFO "💡 Alternatively, run: .venv/bin/python -m pip install pre-commit"
     exit 1
 fi
 
-# Stage any files that were modified by the linter.
-# 'git diff --name-only --cached' lists files already staged for commit.
-# 'git add' will re-stage them if they were modified.
-log INFO "✓ Staging any files modified by the linter..."
+# Run pre-commit on all files
+# This will run: ruff (fix + format), yamlfmt, detect-secrets, and custom secrets scan
+pre-commit run --all-files 2>&1 | tee -a "$LOG_FILE"
+EXIT_CODE=${PIPESTATUS[0]}
+
+if [ $EXIT_CODE -ne 0 ]; then
+    log ERROR "❌ Pre-commit checks failed. Please fix the issues and try again."
+    log INFO "💡 You can run individual hooks with: pre-commit run <hook-id>"
+    log INFO "💡 Or run on specific files: pre-commit run --files <file1> <file2>"
+    exit 1
+fi
+
+# Stage any files that were modified by the pre-commit hooks
+log INFO "✓ Staging any files modified by pre-commit hooks..."
 git add -u
 
-log INFO "✅ Pre-commit checks passed."
+log INFO "✅ Pre-commit checks passed successfully."
+log INFO "🎉 All checks completed: Ruff formatting, YAML formatting, and secrets scanning"
 exit 0

@@ -1,6 +1,6 @@
 import pytest
 
-pytestmark = [pytest.mark.e2e, pytest.mark.slow]
+pytestmark = [pytest.mark.slow]
 
 
 def test_run_cli_in_container_help(run_cli_in_container):  # noqa: ANN001
