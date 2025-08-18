@@ -2,7 +2,7 @@
 """Integration tests for startup validation - real service connections."""
 
 import logging
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -15,14 +15,13 @@ logger = logging.getLogger(__name__)
 class TestInitializationLogging:
     """Integration tests for initialization logging with real service connections."""
 
-    @patch("weaviate.connect_to_custom")
-    def test_weaviate_check_logging(self, mock_connect):
+    def test_weaviate_check_logging(self, mock_weaviate_connect):
         """Test that Weaviate check produces appropriate log messages."""
         # Mock successful connection
         mock_client = MagicMock()
         mock_client.is_ready.return_value = True
         mock_client.collections.exists.return_value = True
-        mock_connect.return_value = mock_client
+        mock_weaviate_connect.return_value = mock_client
 
         from backend.qa_loop import ensure_weaviate_ready_and_populated
 
@@ -34,8 +33,7 @@ class TestInitializationLogging:
         mock_client.collections.exists.assert_called_once()
         mock_client.close.assert_called_once()
 
-    @patch("backend.ollama_client.httpx.get")
-    def test_ollama_model_check_logging(self, mock_get):
+    def test_ollama_model_check_logging(self, mock_httpx_get):
         """Test Ollama model availability check logging."""
         from backend.ollama_client import ensure_model_available
 
@@ -43,7 +41,7 @@ class TestInitializationLogging:
         mock_response = MagicMock()
         mock_response.json.return_value = {"models": [{"name": "test-model"}]}
         mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
+        mock_httpx_get.return_value = mock_response
 
         result = ensure_model_available("test-model")
         assert result is True
@@ -53,8 +51,7 @@ class TestInitializationLogging:
 class TestHybridSearchIntegration:
     """Integration tests for hybrid search with real service interactions."""
 
-    @patch("backend.retriever.weaviate.connect_to_custom")
-    def test_retrieval_with_local_vectorization(self, mock_connect, managed_embedding_model):
+    def test_retrieval_with_local_vectorization(self, mock_weaviate_connect, managed_embedding_model):
         """Integration test for retriever ensuring it uses the local embedding model."""
         from backend.retriever import get_top_k
 
@@ -80,7 +77,7 @@ class TestHybridSearchIntegration:
         mock_query.hybrid.return_value = mock_result
         mock_collection.query = mock_query
         mock_client.collections.get.return_value = mock_collection
-        mock_connect.return_value = mock_client
+        mock_weaviate_connect.return_value = mock_client
 
         # Test the integration
         result = get_top_k("test question", k=5)

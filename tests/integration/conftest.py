@@ -36,21 +36,6 @@ def managed_embedding_model(mocker) -> MagicMock:
 
 
 @pytest.fixture
-def managed_qa_functions(mocker):
-    """
-    Fixture to mock key functions in the QA pipeline.
-
-    Provides mocks for 'get_top_k' and 'generate_response',
-    allowing tests to control the behavior of the QA loop.
-    """
-    mocks = {
-        "get_top_k": mocker.patch("backend.qa_loop.get_top_k"),
-        "generate_response": mocker.patch("backend.qa_loop.generate_response"),
-    }
-    yield mocks
-
-
-@pytest.fixture
 def managed_get_top_k(mocker):
     """Fixture to mock only the get_top_k function in the QA pipeline."""
     patcher = mocker.patch("backend.qa_loop.get_top_k")
@@ -61,3 +46,9 @@ def managed_get_top_k(mocker):
 def mock_weaviate_connect(mocker):
     """Fixture to mock weaviate.connect_to_custom."""
     yield mocker.patch("weaviate.connect_to_custom")
+
+
+@pytest.fixture
+def mock_httpx_get(mocker):
+    """Fixture to mock httpx.get for Ollama client tests."""
+    yield mocker.patch("backend.ollama_client.httpx.get")
