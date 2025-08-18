@@ -2,7 +2,6 @@ import logging
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 # Create a logger for this test file
 logger = logging.getLogger(__name__)
@@ -12,7 +11,6 @@ logger = logging.getLogger(__name__)
 from backend import qa_loop
 
 
-@pytest.mark.unit
 @patch.dict(os.environ, {"RERANKER_CROSS_ENCODER_OPTIMIZATIONS": "true"})
 def test_cross_encoder_loads(mocker):
     """

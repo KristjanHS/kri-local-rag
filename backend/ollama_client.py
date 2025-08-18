@@ -42,9 +42,9 @@ def _detect_ollama_model() -> Optional[str]:
         if models:
             # The endpoint returns a list of objects; each has a `name` field.
             return models[0].get("name")
-    except Exception:
+    except Exception as e:
         # Any issue (network, JSON, etc.) – silently ignore and let caller fall back.
-        pass
+        logger.debug("Failed to detect Ollama model, falling back. Error: %s", e)
     return None
 
 

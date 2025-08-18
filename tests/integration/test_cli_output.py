@@ -78,9 +78,9 @@ def test_cli_logging_setup_with_different_flags():
             logging.getLevelName(root_logger.level),
         )
 
-        assert (
-            root_logger.level == expected_logging_level
-        ), f"Expected {expected_level} for flags: log_level={log_level}, verbose={verbose_count}, quiet={quiet_count}"
+        assert root_logger.level == expected_logging_level, (
+            f"Expected {expected_level} for flags: log_level={log_level}, verbose={verbose_count}, quiet={quiet_count}"
+        )
 
 
 def test_cli_logging_setup_with_environment_variable():

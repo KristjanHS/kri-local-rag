@@ -12,6 +12,42 @@ This document outlines the strategy for testing and mocking in this project, foc
 
 The **target approach** for all tests (both unit and integration) is to use `pytest` fixtures to manage mocks. Fixtures provide clean dependency injection into tests, are managed by the test runner, and prevent the state leakage issues that can arise from using decorators like `@patch`.
 
+### Integration Test Mocking
+
+Integration tests verify the interaction between different components of the application. We use fixtures to mock external services or heavy components that are not the focus of the test.
+
+#### `managed_embedding_model`
+
+This fixture patches the embedding model getter in the `retriever` module. This is crucial for integration tests that need to verify the retrieval pipeline without loading the actual, resource-intensive `SentenceTransformer` model.
+
+**Purpose:**
+- Prevents the real embedding model from being loaded during integration tests.
+- Allows tests to simulate the behavior of the embedding model, such as the vectors it returns, while testing the interaction with other components like the Weaviate client.
+
+**Usage in an Integration Test:**
+```python
+def test_retrieval_with_local_vectorization(mock_weaviate_connect, managed_embedding_model):
+    """Integration test for retriever ensuring it uses the local embedding model."""
+    from backend.retriever import get_top_k
+
+    # Setup embedding model mock behavior via the fixture
+    mock_array = MagicMock()
+    mock_array.tolist.return_value = [0.1, 0.2, 0.3]
+    managed_embedding_model.encode.return_value = mock_array
+
+    # Setup Weaviate mock (as this is an integration test, we might mock the client)
+    mock_client = MagicMock()
+    # ... configure mock_client ...
+    mock_weaviate_connect.return_value = mock_client
+
+    # Test the integration
+    result = get_top_k("test question", k=5)
+
+    # Verify the flow
+    managed_embedding_model.encode.assert_called_once_with("test question")
+    # ... other assertions ...
+```
+
 ### Key Mocking Fixtures
 
 Our `conftest.py` files provide several reusable fixtures for common mocking scenarios.
@@ -37,24 +73,6 @@ def test_qa_pipeline_produces_answer(managed_qa_functions):
 
     assert result == "An answer."
     managed_qa_functions["get_top_k"].assert_called_once()
-```
-
-#### `managed_embedding_model` and `managed_ingest_embedding_model`
-
-These fixtures patch the embedding model getters in the `retriever` and `ingest` modules, respectively.
-
-**Purpose:**
-- Prevents the real, heavy `SentenceTransformer` model from being loaded during tests.
-- Allows tests to control the behavior of the model, such as the vectors it returns.
-
-**Usage:**
-```python
-def test_retrieval_with_local_vectorization(mock_connect, managed_embedding_model):
-    """Test retriever with a mocked embedding model."""
-    # The fixture returns a MagicMock instance directly
-    managed_embedding_model.encode.return_value.tolist.return_value = [0.1, 0.2, 0.3]
-
-    # ... rest of the test
 ```
 
 ### General Purpose Mocking

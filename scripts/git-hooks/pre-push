@@ -2,6 +2,8 @@
 # Git pre-push hook (template) for running local CI with act
 # - Skips gracefully if `act` is not installed
 # - Supports skipping security scans locally via SKIP_LOCAL_SEC_SCANS=1
+# - Includes yamlfmt support for YAML formatting validation
+# - Uses log prefixing for better output readability
 
 set -Eeuo pipefail
 
@@ -36,6 +38,7 @@ if [[ "$SKIP_LOCAL_SEC_SCANS" == "1" ]]; then
 fi
 
 # Optional local skip toggles (developer ergonomics)
+# Default to skipping lint for faster pushes (opt-in for thorough checks)
 SKIP_LINT=${SKIP_LINT:-1}
 SKIP_PYRIGHT=${SKIP_PYRIGHT:-0}
 SKIP_TESTS=${SKIP_TESTS:-0}
@@ -131,7 +134,6 @@ else
 fi
 
 log INFO "Pre-push checks complete" | tee -a "$LOG_FILE"
-
 exit 0
 
 

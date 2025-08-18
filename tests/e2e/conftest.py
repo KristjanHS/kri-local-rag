@@ -91,7 +91,20 @@ def ollama_compose_up():  # type: ignore[no-redef]
 
 @pytest.fixture(scope="session")
 def app_compose_up(weaviate_compose_up, ollama_compose_up):  # type: ignore[no-redef]
-    """Ensure compose app is up for e2e tests needing the full stack."""
+    """Ensure compose app is up for e2e tests needing the full stack.
+
+    Raises:
+        pytest.UsageError: If the required Docker image is not found.
+    """
+    # Check if the image exists
+    image_name = "kri-local-rag-app:latest"
+    try:
+        subprocess.run(["docker", "image", "inspect", image_name], check=True, capture_output=True)
+    except subprocess.CalledProcessError:
+        raise pytest.UsageError(
+            f"Docker image {image_name} not found. Please build it first, e.g., with './scripts/build_app.sh'"
+        )
+
     compose_file = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
     subprocess.run(
         ["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "app"],
