@@ -104,7 +104,7 @@ test = [
     "pytest-socket",
     "requests>=2.31,<3",
     "testcontainers[weaviate]",
-    "ruff==0.5.3",
+            "ruff==0.12.9",
     "protobuf>=5.26,<7",
     "rich>=13,<14",
 ]
