@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 import pytest
 import weaviate
 
-pytestmark = [pytest.mark.slow, pytest.mark.e2e]
+pytestmark = [pytest.mark.slow]
 
 
 @contextmanager

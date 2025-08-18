@@ -115,6 +115,7 @@ def get_top_k(
     metadata_filter: Optional[Dict[str, Any]] = None,
     alpha: float = DEFAULT_HYBRID_ALPHA,  # 0 → pure BM25 search, 1 → pure vector search
     embedding_model: Optional[Any] = None,
+    collection_name: Optional[str] = None,
 ) -> List[str]:
     """Return the *content* strings of the **k** chunks most relevant to *question*.
 
@@ -137,7 +138,9 @@ def get_top_k(
         grpc_secure=parsed_url.scheme == "https",
     )
     try:
-        collection = client.collections.get(COLLECTION_NAME)
+        # Use provided collection_name or fall back to default
+        target_collection = collection_name or COLLECTION_NAME
+        collection = client.collections.get(target_collection)
 
         q = collection.query
         q = _apply_metadata_filter(q, metadata_filter)

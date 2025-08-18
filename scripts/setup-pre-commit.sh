@@ -39,6 +39,14 @@ else
     pip install "detect-secrets[gibberish,entropy,wordlist]"
 fi
 
+# Install bandit for Python security scanning
+log INFO "🔒 Installing bandit for Python security scanning..."
+if [[ -x ".venv/bin/pip" ]]; then
+    .venv/bin/pip install "bandit[toml]==1.8.6"
+else
+    pip install "bandit[toml]==1.8.6"
+fi
+
 # Install yamlfmt (requires Go)
 log INFO "📋 Checking yamlfmt installation..."
 if ! command -v yamlfmt >/dev/null 2>&1; then
