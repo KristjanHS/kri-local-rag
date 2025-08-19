@@ -50,6 +50,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
+    wget \
     libmagic1 \
     poppler-utils \
     tesseract-ocr tesseract-ocr-eng \
