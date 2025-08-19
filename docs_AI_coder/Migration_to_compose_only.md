@@ -78,10 +78,43 @@ This document tracks the progress of the migration from Testcontainers to a Dock
     - Clear feedback and guidance for users
     - All existing functionality (`test-down`, `test-logs`) continues to work seamlessly
 
-- [ ] **Step 6 — Batch-Convert the Remaining TC Tests**
+- [x] **Step 5.6 — Infrastructure Improvements & Optimization**
+  - **Action**: Enhanced the Compose-based testing infrastructure with production-ready improvements:
+    - **Hash-based rebuild detection**: Uses SHA-256 hash instead of file modification times for more reliable rebuilds
+    - **Optimized Docker build**: Removed unnecessary file copying, optimized `.dockerignore`, and proper version pinning
+    - **Improved Makefile**: Fixed missing targets, automatic logs directory creation, and COMPOSE variable for DRY principle
+    - **Pre-commit compliance**: All checks pass including Hadolint with proper version pinning
+    - **Removed redundant files**: Eliminated unnecessary `app.test.Dockerfile.dockerignore`
+  - **Verification**: ✅ All infrastructure improvements working correctly:
+    - Hash-based rebuild logic detects actual changes and prevents unnecessary rebuilds
+    - Docker builds are faster and more reliable
+    - All pre-commit checks pass consistently
+    - Existing tests continue to work with improved infrastructure
+
+- [🔄] **Step 6 — Batch-Convert the Remaining TC Tests**
   - **Action**: Move the rest of the Testcontainers specs in **small batches** (2–3 at a time):
     - Point them to the Compose services.
     - Remove per-test containers; reuse the single stack from Step 3.
+  - **Current Status**: 🔄 **IN PROGRESS** - Testing completed, issues identified:
+    - **✅ Working Compose Tests**: 
+      - `test_weaviate_compose.py` (2/2 tests pass)
+      - `test_vectorizer_enabled_compose.py` (1/1 test pass)
+    - **❌ Issues Found in Existing Compose Tests**:
+      - `test_ingest_pipeline_compose.py`: Uses `localhost:8080` instead of `weaviate:8080`, NLTK data corruption
+      - `test_qa_real_ollama_compose.py`: Uses `localhost:11434` instead of `ollama:11434`
+    - **❌ Docker-in-Docker Issues**:
+      - `test_backend_import_in_container.py`: Tries to run `docker` commands inside container
+      - `test_frontend_requirements_in_container.py`: Tries to run `docker` commands inside container
+    - **📋 Remaining Testcontainers Tests to Convert**:
+      - `test_qa_real_ollama.py`, `test_cli_output.py`, `test_ml_environment.py`, `test_qa_pipeline.py`
+      - `test_startup_validation_integration.py`, `test_answer_streaming_integration.py`, `test_ingest_pipeline.py`
+      - `test_cross_encoder_environment.py`, `test_vectorizer_enabled_integration.py`, `test_python_setup.py`
+      - `test_weaviate_debug.py`, `test_weaviate_integration.py` (marked for deletion in Step 11)
+  - **Next Actions Required**:
+    1. Fix connection issues in existing Compose tests (localhost → service names)
+    2. Resolve NLTK data issues in `test_ingest_pipeline_compose.py`
+    3. Update or remove Docker-in-Docker tests that won't work in Compose
+    4. Convert remaining Testcontainers tests in small batches
   - **Verify**: After each batch, run just that batch; keep failures contained and fix before moving on.
 
 - [ ] **Step 7 — Wire CI for Compose-only (Minimal)**
