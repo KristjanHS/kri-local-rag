@@ -85,3 +85,6 @@ third_party/
 # secrets
 secrets/
 secrets.*
+
+# Ignore the temporary run ID file used by the Makefile
+.run_id
