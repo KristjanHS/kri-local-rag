@@ -52,8 +52,3 @@ rich>=13,<14
 # for Windows (but doesn't hurt on Linux)
 # https://github.com/Unstructured-IO/unstructured/issues/2237
 # python-magic-bin==0.4.14
-# Test comment
-# Test comment
-# Test comment for hash verification
-# Test comment for hash verification
-# Another test comment for hash verification
