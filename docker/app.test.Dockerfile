@@ -40,13 +40,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
-    wget=2.40.1-1 \
+    wget=1.21.3-1+deb12u1 \
     libmagic1=1:5.44-3 \
-    poppler-utils=23.11.0-2 \
-    tesseract-ocr=5.3.3-1 \
+    poppler-utils=22.12.0-2+deb12u1 \
+    tesseract-ocr=5.3.0-2 \
     tesseract-ocr-eng=1:4.1.0-2 \
-    libgl1=1.4.0-1 \
-    libglib2.0-0=2.76.4-1 \
+    libgl1=1.6.0-1 \
+    libglib2.0-0=2.74.6-2+deb12u6 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

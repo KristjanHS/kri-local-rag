@@ -54,3 +54,4 @@ rich>=13,<14
 # python-magic-bin==0.4.14
 # Test comment
 # Test comment
+# Test comment for hash verification

@@ -26,6 +26,7 @@ _build/
 dist/
 *.egg-info/
 .ruff_cache
+.test-build*
 
 # Jupyter
 .ipynb_checkpoints/
