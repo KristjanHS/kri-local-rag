@@ -59,7 +59,7 @@ logs/
 temp/
 tmp/
 
-# Development data
+# Development data (mounted as volume in test environment)
 data/
 
 # Documentation
@@ -67,7 +67,7 @@ docs/
 *.md
 !README.md
 
-# Tests
+# Tests (mounted as volume in test environment)
 tests/
 test_*
 *_test.py
