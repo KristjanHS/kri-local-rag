@@ -26,6 +26,7 @@ _build/
 dist/
 *.egg-info/
 .ruff_cache
+.test-build*
 
 # Jupyter
 .ipynb_checkpoints/
@@ -85,3 +86,6 @@ third_party/
 # secrets
 secrets/
 secrets.*
+
+# Ignore the temporary run ID file used by the Makefile
+.run_id
