@@ -136,6 +136,22 @@ Additional markers for specific behaviors:
 .venv/bin/python -m pytest -q tests/unit tests/integration
 ```
 
+- **Integration tests with real services** (Compose-based):
+  - Uses Docker Compose for Weaviate/Ollama services
+  - Optimized build detection (only rebuilds when dependencies change)
+  - Live code mounting for instant updates
+
+```bash
+# Start test environment
+make test-up
+
+# Run tests in container (use /opt/venv/bin/python, not .venv/bin/python)
+docker compose -f docker/docker-compose.yml -f docker/compose.test.yml -p "$(cat .run_id)" exec -T app /opt/venv/bin/python -m pytest tests/integration/
+
+# Stop environment
+make test-down
+```
+
 - **UI test suite** (Playwright/Streamlit, no coverage):
   - Runs only the UI and Playwright browser tests.
   - Must be run with `--no-cov`.

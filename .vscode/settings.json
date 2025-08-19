@@ -44,5 +44,25 @@
     "geminicodeassist.inlineSuggestions.enableAuto": false,
     "geminicodeassist.chat.defaultDiffLayout": "Side by side diff",
     "geminicodeassist.chat.defaultCodeBlockDisplay": "Expanded",
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+    "cursorpyright.analysis.typeCheckingMode": "standard",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportMissingModuleSource": "none",
+    },
+    "cursorpyright.analysis.diagnosticSeverityOverrides": {
+        "reportMissingModuleSource": "none"
+    },
+    "cursorpyright.analysis.extraPaths": [
+        "backend"
+    ],
+    "cursorpyright.analysis.include": [
+        "backend",
+        "tests"
+    ],
+    "cursorpyright.analysis.exclude": [
+        "**/.venv/**",
+        "**/__pycache__/**",
+        "**/build/**",
+        "**/dist/**"
+    ]
 }

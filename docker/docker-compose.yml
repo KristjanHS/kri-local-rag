@@ -16,10 +16,10 @@ services:
       CLUSTER_HOSTNAME: 'node1'
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
 
   # ---------- Local LLM server for generating RAG answers ---------------------------------------------------
   ollama:
@@ -62,6 +62,17 @@ services:
     working_dir: /app
     # Auto-start Streamlit when container starts
     command: ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8501/_stcore/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      weaviate:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
     env_file:
       - .env.docker
     environment:
@@ -74,8 +85,10 @@ services:
     profiles: ["ingest"]
     image: kri-local-rag-app # reuse the APP image
     depends_on:
-      - weaviate
-      - ollama
+      weaviate:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
     volumes:
       - ../backend:/app/backend # Live backend code
       - ../data:/app/data # Live data access
