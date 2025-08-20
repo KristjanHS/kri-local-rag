@@ -28,9 +28,6 @@ FROM python:3.12.3-slim
 
 ENV VENV_PATH=/opt/venv
 ENV PATH="${VENV_PATH}/bin:${PATH}"
-ENV NLTK_DATA=/opt/venv/nltk_data
-ENV SENTENCE_TRANSFORMERS_HOME=/app/model_cache
-ENV CROSS_ENCODER_CACHE_DIR=/app/model_cache
 
 WORKDIR /app
 
@@ -55,13 +52,10 @@ COPY --from=builder-test ${VENV_PATH} ${VENV_PATH}
 
 # Copy static assets (these will be overridden by volume mounts in development)
 COPY example_data/ /app/example_data/
-COPY model_cache/ /app/model_cache/
 
-# Create directories, download NLTK data, and set up user
+# Create directories and set up user
 RUN mkdir -p backend frontend tests data logs \
-    && mkdir -p "${NLTK_DATA}" \
-    && ${VENV_PATH}/bin/python -c "import nltk; nltk.download(['punkt', 'punkt_tab'], download_dir='${NLTK_DATA}')" || \
-    echo "NLTK download failed, but continuing build." >&2 \
     && useradd -ms /bin/bash appuser \
-    && chown -R appuser:appuser /app /app/example_data /app/model_cache /opt/venv/nltk_data
+    && mkdir -p /root/.ollama \
+    && chown -R appuser:appuser /app /app/example_data /root/.ollama
 USER appuser

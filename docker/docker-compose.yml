@@ -32,7 +32,7 @@ services:
               count: all
               capabilities: [gpu]
     volumes:
-      - ollama_models:/root/.ollama
+      - ../model_cache:/root/.ollama
     ports:
       - "127.0.0.1:11434:11434"
     healthcheck:
@@ -58,7 +58,6 @@ services:
       - ../example_data:/app/example_data:ro # Ensure example_data matches project layout
       - ../logs:/app/logs # Live log access
       - ../tests:/app/tests # Mount tests for in-container testing
-      - hf_cache:/root/.cache/huggingface
     working_dir: /app
     # Auto-start Streamlit when container starts
     command: ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
@@ -94,12 +93,9 @@ services:
       - ../data:/app/data # Live data access
       - ../logs:/app/logs # Live log access
       - ../tests:/app/tests # Mount tests for in-container testing
-      - hf_cache:/root/.cache/huggingface
     env_file:
       - .env.docker
     command: ["python", "backend/ingest.py", "/app/data"]
 
 volumes:
   weaviate_db:
-  ollama_models:
-  hf_cache:

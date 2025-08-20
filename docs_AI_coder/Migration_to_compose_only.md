@@ -124,6 +124,50 @@ This document tracks the progress of the migration from Testcontainers to a Dock
       - All tests pass without Testcontainers dependencies
   - **Verification**: ✅ All integration tests pass successfully in Compose environment
 
+- [x] **Step 6.5 — Fix Model Cache Logic (Critical)**
+  - **Problem**: Environment variables pointed to `/app/model_cache` but volume was mounted at `/root/.cache/huggingface`, causing models to be re-downloaded each time
+  - **Root Cause**: Mismatch between `SENTENCE_TRANSFORMERS_HOME=/app/model_cache` and volume mount path `/root/.cache/huggingface`
+  - **Solution Applied**:
+    1. **Simplified model cache approach**: 
+       - **Ollama models**: Mounted to local `model_cache` directory via bind mount (`../model_cache:/root/.ollama`)
+       - **Hugging Face models**: Use default container cache location (no volume mount needed for small models)
+    2. **Removed environment variables** from both `app.Dockerfile` and `app.test.Dockerfile`:
+       - Removed `SENTENCE_TRANSFORMERS_HOME=/root/.cache/huggingface`
+       - Removed `CROSS_ENCODER_CACHE_DIR=/root/.cache/huggingface`
+    3. **Removed redundant model_cache copying** from Dockerfiles (models now persist appropriately)
+    4. **Fixed container permissions** for Ollama cache directory
+    5. **Simplified NLTK handling**: Removed custom NLTK data directory and pre-downloading, using default NLTK behavior
+       - **Previous approach**: Custom `NLTK_DATA=/opt/venv/nltk_data` environment variable with pre-downloaded `punkt` and `punkt_tab` data
+       - **New approach**: Let NLTK use default cache locations (`~/.local/share/nltk_data`, `/usr/share/nltk_data`, etc.)
+       - **Rationale**: NLTK data is small (~1MB) and downloads quickly on first use, simplifying build process
+       - **Files modified**: `docker/app.Dockerfile`, `docker/app.test.Dockerfile` (removed NLTK_DATA env var and pre-download steps)
+       - **Fallback options**: If this fails, can revert to custom directory or use alternative markdown parsers
+  - **Benefits**:
+    - **Simplified setup**: Only Ollama models (large) are persisted to local directory
+    - **Fast startup**: Hugging Face models (small) download quickly on first use
+    - **Persistent Ollama cache**: Large Ollama models persist across container restarts
+    - **Bandwidth efficient**: Ollama models cached locally in project directory
+    - **Clean separation**: Large models (Ollama) vs small models (Hugging Face) handled appropriately
+    - **Simplified NLTK**: No custom data directories or build-time downloads, uses default behavior
+    - **Reduced build complexity**: Removed flaky NLTK download step that could fail during Docker build
+  - **Migration**: Use existing `model_cache/` directory for Ollama models (one-time setup)
+  - **Verification**: ✅ Simplified cache approach implemented, only Ollama models use local directory, NLTK uses defaults
+  - **Priority**: **COMPLETED** - Critical infrastructure fix for test performance and model management
+
+  **NLTK Usage Context:**
+  - **Used by**: `UnstructuredMarkdownLoader` for parsing markdown files in the ingestion pipeline
+  - **Current data**: No markdown files in `data/` directory (only PDFs), but tests use markdown files
+  - **Data required**: `punkt` and `punkt_tab` tokenizers (~1MB total)
+  - **Default locations**: `~/.local/share/nltk_data`, `/usr/share/nltk_data`, `/usr/local/share/nltk_data`
+  - **Potential issues**: 
+    - Network connectivity during first markdown file processing
+    - Permission issues in container default locations
+    - Build-time vs runtime dependency management
+  - **Alternative solutions if simplified approach fails**:
+    1. **Revert to custom directory**: Restore `NLTK_DATA=/opt/venv/nltk_data` with pre-downloading
+    2. **Use alternative parser**: Replace `UnstructuredMarkdownLoader` with simpler markdown parser
+    3. **Remove markdown support**: Since no markdown files in actual data, could remove feature entirely
+
 - [ ] **Step 7 — Wire CI for Compose-only (Minimal)**
   - **Action**:
     - Keep **unit tests** on every PR.

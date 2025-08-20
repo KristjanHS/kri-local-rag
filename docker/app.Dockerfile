@@ -35,9 +35,6 @@ FROM python:3.12.3-slim
 
 ENV VENV_PATH=/opt/venv
 ENV PATH="${VENV_PATH}/bin:${PATH}"
-ENV NLTK_DATA=/opt/venv/nltk_data
-ENV SENTENCE_TRANSFORMERS_HOME=/app/model_cache
-ENV CROSS_ENCODER_CACHE_DIR=/app/model_cache
 
 WORKDIR /app
 
@@ -64,14 +61,6 @@ COPY --from=builder ${VENV_PATH} ${VENV_PATH}
 # Copy application assets that are not part of the Python package
 COPY frontend/ /app/frontend/
 COPY example_data/ /app/example_data/
-COPY model_cache/ /app/model_cache/
-
-# Pre-download required NLTK data for Unstructured markdown parsing.
-# The NLTK downloader can be flaky; wrap in a check to avoid failing the build
-# if the download server is temporarily unavailable.
-RUN mkdir -p "${NLTK_DATA}" && \
-    ${VENV_PATH}/bin/python -c "import nltk; nltk.download(['punkt', 'punkt_tab'], download_dir='${NLTK_DATA}')" || \
-    echo "NLTK download failed, but continuing build. The entrypoint will retry." >&2
 
 # Runtime tuning (safe defaults for CPU-only deployments)
 ENV OMP_NUM_THREADS=6
@@ -82,7 +71,9 @@ EXPOSE 8501
 
 # Non-root user and permissions
 RUN useradd -ms /bin/bash appuser \
-    && chown -R appuser:appuser /app /app/example_data /app/model_cache /opt/venv/nltk_data
+    && chown -R appuser:appuser /app /app/example_data \
+    && mkdir -p /root/.ollama \
+    && chown -R appuser:appuser /root/.ollama
 USER appuser
 
 CMD ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
