@@ -92,3 +92,50 @@ def test_general_mocking(mocker):
 ### State Management and Caching
 
 Some modules, like `qa_loop`, use a global cache for heavy objects (e.g., `_cross_encoder`). To prevent state from leaking between tests, an `autouse` fixture automatically resets this cache before each test run, ensuring a clean state.
+
+## Compose-Only Testing Approach
+
+For integration tests requiring real services (Weaviate, Ollama), we use Docker Compose to provide a consistent, isolated test environment without Testcontainers.
+
+### Quick Start
+
+```bash
+# Start test environment (smart rebuild detection)
+make test-up
+
+# Run tests in container
+docker compose -f docker/docker-compose.yml -f docker/compose.test.yml -p "$(cat .run_id)" exec -T app /opt/venv/bin/python -m pytest tests/integration/
+
+# Stop environment
+make test-down
+```
+
+**Important**: Use `/opt/venv/bin/python` (not `.venv/bin/python`) in the container.
+
+### Key Features
+
+- **Smart rebuilds**: Only rebuilds when dependencies change (`requirements.txt`, `pyproject.toml`, Dockerfiles)
+- **Live code mounting**: Application and test code mounted as volumes for instant updates
+- **Service isolation**: Unique project names prevent conflicts between test runs
+- **Internal networking**: Services available at `http://weaviate:8080` and `http://ollama:11434`
+
+### Writing Tests
+
+Tests should check for the container environment:
+
+```python
+from pathlib import Path
+import pytest
+
+def test_with_real_services():
+    if not Path("/.dockerenv").exists():
+        pytest.skip("This test requires the Compose test environment. Run with 'make test-up' first.")
+    # Test implementation...
+```
+
+### Debugging
+
+```bash
+make test-logs  # View service logs
+make test-clean # Clean build cache
+```

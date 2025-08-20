@@ -1,5 +1,6 @@
-"""Test the full document ingestion pipeline."""
+"""Test the full document ingestion pipeline using Compose services."""
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -73,14 +74,18 @@ def weaviate_collection_mock(mock_weaviate_connect):
     yield mock_client
 
 
-def test_ingest_pipeline_with_real_weaviate(docker_services, weaviate_client):
+def test_ingest_pipeline_with_real_weaviate_compose(weaviate_client):
     """Test the full ingestion pipeline with a real Weaviate instance, using a local model."""
-    # Run the ingestion process on the 'test_data' directory
+    # Check if we're in the test environment
+    if not Path("/.dockerenv").exists():
+        pytest.skip("This test requires the Compose test environment. Run with 'make test-up' first.")
+
+    # Run the ingestion process on the 'example_data' directory
     from backend.retriever import _get_embedding_model
 
     embedding_model = _get_embedding_model()
     ingest.ingest(
-        directory="test_data/",
+        directory="example_data/",
         collection_name=COLLECTION_NAME,
         weaviate_client=weaviate_client,
         embedding_model=embedding_model,
@@ -93,8 +98,12 @@ def test_ingest_pipeline_with_real_weaviate(docker_services, weaviate_client):
     assert count.total_count >= 2  # test.md and test.pdf
 
 
-def test_ingest_pipeline_loads_and_embeds_data(docker_services, weaviate_collection_mock, sample_documents_path):
+def test_ingest_pipeline_loads_and_embeds_data_compose(weaviate_collection_mock, sample_documents_path):
     """Test the full ingestion pipeline from loading docs to inserting into Weaviate with a local model."""
+    # Check if we're in the test environment
+    if not Path("/.dockerenv").exists():
+        pytest.skip("This test requires the Compose test environment. Run with 'make test-up' first.")
+
     # Provide a real embedding model for this integration test
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
 
@@ -128,8 +137,12 @@ def test_ingest_pipeline_loads_and_embeds_data(docker_services, weaviate_collect
     assert len(first_call_kwargs["vector"]) == 384
 
 
-def test_ingest_pipeline_handles_no_embedding_model(weaviate_collection_mock, sample_documents_path):
+def test_ingest_pipeline_handles_no_embedding_model_compose(weaviate_collection_mock, sample_documents_path):
     """Test that the ingestion pipeline exits gracefully if no local embedding model is available."""
+    # Check if we're in the test environment
+    if not Path("/.dockerenv").exists():
+        pytest.skip("This test requires the Compose test environment. Run with 'make test-up' first.")
+
     with pytest.raises(AttributeError):
         ingest.ingest(
             directory=sample_documents_path,
@@ -139,8 +152,12 @@ def test_ingest_pipeline_handles_no_embedding_model(weaviate_collection_mock, sa
         )
 
 
-def test_ingest_pipeline_is_idempotent(docker_services, weaviate_collection_mock, sample_documents_path):
+def test_ingest_pipeline_is_idempotent_compose(weaviate_collection_mock, sample_documents_path):
     """Test that running ingestion multiple times doesn't create duplicate data, using a local model."""
+    # Check if we're in the test environment
+    if not Path("/.dockerenv").exists():
+        pytest.skip("This test requires the Compose test environment. Run with 'make test-up' first.")
+
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
 
     # Run ingestion once
@@ -164,7 +181,3 @@ def test_ingest_pipeline_is_idempotent(docker_services, weaviate_collection_mock
     )
     assert weaviate_collection_mock.collections.create.call_count == 1
     assert mock_batch.add_object.call_count == 6  # 3 docs * 2 runs
-
-
-if __name__ == "__main__":
-    pytest.main(["-s", __file__])

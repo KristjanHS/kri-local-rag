@@ -1,17 +1,13 @@
-"""Configuration for the integration test suite."""
+"""Configuration for the integration test suite.
+
+This module provides fixtures for integration tests that run in the Compose-based
+test environment. Tests should be run using 'make test-up' to ensure the Docker
+services are available.
+"""
 
 from unittest.mock import MagicMock
 
 import pytest
-
-
-# This fixture automatically applies the 'docker_services' fixture from the root
-# conftest.py to every test in the integration suite. This ensures that the
-# Docker environment is up and running before any integration tests are executed.
-@pytest.fixture(autouse=True)
-def use_docker_services(docker_services):
-    """Ensure Docker services are running for all integration tests."""
-    pass
 
 
 @pytest.fixture
