@@ -43,7 +43,7 @@ _test-up-with-id:
 
 build-if-needed:
 	@mkdir -p $(LOG_DIR)
-	@NEW_HASH=$$(sha256sum $(BUILD_DEPS) 2>/dev/null | sha256sum | awk '{print $$1}'); \
+	@NEW_HASH=$$(sha256sum $(BUILD_DEPS) | sha256sum | awk '{print $$1}'); \
 	OLD_HASH=$$(cat $(BUILD_HASH_FILE) 2>/dev/null || echo ''); \
 	if [ "$$NEW_HASH" != "$$OLD_HASH" ]; then \
 		echo "Build deps changed; rebuilding images..."; \

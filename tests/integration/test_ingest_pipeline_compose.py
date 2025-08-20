@@ -80,12 +80,12 @@ def test_ingest_pipeline_with_real_weaviate_compose(weaviate_client):
     if not Path("/.dockerenv").exists():
         pytest.skip("This test requires the Compose test environment. Run with 'make test-up' first.")
 
-    # Run the ingestion process on the 'test_data' directory
+    # Run the ingestion process on the 'example_data' directory
     from backend.retriever import _get_embedding_model
 
     embedding_model = _get_embedding_model()
     ingest.ingest(
-        directory="test_data/",
+        directory="example_data/",
         collection_name=COLLECTION_NAME,
         weaviate_client=weaviate_client,
         embedding_model=embedding_model,

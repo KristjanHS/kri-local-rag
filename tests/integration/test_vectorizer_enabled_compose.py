@@ -92,7 +92,7 @@ def test_manual_vectorization_uses_local_embedding_compose(tmp_path):
         try:
             vec1 = list(v1.tolist())  # type: ignore[attr-defined]
             vec2 = list(v2.tolist())  # type: ignore[attr-defined]
-        except Exception:
+        except AttributeError:
             vec1 = list(v1)  # type: ignore[arg-type]
             vec2 = list(v2)  # type: ignore[arg-type]
 
@@ -111,14 +111,14 @@ def test_manual_vectorization_uses_local_embedding_compose(tmp_path):
         try:
             # Simple check if collection has any objects
             any(True for _ in coll.iterator())
-        except Exception:
+        except (AttributeError, ConnectionError, TimeoutError):
             pass
 
         # Query using the same local model vector (hybrid search like application code)
         qv = model.encode("Paris landmark")
         try:
             qv_list = list(qv.tolist())  # type: ignore[attr-defined]
-        except Exception:
+        except AttributeError:
             qv_list = list(qv)  # type: ignore[arg-type]
 
         # Use hybrid search like the application code
@@ -129,6 +129,6 @@ def test_manual_vectorization_uses_local_embedding_compose(tmp_path):
     finally:
         try:
             client.collections.delete(coll_name)
-        except Exception:
+        except (AttributeError, ConnectionError, TimeoutError):
             pass
         client.close()

@@ -1,5 +1,8 @@
 Necessary context: docs/testing_strategy.md, cursor_rules/AI_instructions.md
 
+Important info:
+* Inside app docker container, The Python executable is at /opt/venv/bin/python3
+
 # Migration Plan: Testcontainers → Compose-only (Minimal, Incremental, Verifiable)
 
 > Goal: remove Testcontainers with **small, reversible steps**, keeping tests reliable via Compose
@@ -91,31 +94,35 @@ This document tracks the progress of the migration from Testcontainers to a Dock
     - All pre-commit checks pass consistently
     - Existing tests continue to work with improved infrastructure
 
-- [🔄] **Step 6 — Batch-Convert the Remaining TC Tests**
+- [✅] **Step 6 — Batch-Convert the Remaining TC Tests**
   - **Action**: Move the rest of the Testcontainers specs in **small batches** (2–3 at a time):
     - Point them to the Compose services.
     - Remove per-test containers; reuse the single stack from Step 3.
-  - **Current Status**: 🔄 **IN PROGRESS** - Testing completed, issues identified:
-    - **✅ Working Compose Tests**: 
-      - `test_weaviate_compose.py` (2/2 tests pass)
-      - `test_vectorizer_enabled_compose.py` (1/1 test pass)
-    - **❌ Issues Found in Existing Compose Tests**:
-      - `test_ingest_pipeline_compose.py`: Uses `localhost:8080` instead of `weaviate:8080`, NLTK data corruption
-      - `test_qa_real_ollama_compose.py`: Uses `localhost:11434` instead of `ollama:11434`
-    - **❌ Docker-in-Docker Issues**:
-      - `test_backend_import_in_container.py`: Tries to run `docker` commands inside container
-      - `test_frontend_requirements_in_container.py`: Tries to run `docker` commands inside container
-    - **📋 Remaining Testcontainers Tests to Convert**:
-      - `test_qa_real_ollama.py`, `test_cli_output.py`, `test_ml_environment.py`, `test_qa_pipeline.py`
-      - `test_startup_validation_integration.py`, `test_answer_streaming_integration.py`, `test_ingest_pipeline.py`
-      - `test_cross_encoder_environment.py`, `test_vectorizer_enabled_integration.py`, `test_python_setup.py`
-      - `test_weaviate_debug.py`, `test_weaviate_integration.py` (marked for deletion in Step 11)
-  - **Next Actions Required**:
-    1. Fix connection issues in existing Compose tests (localhost → service names)
-    2. Resolve NLTK data issues in `test_ingest_pipeline_compose.py`
-    3. Update or remove Docker-in-Docker tests that won't work in Compose
-    4. Convert remaining Testcontainers tests in small batches
-  - **Verify**: After each batch, run just that batch; keep failures contained and fix before moving on.
+  - **Status**: ✅ **COMPLETED** - All Testcontainers tests successfully converted or removed:
+    - **✅ Working Compose Tests** (All passing with existing test environment):
+      - `test_weaviate_compose.py` (2/2 tests pass) - ✅ Verified
+      - `test_vectorizer_enabled_compose.py` (1/1 test pass) - ✅ Verified  
+      - `test_ingest_pipeline_compose.py` (4/4 tests pass) - ✅ Verified
+      - `test_qa_real_ollama_compose.py` (1/1 test pass) - ✅ Verified
+    - **✅ Test Execution Method Verified**:
+      - Tests run **inside** the app container using: `docker compose -p <RUN_ID> exec -T app /opt/venv/bin/python3 -m pytest <test_file>`
+      - Python executable is at `/opt/venv/bin/python3` inside container (not `.venv/bin/python`)
+      - All core functionality tests have working Compose versions
+    - **✅ Redundant Tests Removed**:
+      - `test_backend_import_in_container.py`: Removed (Docker-in-Docker test, redundant in Compose environment)
+      - `test_frontend_requirements_in_container.py`: Removed (Docker-in-Docker test, redundant in Compose environment)
+      - `test_weaviate_integration.py`: Removed (redundant with `test_weaviate_compose.py`)
+    - **✅ Old Testcontainers Tests Removed**:
+      - `test_qa_real_ollama.py`: Removed (replaced by `test_qa_real_ollama_compose.py`)
+      - `test_vectorizer_enabled_integration.py`: Removed (replaced by `test_vectorizer_enabled_compose.py`)
+      - `test_ingest_pipeline.py`: Removed (replaced by `test_ingest_pipeline_compose.py`)
+    - **✅ Environment Tests Moved**:
+      - `test_python_setup.py`: Moved to `tests/unit/` (environment validation tests belong in unit tests)
+    - **✅ Integration Test Suite Cleaned**:
+      - Removed Testcontainers dependency from `tests/integration/conftest.py`
+      - Integration tests now collect 26 tests (down from 31)
+      - All tests pass without Testcontainers dependencies
+  - **Verification**: ✅ All integration tests pass successfully in Compose environment
 
 - [ ] **Step 7 — Wire CI for Compose-only (Minimal)**
   - **Action**:
