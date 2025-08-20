@@ -46,9 +46,6 @@
     "geminicodeassist.chat.defaultCodeBlockDisplay": "Expanded",
     "python-envs.pythonProjects": [],
     "cursorpyright.analysis.typeCheckingMode": "standard",
-    "python.analysis.diagnosticSeverityOverrides": {
-        "reportMissingModuleSource": "none",
-    },
     "cursorpyright.analysis.diagnosticSeverityOverrides": {
         "reportMissingModuleSource": "none"
     },

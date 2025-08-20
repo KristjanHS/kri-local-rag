@@ -1,17 +1,24 @@
 """Integration test that hits the real Ollama model while bypassing Weaviate.
 
 This test exercises the QA path end-to-end with the actual LLM by patching only
-the retrieval step.
+the retrieval step. Uses the Compose-based test environment.
 """
+
+from pathlib import Path
+
+import pytest
 
 from backend.config import OLLAMA_MODEL
 from backend.ollama_client import ensure_model_available
 from backend.qa_loop import answer
 
-# pytestmark = [pytest.mark.slow, pytest.mark.external]
 
+def test_answer_uses_real_ollama_compose(managed_get_top_k):
+    """Test QA with real Ollama using Compose services."""
+    # Check if we're in the test environment
+    if not Path("/.dockerenv").exists():
+        pytest.skip("This test requires the Compose test environment. Run with 'make test-up' first.")
 
-def test_answer_uses_real_ollama(managed_get_top_k, docker_services):
     # Configure the mock provided by the fixture
     managed_get_top_k.return_value = ["Paris is the capital of France."]
 
