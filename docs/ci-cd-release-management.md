@@ -49,7 +49,7 @@ curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
 ```
 
 ### Project Configuration
-The `.actrc` file uses optimized Docker images.
+The `.actrc` file uses optimized Docker images and automatically removes containers and volumes after each run to prevent accumulation.
 
 ### Usage
 ```bash

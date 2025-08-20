@@ -96,7 +96,7 @@ if [[ "$SKIP_TESTS" == "1" ]]; then
 else
     if [[ "$ACT_AVAILABLE" == "1" ]]; then
       log INFO "Running fast_tests via act (pull_request) …" | tee -a "$LOG_FILE"
-      act pull_request -j fast_tests --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
+      act pull_request -j fast_tests --pull=false --rm --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
     else
       # Native fast path for quick feedback when act isn't available
       if [[ -x ".venv/bin/python" ]]; then
@@ -112,7 +112,7 @@ fi
 if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
   if [[ "$ACT_AVAILABLE" == "1" ]]; then
     log INFO "Running Semgrep (local workflow) via act …" | tee -a "$LOG_FILE"
-    act workflow_dispatch -W .github/workflows/semgrep_local.yml --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
+    act workflow_dispatch -W .github/workflows/semgrep_local.yml --pull=false --rm --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
   else
     log INFO "Running Semgrep (local) via pipx …" | tee -a "$LOG_FILE"
     bash "$SCRIPT_DIR/semgrep_local.sh" 2>&1 | tee -a "$LOG_FILE" || true
@@ -125,7 +125,7 @@ fi
 if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
   if [[ "$ACT_AVAILABLE" == "1" ]]; then
     log INFO "Running CodeQL (informational) via act …" | tee -a "$LOG_FILE"
-    act workflow_dispatch -W .github/workflows/codeql_local.yml --pull=false --reuse --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
+    act workflow_dispatch -W .github/workflows/codeql_local.yml --pull=false --rm --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
   else
     log INFO "Skipping CodeQL (act not available)." | tee -a "$LOG_FILE"
   fi
