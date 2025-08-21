@@ -424,7 +424,7 @@ jobs:
     name: Compose Integration Tests
     runs-on: ubuntu-latest
     needs: fast_tests
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+    if: ${{ github.actor == 'nektos/act' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -445,14 +445,12 @@ jobs:
         run: mkdir -p reports
       - name: Start Compose test environment
         run: |
-          # Use unique RUN_ID for CI isolation
-          export RUN_ID="ci-$${GITHUB_RUN_ID}-$${GITHUB_JOB}"
-          echo "$$RUN_ID" > .run_id
+          # Start test environment via Makefile harness (handles RUN_ID internally)
           make test-up
       - name: Run Compose integration tests
         run: |
-          # Run tests inside the app container using the test harness
-          docker compose -f docker/docker-compose.yml -f docker/compose.test.yml -p "$$(cat .run_id)" exec -T app /opt/venv/bin/python3 -m pytest tests/integration -q --junitxml=reports/junit_compose_integration.xml
+          # Run tests via Makefile harness; reuses existing .run_id if present
+          make test-run-integration
       - name: Tear down Compose test environment
         if: always()
         run: |

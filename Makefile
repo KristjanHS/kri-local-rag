@@ -1,5 +1,6 @@
 .PHONY: setup-hooks test-up test-down test-logs test-up-force-build test-clean \
-        _test-up-with-id _test-down-with-id _test-logs-with-id build-if-needed
+        _test-up-with-id _test-down-with-id _test-logs-with-id build-if-needed \
+        test-run-integration
 
 # Stable project/session handling
 RUN_ID_FILE := .run_id
@@ -90,6 +91,16 @@ test-logs:
 _test-logs-with-id:
 	@echo "Fetching logs for test environment with RUN_ID=$(RUN_ID) ..."
 	@$(COMPOSE) -p "$(RUN_ID)" logs -n 200 app weaviate ollama
+
+# Run integration tests inside the app container using existing .run_id
+test-run-integration:
+	@if [ -f $(RUN_ID_FILE) ]; then \
+		RUN_ID=$$(cat $(RUN_ID_FILE)); \
+		$(COMPOSE) -p "$$RUN_ID" exec -T app /opt/venv/bin/python3 -m pytest tests/integration -q --junitxml=reports/junit_compose_integration.xml; \
+	else \
+		echo "No active test environment found. Run 'make test-up' first."; \
+		exit 1; \
+	fi
 
 test-clean:
 	@echo "Cleaning up test environment and build cache..."
