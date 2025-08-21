@@ -205,7 +205,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
   - Modern NLTK + Unstructured library requires both tokenization AND POS tagging data
   - Container environments are not ideal for runtime downloads
 
-- [x] **Step 7 — Wire CI for Compose-only (Minimal)**
+- [ ] **Step 7 — Wire CI for Compose-only (Minimal)**
   - **Action**:
     - Keep **unit tests** on every PR.
     - Add a **manual/scheduled** job that runs the Compose test lane with unique `-p` names, `up --wait`, and `down -v`, dumping tailed logs on failure.
