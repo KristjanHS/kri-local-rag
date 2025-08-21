@@ -16,12 +16,12 @@ Key ports and exposure:
 Set variables in `.env` (example values shown):
 ```
 LOG_LEVEL=INFO
-OLLAMA_MODEL=cas/mistral-7b-instruct-v0.3
+OLLAMA_MODEL=cas/mistral-7b-instruct-v0.3  # Default defined in backend/config.py
 OLLAMA_CONTEXT_TOKENS=8192
 RETRIEVER_EMBEDDING_TORCH_COMPILE=false
 RERANKER_CROSS_ENCODER_OPTIMIZATIONS=false
-OLLAMA_URL=http://ollama:11434
-WEAVIATE_URL=http://weaviate:8080
+OLLAMA_URL=http://localhost:11434
+WEAVIATE_URL=http://localhost:8080
 ```
 
 ### Start core services (recommended)

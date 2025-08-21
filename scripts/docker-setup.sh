@@ -90,22 +90,21 @@ echo -e "${GREEN}✓ All services are up and healthy.${NC}"
 
 # --- Step 2b: Pre-pull default Ollama model to reduce first-answer latency ---
 ensure_ollama_model() {
-  local model_to_pull
-  model_to_pull="${OLLAMA_MODEL:-cas/mistral-7b-instruct-v0.3}"
-  log INFO "Checking if Ollama model is present: ${model_to_pull}" | tee -a "$LOG_FILE"
-  # If already present, exit quickly
-  if docker compose -f "$DOCKER_COMPOSE_FILE" exec -T "$OLLAMA_SERVICE" ollama list | grep -q "$model_to_pull"; then
-    log INFO "Model '${model_to_pull}' already available." | tee -a "$LOG_FILE"
-    return 0
-  fi
-  log INFO "Pulling Ollama model '${model_to_pull}' (this may take a long time on first run)…" | tee -a "$LOG_FILE"
-  # Try to pull; do not fail the setup if the pull is unavailable or fails.
-  if docker compose -f "$DOCKER_COMPOSE_FILE" exec -T "$OLLAMA_SERVICE" ollama pull "$model_to_pull"; then
-    log INFO "Model '${model_to_pull}' pulled successfully." | tee -a "$LOG_FILE"
-  else
-    log WARN "Failed to pre-pull Ollama model '${model_to_pull}'. The app will attempt to download it on first use." | tee -a "$LOG_FILE"
-  fi
-  return 0
+    # OLLAMA_MODEL defaults to "cas/mistral-7b-instruct-v0.3" in backend/config.py
+    model_to_pull="${OLLAMA_MODEL:-cas/mistral-7b-instruct-v0.3}"
+    log INFO "Checking if Ollama model is present: ${model_to_pull}" | tee -a "$LOG_FILE"
+    
+    if docker compose -f "$DOCKER_COMPOSE_FILE" exec -T "$OLLAMA_SERVICE" ollama list | grep -q "$model_to_pull"; then
+        log INFO "Ollama model '${model_to_pull}' already present; skipping pull." | tee -a "$LOG_FILE"
+    else
+        log INFO "Pulling Ollama model '${model_to_pull}' (this may take a long time on first run)…" | tee -a "$LOG_FILE"
+        
+        if docker compose -f "$DOCKER_COMPOSE_FILE" exec -T "$OLLAMA_SERVICE" ollama pull "$model_to_pull"; then
+            log INFO "Successfully pulled Ollama model '${model_to_pull}'." | tee -a "$LOG_FILE"
+        else
+            log WARN "Failed to pre-pull Ollama model '${model_to_pull}'. The app will attempt to download it on first use." | tee -a "$LOG_FILE"
+        fi
+    fi
 }
 
 echo "" 

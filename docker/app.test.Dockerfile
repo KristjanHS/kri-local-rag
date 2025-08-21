@@ -23,11 +23,21 @@ RUN python -m venv ${VENV_PATH} \
     && ${VENV_PATH}/bin/pip install -r requirements-dev.txt \
     && ${VENV_PATH}/bin/pip install -e .
 
+# Download required NLTK data for UnstructuredMarkdownLoader
+# punkt_tab is required by modern NLTK versions (3.8.2+) for sentence tokenization
+# averaged_perceptron_tagger_eng is required for POS tagging in text classification
+# Pre-downloading during build ensures reliability in production containers
+ENV NLTK_DATA=${VENV_PATH}/nltk_data
+RUN mkdir -p ${NLTK_DATA} \
+    && ${VENV_PATH}/bin/python -m nltk.downloader -d ${NLTK_DATA} punkt_tab averaged_perceptron_tagger_eng
+
 # ---------- Final stage for tests: minimal runtime with test dependencies ----------
 FROM python:3.12.3-slim
 
 ENV VENV_PATH=/opt/venv
 ENV PATH="${VENV_PATH}/bin:${PATH}"
+# NLTK data location (copied from builder stage)
+ENV NLTK_DATA=${VENV_PATH}/nltk_data
 
 WORKDIR /app
 
