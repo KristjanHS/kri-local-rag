@@ -102,12 +102,14 @@ See below for Testing and Docker. For human-oriented docs, see `docs/DEVELOPMENT
 
 ### Vectorization and Reranking Strategy
 
-This project uses a client-side approach for both embedding and reranking, using local models.
+This project uses a client-side approach for both embedding and reranking with a centralized, offline-first model loading system.
 
-- **Vectorization**: A `SentenceTransformer` (bi-encoder) model creates vectors locally. Data is then ingested into Weaviate with manually provided vectors (`vectorizer: 'none'`).
-- **Reranking**: A `CrossEncoder` model re-scores the top search results locally for better relevance.
+- **Model Configuration**: All model settings are centralized in `backend/config.py` with `DEFAULT_*` constants and environment variable overrides
+- **Vectorization**: Uses `backend.models.load_embedder()` with offline-first logic - checks for baked models locally, falls back to downloading with pinned commits
+- **Reranking**: Uses `backend.models.load_reranker()` with the same offline-first approach for the `CrossEncoder` model
+- **Environment Support**: Configurable for both development (with downloads) and production (offline with pre-baked models)
 
-Server-side Weaviate modules like `text2vec-huggingface` or `reranker-huggingface` are not used.
+Server-side Weaviate modules like `text2vec-huggingface` or `reranker-huggingface` are not used. All vectorization happens client-side with local models.
 
 ## Testing
 
@@ -208,7 +210,7 @@ Coverage policy:
 ### Flaky tests: cached globals/env
 
 - Symptoms: order-dependent failures, real LLM text instead of mocked tokens, mocks not taking effect.
-- Likely causes: cached globals (`qa_loop._cross_encoder`, `qa_loop._ollama_context`, `retriever._embedding_model`), leftover `RAG_FAKE_ANSWER`, importing target modules inside fixtures before `@patch` runs.
+- Likely causes: cached globals (`qa_loop._cross_encoder`, `qa_loop._ollama_context`, `models._embedding_model`, `models._cross_encoder`), leftover `RAG_FAKE_ANSWER`, importing target modules inside fixtures before patches run, or using old model loading patterns instead of centralized `backend.models.load_embedder()`/`load_reranker()`.
 
 - Fix quickly:
   1) **Unit tests (TARGET APPROACH)**: Use the modern fixtures in `tests/unit/conftest.py`:
@@ -216,16 +218,15 @@ Coverage policy:
      - `mock_embedding_model` for embedding model mocking (preferred)
      - `reset_cross_encoder_cache` (autouse) handles cache cleanup
 
-  2) **Integration tests (CURRENT AS-IS)**: Use autouse fixture for state reset:
+  2) **Integration tests (TARGET APPROACH)**: Use the established fixtures in `tests/unit/conftest.py`:
   ```python
-  import sys, pytest
-  @pytest.fixture(autouse=True)
-  def _reset_state(monkeypatch):
-      monkeypatch.delenv("RAG_FAKE_ANSWER", raising=False)
-      if (ql := sys.modules.get("backend.qa_loop")):
-          setattr(ql, "_cross_encoder", None); setattr(ql, "_ollama_context", None)
-      if (rt := sys.modules.get("backend.retriever")):
-          setattr(rt, "_embedding_model", None)
+  def test_with_mocked_models(mock_embedding_model: MagicMock):
+      """Example using the project's mock_embedding_model fixture."""
+      from backend.retriever import _get_embedding_model
+
+      # The fixture automatically mocks backend.models.load_embedder
+      model = _get_embedding_model()
+      assert model is not None  # Returns the mock instance
   ```
 
   3) Don’t import target modules in fixtures that run before patches; prefer `sys.modules.get(...)`.

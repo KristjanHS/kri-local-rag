@@ -1,7 +1,7 @@
 Necessary context: docs/testing_strategy.md, cursor_rules/AI_instructions.md
 
 Important info:
-* Inside app docker container, The Python executable is at /opt/venv/bin/python3
+* Tests must be run Inside test docker container, The Python executable is at /opt/venv/bin/python3
 
 # Migration Plan: Testcontainers → Compose-only (Minimal, Incremental, Verifiable)
 
@@ -94,7 +94,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
     - All pre-commit checks pass consistently
     - Existing tests continue to work with improved infrastructure
 
-- [✅] **Step 6 — Batch-Convert the Remaining TC Tests**
+- [x] **Step 6 — Batch-Convert the Remaining TC Tests**
   - **Action**: Move the rest of the Testcontainers specs in **small batches** (2–3 at a time):
     - Point them to the Compose services.
     - Remove per-test containers; reuse the single stack from Step 3.
@@ -136,45 +136,27 @@ This document tracks the progress of the migration from Testcontainers to a Dock
        - Removed `CROSS_ENCODER_CACHE_DIR=/root/.cache/huggingface`
     3. **Removed redundant model_cache copying** from Dockerfiles (models now persist appropriately)
     4. **Fixed container permissions** for Ollama cache directory
-    5. **Simplified NLTK handling**: Removed custom NLTK data directory and pre-downloading, using default NLTK behavior
-       - **Previous approach**: Custom `NLTK_DATA=/opt/venv/nltk_data` environment variable with pre-downloaded `punkt` and `punkt_tab` data
-       - **New approach**: Let NLTK use default cache locations (`~/.local/share/nltk_data`, `/usr/share/nltk_data`, etc.)
-       - **Rationale**: NLTK data is small (~1MB) and downloads quickly on first use, simplifying build process
-       - **Files modified**: `docker/app.Dockerfile`, `docker/app.test.Dockerfile` (removed NLTK_DATA env var and pre-download steps)
-       - **Fallback options**: If this fails, can revert to custom directory or use alternative markdown parsers
-  - **Benefits**:
+      - **Benefits**:
     - **Simplified setup**: Only Ollama models (large) are persisted to local directory
     - **Fast startup**: Hugging Face models (small) download quickly on first use
     - **Persistent Ollama cache**: Large Ollama models persist across container restarts
     - **Bandwidth efficient**: Ollama models cached locally in project directory
     - **Clean separation**: Large models (Ollama) vs small models (Hugging Face) handled appropriately
-    - **Simplified NLTK**: No custom data directories or build-time downloads, uses default behavior
-    - **Reduced build complexity**: Removed flaky NLTK download step that could fail during Docker build
   - **Migration**: Use existing `model_cache/` directory for Ollama models (one-time setup)
-  - **Verification**: ✅ Simplified cache approach implemented, only Ollama models use local directory, NLTK uses defaults
-  - **Priority**: **COMPLETED** - Critical infrastructure fix for test performance and model management
+  - **Verification**: Test if Simplified cache approach implemented, only Ollama models use local directory
 
-  **NLTK Usage Context:**
-  - **Used by**: `UnstructuredMarkdownLoader` for parsing markdown files in the ingestion pipeline
-  - **Current data**: No markdown files in `data/` directory (only PDFs), but tests use markdown files
-  - **Data required**: `punkt` and `punkt_tab` tokenizers (~1MB total)
-  - **Default locations**: `~/.local/share/nltk_data`, `/usr/share/nltk_data`, `/usr/local/share/nltk_data`
-  - **Potential issues**: 
-    - Network connectivity during first markdown file processing
-    - Permission issues in container default locations
-    - Build-time vs runtime dependency management
-  - **Alternative solutions if simplified approach fails**:
-    1. **Revert to custom directory**: Restore `NLTK_DATA=/opt/venv/nltk_data` with pre-downloading
-    2. **Use alternative parser**: Replace `UnstructuredMarkdownLoader` with simpler markdown parser
-    3. **Remove markdown support**: Since no markdown files in actual data, could remove feature entirely
 
-- [ ] **Step 7 — Wire CI for Compose-only (Minimal)**
+- [x] **Step 7 — Wire CI for Compose-only (Minimal)**
   - **Action**:
     - Keep **unit tests** on every PR.
-    - Add a **manual/scheduled** job that runs the Compose test lane with unique `-p` names, `up --wait`, and `down -v`, dumping tailed logs on failure.
-  - **Verify**:
-    - Local `act` run is green.
-    - The scheduled job is green and produces useful logs on failure.
+    - Provide a **manual/scheduled** job for Compose tests that is intended to run only under local `act` (not on GitHub-hosted runners).
+  - **Verification**: ✅ **COMPLETED** - act-only Compose job implemented and simplified:
+    - **✅ Unit tests on PRs**: `fast_tests` runs on `pull_request` and `push`
+    - **✅ Compose integration job (act-only)**: `compose_integration_tests` gated by `github.actor == 'nektos/act'`
+    - **✅ Uses Makefile harness**: `make test-up`, `make test-run-integration`, `make test-down`, `make test-logs`
+    - **✅ Reuses `.run_id` when present**: Allows reusing a running environment; otherwise `make test-up` creates one
+    - **✅ Proper readiness and teardown**: `up --wait` and `down -v`, tailed logs on failure
+    - **✅ In-container Python**: Tests run via `/opt/venv/bin/python3` inside the app container
 
 - [ ] **Step 8 — Remove Testcontainers Code & Dependency**
   - **Action**: Delete TC fixtures/helpers and the TC package from `pyproject.toml`/`requirements`.

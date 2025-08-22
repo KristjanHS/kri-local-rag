@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from backend import ollama_client as oc
+from backend.config import OLLAMA_MODEL
 
 pytestmark = pytest.mark.unit
 
@@ -13,7 +14,7 @@ pytestmark = pytest.mark.unit
 class DummyResp:
     def __init__(self, status_code=200, json_data=None):
         self.status_code = status_code
-        self._json_data = json_data or {"models": [{"name": "cas/mistral-7b-instruct-v0.3:latest"}]}
+        self._json_data = json_data or {"models": [{"name": f"{OLLAMA_MODEL}:latest"}]}
 
     def raise_for_status(self):
         if not (200 <= self.status_code < 400):
