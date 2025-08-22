@@ -21,8 +21,8 @@ act pull_request --pull=false "$@" 2>&1 | tee -a "$LOG_FILE"
 ACT_EXIT_CODE=$?
 set -e
 
-# Always cleanup volumes regardless of act success/failure
-log INFO "Cleaning up act volumes to prevent accumulation..." | tee -a "$LOG_FILE"
+# Additional cleanup for any remaining volumes (containers are auto-removed by --rm flag)
+log INFO "Cleaning up any remaining act volumes..." | tee -a "$LOG_FILE"
 docker volume ls | grep "^local.*act-" | awk '{print $2}' | xargs -r docker volume rm || true
 
 log INFO "Act completed with exit code: $ACT_EXIT_CODE" | tee -a "$LOG_FILE"

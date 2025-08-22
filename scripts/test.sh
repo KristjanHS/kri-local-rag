@@ -8,6 +8,7 @@ cd "$REPO_ROOT"
 
 PY=".venv/bin/python"
 COMPOSE_FILE="$REPO_ROOT/docker/docker-compose.yml"
+COMPOSE_TEST_FILE="$REPO_ROOT/docker/compose.test.yml"
 
 usage() {
   echo "Usage: $0 {unit|integration|e2e|ui} [pytest args...]" >&2
@@ -25,7 +26,17 @@ case "$bundle" in
     exec "$PY" -m pytest tests/unit -q "$@"
     ;;
   integration)
-    exec "$PY" -m pytest tests/integration -q "$@"
+    # Check if test environment is running
+    if [[ ! -f .run_id ]]; then
+      echo "Error: Test environment not running. Run 'make test-up' first." >&2
+      exit 1
+    fi
+    
+    RUN_ID=$(cat .run_id)
+    echo "Running integration tests in Compose environment (RUN_ID=$RUN_ID)..."
+    
+    # Run tests inside the app container
+    docker compose -f "$COMPOSE_FILE" -f "$COMPOSE_TEST_FILE" -p "$RUN_ID" exec -T app /opt/venv/bin/python3 -m pytest tests/integration -q "$@"
     ;;
   e2e)
     # Bring up full stack, run e2e, then tear down. Honor TEARDOWN_DOCKER/KEEP_DOCKER_UP envs.

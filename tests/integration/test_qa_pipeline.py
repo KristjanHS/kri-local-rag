@@ -42,7 +42,9 @@ def test_qa_pipeline_produces_answer():
 
     # ─── Assertions ──────────────────────────────────────────────────────────
     assert "Paris" in result
-    mock_get_top_k.assert_called_once_with(question, k=60, metadata_filter=None, embedding_model=None)
+    mock_get_top_k.assert_called_once_with(
+        question, k=60, metadata_filter=None, embedding_model=None, collection_name=None
+    )
     mock_generate_response.assert_called_once()
 
     # Prompt should contain both the question and the retrieved context

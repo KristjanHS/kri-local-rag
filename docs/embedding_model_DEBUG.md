@@ -15,23 +15,24 @@ This warning appears when loading the sentence transformer model (`all-MiniLM-L6
 **Solutions:**
 
 1. **Suppressed by Default (Recommended):**
-   The warning is automatically suppressed in `backend/ingest.py`. This is the safest approach.
+   The warning is automatically suppressed in `backend/models.py` during model loading. This is the safest approach.
 
 2. **Show Warnings (Debug):**
    ```bash
-   # To see the warnings for debugging
-   SUPPRESS_TORCH_WARNINGS=false python backend/ingest.py
+   # To see the warnings for debugging, set environment variable
+   export SUPPRESS_TORCH_WARNINGS=false
+   .venv/bin/python -m backend.qa_loop
    ```
 
 3. **Use Alternative Model:**
-   ```python
-   # In backend/ingest.py, change the model to:
-   model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")  # 768d, better quality
+   ```bash
+   # Set environment variable to override default model
+   export EMBED_REPO="sentence-transformers/all-mpnet-base-v2"  # 768d, better quality
    # or
-   model = SentenceTransformer("sentence-transformers/multi-qa-MiniLM-L6-cos-v1")  # 384d, similar
+   export EMBED_REPO="sentence-transformers/multi-qa-MiniLM-L6-cos-v1"  # 384d, similar
    ```
 
-**Note:** This warning doesn't affect functionality - it's just a deprecation notice from PyTorch that will be resolved in future versions of the sentence-transformers library.
+**Note:** This warning doesn't affect functionality - it's just a deprecation notice from PyTorch that will be resolved in future versions of the sentence-transformers library. The new centralized model loading system in `backend/models.py` handles all model loading through `load_embedder()` and `load_reranker()` functions.
 
 ---
 

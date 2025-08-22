@@ -67,7 +67,7 @@ Repository preparation tasks
 - [x] Action: Ensure `.env.example` exists with minimal keys and copy to `.env` (use values appropriate for your setup). Example contents:
   ```
   LOG_LEVEL=INFO
-  OLLAMA_MODEL=cas/mistral-7b-instruct-v0.3  # or another model available to your Ollama
+  OLLAMA_MODEL=cas/mistral-7b-instruct-v0.3  # Default defined in backend/config.py
   OLLAMA_CONTEXT_TOKENS=8192
   RETRIEVER_EMBEDDING_TORCH_COMPILE=false
   RERANKER_CROSS_ENCODER_OPTIMIZATIONS=false
@@ -78,7 +78,7 @@ Repository preparation tasks
   ```bash
   test -f .env.example || printf "%s\n" \
     "LOG_LEVEL=INFO" \
-    "OLLAMA_MODEL=cas/mistral-7b-instruct-v0.3" \
+    "OLLAMA_MODEL=cas/mistral-7b-instruct-v0.3  # Default defined in backend/config.py" \
     "OLLAMA_CONTEXT_TOKENS=8192" \
     "RETRIEVER_EMBEDDING_TORCH_COMPILE=false" \
     "RERANKER_CROSS_ENCODER_OPTIMIZATIONS=false" \
@@ -212,7 +212,7 @@ Repository preparation tasks
   # Optional: live stream logs while waiting (Ctrl+C to stop)
   # docker compose -f docker/docker-compose.yml logs -f ollama
   # If Ollama needs a model, pulls can take a long time. Trigger an explicit pull to see progress in logs:
-  # Use the model from .env (host):
+  # OLLAMA_MODEL defaults to "cas/mistral-7b-instruct-v0.3" in backend/config.py
   export OLLAMA_MODEL=${OLLAMA_MODEL:-cas/mistral-7b-instruct-v0.3}
   curl -s -X POST http://localhost:11434/api/pull -d "{\"name\":\"$OLLAMA_MODEL\"}"
   # Or inside the container (pull shows progress in logs):

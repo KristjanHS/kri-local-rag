@@ -33,6 +33,7 @@ dist/
 
 # Environment variables
 .env
+.env.backup
 
 # Logs
 logs/

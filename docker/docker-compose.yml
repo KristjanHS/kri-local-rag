@@ -32,7 +32,7 @@ services:
               count: all
               capabilities: [gpu]
     volumes:
-      - ollama_models:/root/.ollama
+      - ../model_cache:/root/.ollama
     ports:
       - "127.0.0.1:11434:11434"
     healthcheck:
@@ -48,6 +48,12 @@ services:
     build:
       context: .. # project root
       dockerfile: docker/app.Dockerfile
+      args:
+        # Pass pinned model commits for reproducibility (defaults from backend.config)
+        EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+        EMBED_COMMIT: ${EMBED_COMMIT:-c9745ed1d9f207416be6d2e6f8de32d1f16199bf}
+        RERANK_MODEL: ${RERANK_MODEL:-cross-encoder/ms-marco-MiniLM-L-6-v2}
+        RERANK_COMMIT: ${RERANK_COMMIT:-ce0834f22110de6d9222af7a7a03628121708969}
     ports:
       - "8501:8501"
     volumes:
@@ -58,7 +64,6 @@ services:
       - ../example_data:/app/example_data:ro # Ensure example_data matches project layout
       - ../logs:/app/logs # Live log access
       - ../tests:/app/tests # Mount tests for in-container testing
-      - hf_cache:/root/.cache/huggingface
     working_dir: /app
     # Auto-start Streamlit when container starts
     command: ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
@@ -94,12 +99,9 @@ services:
       - ../data:/app/data # Live data access
       - ../logs:/app/logs # Live log access
       - ../tests:/app/tests # Mount tests for in-container testing
-      - hf_cache:/root/.cache/huggingface
     env_file:
       - .env.docker
     command: ["python", "backend/ingest.py", "/app/data"]
 
 volumes:
   weaviate_db:
-  ollama_models:
-  hf_cache:

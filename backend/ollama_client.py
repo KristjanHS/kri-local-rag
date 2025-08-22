@@ -52,9 +52,8 @@ def _check_model_exists(model_name: str, models: list) -> bool:
     """Check if a model exists in the list of available models."""
     for model in models:
         model_name_from_list = model.get("name", "")
-        # Check exact match or if our model is a prefix
-        # (e.g., "cas/mistral-7b-instruct-v0.3" matches "cas/mistral-7b-instruct-v0.3:latest")
-        if model_name_from_list == model_name or model_name_from_list.startswith(model_name + ":"):
+        # Check for exact match or prefix match (e.g., "model" matches "model:latest")
+        if model_name == model_name_from_list or model_name_from_list.startswith(model_name + ":"):
             return True
     return False
 

@@ -16,9 +16,12 @@ LOGS_DIR = REPORTS_DIR / "logs"
 
 def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: D401
     """Ensure report directories exist and unset conflicting env vars."""
-    # Unset environment variables that might conflict with host-based testing
-    os.environ.pop("WEAVIATE_URL", None)
-    os.environ.pop("OLLAMA_URL", None)
+    # Only unset environment variables when running outside Docker containers
+    # (for host-based testing). When running inside containers, we want to
+    # preserve the environment variables set by Docker Compose.
+    if not Path("/.dockerenv").exists():
+        os.environ.pop("WEAVIATE_URL", None)
+        os.environ.pop("OLLAMA_URL", None)
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     LOGS_DIR.mkdir(parents=True, exist_ok=True)

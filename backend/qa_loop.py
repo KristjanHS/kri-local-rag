@@ -14,6 +14,7 @@ from rich.rule import Rule
 # Local .py imports
 from backend.config import OLLAMA_MODEL, get_logger, set_log_level
 from backend.console import console
+from backend.models import load_reranker
 from backend.ollama_client import ensure_model_available, generate_response
 from backend.retriever import get_top_k
 
@@ -62,19 +63,12 @@ _ollama_context: list[int] | None = None
 
 
 # ---------- Cross-encoder helpers --------------------------------------------------
-def _get_cross_encoder(
-    model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
-    cache_folder: Optional[str] = os.getenv("CROSS_ENCODER_CACHE_DIR"),
-):
-    """Return a new CrossEncoder instance."""
+def _get_cross_encoder() -> Any:
+    """Return a cached CrossEncoder instance using the offline-first loader."""
     try:
-        from sentence_transformers import CrossEncoder
-
-        cross_encoder = CrossEncoder(model_name, cache_folder=cache_folder)
-        logger.info("CrossEncoder model '%s' loaded successfully.", model_name)
-        return cross_encoder
+        return load_reranker()
     except Exception as e:
-        logger.error("Failed to load CrossEncoder model '%s': %s", model_name, e)
+        logger.error("Failed to load CrossEncoder model: %s", e)
         return None
 
 
