@@ -50,11 +50,11 @@ from unittest.mock import MagicMock
 
 
 @pytest.fixture
-def mock_embedding_model(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+def mock_embedding_model(mocker) -> MagicMock:
     """Fixture to mock the SentenceTransformer, preventing model downloads."""
     mock = MagicMock()
     # Patch at the retriever level where load_embedder is actually called
-    monkeypatch.setattr("backend.retriever.load_embedder", lambda: mock)
+    mocker.patch("backend.retriever.load_embedder", return_value=mock)
     return mock
 
 
@@ -64,3 +64,11 @@ def managed_cross_encoder(mocker):
     mock_encoder_instance = MagicMock()
     mocker.patch("sentence_transformers.CrossEncoder", return_value=mock_encoder_instance)
     yield mock_encoder_instance
+
+
+@pytest.fixture(autouse=True)
+def reset_embedding_model_cache():
+    """Reset the embedding model cache before each test to prevent state leakage."""
+    from backend import retriever
+
+    retriever._embedding_model = None

@@ -48,13 +48,20 @@ def _get_embedding_model(model_name: str | None = None) -> Any:
     Args:
         model_name: Optional model name to override the default. If None, uses config default.
     """
+    global _embedding_model
+
     try:
         if model_name is not None:
             # For testing - load specific model without using global cache
             from backend.models import load_embedder_with_model
 
             return load_embedder_with_model(model_name)
-        return load_embedder()
+
+        # Use cached model if available
+        if _embedding_model is None:
+            _embedding_model = load_embedder()
+
+        return _embedding_model
     except Exception as e:
         logger.warning("Failed to load embedding model: %s", e)
         return None

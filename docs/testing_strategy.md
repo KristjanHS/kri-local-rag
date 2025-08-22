@@ -75,6 +75,43 @@ def test_qa_pipeline_produces_answer(managed_qa_functions):
     managed_qa_functions["get_top_k"].assert_called_once()
 ```
 
+### Model Loading Testing
+
+The project uses a centralized model loading system. For testing model-related functionality:
+
+#### Use Project Fixtures (Recommended)
+```python
+def test_model_loading(mock_embedding_model):
+    """Test using the project's mock_embedding_model fixture."""
+    from backend.retriever import _get_embedding_model
+
+    # The fixture automatically mocks backend.models.load_embedder
+    model = _get_embedding_model()
+    assert model is not None  # Returns the mock instance
+
+    # Configure the mock behavior
+    mock_embedding_model.encode.return_value = [[0.1, 0.2, 0.3]]
+    result = model.encode("test query")
+    assert result == [[0.1, 0.2, 0.3]]
+```
+
+#### Testing Model Configuration
+```python
+def test_model_configuration_with_env(monkeypatch):
+    """Test environment variable overrides for model configuration."""
+    from backend import config
+
+    monkeypatch.setenv("EMBED_REPO", "custom/sentence-transformer")
+    monkeypatch.setenv("EMBED_COMMIT", "abc123")
+
+    # Reload config to pick up environment changes
+    import importlib
+    importlib.reload(config)
+
+    assert config.EMBEDDING_MODEL == "custom/sentence-transformer"
+    assert config.EMBED_COMMIT == "abc123"
+```
+
 ### General Purpose Mocking
 
 For scenarios not covered by the specific fixtures above, use the `mocker` fixture from `pytest-mock` directly in your test.
@@ -91,7 +128,18 @@ def test_general_mocking(mocker):
 
 ### State Management and Caching
 
-Some modules, like `qa_loop`, use a global cache for heavy objects (e.g., `_cross_encoder`). To prevent state from leaking between tests, an `autouse` fixture automatically resets this cache before each test run, ensuring a clean state.
+Multiple modules use global caches for heavy objects to avoid reloading models:
+
+- **`backend.models`**: `_embedding_model` and `_cross_encoder` caches
+- **`backend.qa_loop`**: `_cross_encoder` and `_ollama_context` caches
+- **`backend.retriever`**: Legacy `_embedding_model` cache (being phased out)
+
+To prevent state leakage between tests, the project provides fixtures:
+- **`mock_embedding_model`**: Automatically handles `backend.models.load_embedder` mocking
+- **`managed_cross_encoder`**: Handles cross-encoder mocking with proper cache management
+- **Manual reset**: Set module cache variables to `None` in test setup when needed
+
+The `mock_embedding_model` fixture is the preferred approach for most embedding model tests, as it integrates with the new centralized model loading system.
 
 ## Compose-Only Testing Approach
 

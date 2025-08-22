@@ -13,20 +13,30 @@ A common issue is `pytest` hanging indefinitely during test collection without a
 #### Before:
 ```python
 # This top-level import hangs pytest during collection
-from retriever import _get_embedding_model
+from backend.models import load_embedder
 
-class TestHybridSearchFix:
-    def test_embedding_model_loading(self):
+class TestModelLoading:
+    def test_model_loading(self):
         # ...
 ```
 
 #### After:
 ```python
-class TestHybridSearchFix:
-    def test_embedding_model_loading(self):
+class TestModelLoading:
+    def test_model_loading(self):
         # Import is moved inside the function, so collection is fast
-        from retriever import _get_embedding_model
+        from backend.models import load_embedder
         # ...
+```
+
+#### Alternative (Recommended):
+```python
+class TestModelLoading:
+    def test_model_loading(self, mock_embedding_model):
+        # Use the project's fixture for clean model mocking
+        from backend.retriever import _get_embedding_model
+        model = _get_embedding_model()
+        assert model is not None  # Returns the mock instance
 ```
 
 ## 2. Debugging a "Hanging" Terminal
@@ -62,7 +72,29 @@ To unlock powerful terminal features in Cursor, enable shell integration.
     *   **Sticky Scroll**: Current command stays visible at the top as you scroll.
     *   **Better History & Autocomplete**: Improved command history and shell-aware Intellisense.
 
-## 4. Manually Update the Python Extension
+## 4. Understanding the New Model Loading Architecture
+
+The project has been updated with a centralized, offline-first model loading system. Here are key changes to be aware of:
+
+### Model Loading Functions
+- **Old**: Direct imports like `from sentence_transformers import SentenceTransformer`
+- **New**: Use centralized loaders: `from backend.models import load_embedder, load_reranker`
+
+### Configuration
+- **Centralized**: All model settings in `backend/config.py` with `DEFAULT_*` constants
+- **Environment Variables**: Override with `EMBED_REPO`, `RERANK_REPO`, `EMBED_COMMIT`, `RERANK_COMMIT`
+- **Offline-First**: Checks for local models first, falls back to downloads with pinned commits
+
+### Testing
+- **Preferred**: Use project fixtures like `mock_embedding_model` instead of manual patches
+- **Cache Management**: Models are cached in `backend.models` module variables, not individual files
+
+### Common Issues
+- **Test Hanging**: Use fixtures or move heavy imports inside test functions
+- **Model Not Found**: Ensure proper environment setup or use offline mode
+- **Configuration**: Check `backend/config.py` for centralized settings
+
+## 5. Manually Update the Python Extension
 
 Cursor manages its VS Code extension updates, but sometimes they can lag behind the official marketplace. An outdated Microsoft Python (`ms-python.python`) extension is a known cause of strange behavior with `pytest`, including issues with test discovery, execution, and debugging.
 

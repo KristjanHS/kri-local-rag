@@ -133,8 +133,10 @@ This file tracks outstanding tasks and planned improvements for the project.
 - ✅ Single source of truth for model configurations (`backend/config.py`)
 - ✅ Removed duplicate model download scripts
 - ✅ Updated all imports to use centralized config
-- ✅ Fixed test mocking for new architecture
+- ✅ Fixed test mocking for new architecture using modern approaches
 - ✅ Maintained environment variable override support
+- ✅ Aligned documentation with new model handling logic
+- ✅ Implemented modern mocking patterns across all test code
 
 **Validation Strategy**: Test from smallest units to full integration, ensuring each layer works before testing the next.
 
@@ -198,13 +200,92 @@ This file tracks outstanding tasks and planned improvements for the project.
     - ✅ **Hadolint**: Pinned `huggingface_hub==0.34.4` versions in both Dockerfiles
     - ✅ **API Enhancement**: Added optional `model_name` parameter to `_get_embedding_model()` for testing flexibility
     - ✅ **Test Support**: Created `load_embedder_with_model()` function for test-specific model loading
+    
+    #### P2.2 — Modern Mocking Approach Implementation ✅ COMPLETED
+    **Goal**: Align all test code with the project's modern mocking strategy as documented in `AI_instructions.md`.
 
-    **Final Pre-commit Status**:
-    - ✅ Ruff: Passed (linting and formatting)
-    - ✅ Pyright: Passed (type checking)  
-    - ✅ Bandit: Passed (security linting)
-    - ✅ Hadolint: Expected warnings only (pip upgrade as requested)
-    - ✅ All other checks: Passed
+    **Background**: Updated test code to follow the established modern mocking patterns:
+    - ✅ Replaced `@patch` decorators with `mocker.patch()` calls
+    - ✅ Used project fixtures (`mock_embedding_model`) correctly
+    - ✅ Eliminated anti-patterns like incorrectly configuring fixtures for failure scenarios
+    - ✅ Applied consistent `mocker` fixture usage throughout test suite
+
+    **Validation Strategy**: Verified alignment with modern approaches documented in testing strategy.
+
+    - [x] **Update test_search_logic.py** ✅ COMPLETED
+      - ✅ Replaced all `@patch` decorators with `mocker.patch()` calls
+      - ✅ Fixed incorrect fixture usage for failure scenarios
+      - ✅ Used proper `mocker.patch("backend.retriever.load_embedder", return_value=None)` for unavailable model tests
+      - ✅ Applied modern approach to weaviate mocking: `mocker.patch("backend.retriever.weaviate.connect_to_custom")`
+
+    - [x] **Update test_cross_encoder_optimizations.py** ✅ COMPLETED
+      - ✅ Replaced `@patch.dict` decorator with `mocker.patch.dict()` calls
+      - ✅ Used proper function-level mocking: `mocker.patch("backend.qa_loop.load_reranker")`
+      - ✅ Eliminated `with patch()` context managers in favor of `mocker.patch()`
+      - ✅ Applied consistent modern mocking patterns
+
+    - [x] **Align with AI_instructions.md patterns** ✅ COMPLETED
+      - ✅ Followed "TARGET APPROACH" for unit tests using `tests/unit/conftest.py` fixtures
+      - ✅ Used `mocker` fixture from `pytest-mock` instead of `unittest.mock.patch`
+      - ✅ Applied clean dependency injection through fixture parameters
+      - ✅ Prevented state leakage by using properly scoped patches
+
+    **✅ IMPLEMENTATION COMPLETE**: All test code now follows the project's modern mocking strategy.
+
+    **Key Improvements Achieved**:
+    - 🎯 **Consistent Architecture**: All tests use the same modern mocking patterns
+    - 🛡️ **State Isolation**: Proper fixture scoping prevents test interference
+    - 📦 **Clean Dependencies**: Fixtures provide clean dependency injection
+    - 🔄 **Maintainability**: Easier to understand and modify test code
+    - 📋 **Best Practices**: Aligned with project's established testing strategy
+
+    **Next Steps**: Continue with remaining unit test failures using the established modern approach.
+
+    #### P2.3 — Documentation Alignment ✅ COMPLETED
+    **Goal**: Ensure all documentation reflects the new model handling logic and modern approaches implemented in P0 and P1.
+
+    **Background**: Updated all documentation files to align with the centralized model configuration and modern testing approaches.
+
+    - [x] **Update AI_instructions.md** ✅ COMPLETED
+      - ✅ Updated vectorization and reranking strategy section
+      - ✅ Added centralized configuration references
+      - ✅ Updated testing strategy with modern mocking patterns
+      - ✅ Added troubleshooting guidance for new architecture
+
+    - [x] **Update DEVELOPMENT.md** ✅ COMPLETED
+      - ✅ Added comprehensive "Model System" section
+      - ✅ Documented configuration, usage, and environment patterns
+      - ✅ Explained development vs production workflows
+
+    - [x] **Update testing_strategy.md** ✅ COMPLETED
+      - ✅ Added model loading testing examples
+      - ✅ Updated configuration testing patterns
+      - ✅ Enhanced state management documentation
+      - ✅ Added fixture usage examples
+
+    - [x] **Update cursor_hints.md** ✅ COMPLETED
+      - ✅ Added "Understanding the New Model Loading Architecture" section
+      - ✅ Updated troubleshooting examples for modern patterns
+      - ✅ Provided practical guidance for developers
+
+    - [x] **Update embedding_model_DEBUG.md** ✅ COMPLETED
+      - ✅ Updated PyTorch warning solutions to use environment variables
+      - ✅ Referenced new `backend/models.py` system
+      - ✅ Aligned with centralized configuration approach
+
+    - [x] **Update models_guide.md** ✅ COMPLETED
+      - ✅ Complete overhaul to reflect centralized architecture
+      - ✅ Updated all examples to use new `backend/config.py` patterns
+      - ✅ Added modern development and testing workflows
+      - ✅ Comprehensive testing strategy alignment
+
+    **✅ DOCUMENTATION ALIGNMENT COMPLETE**: All documentation now accurately reflects the new model handling logic and modern approaches.
+
+    **Documentation Benefits Achieved**:
+    - 📚 **Current and Accurate**: All guides reflect the actual implementation
+    - 🛠️ **Developer-Friendly**: Clear examples and troubleshooting guides
+    - 🔧 **Modern Practices**: Aligned with established testing and mocking patterns
+    - 📖 **Comprehensive Coverage**: Complete workflow documentation from development to production
 
 The implementation follows codebase best practices and maintains backward compatibility while solving the original testing requirement.
 
