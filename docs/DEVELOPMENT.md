@@ -64,6 +64,28 @@ docker compose -f docker/docker-compose.yml down -v
 scripts/git-hooks/pre-push
 ```
 
+## Model System
+
+The project uses a centralized, offline-first model loading system:
+
+### Configuration
+- **Central location**: All model settings in `backend/config.py`
+- **Environment overrides**: Use `EMBED_REPO`, `RERANK_REPO`, `EMBED_COMMIT`, `RERANK_COMMIT`
+- **Default models**: `sentence-transformers/all-MiniLM-L6-v2` (embedding), `cross-encoder/ms-marco-MiniLM-L-6-v2` (reranking)
+
+### Usage
+```python
+from backend.models import load_embedder, load_reranker
+
+# Load models (with automatic caching)
+embedder = load_embedder()
+reranker = load_reranker()
+```
+
+### Development vs Production
+- **Development**: Models download automatically with pinned commits
+- **Production**: Models are pre-baked into Docker images for offline operation
+- **Offline mode**: Set `TRANSFORMERS_OFFLINE=1` for production deployments
 
 ## Docker (optional)
 Preferred startup: use the automated setup script which builds the image, starts services, and waits for health checks.
