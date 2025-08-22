@@ -7,7 +7,9 @@ import torch
 pytestmark = pytest.mark.slow
 
 # --- Constants for ML Environment Validation ---
-EXPECTED_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+from backend.config import DEFAULT_EMBEDDING_MODEL
+
+EXPECTED_MODEL_NAME = DEFAULT_EMBEDDING_MODEL
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
