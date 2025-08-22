@@ -187,11 +187,30 @@ CHUNK_OVERLAP = 100
 
 # Hybrid search parameters
 DEFAULT_HYBRID_ALPHA = 0.5  # 0 → pure BM25, 1 → pure vector
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
+# Model names (single source of truth)
+DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+DEFAULT_OLLAMA_MODEL = "cas/mistral-7b-instruct-v0.3"
+
+# Model paths and caching
+EMBED_MODEL_PATH = os.getenv("EMBED_MODEL_PATH", "/app/models/emb")
+RERANK_MODEL_PATH = os.getenv("RERANK_MODEL_PATH", "/app/models/rerank")
+HF_CACHE_DIR = os.getenv("HF_HOME", "/data/hf")
+
+# Working model names (with environment variable overrides)
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
+RERANKER_MODEL = os.getenv("RERANK_MODEL", DEFAULT_RERANKER_MODEL)
+
+# Model repository and revision configuration
+EMBED_COMMIT = os.getenv("EMBED_COMMIT")
+RERANK_COMMIT = os.getenv("RERANK_COMMIT")
+
+# Offline mode configuration
+TRANSFORMERS_OFFLINE = bool(os.getenv("TRANSFORMERS_OFFLINE"))
 
 # Ollama LLM settings (used by qa_loop.py)
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "cas/mistral-7b-instruct-v0.3")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
 # Default to local Ollama endpoint but allow override via env variable.
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")

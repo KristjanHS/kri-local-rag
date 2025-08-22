@@ -58,6 +58,9 @@ echo -e "${BOLD}Starting the automatic setup for the RAG project...${NC}"
 # Source centralized configuration
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
+# Get default Ollama model from config
+DEFAULT_OLLAMA_MODEL=$(python3 -c "from backend.config import DEFAULT_OLLAMA_MODEL; print(DEFAULT_OLLAMA_MODEL)")
+
 # Setup logging (timestamped file + stable symlink) and traps
 SCRIPT_NAME=$(get_script_name "${BASH_SOURCE[0]}")
 LOG_FILE=$(init_script_logging "$SCRIPT_NAME")
@@ -90,8 +93,8 @@ echo -e "${GREEN}✓ All services are up and healthy.${NC}"
 
 # --- Step 2b: Pre-pull default Ollama model to reduce first-answer latency ---
 ensure_ollama_model() {
-    # OLLAMA_MODEL defaults to "cas/mistral-7b-instruct-v0.3" in backend/config.py
-    model_to_pull="${OLLAMA_MODEL:-cas/mistral-7b-instruct-v0.3}"
+    # Use centralized Ollama model default
+    model_to_pull="${OLLAMA_MODEL:-$DEFAULT_OLLAMA_MODEL}"
     log INFO "Checking if Ollama model is present: ${model_to_pull}" | tee -a "$LOG_FILE"
     
     if docker compose -f "$DOCKER_COMPOSE_FILE" exec -T "$OLLAMA_SERVICE" ollama list | grep -q "$model_to_pull"; then

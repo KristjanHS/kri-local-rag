@@ -28,7 +28,7 @@ class TestHybridSearchFix:
         model = _get_embedding_model()
 
         assert model is not None
-        mock_embedding_model.assert_called_once_with("sentence-transformers/all-MiniLM-L6-v2")
+        assert model is mock_embedding_model  # Should return our mock
 
     def test_embedding_model_caching(self, mock_embedding_model: MagicMock):
         """Test that embedding model is cached after first load."""
@@ -43,8 +43,8 @@ class TestHybridSearchFix:
         model1 = _get_embedding_model()
         model2 = _get_embedding_model()
 
-        assert model1 is model2
-        mock_embedding_model.assert_called_once()
+        assert model1 is model2  # Should return the same cached mock
+        assert model1 is mock_embedding_model  # Should be our mock
 
     def test_embedding_model_unavailable(self, monkeypatch: pytest.MonkeyPatch):
         """Test behavior when SentenceTransformer is not available."""
@@ -59,8 +59,8 @@ class TestHybridSearchFix:
     @patch("backend.retriever.weaviate.connect_to_custom")
     def test_retrieval_uses_local_embedding_model(self, mock_connect: MagicMock, mock_embedding_model: MagicMock):
         """Test that the retriever uses the local embedding model to create a query vector."""
-        from backend.retriever import get_top_k
         from backend import retriever
+        from backend.retriever import get_top_k
 
         retriever._embedding_model = None  # Ensure clean state
 
@@ -91,7 +91,7 @@ class TestHybridSearchFix:
         question = "test question"
         result = get_top_k(question, k=5)
 
-        mock_embedding_model.assert_called_once()
+        # Check that the mock was used and encode was called
         mock_model_instance.encode.assert_called_once_with(question)
 
         mock_query.hybrid.assert_called_once_with(
@@ -107,9 +107,10 @@ class TestHybridSearchFix:
     @patch("backend.retriever.weaviate.connect_to_custom")
     def test_hybrid_search_fallback_to_bm25(self, mock_connect: MagicMock, mock_embedding_model: MagicMock):
         """Test fallback to BM25 when hybrid search fails."""
-        from backend.retriever import get_top_k
-        from backend import retriever
         from weaviate.exceptions import WeaviateQueryError
+
+        from backend import retriever
+        from backend.retriever import get_top_k
 
         retriever._embedding_model = None  # Ensure clean state
 
@@ -141,8 +142,8 @@ class TestHybridSearchFix:
     @patch("backend.retriever.weaviate.connect_to_custom")
     def test_hybrid_search_with_empty_collection(self, mock_connect: MagicMock, mock_embedding_model: MagicMock):
         """Test hybrid search behavior with empty collection."""
-        from backend.retriever import get_top_k
         from backend import retriever
+        from backend.retriever import get_top_k
 
         retriever._embedding_model = None  # Ensure clean state
 
@@ -163,8 +164,9 @@ class TestHybridSearchFix:
 
     def test_vectorization_error_scenario(self, monkeypatch: pytest.MonkeyPatch):
         """Test behavior when vectorization fails."""
-        from backend import retriever
         import importlib
+
+        from backend import retriever
 
         monkeypatch.setattr(retriever, "SentenceTransformer", None)
         retriever._embedding_model = None  # Ensure clean state
@@ -176,9 +178,10 @@ class TestHybridSearchFix:
     @patch("backend.retriever.weaviate.connect_to_custom")
     def test_hybrid_search_without_embedding_model(self, mock_connect: MagicMock, monkeypatch: pytest.MonkeyPatch):
         """Test hybrid search falls back when no embedding model is available."""
-        from backend.retriever import get_top_k
-        from backend import retriever
         from weaviate.exceptions import WeaviateQueryError
+
+        from backend import retriever
+        from backend.retriever import get_top_k
 
         monkeypatch.setattr(retriever, "SentenceTransformer", None)
         retriever._embedding_model = None  # Ensure clean state

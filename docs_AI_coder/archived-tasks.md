@@ -83,56 +83,6 @@ This file records tasks that have been completed and moved out of the active TOD
 
 **Status**: All tasks completed. Core logic has been successfully refactored to use dependency injection, making the code more modular and easier to test without patching.
 
-#### P3 — Containerized CLI E2E copies (Partial Completion) ✅ PARTIALLY COMPLETED
-
-- **Why**: Host-run E2E miss packaging/runtime issues (entrypoint, PATH, env, OS libs). Twins validate the real image without replacing fast host tests.
-- **Current Approach**: Used the existing `app` container which can run both Streamlit (web UI) and CLI commands via `docker compose exec app`. This leveraged the project's existing architecture where the `app` service is designed to handle multiple entry points.
-- **Key Insight**: The project already supports CLI commands in the app container (see README.md: `./scripts/cli.sh python -m backend.qa_loop --question "What is in my docs?"`). This pattern was extended for automated testing rather than creating a separate `cli` service.
-- **Benefits**: Simpler architecture, fewer services to maintain, aligns with existing project patterns, and leverages the same container that users interact with.
-
-- [x] **Task: Resolve Flaky Unit Tests with Improved Mocking Strategy** ✅ **COMPLETED**
-  - **Overall Problem Description:** The unit tests for the cross-encoder logic in `backend/qa_loop.py` were flaky. Specifically, `test_rerank_cross_encoder_success` and `test_cross_encoder_enables_heavy_optimizations_when_allowed` failed when run as part of the full test suite, but succeeded when run in isolation. This indicated a state leakage problem, where the cached global `_cross_encoder` object was being modified by one test and not properly reset before the next, causing unexpected failures. The current mocking strategy, which relied on `unittest.mock.patch`, was proving difficult to debug and was not robust enough to prevent this state pollution. The goal was to implement a more reliable, `pytest`-native mocking and state management strategy to ensure all unit tests were deterministic and isolated.
-  - **Action Plan:**
-    1.  **Install `pytest-mock`:** Ensured the `pytest-mock` plugin was included in the project's development dependencies.
-        -   **Verify:** The command `.venv/bin/python -m pip show pytest-mock` confirmed the package was installed.
-    2.  **Create a `managed_cross_encoder` Fixture:** In `tests/unit/conftest.py`, created a new `pytest` fixture named `managed_cross_encoder`. This fixture used the `mocker` fixture to patch `backend.qa_loop._get_cross_encoder`. It was function-scoped to ensure cleanup after every test.
-        -   **Verify:** The new fixture was available to the test suite without causing errors.
-    3.  **Refactor `test_qa_loop_logic.py`:** Updated the failing tests in this file to use the new `managed_cross_encoder` fixture instead of the `@patch` decorator.
-        -   **Verify:** The tests in `tests/unit/test_qa_loop_logic.py` passed consistently, both when run in isolation and as part of the full suite.
-    4.  **Refactor `test_cross_encoder_optimizations.py`:** Updated this test to use the `managed_cross_encoder` fixture as well, removing any direct patching.
-        -   **Verify:** The test in `tests/unit/test_cross_encoder_optimizations.py` passed consistently.
-    5.  **Long-Term Consideration (No Immediate Action):** Evaluated the feasibility of refactoring `backend/qa_loop.py` to use dependency injection. This would involve passing the cross-encoder as an explicit argument to the functions that need it, which would make the code more testable and reduce the need for mocking. This is a larger architectural change and should be considered for future development.
-
-- [x] Step 1 — Identify candidates ✅ **COMPLETED**
-  - Action: Listed E2E tests invoking CLI in-process (e.g., `backend.qa_loop`) such as `tests/e2e/test_qa_real_end_to_end.py`.
-  - Verify: Confirmed they don't already run via container.
-
-- [x] Step 2 — Use existing app container for CLI testing ✅ **COMPLETED**
-  - Action: Leveraged the existing `app` service which can run both Streamlit and CLI commands via `docker compose exec`.
-  - Verify: `docker compose exec app python -m backend.qa_loop --help` exited 0.
-
-- [x] Step 3 — Test helper ✅ **COMPLETED**
-  - Action: In `tests/e2e/conftest.py`, added `run_cli_in_container(args, env=None)` that uses `docker compose exec app ...`, returns `returncode/stdout/stderr`.
-  - Verify: `--help` smoke passed.
-
-- [x] Step 3.1 — Review and validate implementation ✅ **COMPLETED**
-  - Action: Reviewed the implementation against best practices and simplified to use existing app container.
-  - Verify: Confirmed that the simplified approach was correct and aligned with project structure.
-
-- [x] Step 3.2 — Clean up old complexity ✅ **COMPLETED**
-  - Action: Removed the separate `cli` service from `docker/docker-compose.yml` since we're using the existing `app` container.
-  - Action: Updated `run_cli_in_container` fixture in `tests/e2e/conftest.py` to use `docker compose exec app`
-
-- [x] Step 4 — Readiness and URLs ✅ **COMPLETED**
-  - Action: Used existing `weaviate_compose_up`/`ollama_compose_up`; ensured ingestion uses compose-internal URLs.
-  - Verify: Readiness checks passed before CLI twin runs.
-
-- [x] Step 5 — Create test twins ✅ **COMPLETED**
-  - Action: Added `_container_e2e.py` twins that call `run_cli_in_container([...])` with equivalent CLI subcommands; optionally marked with `@pytest.mark.docker`.
-  - Verify: Single twin passed via `.venv/bin/python -m pytest -q tests/e2e/test_qa_real_end_to_end_container_e2e.py` after compose `--wait`.
-
-**Status**: Steps 1-5 completed. Containerized CLI E2E testing infrastructure has been successfully implemented using the existing app container. Remaining tasks (Steps 6-8) are pending for future completion.
-
 #### P0 — Epic: Refactor Testing Strategy for Robustness and Simplicity ✅ COMPLETED
 
 - **High-Level Goal**: Overhaul the testing strategy to align with modern best practices. This involved centralizing the model cache for reliable offline testing, hardening the application's model-loading logic, and replacing fragile, module-level mocks with clean, scoped pytest fixtures.

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from urllib.parse import urlparse
 
@@ -11,10 +10,10 @@ from weaviate.exceptions import WeaviateQueryError
 from backend.config import (
     COLLECTION_NAME,
     DEFAULT_HYBRID_ALPHA,
-    EMBEDDING_MODEL,
     WEAVIATE_URL,
     get_logger,
 )
+from backend.models import load_embedder
 from backend.vector_utils import to_float_list
 
 # Optional dependency note: If sentence-transformers is not installed, we handle
@@ -41,59 +40,24 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _get_embedding_model(model_name: str = EMBEDDING_MODEL):
+def _get_embedding_model(model_name: str | None = None) -> Any:
     """Return a (cached) SentenceTransformer instance for manual vectorization.
 
-    Uses the same model as specified in ingest.py to ensure consistency.
+    Uses the new offline-first model loader for better reliability and reproducibility.
+
+    Args:
+        model_name: Optional model name to override the default. If None, uses config default.
     """
-    global _embedding_model
-    if _embedding_model is None:
-        try:
-            # Determine constructor: prefer patched module-level `SentenceTransformer` if provided
-            ctor = SentenceTransformer
-            if ctor is None:
-                # Import lazily to avoid heavy dependency at module import time
-                from sentence_transformers import SentenceTransformer as _ST  # type: ignore
+    try:
+        if model_name is not None:
+            # For testing - load specific model without using global cache
+            from backend.models import load_embedder_with_model
 
-                ctor = _ST
-        except Exception as e:
-            logger.warning("SentenceTransformer not available: %s", e)
-            return None
-        try:
-            # Use the same model as ingestion to ensure vector compatibility
-            _embedding_model = ctor(model_name)
-
-            # Apply PyTorch CPU optimizations
-            # Set optimal threading for current environment
-            try:
-                import torch  # defer heavy import
-
-                torch.set_num_threads(12)  # Oversubscribe lightly to hide I/O stalls
-            except Exception as _threads_e:  # noqa: F841
-                logger.debug("Failed to set torch threads: %s", _threads_e)
-
-            # Apply torch.compile for production performance, but allow skipping for tests
-            from unittest.mock import MagicMock  # type: ignore
-
-            enable_compile_str = os.getenv("RETRIEVER_EMBEDDING_TORCH_COMPILE", "true")
-
-            if enable_compile_str.lower() == "true" and not isinstance(_embedding_model, MagicMock):
-                try:
-                    import torch  # defer heavy import
-
-                    logger.info("torch.compile: optimizing embedding model – first run may take up to a minute…")
-                    _embedding_model = torch.compile(_embedding_model, backend="inductor", mode="max-autotune")
-                    logger.debug("Applied torch.compile optimization to embedding model")
-                except Exception as compile_e:
-                    logger.warning("Failed to apply torch.compile optimization: %s", compile_e)
-            else:
-                logger.debug("Skipping torch.compile optimization (tests or MagicMock instance).")
-
-            logger.debug("Loaded embedding model: %s", model_name)
-        except Exception as e:
-            logger.warning("Failed to load embedding model: %s", e)
-            _embedding_model = None
-    return _embedding_model
+            return load_embedder_with_model(model_name)
+        return load_embedder()
+    except Exception as e:
+        logger.warning("Failed to load embedding model: %s", e)
+        return None
 
 
 def _apply_metadata_filter(query: Any, metadata_filter: Optional[Dict[str, Any]]):

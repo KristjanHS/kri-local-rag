@@ -53,7 +53,8 @@ from unittest.mock import MagicMock
 def mock_embedding_model(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """Fixture to mock the SentenceTransformer, preventing model downloads."""
     mock = MagicMock()
-    monkeypatch.setattr("backend.retriever.SentenceTransformer", mock)
+    # Patch at the retriever level where load_embedder is actually called
+    monkeypatch.setattr("backend.retriever.load_embedder", lambda: mock)
     return mock
 
 

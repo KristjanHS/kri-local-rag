@@ -2,7 +2,6 @@ import logging
 import os
 from unittest.mock import MagicMock, patch
 
-
 # Create a logger for this test file
 logger = logging.getLogger(__name__)
 
@@ -22,8 +21,10 @@ def test_cross_encoder_loads(mocker):
     mock_ce_instance = MagicMock()
     mocker.patch("sentence_transformers.CrossEncoder", return_value=mock_ce_instance)
 
-    # --- First call: should load the model ---
-    cross_encoder = qa_loop._get_cross_encoder(model_name="dummy-model")
+    # Mock the centralized configuration to use our dummy model
+    with patch("backend.qa_loop.RERANKER_MODEL", "dummy-model"):
+        # --- First call: should load the model ---
+        cross_encoder = qa_loop._get_cross_encoder()
 
     # Assertions for the first call
     assert cross_encoder is not None, "The encoder should be a mock instance, not None"
