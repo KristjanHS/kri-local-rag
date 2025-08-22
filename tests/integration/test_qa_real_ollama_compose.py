@@ -31,6 +31,3 @@ def test_answer_uses_real_ollama_compose(managed_get_top_k):
     cross_encoder = _get_cross_encoder()
     out = answer(question, k=1, cross_encoder=cross_encoder)
     assert isinstance(out, str) and out.strip(), "Expected a non-empty answer from the real model"
-
-
-# Test comment

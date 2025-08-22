@@ -2,8 +2,17 @@ services:
   weaviate:
     ports: [] # Un-expose ports for tests
 
+  # Shared Ollama service with isolation
   ollama:
     ports: [] # Un-expose ports for tests
+    # Add resource limits for test environment
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   app:
     build:
@@ -18,7 +27,6 @@ services:
       - ../data:/app/data # Live data access
       - ../example_data:/app/example_data:ro # Ensure example_data matches project layout
       - ../logs:/app/logs # Live log access
-      - hf_cache:/root/.cache/huggingface
     # Keep container alive for exec commands without starting the web server
     command: ["tail", "-f", "/dev/null"]
     healthcheck:
@@ -26,6 +34,11 @@ services:
       # This simple check just ensures the container is running.
       test: ["CMD-SHELL", "exit 0"]
     environment:
-      # Point the Python code to the other services inside the compose network
+      # Point the Python code to the shared Ollama service
       - OLLAMA_URL=http://ollama:11434
       - WEAVIATE_URL=http://weaviate:8080
+    depends_on:
+      weaviate:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
