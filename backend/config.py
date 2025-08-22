@@ -207,7 +207,11 @@ EMBED_COMMIT = os.getenv("EMBED_COMMIT")
 RERANK_COMMIT = os.getenv("RERANK_COMMIT")
 
 # Offline mode configuration
-TRANSFORMERS_OFFLINE = bool(os.getenv("TRANSFORMERS_OFFLINE"))
+# Parse TRANSFORMERS_OFFLINE environment variable properly
+# "1", "true", "yes" (case-insensitive) → True (offline mode enabled)
+# "0", "false", "no", empty, or not set → False (offline mode disabled)
+transformers_offline_env = os.getenv("TRANSFORMERS_OFFLINE", "").lower()
+TRANSFORMERS_OFFLINE = transformers_offline_env in ("1", "true", "yes")
 
 # Ollama LLM settings (used by qa_loop.py)
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)

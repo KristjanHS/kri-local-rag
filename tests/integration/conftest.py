@@ -131,42 +131,53 @@ def real_model_loader(integration_model_cache):
 
     This fixture ensures models are available locally before tests run, avoiding
     network dependencies during test execution. Models are downloaded once during
-    the session setup and reused.
+    the session setup and reused. Uses integration test optimized loading with
+    enhanced health checks and retry logic.
 
     Returns:
-        dict: Contains 'embedder' and 'reranker' keys with loaded model instances
+        dict: Contains 'embedder' and 'reranker' keys with loaded model instances,
+              plus 'status' key with detailed loading information
     """
     from backend.config import get_logger
-    from backend.models import load_embedder, load_reranker, preload_models
+    from backend.models import clear_model_cache, load_embedder, load_reranker, preload_models_with_health_check
 
     logger = get_logger(__name__)
 
-    # Preload models to ensure they're ready
-    logger.info("Preloading models for integration test...")
-    preload_models()
+    # Clear any cached models to ensure fresh loading
+    clear_model_cache()
+
+    # Use the enhanced preload function with health checks
+    logger.info("Preloading models for integration test with enhanced health checks...")
+    status = preload_models_with_health_check()
 
     # Load models with better error handling
     models = {}
     try:
         models["embedder"] = load_embedder()
-        logger.info("✓ Embedding model loaded successfully")
+        logger.info("✓ Embedding model loaded successfully with integration optimizations")
     except Exception as e:
         logger.error(f"Failed to load embedding model: {e}")
-        # Try to continue with reranker if possible
         models["embedder"] = None
 
     try:
         models["reranker"] = load_reranker()
-        logger.info("✓ Reranker model loaded successfully")
+        logger.info("✓ Reranker model loaded successfully with integration optimizations")
     except Exception as e:
         logger.error(f"Failed to load reranker model: {e}")
         models["reranker"] = None
+
+    # Add status information to the returned dict
+    models["status"] = status
 
     # At least one model should be available for meaningful tests
     if models["embedder"] is None and models["reranker"] is None:
         pytest.skip("No models could be loaded - skipping real model integration tests")
 
-    logger.info("✓ Model loading completed for integration test")
+    # Log summary of what was loaded
+    available_models = [name for name, model in models.items() if model is not None and name != "status"]
+    logger.info(f"✓ Model loading completed. Available models: {available_models}")
+    logger.info(".2f")
+
     return models
 
 
@@ -217,8 +228,26 @@ def model_health_checker():
                 if not hasattr(scores, "__len__"):
                     logger.warning(f"Model {model_name} returned invalid scores format")
                     return False
+
+                # Check that all scores are numeric (including numpy types)
+                def is_numeric(value):
+                    try:
+                        # Check for Python numeric types
+                        if isinstance(value, (int, float)):
+                            return True
+                        # Check for numpy numeric types
+                        if hasattr(value, "dtype"):
+                            import numpy as np
+
+                            return np.issubdtype(value.dtype, np.number)
+                        # Fallback: try to convert to float
+                        float(value)
+                        return True
+                    except (ValueError, TypeError):
+                        return False
+
                 # Type checker doesn't understand hasattr narrowing, but we've verified __len__ exists
-                return len(scores) > 0 and all(isinstance(s, (int, float)) for s in scores)  # type: ignore[arg-type]
+                return len(scores) > 0 and all(is_numeric(s) for s in scores)  # type: ignore[arg-type]
 
             else:
                 logger.warning(f"Unknown model type for {model_name}")
@@ -247,3 +276,111 @@ def model_health_checker():
         return info
 
     return {"check_health": check_model_health, "get_info": get_model_info}
+
+
+@pytest.fixture(scope="function")
+def ensure_models_preloaded(real_model_loader):
+    """
+    Fixture that ensures models are preloaded before each test function runs.
+    This provides additional assurance that models are ready for integration tests.
+
+    The real_model_loader fixture already handles preloading, but this fixture
+    provides a more explicit hook for tests that specifically need models ready.
+    """
+    # Models are already preloaded by real_model_loader fixture
+    # This fixture just serves as a dependency and documentation point
+    from backend.config import get_logger
+
+    logger = get_logger(__name__)
+    logger.debug("Models ensured to be preloaded for integration test")
+    return real_model_loader
+
+
+@pytest.fixture
+def model_performance_monitor():
+    """
+    Fixture that provides utilities to monitor model performance during integration tests.
+
+    Returns:
+        dict: Contains functions to measure model performance and track metrics
+    """
+    import time
+
+    from backend.config import get_logger
+
+    logger = get_logger(__name__)
+
+    def time_model_operation(model, operation_name, operation_func, *args, **kwargs):
+        """Time a model operation and log the results."""
+        start_time = time.time()
+        try:
+            result = operation_func(*args, **kwargs)
+            elapsed_time = time.time() - start_time
+            logger.info(".3f")
+            return result, elapsed_time
+        except Exception:
+            elapsed_time = time.time() - start_time
+            logger.error(".3f")
+            raise
+
+    def benchmark_model(model, model_name, test_data):
+        """Benchmark a model's performance with test data."""
+        if model is None:
+            logger.warning(f"Cannot benchmark {model_name}: model is None")
+            return {"error": "model is None"}
+
+        results = {"model_name": model_name, "operations": {}}
+
+        # Benchmark embedding model
+        if hasattr(model, "encode") and model_name == "embedding":
+            try:
+                _, encode_time = time_model_operation(model, "encode", model.encode, test_data)
+                results["operations"]["encode"] = encode_time
+            except Exception as e:
+                results["operations"]["encode"] = f"error: {e}"
+
+        # Benchmark reranker model
+        elif hasattr(model, "predict") and model_name == "reranker":
+            try:
+                _, predict_time = time_model_operation(model, "predict", model.predict, test_data)
+                results["operations"]["predict"] = predict_time
+            except Exception as e:
+                results["operations"]["predict"] = f"error: {e}"
+
+        else:
+            results["operations"]["unknown"] = f"Unknown model type for {model_name}"
+
+        return results
+
+    def get_performance_summary(real_model_loader):
+        """Get a summary of model loading and performance for the current test session."""
+        status = real_model_loader.get("status", {})
+
+        summary = {
+            "models_loaded": [],
+            "models_failed": [],
+            "total_load_time": status.get("total_time", 0),
+            "load_success_rate": 0,
+        }
+
+        # Count successful and failed model loads
+        for model_type in ["embedding_model", "reranker_model"]:
+            if model_type in status:
+                model_status = status[model_type]
+                if model_status.get("loaded"):
+                    summary["models_loaded"].append(model_type)
+                else:
+                    summary["models_failed"].append(model_type)
+
+        # Calculate success rate
+        total_models = len(summary["models_loaded"]) + len(summary["models_failed"])
+        if total_models > 0:
+            summary["load_success_rate"] = len(summary["models_loaded"]) / total_models
+
+        return summary
+
+    return {
+        "time_operation": time_model_operation,
+        "benchmark_model": benchmark_model,
+        "get_performance_summary": get_performance_summary,
+    }

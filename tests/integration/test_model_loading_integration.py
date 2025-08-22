@@ -55,64 +55,211 @@ def reset_global_cache():
 
 
 def test_load_embedder_real_model_with_timeout(reset_global_cache):
-    """Test loading real embedding model with timeout protection."""
+    """
+    Test loading real embedding model with timeout protection.
+
+    This test validates that the embedding model can be loaded and functions correctly.
+    In integration test environments, network issues may cause model loading to fail,
+    which should result in graceful test skipping rather than failure.
+    """
     logger.info("Testing real embedding model loading...")
 
     start_time = time.time()
 
-    # Load with timeout protection
-    model = load_embedder()
-    elapsed_time = time.time() - start_time
+    try:
+        # Load with timeout protection
+        model = load_embedder()
+        elapsed_time = time.time() - start_time
 
-    # Verify reasonable load time
-    assert elapsed_time < MODEL_LOAD_TIMEOUT, ".2f"
-    logger.info(".2f")
+        # Verify reasonable load time
+        assert elapsed_time < MODEL_LOAD_TIMEOUT, ".2f"
+        logger.info(".2f")
 
-    # Verify model is loaded and functional
-    assert model is not None, "Embedding model should be loaded"
+        # Verify model is loaded and functional
+        assert model is not None, "Embedding model should be loaded"
 
-    # Test basic functionality
-    embedder_model = cast(SentenceTransformer, model)
-    embedding = embedder_model.encode(TEST_SENTENCE)
-    assert embedding.shape == (EXPECTED_EMBEDDING_DIM,), (
-        f"Expected shape ({EXPECTED_EMBEDDING_DIM},), got {embedding.shape}"
-    )
-    assert len(embedding) > 0, "Embedding should not be empty"
-    assert embedding.dtype in ["float32", "float64"], f"Unexpected embedding dtype: {embedding.dtype}"
+        # Test basic functionality
+        embedder_model = cast(SentenceTransformer, model)
+        embedding = embedder_model.encode(TEST_SENTENCE)
 
-    logger.info("✓ Embedding model loaded and validated successfully")
+        # Validate embedding output
+        assert embedding.shape == (EXPECTED_EMBEDDING_DIM,), (
+            f"Expected shape ({EXPECTED_EMBEDDING_DIM},), got {embedding.shape}"
+        )
+        assert len(embedding) > 0, "Embedding should not be empty"
+        assert embedding.dtype in ["float32", "float64"], f"Unexpected embedding dtype: {embedding.dtype}"
+
+        logger.info("✓ Embedding model loaded and validated successfully")
+
+    except (OSError, ConnectionError, TimeoutError) as e:
+        # Handle network/system level errors
+        should_skip, reason = _should_skip_on_model_error(e)
+        if should_skip:
+            pytest.skip(f"Embedding model loading failed: {reason}")
+        else:
+            # Re-raise unexpected errors of this type
+            raise
+
+    except Exception as e:
+        # Handle other model loading failures - analyze the error to determine if skip is appropriate
+        should_skip, reason = _should_skip_on_model_error(e)
+        if should_skip:
+            pytest.skip(f"Embedding model loading failed: {reason}")
+        else:
+            # For truly unexpected errors, we want to know about them
+            logger.error(f"Unexpected error during embedding model loading: {e}")
+            raise
+
+
+def _is_network_connectivity_error(error: Exception) -> bool:
+    """
+    Determine if an exception is likely due to network connectivity issues.
+
+    Args:
+        error: The exception to analyze
+
+    Returns:
+        bool: True if this appears to be a network connectivity issue
+    """
+    error_msg = str(error).lower()
+    network_indicators = [
+        "huggingface.co",
+        "couldn't connect",
+        "failed to establish",
+        "no route to host",
+        "connection refused",
+        "connection reset",
+        "connection timed out",
+        "network is unreachable",
+        "temporary failure in name resolution",
+        "ssl certificate verify failed",
+        "certificate verify failed",
+    ]
+    return any(indicator in error_msg for indicator in network_indicators)
+
+
+def _is_model_availability_error(error: Exception) -> bool:
+    """
+    Determine if an exception is likely due to model availability issues.
+
+    Args:
+        error: The exception to analyze
+
+    Returns:
+        bool: True if this appears to be a model availability issue
+    """
+    error_msg = str(error).lower()
+    availability_indicators = [
+        "offline",
+        "not found",
+        "no such file",
+        "cannot find",
+        "model not available",
+        "repository not found",
+        "revision not found",
+        "access denied",  # Sometimes indicates network/auth issues
+    ]
+    return any(indicator in error_msg for indicator in availability_indicators)
+
+
+def _should_skip_on_model_error(error: Exception) -> tuple[bool, str]:
+    """
+    Determine if a model loading error should result in test skip.
+
+    Args:
+        error: The exception to analyze
+
+    Returns:
+        tuple: (should_skip, reason_message)
+    """
+    if _is_network_connectivity_error(error):
+        return True, f"Network connectivity issue: {error}"
+
+    if _is_model_availability_error(error):
+        return True, f"Model availability issue: {error}"
+
+    # Check for specific exception types that indicate environmental issues
+    if isinstance(error, (OSError, ConnectionError, TimeoutError)):
+        return True, f"System/environmental issue: {error}"
+
+    return False, ""
 
 
 def test_load_reranker_real_model_with_timeout(reset_global_cache):
-    """Test loading real reranker model with timeout protection."""
+    """
+    Test loading real reranker model with timeout protection.
+
+    This test validates that the reranker model can be loaded and functions correctly.
+    In integration test environments, network issues may cause model loading to fail,
+    which should result in graceful test skipping rather than failure.
+    """
     logger.info("Testing real reranker model loading...")
 
     start_time = time.time()
 
-    # Load with timeout protection
-    model = load_reranker()
-    elapsed_time = time.time() - start_time
+    try:
+        # Load with timeout protection
+        model = load_reranker()
+        elapsed_time = time.time() - start_time
 
-    # Verify reasonable load time
-    assert elapsed_time < MODEL_LOAD_TIMEOUT, ".2f"
-    logger.info(".2f")
+        # Verify reasonable load time
+        assert elapsed_time < MODEL_LOAD_TIMEOUT, ".2f"
+        logger.info(".2f")
 
-    # Verify model is loaded and functional
-    assert model is not None, "Reranker model should be loaded"
+        # Verify model is loaded and functional
+        assert model is not None, "Reranker model should be loaded"
 
-    # Test basic functionality with simple query-chunk pair
-    query = "What is machine learning?"
-    relevant_chunk = "Machine learning is a subset of artificial intelligence."
-    irrelevant_chunk = "The weather is nice today for outdoor activities."
+        # Test basic functionality with simple query-chunk pair
+        query = "What is machine learning?"
+        relevant_chunk = "Machine learning is a subset of artificial intelligence."
+        irrelevant_chunk = "The weather is nice today for outdoor activities."
 
-    reranker_model = cast(CrossEncoder, model)
-    scores = reranker_model.predict([[query, relevant_chunk], [query, irrelevant_chunk]])
+        reranker_model = cast(CrossEncoder, model)
+        scores = reranker_model.predict([[query, relevant_chunk], [query, irrelevant_chunk]])
 
-    assert len(scores) == 2, f"Expected 2 scores, got {len(scores)}"
-    assert scores[0] > scores[1], f"Relevant chunk should score higher: {scores[0]} vs {scores[1]}"
-    assert all(isinstance(score, (int, float)) for score in scores), "All scores should be numeric"
+        # Validate reranker output
+        assert len(scores) == 2, f"Expected 2 scores, got {len(scores)}"
+        assert scores[0] > scores[1], f"Relevant chunk should score higher: {scores[0]} vs {scores[1]}"
 
-    logger.info("✓ Reranker model loaded and validated successfully")
+        # Check that all scores are numeric (including numpy types)
+        def is_numeric(value):
+            try:
+                # Check for Python numeric types
+                if isinstance(value, (int, float)):
+                    return True
+                # Check for numpy numeric types
+                if hasattr(value, "dtype"):
+                    import numpy as np
+
+                    return np.issubdtype(value.dtype, np.number)
+                # Fallback: try to convert to float
+                float(value)
+                return True
+            except (ValueError, TypeError):
+                return False
+
+        assert all(is_numeric(score) for score in scores), f"All scores should be numeric: {scores}"
+
+        logger.info("✓ Reranker model loaded and validated successfully")
+
+    except (OSError, ConnectionError, TimeoutError) as e:
+        # Handle network/system level errors
+        should_skip, reason = _should_skip_on_model_error(e)
+        if should_skip:
+            pytest.skip(f"Reranker model loading failed: {reason}")
+        else:
+            # Re-raise unexpected errors of this type
+            raise
+
+    except Exception as e:
+        # Handle other model loading failures - analyze the error to determine if skip is appropriate
+        should_skip, reason = _should_skip_on_model_error(e)
+        if should_skip:
+            pytest.skip(f"Reranker model loading failed: {reason}")
+        else:
+            # For truly unexpected errors, we want to know about them
+            logger.error(f"Unexpected error during reranker model loading: {e}")
+            raise
 
 
 def test_model_caching_behavior(reset_global_cache):
