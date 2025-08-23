@@ -3,12 +3,9 @@
 from typing import cast
 
 import httpx
-import pytest
 
 from backend import ollama_client as oc
 from backend.config import OLLAMA_MODEL
-
-pytestmark = pytest.mark.unit
 
 
 class DummyResp:

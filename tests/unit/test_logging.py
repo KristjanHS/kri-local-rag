@@ -5,12 +5,8 @@ import logging
 import os
 import tempfile
 
-import pytest
-
 from backend.config import get_logger
 from backend.console import console
-
-pytestmark = pytest.mark.unit
 
 
 def test_basic_logging():
