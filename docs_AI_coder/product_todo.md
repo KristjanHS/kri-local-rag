@@ -448,6 +448,49 @@ def test_something(mocker, mock_embedding_model):
     - ✅ Focused mocking with pytest's monkeypatch
     - ✅ Easy to understand and modify for new developers
 
+    #### P2.3 — Pre-commit Error Resolution Code Quality Improvements (PLANNED)
+
+    **Goal**: Fix code organization issues introduced during pre-commit error resolution to follow established best practices and eliminate code duplication.
+
+    **Issues Identified**:
+    - **Code Duplication**: `scripts/check_integration_env.py` implements functions that should be imported from `conftest.py`
+    - **Inconsistent Function Organization**: Utility functions scattered across modules instead of being centralized
+    - **Maintenance Burden**: Multiple implementations of the same functionality increase maintenance overhead
+
+    **Best Practices Analysis**:
+    - ✅ **Type Annotations**: Proper use of `Optional[dict[str, Any]]` for None parameters
+    - ✅ **Import Organization**: Correct import of `is_running_in_docker` from `backend.config`
+    - ✅ **Dependency Management**: Proper conditional dependency for `tomli` with Python version constraints
+    - ✅ **Import Error Handling**: Correct use of `# type: ignore[import-untyped]` for conditional imports
+    - ⚠️ **Function Organization**: Local implementations instead of importing from appropriate modules
+
+    **Implementation Plan**:
+
+    - [ ] **Task P2.3.1** — Consolidate Integration Test Utility Functions
+      - Action: Move `get_available_services()`, `get_ollama_url()`, and `get_weaviate_hostname()` from `scripts/check_integration_env.py` to `tests/integration/conftest.py`
+      - Action: Update `scripts/check_integration_env.py` to import these functions from `conftest.py`
+      - Action: Ensure functions are properly exported and accessible
+      - Verify: No code duplication, single source of truth for integration utilities
+
+    - [ ] **Task P2.3.2** — Improve Function Organization and Imports
+      - Action: Review all utility functions in `scripts/` directory for proper module organization
+      - Action: Identify functions that should be moved to appropriate `backend/` modules
+      - Action: Update imports to use centralized utility functions
+      - Verify: Clear separation of concerns and reduced code duplication
+
+    - [ ] **Task P2.3.3** — Add Integration Test Utility Function Documentation
+      - Action: Add docstrings to utility functions in `conftest.py` explaining their purpose and usage
+      - Action: Update `scripts/check_integration_env.py` documentation to reference imported functions
+      - Action: Ensure clear documentation of the integration test utility API
+      - Verify: Clear documentation for developers using these utilities
+
+    **Success Criteria**:
+    - ✅ No code duplication between `scripts/` and `tests/integration/` modules
+    - ✅ Single source of truth for integration test utilities
+    - ✅ Clear function organization following established patterns
+    - ✅ Proper documentation of utility functions and their usage
+    - ✅ Maintained functionality while improving code organization
+
     **Expected Benefits**:
     - **Faster onboarding**: New developers understand the system quickly with pytest-native patterns
     - **Easier maintenance**: Less code to maintain and debug (80% reduction in conftest.py)
