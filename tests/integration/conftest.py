@@ -171,6 +171,23 @@ def get_ollama_url() -> str:
     return get_service_url("ollama")
 
 
+def get_weaviate_hostname() -> str:
+    """Get the Weaviate hostname."""
+    weaviate_url = get_service_url("weaviate")
+    return weaviate_url.replace("http://", "").replace(":8080", "")
+
+
+def get_available_services() -> dict[str, bool]:
+    """Check available services using HTTP health checks."""
+    config = get_integration_config()
+    services = {}
+
+    for service in ["weaviate", "ollama"]:
+        services[service] = is_service_healthy(service, config)
+
+    return services
+
+
 # Mocking fixtures using monkeypatch
 @pytest.fixture
 def managed_embedding_model(mocker) -> MagicMock:
