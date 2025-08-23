@@ -4,8 +4,6 @@ import types
 
 import pytest
 
-pytestmark = pytest.mark.unit
-
 
 def test_weaviate_connect_to_custom_guard_blocks_real_client():
     """Direct calls to weaviate.connect_to_custom must be blocked in unit tests."""

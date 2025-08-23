@@ -9,8 +9,6 @@ import pytest
 # Disable torch.compile during these mocked tests to avoid unnecessary compile overhead
 os.environ["RETRIEVER_EMBEDDING_TORCH_COMPILE"] = "false"
 
-pytestmark = pytest.mark.unit
-
 
 class TestHybridSearchFix:
     """Test hybrid search with manual vectorization and error scenarios."""
