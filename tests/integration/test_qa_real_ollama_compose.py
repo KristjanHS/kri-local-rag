@@ -4,18 +4,20 @@ This test exercises the QA path end-to-end with the actual LLM by patching only
 the retrieval step. Supports both Docker and local environments.
 """
 
+import pytest
+
 from backend.config import OLLAMA_MODEL
 from backend.ollama_client import ensure_model_available
 from backend.qa_loop import answer
 
-from .conftest import require_services
+pytestmark = pytest.mark.requires_ollama
 
 
-@require_services("ollama")
-def test_answer_uses_real_ollama_compose(managed_get_top_k):
+@pytest.mark.requires_ollama
+def test_answer_uses_real_ollama_compose(mock_get_top_k):
     """Test QA with real Ollama using both Docker and local environments."""
     # Configure the mock provided by the fixture
-    managed_get_top_k.return_value = ["Paris is the capital of France."]
+    mock_get_top_k.return_value = ["Paris is the capital of France."]
 
     # Ensure the required model is available (will download with visible progress if missing)
     assert ensure_model_available(OLLAMA_MODEL) is True

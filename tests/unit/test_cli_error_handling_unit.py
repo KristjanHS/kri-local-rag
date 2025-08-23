@@ -27,7 +27,7 @@ def test_cli_single_question_reports_error_and_exits(monkeypatch, capsys):
     fake_qa_module.answer = _raise_answer  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "backend.qa_loop", fake_qa_module)
     # Also attach to parent package to ensure import resolution uses the fake
-    import backend  # noqa: WPS433 (import for testing)
+    import backend  # type: ignore[attr-defined] # import for testing
 
     monkeypatch.setattr(backend, "qa_loop", fake_qa_module, raising=False)
 

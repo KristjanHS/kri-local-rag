@@ -12,7 +12,9 @@ VENV_PYTHON_PATH = PROJECT_ROOT / ".venv" / "bin" / "python"
 BACKEND_CONFIG_PATH = PROJECT_ROOT / "backend" / "config.py"
 
 
-@pytest.mark.skipif(Path("/.dockerenv").exists(), reason="Test not applicable in Docker container")
+@pytest.mark.skipif(
+    os.getenv("TEST_DOCKER", "false").lower() == "true", reason="Test not applicable in Docker container"
+)
 def test_python_executable_is_from_venv():
     """
     Verifies that pytest runs inside the project's virtual environment.

@@ -6,7 +6,8 @@ import pytest
 from sentence_transformers import SentenceTransformer
 
 from backend import config, ingest
-from tests.integration.conftest import get_weaviate_hostname, is_running_in_docker
+from backend.config import is_running_in_docker
+from tests.integration.conftest import get_service_url
 
 # Mark the entire module as 'slow'
 pytestmark = pytest.mark.slow
@@ -14,6 +15,12 @@ pytestmark = pytest.mark.slow
 # --- Constants ---
 EMBEDDING_MODEL = config.EMBEDDING_MODEL
 COLLECTION_NAME = "TestCollection"  # Use a dedicated test collection
+
+
+def get_weaviate_hostname() -> str:
+    """Get the Weaviate hostname."""
+    weaviate_url = get_service_url("weaviate")
+    return weaviate_url.replace("http://", "").replace(":8080", "")
 
 
 @pytest.fixture(scope="module")

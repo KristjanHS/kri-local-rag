@@ -19,7 +19,8 @@ def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: D401
     # Only unset environment variables when running outside Docker containers
     # (for host-based testing). When running inside containers, we want to
     # preserve the environment variables set by Docker Compose.
-    if not Path("/.dockerenv").exists():
+    test_docker = os.getenv("TEST_DOCKER", "false").lower() == "true"
+    if not test_docker:
         os.environ.pop("WEAVIATE_URL", None)
         os.environ.pop("OLLAMA_URL", None)
 
@@ -141,7 +142,8 @@ def docker_services(request, test_log_file):
     Manages the Docker environment for the test session.
     """
     # If running inside a Docker container, assume services are already managed
-    if Path("/.dockerenv").exists():
+    test_docker = os.getenv("TEST_DOCKER", "false").lower() == "true"
+    if test_docker:
         console.print("\n--- Running inside Docker, skipping Docker service management. ---")
         yield
         return
