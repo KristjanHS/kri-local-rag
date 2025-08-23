@@ -23,7 +23,7 @@ def test_startup_ensures_model_and_exits_when_missing(monkeypatch, capsys, caplo
     fake_qa_module.ensure_weaviate_ready_and_populated = _noop_ready  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "backend.qa_loop", fake_qa_module)
     # Ensure parent package attribute also points to fake module
-    import backend  # noqa: WPS433
+    import backend  # type: ignore[attr-defined]
 
     monkeypatch.setattr(backend, "qa_loop", fake_qa_module, raising=False)
 
