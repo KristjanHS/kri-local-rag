@@ -48,83 +48,6 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 ## Prioritized Backlog
 
-#### P0 — Model Handling Best Practices Implementation ✅ COMPLETED
-- **Why**: Current model setup lacks reproducibility, offline capability, and proper environment separation. Following `models_guide.md` best practices to create production-ready model handling.
-- **Goal**: Implement offline-first, reproducible model loading with proper environment-specific configurations.
-
-- [x] **Task 1 — Pin model commits for reproducibility**
-  - **Action**: Added pinned model commits to `.env` file for sentence-transformers/all-MiniLM-L6-v2 and cross-encoder/ms-marco-MiniLM-L-6-v2
-  - **Verify**: `.env` file contains EMBED_REPO, EMBED_COMMIT, RERANK_REPO, RERANK_COMMIT variables
-
-- [x] **Task 2 — Create offline-first model loader**
-  - **Action**: Created `backend/models.py` with `load_embedder()` and `load_reranker()` functions that check local paths first, fall back to downloads with proper caching
-  - **Verify**: Model loading works both online (development) and can be configured for offline (production)
-
-- [x] **Task 3 — Update existing code to use new loader**
-  - **Action**: Replaced old model loading in `backend/retriever.py` and `backend/qa_loop.py` with new offline-first loader
-  - **Verify**: Updated `_get_embedding_model()` and `_get_cross_encoder()` functions to use `load_embedder()` and `load_reranker()`
-
-- [x] **Task 4 — Configure environment-specific settings**
-  - **Action**: Configured environment variables for development mode with `TRANSFORMERS_OFFLINE=0`, `HF_HOME=/tmp/hf_cache`, and proper model repository/commit pinning
-  - **Verify**: Current setup supports development workflow with cached downloads; production configuration can be added by switching `TRANSFORMERS_OFFLINE=1` and using baked model paths
-
-- [x] **Task 5 — Update Dockerfiles for two-stage model fetching** ✅ COMPLETED
-  - **Action**: Modified both `docker/app.Dockerfile` and `docker/app.test.Dockerfile` to implement two-stage build: fetch models at build time, copy to runtime
-  - **Verification Progress**:
-    - ✅ Dockerfiles updated with models stage using `huggingface_hub.snapshot_download`
-    - ✅ Models stage downloads with pinned commits from build args
-    - ✅ Models copied to builder and final stages
-    - ✅ Offline environment variables set (`TRANSFORMERS_OFFLINE=1`, model paths)
-    - ✅ Docker build successful - image `kri-local-rag-app:test` created (7.46GB)
-    - ✅ Verified built image contains models (embedding + reranker with PyTorch, SafeTensors, OpenVINO)
-    - ✅ Tested offline functionality - models load and perform inference successfully
-    - ✅ Confirmed pinned commits are correctly used (c9745ed1d9f207416be6d2e6f8de32d1f16199bf, ce0834f22110de6d9222af7a7a03628121708969)
-
-**P0 VERIFICATION SUMMARY** ✅ FULLY COMPLETED:
-- **✅ Task 1**: `.env` file created with pinned commits (c9745ed1d9f207416be6d2e6f8de32d1f16199bf, ce0834f22110de6d9222af7a7a03628121708969)
-- **✅ Task 2**: `backend/models.py` loader functions working (offline-first logic verified)
-- **✅ Task 3**: Updated code integration verified (retriever and qa_loop use new loaders)
-- **✅ Task 4**: Environment configurations tested (development vs offline modes)
-- **✅ Task 5**: Docker implementation completed with full offline functionality verified
-
-
-#### P1 — Single Source of Truth for Model Configuration ✅ COMPLETED
-**Goal**: Eliminate model name duplication across the entire codebase and establish `backend/config.py` as the single source of truth for all model configurations.
-
-**Current Status**: ✅ **COMPLETED**
-- ✅ Centralized model defaults in `backend/config.py`
-- ✅ Updated `backend/models.py` to use centralized config
-- ✅ Updated scripts to use centralized config
-- ✅ Consistent `DEFAULT_` naming convention
-- ✅ Environment variable override support maintained
-- ✅ Removed duplicate model download scripts
-- ✅ Updated all test files to use centralized config
-- ✅ Validated single source of truth working correctly
-
-**Next Steps**:
-- [x] **Remove duplicate model download scripts** ✅ COMPLETED
-  - Removed `scripts/setup/download_model.py` (redundant with `backend/models.py`)
-  - Removed `scripts/download_models.py` (duplication of functionality)
-  - Kept `backend/models.py` as single source for model downloading
-  - ✅ Validation script confirms single source of truth still works
-- [x] **Update remaining references** ✅ COMPLETED
-  - ✅ Updated test files to use centralized model names
-  - ✅ Updated `tests/unit/test_search_logic.py`
-  - ✅ Updated `tests/integration/test_ml_environment.py`
-  - Update documentation references
-  - Ensure all scripts use centralized config
-- [x] **Validate single source of truth** ✅ COMPLETED
-  - ✅ Ran validation script - no duplicates remain
-  - ✅ Environment variable overrides work correctly (EMBED_REPO, RERANK_REPO, OLLAMA_MODEL)
-  - ✅ All model configurations come from `backend/config.py`
-  - ✅ Validation script confirms single source of truth working
-
-**Benefits**:
-- 🔄 **Single place to change** any model configuration
-- 🛡️ **No risk of inconsistencies** between different files
-- 📋 **Easy maintenance** - one file to update for model changes
-- 🧪 **Environment flexibility** - override any model via environment variables
-
 #### P2 — Complete Application Validation After Model Changes (IN PROGRESS)
 
 **Goal**: Validate that the entire RAG application works correctly after the comprehensive model handling refactoring, ensuring no regressions were introduced.
@@ -160,7 +83,7 @@ This file tracks outstanding tasks and planned improvements for the project.
 
     **✅ VALIDATION COMPLETE**: All unit tests now pass with modern mocking approach implemented.
 
-## **📋 Established Patterns for AI Coders**
+## **📋 Established Patterns for AI Coder**
 
 ### **🔧 Testing Infrastructure**
 - **Modern Mocking**: Use `mocker` fixture from `pytest-mock` instead of `unittest.mock.patch`
@@ -193,79 +116,7 @@ def test_something(mocker, mock_embedding_model):
   - 🔄 Test error scenarios (missing models, network issues)
   - 🔄 Verify offline mode functionality
 
-      #### P2.1 — Integration Tests with Real Local Models ✅ FULLY COMPLETED
-
-    **Goal**: Configure integration tests to use real local models efficiently, ensuring proper caching and performance while maintaining test reliability.
-
-    **Status**: ✅ COMPLETED - All integration test optimizations have been successfully implemented and validated.
-
-    **Key Achievements**:
-    - **100x+ Performance Improvement**: Model loading reduced from 7-11s to 0.005s with caching
-    - **Robust Error Handling**: Tests gracefully skip on network issues instead of failing
-    - **Production-Ready**: Enterprise-grade error handling and logging
-    - **Comprehensive Coverage**: All model types (embedding, reranker) fully supported
-    - **Environment Flexibility**: Works in CI/CD, development, and offline scenarios
-
-    **Target Architecture**:
-    - Use pre-downloaded/cached local models for integration tests
-    - Implement smart model caching to avoid repeated downloads
-    - Focus on component integration with real model behavior
-    - Maintain test isolation and performance
-
-    **Implementation Plan**:
-    - [x] **Step 1**: Set up local model cache infrastructure ✅ COMPLETED
-      - ✅ Create dedicated cache directory for integration tests
-      - ✅ Configure environment variables for local model paths
-      - ✅ Ensure models are available offline for CI/local testing
-      - ✅ Implement session-scoped fixtures with automatic cleanup
-      - ✅ Add comprehensive model health checking and error handling
-      - ✅ Performance validation: 100x+ speed improvement (0.005s vs 7-11s)
-
-    - [x] **Step 2**: Optimize model loading for integration tests ✅ COMPLETED
-      - ✅ Modify backend/models.py to prioritize local cache over downloads
-      - ✅ Add integration-specific model loading configuration with environment variables
-      - ✅ Implement timeout handling for model operations with configurable timeouts
-      - ✅ Add retry logic with exponential backoff for network failures
-      - ✅ Fix TRANSFORMERS_OFFLINE configuration to properly handle environment variables
-
-    - [x] **Step 3**: Update integration test fixtures for real models ✅ COMPLETED
-      - ✅ Create fixtures that ensure real models are available (real_model_loader, real_embedding_model, real_reranker_model)
-      - ✅ Add model health checks before test execution with comprehensive error handling
-      - ✅ Implement proper cleanup and cache management with session-scoped fixtures
-      - ✅ Add model performance monitoring capabilities
-      - ✅ Enhanced fixture with status tracking and detailed loading information
-
-    - [x] **Step 4**: Enhance test performance and reliability ✅ COMPLETED
-      - ✅ Add model preloading capabilities (preload_models_with_health_check, preload_models_for_integration_tests)
-      - ✅ Implement test-specific model caching strategies with automatic cleanup
-      - ✅ Add retry logic for model loading failures with exponential backoff
-      - ✅ Implement comprehensive error handling for network connectivity issues
-      - ✅ Add performance monitoring and benchmarking capabilities
-      - ✅ Enhanced model loading with status tracking and detailed logging
-
-    - [x] **Step 5**: Validate real model integration testing ✅ COMPLETED
-      - ✅ Ensure tests focus on component interactions with real models (comprehensive test suite)
-      - ✅ Verify proper error handling with actual model failures (graceful skipping for network issues)
-      - ✅ Confirm performance meets acceptable thresholds (< 60 seconds - achieved ~8-10 seconds)
-      - ✅ Implement robust error detection for network vs code issues
-      - ✅ Add comprehensive numeric type handling for numpy arrays
-      - ✅ Validate all integration test optimizations work correctly
-
-    **Success Criteria - ALL MET**:
-    - ✅ Integration tests use real local models without internet downloads
-    - ✅ Model caching works efficiently across test runs (100x+ performance improvement)
-    - ✅ Tests maintain focus on component integration, not just model validation
-    - ✅ Reasonable test execution time (target: < 60 seconds - achieved 8-10 seconds)
-    - ✅ Proper test isolation and cleanup with session-scoped fixtures
-    - ✅ Works in both local development and CI environments with graceful error handling
-
-    **Risks to Monitor**:
-    - ⚠️ Model download size impacting CI performance
-    - ⚠️ Local model storage requirements
-    - ⚠️ Model compatibility issues across different environments
-    - ⚠️ Test flakiness from real model operations
-
-    #### P2.2 — Integration Tests Logic Simplification (PLANNED)
+    #### P2.2 — Integration Tests Logic Simplification
 
     **Goal**: Dramatically simplify the integration tests infrastructure while maintaining functionality and improving developer experience by adopting pytest best practices.
 
@@ -411,7 +262,6 @@ def test_something(mocker, mock_embedding_model):
     - ⚠️ Loss of some advanced features (detailed error context, service caching)
     - ⚠️ Need for clear migration documentation
     - ⚠️ Potential initial test failures during transition
-
 
 - [ ] **Core RAG Pipeline Components**
   - 🔄 Test retriever module with real models
