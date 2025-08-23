@@ -1,38 +1,31 @@
 #!/usr/bin/env python3
-"""Integration tests for Weaviate using Docker Compose - runs inside container."""
+"""Integration tests for Weaviate using simplified pytest-native patterns."""
 
 import logging
-import time
 
+import pytest
 import weaviate
 from weaviate.classes.config import DataType, Property
-
-from tests.integration.conftest import get_weaviate_hostname
 
 logger = logging.getLogger(__name__)
 
 
-def test_weaviate_service_is_ready():
+@pytest.mark.requires_weaviate
+def test_weaviate_service_is_ready(integration):
     """Verify that the Weaviate service is ready to accept connections."""
-    # Use dynamic hostname detection to work in both Docker and local environments
-    weaviate_host = get_weaviate_hostname()
-    logger.info(f"Connecting to Weaviate at {weaviate_host}:8080")
-    client = weaviate.connect_to_local(
-        host=weaviate_host,
-        port=8080,
-        grpc_port=50051,
-    )
+    # Get Weaviate URL using the integration fixture
+    weaviate_url = integration["get_service_url"]("weaviate")
+    hostname = weaviate_url.replace("http://", "").replace(":8080", "")
 
-    # Wait for Weaviate to be ready
-    max_retries = 30
-    for i in range(max_retries):
-        try:
-            if client.is_ready():
-                break
-        except Exception:
-            if i == max_retries - 1:
-                raise
-            time.sleep(2)
+    logger.info(f"Connecting to Weaviate at {hostname}:8080")
+    client = weaviate.connect_to_custom(
+        http_host=hostname,
+        http_port=8080,
+        grpc_host=hostname,
+        grpc_port=50051,
+        http_secure=False,
+        grpc_secure=False,
+    )
 
     try:
         assert client.is_ready()
@@ -41,15 +34,21 @@ def test_weaviate_service_is_ready():
         client.close()
 
 
-def test_weaviate_basic_operations():
+@pytest.mark.requires_weaviate
+def test_weaviate_basic_operations(integration):
     """Test basic Weaviate operations to ensure the service is fully functional."""
-    # Use dynamic hostname detection to work in both Docker and local environments
-    weaviate_host = get_weaviate_hostname()
-    logger.info(f"Connecting to Weaviate at {weaviate_host}:8080 for basic operations test")
-    client = weaviate.connect_to_local(
-        host=weaviate_host,
-        port=8080,
+    # Get Weaviate URL using the integration fixture
+    weaviate_url = integration["get_service_url"]("weaviate")
+    hostname = weaviate_url.replace("http://", "").replace(":8080", "")
+
+    logger.info(f"Connecting to Weaviate at {hostname}:8080 for basic operations test")
+    client = weaviate.connect_to_custom(
+        http_host=hostname,
+        http_port=8080,
+        grpc_host=hostname,
         grpc_port=50051,
+        http_secure=False,
+        grpc_secure=False,
     )
 
     try:

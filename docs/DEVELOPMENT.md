@@ -37,15 +37,20 @@ For basic usage and quick-start commands, see the root README. This document foc
 .venv/bin/python -m pytest tests/unit -n auto -q
 ```
 
-- Integration (one real component; network allowed):
+- Integration (real services with simplified patterns):
 ```bash
+# Docker environment (recommended)
+export TEST_DOCKER=true
+make test-up
+.venv/bin/python -m pytest tests/integration -q
+make test-down
+
+# Local environment
+export TEST_DOCKER=false
 .venv/bin/python -m pytest tests/integration -q
 ```
 
-Integration policy:
-- Prefer a single real dependency or Testcontainers per test. If multiple real services are required, move the test to `tests/e2e/`.
-- Network is allowed. Do not auto-start Docker Compose in this suite; tests that truly need the full stack belong in E2E.
-- Keep tests deterministic: avoid importing heavy target modules in fixtures; if needed, reset module caches via `sys.modules`.
+For detailed integration testing patterns, see `docs/testing_strategy.md`.
 
 - E2E (full stack via Docker Compose):
 ```bash
@@ -128,6 +133,7 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 ## More docs
 - Detailed guidance used mostly by AI coder: `docs_AI_coder/AI_instructions.md`
 - Docker management and troubleshooting: `docs/docker-management.md`
+- **Testing strategy**: `docs/testing_strategy.md` - Complete guide to testing patterns, integration tests, and model management
 
 
 ## Helper scripts
