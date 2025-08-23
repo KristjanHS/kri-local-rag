@@ -265,73 +265,22 @@ def test_something(mocker, mock_embedding_model):
     - ⚠️ Model compatibility issues across different environments
     - ⚠️ Test flakiness from real model operations
 
-    #### P2.2 — Convert Standalone Test Script to Proper Pytest Integration Tests
-
-    **Goal**: Convert the standalone `test_integration_optimizations.py` script into proper pytest integration tests that follow project conventions and integrate with the existing test infrastructure.
-
-    **Background**: The current `test_integration_optimizations.py` script provides unique value by testing configuration and environment variable behavior that isn't covered by existing integration tests. However, it needs to be converted to follow pytest patterns and integrate with the project's test suite.
-
-    **Current State**: Standalone script with manual test functions, `assert` statements, and `print()` calls that needs conversion to proper pytest format.
-
-    - [ ] **Task 1 — Convert to pytest format**
-      - **Action**: Convert standalone script functions to proper pytest test functions with descriptive names
-      - **Action**: Replace `assert` statements with proper pytest assertions and error messages
-      - **Action**: Add appropriate pytest marks (`@pytest.mark.integration`, potentially `@pytest.mark.slow`)
-      - **Verify**: Script can be discovered and run by pytest
-
-    - [ ] **Task 2 — Integrate with existing test infrastructure**
-      - **Action**: Move test file to `tests/integration/` directory with proper naming
-      - **Action**: Integrate with existing conftest.py fixtures for model setup and cleanup
-      - **Action**: Use project's logging system instead of manual print statements
-      - **Action**: Add proper test isolation and dependency injection patterns
-      - **Verify**: Test works with existing fixture infrastructure
-
-    - [ ] **Task 3 — Add environment variable testing coverage**
-      - **Action**: Create comprehensive tests for all integration test configuration options
-      - **Action**: Test environment variable precedence and fallback behavior
-      - **Action**: Add tests for invalid configuration scenarios and error handling
-      - **Verify**: All configuration paths are tested with proper assertions
-
-    - [ ] **Task 4 — Implement proper test cleanup and isolation**
-      - **Action**: Replace manual environment variable manipulation with pytest fixtures
-      - **Action**: Add proper cleanup to restore original environment state
-      - **Action**: Ensure tests don't interfere with each other
-      - **Verify**: Tests are deterministic and isolated
-
-    - [ ] **Task 5 — Add documentation and CI integration**
-      - **Action**: Update testing documentation to include new integration tests
-      - **Action**: Add tests to CI pipeline with appropriate markers
-      - **Action**: Document test purpose and coverage in test docstrings
-      - **Verify**: Tests are included in CI and documentation is complete
-
-    **Success Criteria**:
-    - ✅ Tests follow pytest conventions and project patterns
-    - ✅ Tests integrate with existing fixture infrastructure
-    - ✅ Configuration testing provides unique value not covered by existing tests
-    - ✅ Tests are isolated, deterministic, and properly cleaned up
-    - ✅ Tests are included in CI pipeline and documentation
-
-    **Risks to Monitor**:
-    - ⚠️ Test duplication with existing integration tests
-    - ⚠️ Configuration changes breaking test assumptions
-    - ⚠️ Environment variable conflicts between tests
-
 - [ ] **Core RAG Pipeline Components**
   - 🔄 Test retriever module with real models
-  - 🔄 Test vectorization pipeline
-  - 🔄 Test reranking functionality
-  - 🔄 Test hybrid search logic
+  - 🔄 Test vectorization pipeline with real models
+  - 🔄 Test reranking functionality with real models
+  - 🔄 Test hybrid search logic with real models
 
 - [ ] **Ollama Integration**
   - 🔄 Test Ollama client connectivity
   - 🔄 Test model availability checking
   - 🔄 Test model download via Ollama
-  - 🔄 Test generation with real Ollama models
+  - 🔄 Test generation with real Ollama model
 
 - [ ] **End-to-End QA Pipeline**
-  - 🔄 Test complete QA workflow with mock services
+  - 🔄 Test complete QA workflow with mock services and real models
   - 🔄 Test error handling in QA pipeline
-  - 🔄 Validate context retrieval and answer generation
+  - 🔄 Validate context retrieval and answer generation with real models
   - 🔄 Test different model configurations
 
 - [ ] **Docker Environment**
@@ -343,17 +292,17 @@ def test_something(mocker, mock_embedding_model):
 - [ ] **Real Model Operations**
   - 🔄 Test with actual embedding model (small/fast one)
   - 🔄 Test with actual reranker model (small/fast one)
-  - 🔄 Validate model caching and reuse
+  - 🔄 Validate model caching and reuse with real models
   - 🔄 Test model switching via environment variables
 
 - [ ] **Performance & Memory**
-  - 🔄 Test memory usage with model loading
-  - 🔄 Validate model unloading/caching works
-  - 🔄 Test concurrent model access
+  - 🔄 Test memory usage with real model loading
+  - 🔄 Validate real model unloading/caching works
+  - 🔄 Test concurrent real model access
   - 🔄 Monitor for memory leaks
 
 - [ ] **Error Handling & Edge Cases**
-  - 🔄 Test behavior with missing models
+  - 🔄 Test behavior with missing real models
   - 🔄 Test network failure scenarios
   - 🔄 Test disk space issues
   - 🔄 Test corrupted model files
