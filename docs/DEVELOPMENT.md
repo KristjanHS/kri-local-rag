@@ -142,4 +142,6 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 - `scripts/docker-reset.sh`: full Docker cleanup (containers, images, volumes).
 - `scripts/build_app.sh`: build the `app` image; accepts `--no-cache`.
 - `scripts/cli.sh`: convenience wrapper to run the CLI inside Docker.
-- `
+- `scripts/check_integration_env.py`: Integration test environment checker (imports utilities from `tests/integration/conftest.py`).
+
+**Note**: Scripts that need integration test utilities should import them from `tests/integration/conftest.py` rather than duplicating the logic. See `docs/testing_strategy.md` for details.

@@ -20,35 +20,15 @@ sys.path.insert(0, str(project_root))
 
 try:
     from backend.config import is_running_in_docker
-    from tests.integration.conftest import get_service_url
+    from tests.integration.conftest import (
+        get_available_services,
+        get_ollama_url,
+        get_weaviate_hostname,
+    )
 except ImportError as e:
     logger.error(f"Import error: {e}")
     logger.error("Make sure you're running from the project root directory")
     sys.exit(1)
-
-
-def get_available_services() -> dict[str, bool]:
-    """Check available services using HTTP health checks."""
-    from tests.integration.conftest import get_integration_config, is_service_healthy
-
-    config = get_integration_config()
-    services = {}
-
-    for service in ["weaviate", "ollama"]:
-        services[service] = is_service_healthy(service, config)
-
-    return services
-
-
-def get_ollama_url() -> str:
-    """Get the appropriate Ollama URL."""
-    return get_service_url("ollama")
-
-
-def get_weaviate_hostname() -> str:
-    """Get the Weaviate hostname."""
-    weaviate_url = get_service_url("weaviate")
-    return weaviate_url.replace("http://", "").replace(":8080", "")
 
 
 def check_environment():
