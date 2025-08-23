@@ -35,6 +35,38 @@ A high-level guide to testing with real local models and external services.
 - `tests/integration/` - Real models + mocked services
 - `tests/e2e/` - Full system validation
 
+## Integration Test Utilities
+
+Integration test utilities are centralized in `tests/integration/conftest.py` to avoid code duplication:
+
+### Core Utility Functions
+
+- **`get_service_url(service)`**: Resolves service URLs based on `TEST_DOCKER` environment variable
+- **`is_service_healthy(service)`**: Performs HTTP health checks for services (Weaviate, Ollama)
+- **`get_available_services()`**: Returns a dictionary of service availability status
+- **`get_weaviate_hostname()`**: Extracts hostname from Weaviate URL for connection setup
+
+### Usage Pattern
+
+Scripts and tests should import these utilities rather than reimplementing them:
+
+```python
+# ✅ Correct: Import from conftest.py
+from tests.integration.conftest import (
+    get_service_url,
+    get_available_services,
+    is_service_healthy
+)
+
+# ❌ Avoid: Duplicating logic in scripts
+def get_service_url(service):  # Duplicate implementation
+    # ... implementation
+```
+
+### Example: Integration Environment Checker
+
+The `scripts/check_integration_env.py` script demonstrates proper usage by importing utilities from `conftest.py` rather than duplicating the logic.
+
 ## Environment Configuration
 
 **Environment Variable**: `TEST_DOCKER`
