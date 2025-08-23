@@ -5,8 +5,6 @@ from types import ModuleType
 
 import pytest
 
-pytestmark = pytest.mark.unit
-
 
 def test_startup_ensures_model_and_exits_when_missing(monkeypatch, capsys, caplog):
     # Force startup checks to run: ensure both skip flags are unset
