@@ -46,11 +46,14 @@ addopts = [
     "--ignore=tests/unit/test_debug.py",
     "--ignore=tests/unit/test_logging.py",
     "--ignore=tests/unit/test_search_logic_archived.py",
+    "--strict-markers",  # Ensure all markers are registered
 ]
 markers = [
     "slow: Tests that take longer to run (>30s)",
     "docker: Tests requiring a running Docker daemon",
     "external: Tests that require external services (Weaviate, Ollama)",
+    "requires_weaviate: Tests that require Weaviate service",
+    "requires_ollama: Tests that require Ollama service",
 ]
 testpaths = [
     "tests/unit",
@@ -135,3 +138,27 @@ DEP002 = ["boto3"]       # AWS libs pulled in indirectly
 [tool.coverage.run]
 omit = ["tests/ui/*"]
 data_file = "reports/coverage/.coverage"
+
+[tool.integration]
+# Integration test configuration
+# Service connection settings for different environments
+
+[tool.integration.services]
+weaviate = { host_docker = "weaviate", host_local = "localhost", port = 8080 }
+ollama = { host_docker = "ollama", host_local = "localhost", port = 11434 }
+
+[tool.integration.timeouts]
+service_check = 1.0  # seconds for service availability checks
+cache_duration = 5.0  # seconds to cache service availability
+
+[tool.integration.environments]
+# Environment-specific settings
+docker = { description = "Running inside Docker containers" }
+local = { description = "Running on local machine" }
+
+[tool.integration.commands]
+# Commands to start services in different environments
+docker_start = "make test-up"
+docker_stop = "make test-down"
+local_weaviate_start = "docker run -d -p 8080:8080 semitechnologies/weaviate:latest"
+local_ollama_start = "ollama serve"

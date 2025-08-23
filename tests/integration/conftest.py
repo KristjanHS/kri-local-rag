@@ -16,11 +16,258 @@ Type Safety Notes:
 
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
+
+# Import from centralized location to avoid duplication
+from backend.config import is_running_in_docker
+
+
+# Configuration access utility (if needed for accessing pyproject.toml settings)
+def get_integration_config():
+    """
+    Get integration configuration from pyproject.toml.
+
+    Returns:
+        dict: Integration configuration settings
+    """
+    try:
+        # Try Python 3.11+ tomllib first
+        try:
+            import tomllib
+        except ImportError:
+            # Fall back to tomli for older Python versions
+            try:
+                import tomli as tomllib  # type: ignore[import]
+            except ImportError:
+                return {}  # No TOML support available
+
+        with open("pyproject.toml", "rb") as f:
+            config = tomllib.load(f)
+        return config.get("tool", {}).get("integration", {})
+    except (ImportError, FileNotFoundError, AttributeError):
+        # Fall back to empty config if libraries not available or file not found
+        return {}
+
+
+# Register pytest markers
+def pytest_configure(config):
+    """Register custom pytest markers."""
+    config.addinivalue_line("markers", "requires_weaviate: mark test as requiring Weaviate service")
+    config.addinivalue_line("markers", "requires_ollama: mark test as requiring Ollama service")
+
+
+def get_weaviate_hostname() -> str:
+    """
+    Get the appropriate Weaviate hostname based on the current environment.
+
+    Returns:
+        str: "weaviate" if running in Docker, "localhost" otherwise
+    """
+    return "weaviate" if is_running_in_docker() else "localhost"
+
+
+def is_service_available(host: str, port: int, service_name: str = "service", timeout: float = 1.0) -> bool:
+    """
+    Check if a service is available by attempting a connection.
+
+    Args:
+        host: Service hostname
+        port: Service port
+        service_name: Name of the service for logging
+        timeout: Connection timeout in seconds (reduced for faster tests)
+
+    Returns:
+        bool: True if service is available, False otherwise
+    """
+    import socket
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(timeout)
+            result = sock.connect_ex((host, port))
+            return result == 0
+    except Exception:
+        return False
+
+
+# Cache service availability checks to avoid repeated network calls
+_service_cache = {}
+_service_cache_timestamp = 0
+CACHE_DURATION = 5  # seconds
+
+
+def is_weaviate_available() -> bool:
+    """Check if Weaviate service is available (with caching)."""
+    global _service_cache_timestamp
+    current_time = time.time()
+    cache_key = "weaviate"
+
+    # Use cached result if recent enough
+    if cache_key in _service_cache and current_time - _service_cache_timestamp < CACHE_DURATION:
+        return _service_cache[cache_key]
+
+    # Check service availability
+    hostname = get_weaviate_hostname()
+    result = is_service_available(hostname, 8080, "Weaviate")
+
+    # Cache the result
+    _service_cache[cache_key] = result
+    _service_cache_timestamp = current_time
+
+    return result
+
+
+def is_ollama_available() -> bool:
+    """Check if Ollama service is available (with caching)."""
+    global _service_cache_timestamp
+    current_time = time.time()
+    cache_key = "ollama"
+
+    # Use cached result if recent enough
+    if cache_key in _service_cache and current_time - _service_cache_timestamp < CACHE_DURATION:
+        return _service_cache[cache_key]
+
+    # Check service availability
+    hostname = "ollama" if is_running_in_docker() else "localhost"
+    result = is_service_available(hostname, 11434, "Ollama")
+
+    # Cache the result
+    _service_cache[cache_key] = result
+    _service_cache_timestamp = current_time
+
+    return result
+
+
+def get_available_services() -> dict[str, bool]:
+    """
+    Check availability of all integration test services.
+
+    Returns:
+        dict: Dictionary with service names as keys and availability as values
+    """
+    return {
+        "weaviate": is_weaviate_available(),
+        "ollama": is_ollama_available(),
+    }
+
+
+def connect_to_weaviate_with_fallback(headers: dict[str, str] | None = None):
+    """
+    Connect to Weaviate using environment-appropriate hostname.
+
+    This function automatically detects whether we're running in Docker or locally
+    and uses the appropriate hostname. It will raise an exception if Weaviate
+    is not available.
+
+    Args:
+        headers: Optional headers for Weaviate connection
+
+    Returns:
+        Connected Weaviate client
+
+    Raises:
+        ConnectionError: If Weaviate is not available
+        Exception: For other connection errors
+    """
+    import weaviate
+
+    hostname = get_weaviate_hostname()
+
+    # Check if service is available first
+    if not is_service_available(hostname, 8080, "Weaviate"):
+        raise ConnectionError(f"Weaviate not available at {hostname}:8080")
+
+    try:
+        return weaviate.connect_to_custom(
+            http_host=hostname,
+            http_port=8080,
+            grpc_host=hostname,
+            grpc_port=50051,
+            http_secure=False,
+            grpc_secure=False,
+            headers=headers,
+        )
+    except Exception as e:
+        raise ConnectionError(f"Failed to connect to Weaviate at {hostname}:8080: {e}") from e
+
+
+def get_ollama_url() -> str:
+    """
+    Get the appropriate Ollama URL based on the current environment.
+
+    Returns:
+        str: Ollama URL for the current environment
+    """
+    hostname = "ollama" if is_running_in_docker() else "localhost"
+    return f"http://{hostname}:11434"
+
+
+def require_services(*service_names: str):
+    """
+    Decorator to skip tests if required services are not available.
+
+    Usage:
+        @require_services("weaviate")
+        def test_something():
+            pass
+
+    Args:
+        *service_names: Names of services required for the test
+
+    Returns:
+        Decorator function
+    """
+
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            import pytest
+
+            missing = []
+            for service in service_names:
+                if service == "weaviate" and not is_weaviate_available():
+                    missing.append("weaviate")
+                elif service == "ollama" and not is_ollama_available():
+                    missing.append("ollama")
+
+            if missing:
+                env = "Docker" if is_running_in_docker() else "local"
+                pytest.skip(f"Services not available: {', '.join(missing)} (in {env} environment)")
+
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+# Pytest hook to automatically handle service requirements
+def pytest_runtest_setup(item):
+    """Automatically skip tests based on service availability and markers."""
+    # Check for service requirement markers
+    requires_weaviate = item.get_closest_marker("requires_weaviate")
+    requires_ollama = item.get_closest_marker("requires_ollama")
+
+    missing_services = []
+
+    if requires_weaviate and not is_weaviate_available():
+        missing_services.append("weaviate")
+
+    if requires_ollama and not is_ollama_available():
+        missing_services.append("ollama")
+
+    if missing_services:
+        env = "Docker" if is_running_in_docker() else "local"
+        pytest.skip(
+            f"Required services not available: {', '.join(missing_services)} "
+            f"(in {env} environment). "
+            "Run 'make test-up' for Docker or start services locally."
+        )
+
 
 # Type checking imports
 if TYPE_CHECKING:
@@ -384,3 +631,98 @@ def model_performance_monitor():
         "benchmark_model": benchmark_model,
         "get_performance_summary": get_performance_summary,
     }
+
+
+@pytest.fixture(scope="session")
+def environment_info():
+    """
+    Session-scoped fixture that provides information about the current test environment.
+
+    Returns:
+        dict: Environment information including:
+            - in_docker: bool
+            - available_services: dict of service availability
+            - weaviate_hostname: str
+            - ollama_url: str
+    """
+    return {
+        "in_docker": is_running_in_docker(),
+        "available_services": get_available_services(),
+        "weaviate_hostname": get_weaviate_hostname(),
+        "ollama_url": get_ollama_url(),
+    }
+
+
+@pytest.fixture
+def weaviate_client(environment_info):
+    """
+    Fixture that provides a connected Weaviate client.
+
+    Automatically handles:
+    - Environment detection (Docker vs local)
+    - Service availability checking
+    - Connection with appropriate hostname
+    - Proper cleanup
+
+    Usage:
+        def test_something(weaviate_client):
+            # Client is already connected and ready to use
+            collection = weaviate_client.collections.get("MyCollection")
+            # ... use client ...
+    """
+    if not is_weaviate_available():
+        pytest.skip("Weaviate service not available")
+
+    client = connect_to_weaviate_with_fallback()
+    yield client
+
+    try:
+        client.close()
+    except Exception:
+        pass  # Ignore cleanup errors
+
+
+@pytest.fixture
+def integration_test_env(environment_info):
+    """
+    Comprehensive fixture for integration tests that need multiple services.
+
+    Provides:
+    - Environment information
+    - Connected clients for available services
+    - Service availability status
+    - Helper functions
+
+    Usage:
+        def test_integration(integration_test_env):
+            env = integration_test_env
+            if env['weaviate_available']:
+                # Use Weaviate
+                collection = env['weaviate_client'].collections.get("Test")
+            # ... rest of test
+    """
+    env = environment_info.copy()
+
+    # Add service availability
+    env["weaviate_available"] = is_weaviate_available()
+    env["ollama_available"] = is_ollama_available()
+
+    # Add connected clients (only if services are available)
+    env["weaviate_client"] = None
+    env["ollama_url"] = get_ollama_url()
+
+    if env["weaviate_available"]:
+        try:
+            env["weaviate_client"] = connect_to_weaviate_with_fallback()
+        except Exception:
+            env["weaviate_available"] = False
+            env["weaviate_client"] = None
+
+    yield env
+
+    # Cleanup
+    if env["weaviate_client"]:
+        try:
+            env["weaviate_client"].close()
+        except Exception:
+            pass

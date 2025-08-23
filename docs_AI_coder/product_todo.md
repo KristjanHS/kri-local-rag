@@ -265,6 +265,143 @@ def test_something(mocker, mock_embedding_model):
     - ⚠️ Model compatibility issues across different environments
     - ⚠️ Test flakiness from real model operations
 
+    #### P2.2 — Integration Tests Logic Simplification (PLANNED)
+
+    **Goal**: Dramatically simplify the integration tests infrastructure while maintaining functionality and improving developer experience.
+
+    **Current Setup Description**:
+
+    **conftest.py Analysis (722 lines)**:
+    - conftest.py handles environment detection, service checking, fixture creation, caching, and test hooks
+    - Import chain: `backend.config.is_running_in_docker()` → `conftest.py` → test files
+    - 8+ different fixtures with overlapping responsibilities (weaviate_client, integration_test_env, environment_info)
+    - Service availability cached with timestamps, cache invalidation, and TTL logic
+    - pytest_runtest_setup hook duplicates require_services decorator functionality
+
+    **Service Detection**:
+    - 3 different ways to detect Docker (cgroup, .dockerenv, env vars)
+    - Service checks cached for 5 seconds despite tests being short-lived
+    - Service checking uses custom socket logic instead of simple HTTP health checks
+    - Multiple environment variables for similar purposes
+
+    **Decorator Patterns**:
+    - require_services decorator and pytest hook do the same thing
+    - 20+ line error messages with technical details instead of user actions
+    - require_services decorator kept for backward compatibility
+
+    **Configuration**:
+    - Settings split across pyproject.toml, conftest.py, and integration_config.toml
+    - No validation that configuration values are sensible
+    - Docker vs local logic spread across multiple files
+    - Hardcoded timeouts (2.0 seconds) instead of configurable values
+
+    **Test Structure**:
+    - Tests require multiple fixtures that depend on each other
+    - Mix of decorator-based and marker-based service requirements
+    - Tests have elaborate setup code instead of simple fixture usage
+    - When services are unavailable, error messages don't clearly indicate which test failed and why
+
+    **Documentation**:
+    - Setup instructions scattered across README, config files, and code comments
+    - Different files show different patterns for the same use case
+    - No clear guidance for evolving from current to simplified patterns
+
+    **Current Complexity Issues**:
+    - conftest.py contains 700+ lines with complex service detection, caching, and fixture logic
+    - Configuration settings are split across pyproject.toml, conftest.py, and multiple config files
+    - require_services decorator uses elaborate error handling
+    - Multiple overlapping fixtures exist for similar functionality
+    - Complex Docker detection logic is duplicated across files
+    - Service caching uses timestamps and cache invalidation
+    - Error messages use verbose error handling
+
+    **Target Simplicity**:
+    - Single configuration file: All settings in pyproject.toml [tool.integration]
+    - Simple service checking: Basic socket connection tests without caching complexity
+    - Unified fixture: One integration_test fixture that handles everything
+    - Clear error messages: Simple skip reasons for missing services
+    - Environment variables: Use TEST_DOCKER=true/false instead of complex detection
+    - Minimal conftest.py: < 200 lines focused on essential functionality
+
+    **Implementation Plan**:
+
+    - [ ] **Step 1: Consolidate Configuration**
+      - Action: Move all integration settings to pyproject.toml [tool.integration]
+      - Action: Remove integration_config.toml and scattered settings
+      - Action: Use environment variables for runtime overrides
+      - Verify: Single source of truth for all integration test settings
+
+    - [ ] **Step 2: Simplify Service Detection**
+      - Action: Remove complex caching and timestamp logic
+      - Action: Replace with simple socket connection tests
+      - Action: Use environment variables to override service URLs
+      - Action: Remove duplicate Docker detection logic
+      - Verify: Service detection is reliable and fast (< 1 second)
+
+    - [ ] **Step 3: Streamline Fixtures**
+      - Action: Replace multiple fixtures with one comprehensive integration_test fixture
+      - Action: Remove complex fixture inheritance and dependencies
+      - Action: Use simple conditional logic instead of complex fixture graphs
+      - Action: Provide clear fixture documentation
+      - Verify: Single fixture handles all integration test needs
+
+    - [ ] **Step 4: Simplify Test Decorators**
+      - Action: Remove complex require_services decorator
+      - Action: Use simple pytest markers instead of decorators
+      - Action: Remove elaborate error handling and caching
+      - Action: Use pytest's built-in skip functionality
+      - Verify: Tests use simple @pytest.mark.requires_weaviate syntax
+
+    - [ ] **Step 5: Environment Detection Overhaul**
+      - Action: Replace complex Docker detection with TEST_DOCKER environment variable
+      - Action: Remove duplicate detection logic from multiple files
+      - Action: Use simple hostname checks instead of cgroup parsing
+      - Action: Provide clear documentation for environment setup
+      - Verify: Environment detection is explicit and testable
+
+    - [ ] **Step 6: Error Message Simplification**
+      - Action: Replace verbose error messages with simple, actionable ones
+      - Action: Remove complex exception chaining and detailed error context
+      - Action: Use standard pytest skip messages
+      - Action: Focus on user action rather than technical details
+      - Verify: Error messages are clear and actionable
+
+    - [ ] **Step 7: Documentation and Examples**
+      - Action: Create simple integration test examples
+      - Action: Document the simplified patterns
+      - Action: Remove references to complex legacy patterns
+      - Action: Provide migration guide from current to simplified approach
+      - Verify: New developers can understand and use the system quickly
+
+    - [ ] **Step 8: Validation and Cleanup**
+      - Action: Test all integration tests with simplified system
+      - Action: Remove unused code and legacy patterns
+      - Action: Update README and documentation
+      - Action: Ensure backward compatibility for essential features
+      - Verify: All tests pass with simplified implementation
+
+    **Success Criteria**:
+    - conftest.py reduced from 700+ lines to < 200 lines
+    - Single configuration source (pyproject.toml)
+    - Simple service detection without complex caching
+    - One comprehensive fixture instead of multiple overlapping ones
+    - Clear, actionable error messages
+    - Environment detection via simple environment variables
+    - Easy to understand and modify for new developers
+
+    **Expected Benefits**:
+    - Faster onboarding: New developers understand the system quickly
+    - Easier maintenance: Less code to maintain and debug
+    - Clearer errors: Simple messages that tell users exactly what to do
+    - Better documentation: Examples are easier to follow
+    - More reliable: Less complex logic means fewer bugs
+
+    **Risks to Monitor**:
+    - Potential loss of some advanced features (caching, detailed error info)
+    - Breaking changes for existing test patterns
+    - Need for migration guide for existing tests
+
+
 - [ ] **Core RAG Pipeline Components**
   - 🔄 Test retriever module with real models
   - 🔄 Test vectorization pipeline with real models

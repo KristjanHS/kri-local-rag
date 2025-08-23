@@ -1,65 +1,33 @@
 """Integration test for manual vectorization using local embedding models.
 
 This test verifies that the application can use local embedding models for
-vector generation and hybrid search with Weaviate. Uses the Compose-based test environment.
+vector generation and hybrid search with Weaviate. Supports both Docker and local environments.
 """
 
 import os
-from pathlib import Path
-from urllib.parse import urlparse
 
 import pytest
-import weaviate
 from weaviate.classes.config import Configure, DataType, Property
 
 from backend import retriever
+
+from .conftest import connect_to_weaviate_with_fallback, require_services
 
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 pytestmark = pytest.mark.slow
 
 
-def _connect_client(headers: dict[str, str] | None = None) -> weaviate.WeaviateClient:
-    """Connect to the local Weaviate started by Compose.
-
-    Uses the service name for internal communication within the Docker network.
-    """
-    # When running inside the Compose environment, use service names
-    if Path("/.dockerenv").exists():
-        return weaviate.connect_to_custom(
-            http_host="weaviate",
-            http_port=8080,
-            grpc_host="weaviate",
-            grpc_port=50051,
-            http_secure=False,
-            grpc_secure=False,
-            headers=headers,
-        )
-    else:
-        # Fallback for local development
-        base_url = os.getenv("WEAVIATE_URL", "http://localhost:8080")
-        pu = urlparse(base_url)
-        return weaviate.connect_to_custom(
-            http_host=pu.hostname or "localhost",
-            http_port=pu.port or 8080,
-            grpc_host=pu.hostname or "localhost",
-            grpc_port=50051,
-            http_secure=pu.scheme == "https",
-            grpc_secure=pu.scheme == "https",
-            headers=headers,
-        )
+# Connection function is now provided by conftest.py
 
 
+@require_services("weaviate")
 def test_manual_vectorization_uses_local_embedding_compose(tmp_path):
-    """Test manual vectorization with local embedding model using Compose services."""
-    # Check if we're in the test environment
-    if not Path("/.dockerenv").exists():
-        pytest.skip("This test requires the Compose test environment. Run with 'make test-up' first.")
-
+    """Test manual vectorization with local embedding model in both Docker and local environments."""
     # Speed up model init for tests by disabling torch.compile in retriever
     os.environ.setdefault("RETRIEVER_EMBEDDING_TORCH_COMPILE", "false")
 
-    client = _connect_client()
+    client = connect_to_weaviate_with_fallback()
     coll_name = "ManualVectorProof"
     try:
         # Create a collection configured for self-provided vectors

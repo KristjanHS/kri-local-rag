@@ -230,6 +230,40 @@ WEAVIATE_CONCURRENT_REQUESTS = int(os.getenv("WEAVIATE_CONCURRENT_REQUESTS", 2))
 OLLAMA_CONTEXT_TOKENS = int(os.getenv("OLLAMA_CONTEXT_TOKENS", 8192))  # e.g. 4096, 8192, etc.
 
 
+def is_running_in_docker() -> bool:
+    """
+    Detect if the current process is running inside a Docker container.
+
+    Returns:
+        bool: True if running inside Docker, False otherwise
+    """
+    import os
+    from pathlib import Path
+
+    # Check for Docker-specific files
+    docker_files = ["/.dockerenv", "/proc/1/cgroup"]
+    for file_path in docker_files:
+        if Path(file_path).exists():
+            if file_path == "/.dockerenv":
+                return True
+            if file_path == "/proc/1/cgroup":
+                try:
+                    with open(file_path, "r") as f:
+                        cgroup_content = f.read()
+                        if "docker" in cgroup_content or "containerd" in cgroup_content:
+                            return True
+                except (FileNotFoundError, PermissionError):
+                    pass
+
+    # Check environment variables that might indicate Docker
+    docker_env_vars = ["DOCKER_CONTAINER", "KUBERNETES_SERVICE_HOST"]
+    for env_var in docker_env_vars:
+        if os.getenv(env_var):
+            return True
+
+    return False
+
+
 # (base) PS C:\Users\PC> ollama show cas/mistral-7b-instruct-v0.3
 #  Model
 #    architecture        llama3

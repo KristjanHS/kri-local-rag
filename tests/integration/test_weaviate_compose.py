@@ -7,14 +7,18 @@ import time
 import weaviate
 from weaviate.classes.config import DataType, Property
 
+from tests.integration.conftest import get_weaviate_hostname
+
 logger = logging.getLogger(__name__)
 
 
 def test_weaviate_service_is_ready():
     """Verify that the Weaviate service is ready to accept connections."""
-    # This test runs inside the app container where it can access the Docker network
+    # Use dynamic hostname detection to work in both Docker and local environments
+    weaviate_host = get_weaviate_hostname()
+    logger.info(f"Connecting to Weaviate at {weaviate_host}:8080")
     client = weaviate.connect_to_local(
-        host="weaviate",
+        host=weaviate_host,
         port=8080,
         grpc_port=50051,
     )
@@ -39,8 +43,11 @@ def test_weaviate_service_is_ready():
 
 def test_weaviate_basic_operations():
     """Test basic Weaviate operations to ensure the service is fully functional."""
+    # Use dynamic hostname detection to work in both Docker and local environments
+    weaviate_host = get_weaviate_hostname()
+    logger.info(f"Connecting to Weaviate at {weaviate_host}:8080 for basic operations test")
     client = weaviate.connect_to_local(
-        host="weaviate",
+        host=weaviate_host,
         port=8080,
         grpc_port=50051,
     )
