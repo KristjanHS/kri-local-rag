@@ -2,6 +2,51 @@
 
 This file records tasks that have been completed and moved out of the active TODO backlog.
 
+
+    #### P2.2 — Convert Standalone Test Script to Proper Pytest Integration Tests ✅ COMPLETED
+
+    **Goal**: Convert the standalone `test_integration_optimizations.py` script into proper pytest integration tests that follow project conventions and integrate with the existing test infrastructure.
+
+    **Background**: The current `test_integration_optimizations.py` script provides unique value by testing configuration and environment variable behavior that isn't covered by existing integration tests. However, it needs to be converted to follow pytest patterns and integrate with the project's test suite.
+
+    **Current State**: Standalone script with manual test functions, `assert` statements, and `print()` calls that needs conversion to proper pytest format.
+
+    **Status**: ✅ **FULLY COMPLETED**
+
+    **Key Achievements**:
+    - ✅ **Comprehensive pytest conversion**: All standalone functions converted to proper pytest test functions
+    - ✅ **Integration with existing infrastructure**: Tests now use project's logging system, fixtures, and patterns
+    - ✅ **Environment variable testing**: Added comprehensive coverage for all configuration options including edge cases
+    - ✅ **Proper test isolation**: Implemented pytest fixtures for clean environment state management
+    - ✅ **CI-ready**: Tests are discoverable by pytest and follow project conventions
+    - ✅ **Unique value preserved**: Tests provide configuration validation that isn't covered elsewhere
+
+    **Implementation Details**:
+    - **5 comprehensive test functions** covering integration test configuration, cache priority logic, timeout functionality, environment variable precedence, and edge cases
+    - **Custom pytest fixtures** for environment cleanup and model cache reset
+    - **Robust error handling** with detailed logging and informative assertions
+    - **Session-scoped integration** with existing `integration_model_cache` fixture
+    - **100% test pass rate** with all 5 tests passing successfully
+
+    **Tests Created**:
+    - `test_integration_test_mode_configuration()` - Validates environment variable configuration and boolean parsing
+    - `test_cache_priority_logic_integration_test_mode()` - Tests cache functionality within integration test infrastructure
+    - `test_timeout_functionality_configuration()` - Validates timeout configuration and edge cases
+    - `test_environment_variable_precedence()` - Ensures proper environment variable override behavior
+    - `test_configuration_validation_edge_cases()` - Tests boolean parsing edge cases and numeric validation
+
+    **Success Criteria Met**:
+    - ✅ Tests follow pytest conventions and project patterns
+    - ✅ Tests integrate with existing fixture infrastructure
+    - ✅ Configuration testing provides unique value not covered by existing tests
+    - ✅ Tests are isolated, deterministic, and properly cleaned up
+    - ✅ Tests are included in CI pipeline and documentation
+
+    **Risks to Monitor**:
+    - ⚠️ Test duplication with existing integration tests
+    - ⚠️ Configuration changes breaking test assumptions
+    - ⚠️ Environment variable conflicts between tests
+    
 ## Archived on 2025-01-28
 
 #### P0 — Migrate Integration Tests to Target Approach (Solve P4 MagicMock Detection) ✅ COMPLETED
