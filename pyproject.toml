@@ -54,6 +54,7 @@ markers = [
     "external: Tests that require external services (Weaviate, Ollama)",
     "requires_weaviate: Tests that require Weaviate service",
     "requires_ollama: Tests that require Ollama service",
+    "integration: Integration tests that require real services or models",
 ]
 testpaths = [
     "tests/unit",
