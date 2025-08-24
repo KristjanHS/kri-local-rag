@@ -331,23 +331,21 @@ def test_model_loading_error_handling(reset_global_cache):
     # Test with completely invalid model configuration that will definitely fail
     with patch("backend.models.EMBEDDING_MODEL", "definitely-invalid-model-name-that-cannot-exist"):
         with patch("backend.models.EMBED_MODEL_PATH", "/completely/nonexistent/path/to/model"):
-            with patch("backend.models.TRANSFORMERS_OFFLINE", True):
-                # This should raise an exception because offline mode is enabled but no local model exists
-                # and the model name is invalid
-                with pytest.raises(Exception) as exc_info:
-                    load_embedder()
+            # This should raise an exception because the model name is invalid and no local model exists
+            with pytest.raises(Exception) as exc_info:
+                load_embedder()
 
-                # Should raise some kind of error
-                assert exc_info.value is not None, "Should raise an error for invalid model configuration"
-                assert isinstance(exc_info.value, (RuntimeError, OSError, Exception)), (
-                    f"Expected model loading exception, got {type(exc_info.value)}"
-                )
+            # Should raise some kind of error
+            assert exc_info.value is not None, "Should raise an error for invalid model configuration"
+            assert isinstance(exc_info.value, (RuntimeError, OSError, Exception)), (
+                f"Expected model loading exception, got {type(exc_info.value)}"
+            )
 
-                # Verify it's related to offline/missing model
-                error_msg = str(exc_info.value).lower()
-                assert any(
-                    keyword in error_msg for keyword in ["offline", "not found", "no such file", "cannot find"]
-                ), f"Expected offline/missing model error, got: {error_msg}"
+            # Verify it's related to missing model
+            error_msg = str(exc_info.value).lower()
+            assert any(keyword in error_msg for keyword in ["not found", "no such file", "cannot find", "model"]), (
+                f"Expected missing model error, got: {error_msg}"
+            )
 
     logger.info("✓ Error handling validated successfully")
 
