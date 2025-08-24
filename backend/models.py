@@ -43,14 +43,11 @@ LOCAL_CACHE_PRIORITY = os.getenv("LOCAL_CACHE_PRIORITY", "true").lower() == "tru
 
 # Import model configuration from central config
 from backend.config import (
-    EMBED_COMMIT,
     EMBED_MODEL_PATH,
     EMBEDDING_MODEL,
     HF_CACHE_DIR,
-    RERANK_COMMIT,
     RERANK_MODEL_PATH,
     RERANKER_MODEL,
-    TRANSFORMERS_OFFLINE,
 )
 
 # Configuration is imported directly from config.py
@@ -112,26 +109,17 @@ def load_embedder() -> SentenceTransformerType:
                     logger.debug("Embedding model loaded successfully from local path")
                     return _embedding_model
 
-                # Fallback to downloading with pinned revision (development mode)
+                # Fallback to loading from cache or downloading (development mode)
                 logger.info(
-                    "Local embedding model not found, downloading: %s (attempt %d/%d)",
+                    "Local embedding model not found, loading: %s (attempt %d/%d)",
                     EMBEDDING_MODEL,
                     attempt + 1,
                     max_retries,
                 )
-                if EMBED_COMMIT:
-                    logger.debug("Using pinned revision: %s", EMBED_COMMIT)
-                    _embedding_model = SentenceTransformer(
-                        EMBEDDING_MODEL,
-                        cache_folder=HF_CACHE_DIR,
-                        revision=EMBED_COMMIT,
-                        local_files_only=TRANSFORMERS_OFFLINE,
-                    )
-                else:
-                    logger.warning("No pinned revision found for embedding model")
-                    _embedding_model = SentenceTransformer(
-                        EMBEDDING_MODEL, cache_folder=HF_CACHE_DIR, local_files_only=TRANSFORMERS_OFFLINE
-                    )
+                _embedding_model = SentenceTransformer(
+                    EMBEDDING_MODEL,
+                    cache_folder=HF_CACHE_DIR,
+                )
 
                 # Check for timeout in integration test mode
                 if INTEGRATION_TEST_MODE:
@@ -214,26 +202,17 @@ def load_reranker() -> CrossEncoderType:
                     logger.debug("Reranker model loaded successfully from local path")
                     return _cross_encoder
 
-                # Fallback to downloading with pinned revision (development mode)
+                # Fallback to loading from cache or downloading (development mode)
                 logger.info(
-                    "Local reranker model not found, downloading: %s (attempt %d/%d)",
+                    "Local reranker model not found, loading: %s (attempt %d/%d)",
                     RERANKER_MODEL,
                     attempt + 1,
                     max_retries,
                 )
-                if RERANK_COMMIT:
-                    logger.debug("Using pinned revision: %s", RERANK_COMMIT)
-                    _cross_encoder = CrossEncoder(
-                        RERANKER_MODEL,
-                        cache_folder=HF_CACHE_DIR,
-                        revision=RERANK_COMMIT,
-                        local_files_only=TRANSFORMERS_OFFLINE,
-                    )
-                else:
-                    logger.warning("No pinned revision found for reranker model")
-                    _cross_encoder = CrossEncoder(
-                        RERANKER_MODEL, cache_folder=HF_CACHE_DIR, local_files_only=TRANSFORMERS_OFFLINE
-                    )
+                _cross_encoder = CrossEncoder(
+                    RERANKER_MODEL,
+                    cache_folder=HF_CACHE_DIR,
+                )
 
                 # Check for timeout in integration test mode
                 if INTEGRATION_TEST_MODE:
@@ -346,19 +325,12 @@ def load_embedder_with_model(model_name: str) -> SentenceTransformerType:
         logger.info("Loading specific embedding model from local path: %s", EMBED_MODEL_PATH)
         return SentenceTransformer(EMBED_MODEL_PATH)
 
-    # Fallback to downloading with pinned revision (development mode)
-    logger.info("Local embedding model not found, downloading specific model: %s", model_name)
-    if EMBED_COMMIT:
-        logger.debug("Using pinned revision: %s", EMBED_COMMIT)
-        return SentenceTransformer(
-            model_name,
-            cache_folder=HF_CACHE_DIR,
-            revision=EMBED_COMMIT,
-            local_files_only=TRANSFORMERS_OFFLINE,
-        )
-    else:
-        logger.warning("No pinned revision found for embedding model")
-        return SentenceTransformer(model_name, cache_folder=HF_CACHE_DIR, local_files_only=TRANSFORMERS_OFFLINE)
+    # Fallback to loading from cache or downloading (development mode)
+    logger.info("Local embedding model not found, loading specific model: %s", model_name)
+    return SentenceTransformer(
+        model_name,
+        cache_folder=HF_CACHE_DIR,
+    )
 
 
 def get_cross_encoder() -> CrossEncoderType:
