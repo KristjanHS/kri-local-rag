@@ -15,7 +15,7 @@ from rich.rule import Rule
 from backend.config import OLLAMA_MODEL, get_logger, set_log_level
 from backend.console import console
 from backend.models import load_reranker
-from backend.ollama_client import ensure_model_available, generate_response
+from backend.ollama_client import generate_response, pull_if_missing
 from backend.retriever import get_top_k
 
 # Set up logging for this module
@@ -356,7 +356,7 @@ def qa_loop(
         ensure_weaviate_ready_and_populated()
 
         # Ensure the required Ollama model is available locally before accepting questions
-        if not ensure_model_available(OLLAMA_MODEL):
+        if not pull_if_missing(OLLAMA_MODEL):
             logger.error(
                 "Failed to ensure Ollama model %s is available. Check the logs above for details.", OLLAMA_MODEL
             )
@@ -424,7 +424,7 @@ if __name__ == "__main__":
     # Interactive loop - show readiness spinners and then the prompt
     with console.status("[bold green]Verifying backend services...", spinner="dots"):
         ensure_weaviate_ready_and_populated()
-        if not ensure_model_available(OLLAMA_MODEL):
+        if not pull_if_missing(OLLAMA_MODEL):
             logger.error(
                 "Failed to ensure Ollama model %s is available. Check the logs above for details.", OLLAMA_MODEL
             )

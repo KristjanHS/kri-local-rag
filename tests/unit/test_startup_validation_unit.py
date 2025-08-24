@@ -123,23 +123,23 @@ class TestStartupValidationUnit:
         logger.info("=== SAFE CONFIG IMPORT TEST COMPLETED ===")
 
     @patch("backend.qa_loop.ensure_weaviate_ready_and_populated")
-    @patch("backend.qa_loop.ensure_model_available")
-    def test_qa_loop_initialization_components(self, mock_ensure_model, mock_ensure_weaviate):
+    @patch("backend.qa_loop.pull_if_missing")
+    def test_qa_loop_initialization_components(self, mock_pull_if_missing, mock_ensure_weaviate):
         """Test that qa_loop initialization components are available."""
         from backend import qa_loop
 
         # Verify functions exist
         assert hasattr(qa_loop, "answer")
         assert hasattr(qa_loop, "ensure_weaviate_ready_and_populated")
-        assert hasattr(qa_loop, "ensure_model_available")
+        assert hasattr(qa_loop, "pull_if_missing")
 
         # Verify they can be called (with mocks)
         mock_ensure_weaviate.return_value = True
-        mock_ensure_model.return_value = True
+        mock_pull_if_missing.return_value = True
 
         # Test that functions don't crash on basic calls
         assert mock_ensure_weaviate() is True
-        assert mock_ensure_model("test-model") is True
+        assert mock_pull_if_missing("test-model") is True
 
     def test_heavy_imports_eventually_succeed(self):
         """Test that heavy libs are discoverable without importing heavy modules."""

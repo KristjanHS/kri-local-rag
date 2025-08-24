@@ -85,27 +85,31 @@ def test_generate_response_handles_empty_and_exception(monkeypatch, caplog):
     assert any("Exception in generate_response" in m for m in msgs)
 
 
-def test_ensure_model_available_uses_timeout_and_download(monkeypatch):
-    calls: list[tuple[str, int]] = []
+def test_ensure_model_available_issues_single_pull_with_short_timeout(monkeypatch):
+    seen: dict[str, object] = {"method": None, "url": None, "json": None, "timeout": None}
 
-    def fake_get(url, timeout):  # noqa: ARG001
-        calls.append((url, timeout))
-        # Simulate no models present initially
-        return DummyResp(200, json_data={"models": []})
+    class FakeResp:
+        def raise_for_status(self):
+            return None
 
-    # Avoid performing real download/verify in this unit test
-    monkeypatch.setattr(httpx, "get", fake_get)
-    monkeypatch.setattr(oc, "_download_model_with_progress", lambda model_name, base_url: True)
-    monkeypatch.setattr(oc, "_verify_model_download", lambda model_name, base_url: True)
+    def fake_post(url, json, timeout):  # noqa: A002, ARG001
+        seen["method"] = "POST"
+        seen["url"] = url
+        seen["json"] = json
+        seen["timeout"] = timeout
+        return FakeResp()
 
-    assert oc.ensure_model_available("some/model:tag") is True
+    monkeypatch.setenv("DOCKER_ENV", "0")
+    monkeypatch.setattr(httpx, "post", fake_post)
 
-    # Assert we called the tags endpoint with a timeout
-    assert calls, "httpx.get was not called"
-    url, timeout = calls[0]
-    assert isinstance(url, str)
-    assert url.endswith("/api/tags")
-    assert timeout == 2
+    ok = oc.ensure_model_available("some/model:tag")
+    assert ok is True
+
+    seen_url = cast(str, seen["url"])
+    assert seen["method"] == "POST"
+    assert seen_url.endswith("/api/pull")
+    assert seen["json"] == {"name": "some/model:tag"}
+    assert isinstance(seen["timeout"], int) and seen["timeout"] <= 10
 
 
 def test_download_model_with_progress_uses_timeout_in_stream(monkeypatch):
