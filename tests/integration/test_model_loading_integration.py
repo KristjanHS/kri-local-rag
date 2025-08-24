@@ -401,9 +401,9 @@ def test_real_model_fixtures_integration(real_model_loader, model_health_checker
     """Test that the new real model fixtures work correctly in integration tests."""
     logger.info("Testing real model fixtures integration...")
 
-    # Verify models are loaded (some may be None due to network issues)
-    embedder = real_model_loader["embedder"]
-    reranker = real_model_loader["reranker"]
+    # Load models using the functions from the fixture
+    embedder = real_model_loader["embedder"]()
+    reranker = real_model_loader["reranker"]()
 
     # Check model health using the health checker
     health_checker = model_health_checker
@@ -487,9 +487,9 @@ def test_model_cache_integration_performance(real_model_loader):
 
     logger.info("Testing model cache performance integration...")
 
-    # Use the pre-loaded models from the fixture
-    embedder1 = real_model_loader["embedder"]
-    reranker1 = real_model_loader["reranker"]
+    # Load models using the functions from the fixture
+    embedder1 = real_model_loader["embedder"]()
+    reranker1 = real_model_loader["reranker"]()
 
     # Second load - measure time to load from cache (only for available models)
     start_time = time.time()

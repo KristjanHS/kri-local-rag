@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,10 @@ else:
 # Module-level cache to avoid reloading models
 _embedding_model: Any = None
 _cross_encoder: Any = None
+
+# Thread-safe locks for model initialization
+_embedder_lock = threading.Lock()
+_reranker_lock = threading.Lock()
 
 # Set up logging for this module
 logger = get_logger(__name__)
@@ -67,84 +72,93 @@ def load_embedder() -> SentenceTransformerType:
     if _embedding_model is not None:
         return _embedding_model
 
-    try:
-        # Import lazily to avoid heavy import-time side effects
-        from sentence_transformers import SentenceTransformer  # type: ignore
-    except ImportError as e:
-        raise RuntimeError("SentenceTransformer not available. Install with: pip install sentence-transformers") from e
-
-    start_time = time.time()
-    max_retries = 3 if INTEGRATION_TEST_MODE else 1
-    last_exception = None
-
-    for attempt in range(max_retries):
-        try:
-            # In integration test mode with local cache priority, check cache first
-            if INTEGRATION_TEST_MODE and LOCAL_CACHE_PRIORITY:
-                # Check if model exists in HuggingFace cache directory
-                cached_model_path = Path(HF_CACHE_DIR) / "hub" / f"models--{EMBEDDING_MODEL.replace('/', '--')}"
-                if cached_model_path.exists():
-                    logger.info("Loading embedding model from integration test cache: %s", cached_model_path)
-                    try:
-                        _embedding_model = SentenceTransformer(str(cached_model_path))
-                        logger.debug("Embedding model loaded successfully from integration cache")
-                        return _embedding_model
-                    except Exception as e:
-                        logger.warning("Failed to load from integration cache, falling back to standard logic: %s", e)
-
-            # Check if baked model exists (production/offline mode)
-            if Path(EMBED_MODEL_PATH).exists():
-                logger.info("Loading embedding model from local path: %s", EMBED_MODEL_PATH)
-                _embedding_model = SentenceTransformer(EMBED_MODEL_PATH)
-                logger.debug("Embedding model loaded successfully from local path")
-                return _embedding_model
-
-            # Fallback to downloading with pinned revision (development mode)
-            logger.info(
-                "Local embedding model not found, downloading: %s (attempt %d/%d)",
-                EMBEDDING_MODEL,
-                attempt + 1,
-                max_retries,
-            )
-            if EMBED_COMMIT:
-                logger.debug("Using pinned revision: %s", EMBED_COMMIT)
-                _embedding_model = SentenceTransformer(
-                    EMBEDDING_MODEL,
-                    cache_folder=HF_CACHE_DIR,
-                    revision=EMBED_COMMIT,
-                    local_files_only=TRANSFORMERS_OFFLINE,
-                )
-            else:
-                logger.warning("No pinned revision found for embedding model")
-                _embedding_model = SentenceTransformer(
-                    EMBEDDING_MODEL, cache_folder=HF_CACHE_DIR, local_files_only=TRANSFORMERS_OFFLINE
-                )
-
-            # Check for timeout in integration test mode
-            if INTEGRATION_TEST_MODE:
-                load_time = time.time() - start_time
-                if load_time > MODEL_LOAD_TIMEOUT:
-                    raise TimeoutError(".2f")
-
-            logger.debug("Embedding model loaded successfully from remote")
+    with _embedder_lock:
+        # Double-checked locking to prevent re-initialization
+        if _embedding_model is not None:
             return _embedding_model
 
-        except Exception as e:
-            last_exception = e
-            if attempt < max_retries - 1:
-                wait_time = 2**attempt  # Exponential backoff
-                logger.warning(
-                    "Model loading attempt %d failed: %s. Retrying in %d seconds...", attempt + 1, e, wait_time
-                )
-                time.sleep(wait_time)
-            else:
-                logger.error("All %d attempts to load embedding model failed", max_retries)
+        try:
+            # Import lazily to avoid heavy import-time side effects
+            from sentence_transformers import SentenceTransformer  # type: ignore
+        except ImportError as e:
+            raise RuntimeError(
+                "SentenceTransformer not available. Install with: pip install sentence-transformers"
+            ) from e
 
-    # If we get here, all retries failed
-    if last_exception:
-        raise last_exception
-    else:
-        raise RuntimeError("Failed to load embedding model after all retries")
+        start_time = time.time()
+        max_retries = 3 if INTEGRATION_TEST_MODE else 1
+        last_exception = None
+
+        for attempt in range(max_retries):
+            try:
+                # In integration test mode with local cache priority, check cache first
+                if INTEGRATION_TEST_MODE and LOCAL_CACHE_PRIORITY:
+                    # Check if model exists in HuggingFace cache directory
+                    cached_model_path = Path(HF_CACHE_DIR) / "hub" / f"models--{EMBEDDING_MODEL.replace('/', '--')}"
+                    if cached_model_path.exists():
+                        logger.info("Loading embedding model from integration test cache: %s", cached_model_path)
+                        try:
+                            _embedding_model = SentenceTransformer(str(cached_model_path))
+                            logger.debug("Embedding model loaded successfully from integration cache")
+                            return _embedding_model
+                        except Exception as e:
+                            logger.warning(
+                                "Failed to load from integration cache, falling back to standard logic: %s", e
+                            )
+
+                # Check if baked model exists (production/offline mode)
+                if Path(EMBED_MODEL_PATH).exists():
+                    logger.info("Loading embedding model from local path: %s", EMBED_MODEL_PATH)
+                    _embedding_model = SentenceTransformer(EMBED_MODEL_PATH)
+                    logger.debug("Embedding model loaded successfully from local path")
+                    return _embedding_model
+
+                # Fallback to downloading with pinned revision (development mode)
+                logger.info(
+                    "Local embedding model not found, downloading: %s (attempt %d/%d)",
+                    EMBEDDING_MODEL,
+                    attempt + 1,
+                    max_retries,
+                )
+                if EMBED_COMMIT:
+                    logger.debug("Using pinned revision: %s", EMBED_COMMIT)
+                    _embedding_model = SentenceTransformer(
+                        EMBEDDING_MODEL,
+                        cache_folder=HF_CACHE_DIR,
+                        revision=EMBED_COMMIT,
+                        local_files_only=TRANSFORMERS_OFFLINE,
+                    )
+                else:
+                    logger.warning("No pinned revision found for embedding model")
+                    _embedding_model = SentenceTransformer(
+                        EMBEDDING_MODEL, cache_folder=HF_CACHE_DIR, local_files_only=TRANSFORMERS_OFFLINE
+                    )
+
+                # Check for timeout in integration test mode
+                if INTEGRATION_TEST_MODE:
+                    load_time = time.time() - start_time
+                    if load_time > MODEL_LOAD_TIMEOUT:
+                        raise TimeoutError(".2f")
+
+                logger.debug("Embedding model loaded successfully from remote")
+                return _embedding_model
+
+            except Exception as e:
+                last_exception = e
+                if attempt < max_retries - 1:
+                    wait_time = 2**attempt  # Exponential backoff
+                    logger.warning(
+                        "Model loading attempt %d failed: %s. Retrying in %d seconds...", attempt + 1, e, wait_time
+                    )
+                    time.sleep(wait_time)
+                else:
+                    logger.error("All %d attempts to load embedding model failed", max_retries)
+
+        # If we get here, all retries failed
+        if last_exception:
+            raise last_exception
+        else:
+            raise RuntimeError("Failed to load embedding model after all retries")
 
 
 def load_reranker() -> CrossEncoderType:
@@ -162,84 +176,94 @@ def load_reranker() -> CrossEncoderType:
     if _cross_encoder is not None:
         return _cross_encoder
 
-    try:
-        # Import lazily to avoid heavy import-time side effects
-        from sentence_transformers.cross_encoder import CrossEncoder  # type: ignore
-    except ImportError as e:
-        raise RuntimeError("CrossEncoder not available. Install with: pip install sentence-transformers") from e
-
-    start_time = time.time()
-    max_retries = 3 if INTEGRATION_TEST_MODE else 1
-    last_exception = None
-
-    for attempt in range(max_retries):
-        try:
-            # In integration test mode with local cache priority, check cache first
-            if INTEGRATION_TEST_MODE and LOCAL_CACHE_PRIORITY:
-                # Check if model exists in HuggingFace cache directory
-                cached_model_path = Path(HF_CACHE_DIR) / "hub" / f"models--{RERANKER_MODEL.replace('/', '--')}"
-                if cached_model_path.exists():
-                    logger.info("Loading reranker model from integration test cache: %s", cached_model_path)
-                    try:
-                        _cross_encoder = CrossEncoder(str(cached_model_path))
-                        logger.debug("Reranker model loaded successfully from integration cache")
-                        return _cross_encoder
-                    except Exception as e:
-                        logger.warning("Failed to load from integration cache, falling back to standard logic: %s", e)
-
-            # Check if baked model exists (production/offline mode)
-            if Path(RERANK_MODEL_PATH).exists():
-                logger.info("Loading reranker model from local path: %s", RERANK_MODEL_PATH)
-                _cross_encoder = CrossEncoder(RERANK_MODEL_PATH)
-                logger.debug("Reranker model loaded successfully from local path")
-                return _cross_encoder
-
-            # Fallback to downloading with pinned revision (development mode)
-            logger.info(
-                "Local reranker model not found, downloading: %s (attempt %d/%d)",
-                RERANKER_MODEL,
-                attempt + 1,
-                max_retries,
-            )
-            if RERANK_COMMIT:
-                logger.debug("Using pinned revision: %s", RERANK_COMMIT)
-                _cross_encoder = CrossEncoder(
-                    RERANKER_MODEL,
-                    cache_folder=HF_CACHE_DIR,
-                    revision=RERANK_COMMIT,
-                    local_files_only=TRANSFORMERS_OFFLINE,
-                )
-            else:
-                logger.warning("No pinned revision found for reranker model")
-                _cross_encoder = CrossEncoder(
-                    RERANKER_MODEL, cache_folder=HF_CACHE_DIR, local_files_only=TRANSFORMERS_OFFLINE
-                )
-
-            # Check for timeout in integration test mode
-            if INTEGRATION_TEST_MODE:
-                load_time = time.time() - start_time
-                if load_time > MODEL_LOAD_TIMEOUT:
-                    raise TimeoutError(".2f")
-
-            logger.debug("Reranker model loaded successfully from remote")
+    with _reranker_lock:
+        # Double-checked locking to prevent re-initialization
+        if _cross_encoder is not None:
             return _cross_encoder
 
-        except Exception as e:
-            last_exception = e
-            if attempt < max_retries - 1:
-                wait_time = 2**attempt  # Exponential backoff
-                logger.warning(
-                    "Reranker model loading attempt %d failed: %s. Retrying in %d seconds...", attempt + 1, e, wait_time
-                )
-                time.sleep(wait_time)
-            else:
-                logger.error("All %d attempts to load reranker model failed", max_retries)
+        try:
+            # Import lazily to avoid heavy import-time side effects
+            from sentence_transformers.cross_encoder import CrossEncoder  # type: ignore
+        except ImportError as e:
+            raise RuntimeError("CrossEncoder not available. Install with: pip install sentence-transformers") from e
 
-    # If we get here, all retries failed
-    if last_exception:
-        raise last_exception
-    else:
-        raise RuntimeError("Failed to load reranker model after all retries")
+        start_time = time.time()
+        max_retries = 3 if INTEGRATION_TEST_MODE else 1
+        last_exception = None
+
+        for attempt in range(max_retries):
+            try:
+                # In integration test mode with local cache priority, check cache first
+                if INTEGRATION_TEST_MODE and LOCAL_CACHE_PRIORITY:
+                    # Check if model exists in HuggingFace cache directory
+                    cached_model_path = Path(HF_CACHE_DIR) / "hub" / f"models--{RERANKER_MODEL.replace('/', '--')}"
+                    if cached_model_path.exists():
+                        logger.info("Loading reranker model from integration test cache: %s", cached_model_path)
+                        try:
+                            _cross_encoder = CrossEncoder(str(cached_model_path))
+                            logger.debug("Reranker model loaded successfully from integration cache")
+                            return _cross_encoder
+                        except Exception as e:
+                            logger.warning(
+                                "Failed to load from integration cache, falling back to standard logic: %s", e
+                            )
+
+                # Check if baked model exists (production/offline mode)
+                if Path(RERANK_MODEL_PATH).exists():
+                    logger.info("Loading reranker model from local path: %s", RERANK_MODEL_PATH)
+                    _cross_encoder = CrossEncoder(RERANK_MODEL_PATH)
+                    logger.debug("Reranker model loaded successfully from local path")
+                    return _cross_encoder
+
+                # Fallback to downloading with pinned revision (development mode)
+                logger.info(
+                    "Local reranker model not found, downloading: %s (attempt %d/%d)",
+                    RERANKER_MODEL,
+                    attempt + 1,
+                    max_retries,
+                )
+                if RERANK_COMMIT:
+                    logger.debug("Using pinned revision: %s", RERANK_COMMIT)
+                    _cross_encoder = CrossEncoder(
+                        RERANKER_MODEL,
+                        cache_folder=HF_CACHE_DIR,
+                        revision=RERANK_COMMIT,
+                        local_files_only=TRANSFORMERS_OFFLINE,
+                    )
+                else:
+                    logger.warning("No pinned revision found for reranker model")
+                    _cross_encoder = CrossEncoder(
+                        RERANKER_MODEL, cache_folder=HF_CACHE_DIR, local_files_only=TRANSFORMERS_OFFLINE
+                    )
+
+                # Check for timeout in integration test mode
+                if INTEGRATION_TEST_MODE:
+                    load_time = time.time() - start_time
+                    if load_time > MODEL_LOAD_TIMEOUT:
+                        raise TimeoutError(".2f")
+
+                logger.debug("Reranker model loaded successfully from remote")
+                return _cross_encoder
+
+            except Exception as e:
+                last_exception = e
+                if attempt < max_retries - 1:
+                    wait_time = 2**attempt  # Exponential backoff
+                    logger.warning(
+                        "Reranker model loading attempt %d failed: %s. Retrying in %d seconds...",
+                        attempt + 1,
+                        e,
+                        wait_time,
+                    )
+                    time.sleep(wait_time)
+                else:
+                    logger.error("All %d attempts to load reranker model failed", max_retries)
+
+        # If we get here, all retries failed
+        if last_exception:
+            raise last_exception
+        else:
+            raise RuntimeError("Failed to load reranker model after all retries")
 
 
 def preload_models() -> None:

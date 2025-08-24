@@ -19,7 +19,8 @@ def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: D401
     # Only unset environment variables when running outside Docker containers
     # (for host-based testing). When running inside containers, we want to
     # preserve the environment variables set by Docker Compose.
-    if not Path("/.dockerenv").exists():
+    test_docker = os.getenv("TEST_DOCKER", "false").lower() == "true"
+    if not test_docker:
         os.environ.pop("WEAVIATE_URL", None)
         os.environ.pop("OLLAMA_URL", None)
 
@@ -88,39 +89,37 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 @pytest.fixture(scope="session")
 def cross_encoder_cache_dir(project_root: Path) -> str:
-    """Ensure the CrossEncoder model is cached locally and return the cache path."""
-    import inspect
-
-    from httpx import HTTPError as HttpxHTTPError
+    """Ensure the CrossEncoder model is available (download if needed) and return cache path."""
     from huggingface_hub import snapshot_download
-    from requests.exceptions import HTTPError as RequestsHTTPError
 
     cache_dir = project_root / "model_cache"
 
-    # Dynamically read the default model name from the _get_cross_encoder function signature
-    from backend.qa_loop import _get_cross_encoder
+    # Get the default model name from the config module
+    from backend.config import DEFAULT_RERANKER_MODEL
 
-    sig = inspect.signature(_get_cross_encoder)
-    default_model_name = sig.parameters["model_name"].default
+    default_model_name = DEFAULT_RERANKER_MODEL
 
     try:
-        # This will check the cache first and not make a network call.
-        # If the model is not in the cache, it will raise an exception because of local_files_only=True.
+        # First, try to use cached model (no network call)
         snapshot_download(
             repo_id=default_model_name,
             cache_dir=cache_dir,
             local_files_only=True,
         )
-    except (FileNotFoundError, HttpxHTTPError, RequestsHTTPError) as e:
-        # A more specific error could be raised if we know it's a "not found" error
-        # For now, a generic failure is fine. HfHubHTTPError is for network-related issues,
-        # but with local_files_only=True, it might be raised for cache lookup failures.
-        # FileNotFoundError is also a possibility.
-        pytest.fail(
-            f"Failed to find CrossEncoder model '{default_model_name}' in local cache at '{cache_dir}'.\\n"
-            f"Please run '.venv/bin/python scripts/setup/download_model.py' to download it.\\n"
-            f"Original error: {e}"
-        )
+    except Exception:
+        # Model not in cache, try to download (without timeout parameter since it's not supported)
+        try:
+            snapshot_download(
+                repo_id=default_model_name,
+                cache_dir=cache_dir,
+            )
+        except Exception as e:
+            # Skip the test if we can't download the model
+            pytest.skip(
+                f"Could not download CrossEncoder model '{default_model_name}' for integration test. "
+                f"This test requires internet connectivity or pre-cached models. "
+                f"Error: {e}"
+            )
 
     return str(cache_dir)
 
@@ -141,7 +140,8 @@ def docker_services(request, test_log_file):
     Manages the Docker environment for the test session.
     """
     # If running inside a Docker container, assume services are already managed
-    if Path("/.dockerenv").exists():
+    test_docker = os.getenv("TEST_DOCKER", "false").lower() == "true"
+    if test_docker:
         console.print("\n--- Running inside Docker, skipping Docker service management. ---")
         yield
         return

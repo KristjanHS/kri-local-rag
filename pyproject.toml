@@ -54,6 +54,7 @@ markers = [
     "external: Tests that require external services (Weaviate, Ollama)",
     "requires_weaviate: Tests that require Weaviate service",
     "requires_ollama: Tests that require Ollama service",
+    "integration: Integration tests that require real services or models",
 ]
 testpaths = [
     "tests/unit",
@@ -110,6 +111,7 @@ test = [
     "testcontainers>=3.7.0,<4.0",
     "protobuf>=5.26,<7.0",
     "rich>=13.0,<14.0",
+    "tomli>=2.0.0,<3.0; python_version<'3.11'",
 ]
 
 # Documentation dependencies
@@ -140,24 +142,36 @@ omit = ["tests/ui/*"]
 data_file = "reports/coverage/.coverage"
 
 [tool.integration]
-# Integration test configuration
+# Integration test configuration - single source of truth
+# All integration test settings consolidated here
+
 # Service connection settings for different environments
-
 [tool.integration.services]
-weaviate = { host_docker = "weaviate", host_local = "localhost", port = 8080 }
-ollama = { host_docker = "ollama", host_local = "localhost", port = 11434 }
+weaviate = { host_docker = "weaviate", host_local = "localhost", port = 8080, health_endpoint = "/v1/.well-known/ready" }
+ollama = { host_docker = "ollama", host_local = "localhost", port = 11434, health_endpoint = "/api/version" }
 
+# Timeout settings for service operations
 [tool.integration.timeouts]
-service_check = 1.0  # seconds for service availability checks
-cache_duration = 5.0  # seconds to cache service availability
+timeout_s = 1.0                    # seconds for service availability checks
+service_check = 1.0               # seconds for service availability checks (legacy)
+cache_duration = 5.0              # seconds to cache service availability
+http_timeout = 2.0                # seconds for HTTP health checks
+model_loading_timeout = 30.0      # seconds for model loading operations
 
+# Environment-specific settings and URLs
 [tool.integration.environments]
-# Environment-specific settings
-docker = { description = "Running inside Docker containers" }
-local = { description = "Running on local machine" }
+docker = { description = "Running inside Docker containers", test_docker = true }
+local = { description = "Running on local machine", test_docker = false }
 
+# Service URLs for different environments (Docker vs Local)
+[tool.integration.urls]
+weaviate_docker = "http://weaviate:8080"
+weaviate_local = "http://localhost:8080"
+ollama_docker = "http://ollama:11434"
+ollama_local = "http://localhost:11434"
+
+# Commands to start/stop services in different environments
 [tool.integration.commands]
-# Commands to start services in different environments
 docker_start = "make test-up"
 docker_stop = "make test-down"
 local_weaviate_start = "docker run -d -p 8080:8080 semitechnologies/weaviate:latest"
