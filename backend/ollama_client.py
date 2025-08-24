@@ -2,7 +2,6 @@
 """Ollama client utilities for model management and inference."""
 
 import json
-import os
 from typing import Optional
 
 import httpx
@@ -15,19 +14,25 @@ logger = get_logger(__name__)
 
 
 def _get_ollama_base_url() -> str:
-    """Return the Ollama base URL accessible from WSL.
+    """Return the Ollama base URL for the current environment.
 
-    Prefers the Windows host IP if available, otherwise falls back to the
-    default URL from config.
+    Uses environment-appropriate hostname based on whether we're running
+    in Docker or locally.
     """
-    # When running outside Docker, use localhost directly
-    if not os.getenv("DOCKER_ENV"):
-        return OLLAMA_URL
+    from backend.config import is_running_in_docker
 
-    # When running inside Docker, try to get Windows host IP
-    ip = get_windows_host_ip()
-    if ip:
-        return f"http://{ip}:11434"
+    is_docker = is_running_in_docker()
+
+    # When running inside Docker, use service name or Windows host IP
+    if is_docker:
+        # Try to get Windows host IP for WSL compatibility
+        ip = get_windows_host_ip()
+        if ip:
+            return f"http://{ip}:11434"
+        # Fall back to service name for Docker Compose
+        return "http://ollama:11434"
+
+    # When running outside Docker, use localhost
     return OLLAMA_URL
 
 

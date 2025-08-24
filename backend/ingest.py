@@ -38,6 +38,39 @@ from backend.config import (
     WEAVIATE_URL,
     get_logger,
 )
+
+
+def _get_weaviate_url() -> str:
+    """
+    Get the appropriate Weaviate URL based on the current environment.
+
+    Returns:
+        str: Weaviate URL with appropriate hostname for current environment
+    """
+    from backend.config import is_running_in_docker
+
+    is_docker = is_running_in_docker()
+
+    # Use the configured URL but replace hostname if needed
+    from urllib.parse import urlparse, urlunparse
+
+    parsed_url = urlparse(WEAVIATE_URL)
+
+    if is_docker and parsed_url.hostname == "localhost":
+        # Replace localhost with weaviate hostname when in Docker
+        new_netloc = parsed_url.netloc.replace("localhost", "weaviate")
+        new_parsed = parsed_url._replace(netloc=new_netloc)
+        return urlunparse(new_parsed)
+    elif not is_docker and parsed_url.hostname == "weaviate":
+        # Replace weaviate with localhost when running locally
+        new_netloc = parsed_url.netloc.replace("weaviate", "localhost")
+        new_parsed = parsed_url._replace(netloc=new_netloc)
+        return urlunparse(new_parsed)
+    else:
+        # URL is already appropriate for the environment
+        return WEAVIATE_URL
+
+
 from backend.vector_utils import to_float_list
 
 # --- Logging Setup ---
@@ -137,8 +170,9 @@ from urllib.parse import urlparse
 
 def connect_to_weaviate() -> weaviate.WeaviateClient:
     """Connect to the Weaviate instance."""
-    logger.info(f"Connecting to Weaviate at {WEAVIATE_URL}...")
-    parsed_url = urlparse(WEAVIATE_URL)
+    weaviate_url = _get_weaviate_url()
+    logger.info(f"Connecting to Weaviate at {weaviate_url}...")
+    parsed_url = urlparse(weaviate_url)
     client = weaviate.connect_to_custom(
         http_host=parsed_url.hostname or "localhost",
         http_port=parsed_url.port or 80,
