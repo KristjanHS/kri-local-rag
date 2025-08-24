@@ -114,29 +114,12 @@ def load_and_split_documents(path: str) -> List[Document]:
             return []
     else:
         # 2) Directory path with glob patterns
-        # Debug: List all files in the directory
-        if os.path.exists(path):
-            all_files = []
-            for root, _, files in os.walk(path):
-                for file in files:
-                    rel_path = os.path.relpath(os.path.join(root, file), path)
-                    all_files.append(rel_path)
-            logger.info(f"DEBUG: Found files in directory: {all_files}")
-            # Debug: Check specifically for .md files
-            md_files = [f for f in all_files if f.endswith(".md")]
-            logger.info(f"DEBUG: Found markdown files: {md_files}")
-            backup_files = [f for f in all_files if ".backup" in f]
-            logger.info(f"DEBUG: Found backup files: {backup_files}")
-        else:
-            logger.error(f"DEBUG: Directory '{path}' does not exist!")
-            return []
 
         loader_configs = {
             "**/*.pdf": pdf_loader_cls,
             "**/*.md": UnstructuredMarkdownLoader,
         }
         for glob_pattern, loader_cls in loader_configs.items():
-            logger.info(f"DEBUG: Processing glob pattern '{glob_pattern}' with loader {loader_cls.__name__}")
             try:
                 loader = DirectoryLoader(
                     path,
@@ -146,11 +129,10 @@ def load_and_split_documents(path: str) -> List[Document]:
                     use_multithreading=True,
                 )
                 loaded_docs = loader.load()
-                logger.info(f"DEBUG: Successfully loaded {len(loaded_docs)} documents with pattern '{glob_pattern}'")
                 docs.extend(loaded_docs)
             except Exception as e:
-                logger.error(f"DEBUG: Error loading documents with pattern '{glob_pattern}': {e}")
-                logger.exception("DEBUG: Full traceback for loading error:")
+                logger.error(f"Error loading documents with pattern '{glob_pattern}': {e}")
+                logger.exception("Full traceback for loading error:")
 
     if not docs:
         logger.warning(f"No documents found in '{path}'.")

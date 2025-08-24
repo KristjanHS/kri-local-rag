@@ -111,9 +111,11 @@ ENV HF_HOME=/data/hf
 
 EXPOSE 8501
 
-# Create directories (base image already has non-root user, no need for chown)
-RUN mkdir -p backend frontend data logs \
-    && mkdir -p /data/hf \
-    && mkdir -p /root/.ollama
+# Create non-root user and directories, and set permissions
+RUN useradd -ms /bin/bash appuser \
+    && mkdir -p backend frontend data logs /data/hf \
+    && chown -R appuser:appuser /app /data /models
+
+USER appuser
 
 CMD ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]

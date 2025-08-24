@@ -11,17 +11,17 @@ from weaviate.classes.config import Configure, DataType, Property
 
 from backend import retriever
 
-from .conftest import connect_to_weaviate_with_fallback, require_services
+from tests.integration.conftest import connect_to_weaviate_with_fallback
 
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.slow, pytest.mark.requires_weaviate]
 
 
 # Connection function is now provided by conftest.py
 
 
-@require_services("weaviate")
+@pytest.mark.requires_weaviate
 def test_manual_vectorization_uses_local_embedding_compose(tmp_path):
     """Test manual vectorization with local embedding model in both Docker and local environments."""
     # Speed up model init for tests by disabling torch.compile in retriever
