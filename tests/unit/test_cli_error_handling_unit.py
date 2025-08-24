@@ -5,8 +5,6 @@ from types import ModuleType
 
 import pytest
 
-pytestmark = pytest.mark.unit
-
 
 def test_cli_single_question_reports_error_and_exits(monkeypatch, capsys):
     # Arrange: force single-question path without startup checks
