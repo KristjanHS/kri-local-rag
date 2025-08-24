@@ -5,7 +5,6 @@ health checks and unified service management using pyproject.toml configuration.
 """
 
 import os
-import time
 from typing import Any, Optional
 from unittest.mock import MagicMock
 
@@ -139,6 +138,16 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "requires_ollama: mark test as requiring Ollama service")
 
 
+def is_weaviate_available() -> bool:
+    """Check if Weaviate service is available."""
+    return is_service_healthy("weaviate")
+
+
+def is_ollama_available() -> bool:
+    """Check if Ollama service is available."""
+    return is_service_healthy("ollama")
+
+
 def pytest_collection_modifyitems(config, items):
     """Skip tests that require services that are not available."""
     for item in items:
@@ -210,6 +219,79 @@ def get_available_services() -> dict[str, bool]:
     return services
 
 
+# Model cache and integration fixtures
+@pytest.fixture(scope="session")
+def integration_model_cache(tmp_path_factory):
+    """Create a session-level model cache for integration tests."""
+    cache_dir = tmp_path_factory.mktemp("integration_model_cache")
+    return str(cache_dir)
+
+
+@pytest.fixture
+def real_model_loader():
+    """Fixture for loading real models in integration tests."""
+    from backend.models import load_embedder, load_reranker
+
+    return {
+        "embedder": load_embedder,
+        "reranker": load_reranker,
+    }
+
+
+@pytest.fixture
+def real_embedding_model():
+    """Fixture for loading real embedding model."""
+    from backend.models import load_embedder
+
+    return load_embedder()
+
+
+@pytest.fixture
+def real_reranker_model():
+    """Fixture for loading real reranker model."""
+    from backend.models import load_reranker
+
+    return load_reranker()
+
+
+@pytest.fixture
+def model_health_checker():
+    """Fixture for checking model health."""
+
+    def check_model_health(model, test_sentence="Test sentence"):
+        try:
+            if hasattr(model, "encode"):
+                # Embedding model
+                embedding = model.encode(test_sentence)
+                return embedding is not None and len(embedding) > 0
+            elif hasattr(model, "predict"):
+                # Cross-encoder model
+                scores = model.predict([(test_sentence, test_sentence)])
+                return scores is not None and len(scores) > 0
+            else:
+                return False
+        except Exception:
+            return False
+
+    def get_model_info(model, model_type):
+        """Get model information."""
+        try:
+            if hasattr(model, "encode"):
+                # Embedding model
+                embedding = model.encode("Test")
+                return {"healthy": True, "embedding_dim": len(embedding), "model_type": "embedding"}
+            elif hasattr(model, "predict"):
+                # Cross-encoder model
+                model.predict([("Test", "Test")])  # Test the model
+                return {"healthy": True, "model_type": "cross_encoder"}
+            else:
+                return {"healthy": False, "model_type": "unknown"}
+        except Exception:
+            return {"healthy": False, "model_type": model_type}
+
+    return {"check_health": check_model_health, "get_info": get_model_info}
+
+
 # Mocking fixtures using monkeypatch
 @pytest.fixture
 def managed_embedding_model(mocker) -> MagicMock:
@@ -249,45 +331,3 @@ def mock_httpx_get(monkeypatch):
     mock_func = MagicMock()
     monkeypatch.setattr("backend.ollama_client.httpx.get", mock_func)
     return mock_func
-
-
-_service_cache = {}  # Will store dicts with 'result' and 'timestamp'
-CACHE_DURATION = 5  # seconds
-
-
-def is_weaviate_available() -> bool:
-    """Check if Weaviate service is available (with caching)."""
-    current_time = time.time()
-    cache_key = "weaviate"
-
-    # Use cached result if recent enough
-    if cache_key in _service_cache and current_time - _service_cache[cache_key].get("timestamp", 0) < CACHE_DURATION:
-        return _service_cache[cache_key].get("result", False)
-
-    # Check service availability
-    hostname = get_weaviate_hostname()
-    result = is_http_service_available(f"http://{hostname}:8080", 2.0)  # Assuming a default timeout for this function
-
-    # Cache the result
-    _service_cache[cache_key] = {"result": result, "timestamp": current_time}
-
-    return result
-
-
-def is_ollama_available() -> bool:
-    """Check if Ollama service is available (with caching)."""
-    current_time = time.time()
-    cache_key = "ollama"
-
-    # Use cached result if recent enough
-    if cache_key in _service_cache and current_time - _service_cache[cache_key].get("timestamp", 0) < CACHE_DURATION:
-        return _service_cache[cache_key].get("result", False)
-
-    # Check service availability
-    hostname = "ollama" if os.getenv("TEST_DOCKER", "false").lower() == "true" else "localhost"
-    result = is_http_service_available(f"http://{hostname}:11434", 2.0)  # Assuming a default timeout for this function
-
-    # Cache the result
-    _service_cache[cache_key] = {"result": result, "timestamp": current_time}
-
-    return result
