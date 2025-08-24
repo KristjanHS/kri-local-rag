@@ -91,6 +91,13 @@ Tests declare service dependencies using pytest markers and use the `integration
 
 Integration tests combine real local models with mocked external services for efficient testing.
 
+### Production Model Smoke Test (Offline)
+
+- Inside the Docker image, models are baked at `EMBED_MODEL_PATH` and `RERANK_MODEL_PATH`.
+- We include a simple integration smoke test that verifies these local paths load and run offline.
+- Locally (outside Docker), this test skips to keep developer workflow fast.
+- To run in Docker tests: `TEST_DOCKER=true make test-up && make test-run-integration && make test-down`.
+
 ## Testing Strategy Guidelines
 
 ### When to Use Real Models vs Mocks
