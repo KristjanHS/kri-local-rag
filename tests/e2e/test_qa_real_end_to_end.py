@@ -10,7 +10,7 @@ import pytest
 
 pytest_plugins = ["tests.e2e.fixtures_ingestion"]
 from backend.config import OLLAMA_MODEL
-from backend.ollama_client import ensure_model_available
+from backend.ollama_client import pull_if_missing
 from backend.qa_loop import answer
 
 pytestmark = [pytest.mark.slow, pytest.mark.external]
@@ -22,8 +22,8 @@ def test_e2e_answer_with_real_services(docker_services_ready):  # noqa: ANN001
     Asks a generic question; retrieval should find some context from example_data
     and the LLM should provide a coherent answer based on it.
     """
-    # Ensure the required model is available (will download with visible progress if missing)
-    assert ensure_model_available(OLLAMA_MODEL) is True
+    # Ensure the required model is available (single pull request if missing)
+    assert pull_if_missing(OLLAMA_MODEL) is True
     # Ensure fake-answer mode is not active
     if "RAG_FAKE_ANSWER" in os.environ:
         del os.environ["RAG_FAKE_ANSWER"]

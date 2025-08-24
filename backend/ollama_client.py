@@ -140,53 +140,37 @@ def _verify_model_download(model_name: str, base_url: str) -> bool:
 
 
 def ensure_model_available(model_name: str) -> bool:
-    """Ensure the specified model is available, download if needed."""
+    """Simplified model ensure: attempt a quick, single pull request.
+
+    This avoids pre-checks and verbose progress. Intended for dev flows.
+    """
     try:
-        base_url = _get_ollama_base_url()
-
-        # Check if model exists
-        try:
-            resp = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=2)
-            resp.raise_for_status()
-            models = resp.json().get("models", [])
-        except httpx.ConnectError as e:
-            logger.error(
-                "Cannot connect to Ollama server at %s. Please ensure Ollama is running and accessible.", base_url
-            )
-            logger.debug("Connection error details: %s", e)
-            return False
-        except httpx.TimeoutException:
-            logger.error("Timeout connecting to Ollama server at %s. Please check if Ollama is running.", base_url)
-            return False
-        except Exception as e:
-            logger.error("Unexpected error connecting to Ollama server: %s", e)
-            return False
-
-        # Check if our model is in the list
-        model_exists = _check_model_exists(model_name, models)
-
-        if not model_exists:
-            logger.info("Model '%s' not found in Ollama. Attempting to download...", model_name)
-            # Download the model with progress tracking
-            if not _download_model_with_progress(model_name, base_url):
-                logger.error(
-                    "Failed to download model '%s'. Please check your internet connection and try again.", model_name
-                )
-                return False
-
-            # Verify the download was successful
-            if not _verify_model_download(model_name, base_url):
-                logger.error("Model '%s' download verification failed.", model_name)
-                return False
-
-            logger.info("Model '%s' successfully downloaded and verified.", model_name)
-            return True
-        else:
-            logger.info("Model '%s' is already available.", model_name)
-            return True
-
+        return pull_if_missing(model_name)
     except Exception as e:
         logger.error("Unexpected error ensuring model availability: %s", e)
+        return False
+
+
+def pull_if_missing(model_name: str, timeout_seconds: int = 10) -> bool:
+    """Attempt to pull the model once with a short timeout.
+
+    Returns True if the request was issued successfully; False on error.
+    """
+    base_url = _get_ollama_base_url()
+    url = f"{base_url.rstrip('/')}/api/pull"
+    try:
+        resp = httpx.post(url, json={"name": model_name}, timeout=timeout_seconds)
+        resp.raise_for_status()
+        logger.info("Pull requested for model '%s'", model_name)
+        return True
+    except httpx.TimeoutException:
+        logger.warning("Timed out while requesting pull for model '%s'", model_name)
+        return False
+    except httpx.ConnectError as e:
+        logger.error("Cannot connect to Ollama at %s: %s", base_url, e)
+        return False
+    except httpx.HTTPStatusError as e:
+        logger.error("Pull request failed for model '%s': %s", model_name, e)
         return False
 
 
