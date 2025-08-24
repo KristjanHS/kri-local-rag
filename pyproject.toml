@@ -165,9 +165,9 @@ local = { description = "Running on local machine", test_docker = false }
 
 # Service URLs for different environments (Docker vs Local)
 [tool.integration.urls]
-weaviate_docker = "http://localhost:8080"
+weaviate_docker = "http://weaviate:8080"
 weaviate_local = "http://localhost:8080"
-ollama_docker = "http://localhost:11434"
+ollama_docker = "http://ollama:11434"
 ollama_local = "http://localhost:11434"
 
 # Commands to start/stop services in different environments
