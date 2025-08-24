@@ -7,7 +7,7 @@ the retrieval step. Supports both Docker and local environments.
 import pytest
 
 from backend.config import OLLAMA_MODEL
-from backend.ollama_client import ensure_model_available
+from backend.ollama_client import pull_if_missing
 from backend.qa_loop import answer
 
 pytestmark = pytest.mark.requires_ollama
@@ -28,8 +28,8 @@ def test_answer_uses_real_ollama_compose(weaviate_client, sample_documents_path)
         embedding_model=embedding_model,
     )
 
-    # Ensure the required model is available (will download with visible progress if missing)
-    assert ensure_model_available(OLLAMA_MODEL) is True
+    # Ensure the required model is available (single pull request if missing)
+    assert pull_if_missing(OLLAMA_MODEL) is True
 
     question = "What is the capital of France?"
     # Use a small k to keep the prompt minimal; actual generation length is controlled by server/model

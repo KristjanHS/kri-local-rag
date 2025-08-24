@@ -61,12 +61,12 @@ Examples:
             # Ensure Weaviate is ready
             import backend.qa_loop as qa
             from backend.config import OLLAMA_MODEL
-            from backend.ollama_client import ensure_model_available
+            from backend.ollama_client import pull_if_missing
 
             qa.ensure_weaviate_ready_and_populated()
 
             # Ensure the required Ollama model is available
-            if not ensure_model_available(OLLAMA_MODEL):
+            if not pull_if_missing(OLLAMA_MODEL):
                 logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
                 sys.exit(1)
         else:
