@@ -27,13 +27,15 @@ def test_startup_ensures_model_and_exits_when_missing(monkeypatch, capsys, caplo
 
     monkeypatch.setattr(backend, "qa_loop", fake_qa_module, raising=False)
 
-    # Mock ensure_model_available to return False (model missing) via a fake module
+    # Mock pull_if_missing to return False (model missing) via a fake module
     fake_ollama_module = ModuleType("backend.ollama_client")
 
-    def _ensure_model_available(_model: str) -> bool:  # noqa: ARG001
+    def _pull_if_missing(_model: str) -> bool:  # noqa: ARG001
         return False
 
-    fake_ollama_module.ensure_model_available = _ensure_model_available  # type: ignore[attr-defined]
+    # Provide both names for backward compatibility in other imports
+    fake_ollama_module.pull_if_missing = _pull_if_missing  # type: ignore[attr-defined]
+    fake_ollama_module.ensure_model_available = lambda _model: False  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "backend.ollama_client", fake_ollama_module)
     monkeypatch.setattr(backend, "ollama_client", fake_ollama_module, raising=False)
 
