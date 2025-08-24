@@ -5,6 +5,7 @@ health checks and unified service management using pyproject.toml configuration.
 """
 
 import os
+import time
 from typing import Any, Optional
 from unittest.mock import MagicMock
 
@@ -14,14 +15,11 @@ import pytest
 def get_integration_config() -> dict[str, Any]:
     """Get integration configuration from pyproject.toml."""
     try:
-        try:
-            import tomllib
-        except ImportError:
-            try:
-                import tomli as tomllib  # type: ignore[import-untyped]
-            except ImportError:
-                return {}
+        import tomllib
+    except ImportError:
+        return {}  # No TOML support available
 
+    try:
         with open("pyproject.toml", "rb") as f:
             config = tomllib.load(f)
         return config.get("tool", {}).get("integration", {})
@@ -141,6 +139,30 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "requires_ollama: mark test as requiring Ollama service")
 
 
+def pytest_collection_modifyitems(config, items):
+    """Skip tests that require services that are not available."""
+    for item in items:
+        # Check for requires_weaviate marker
+        if item.get_closest_marker("requires_weaviate"):
+            if not is_weaviate_available():
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason=(
+                            "Weaviate service not available. Run with 'make test-up' first or start Weaviate locally."
+                        )
+                    )
+                )
+
+        # Check for requires_ollama marker
+        if item.get_closest_marker("requires_ollama"):
+            if not is_ollama_available():
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason="Ollama service not available. Run with 'make test-up' first or start Ollama locally."
+                    )
+                )
+
+
 def connect_to_weaviate_with_fallback(headers: dict[str, str] | None = None):
     """Connect to Weaviate using environment-appropriate settings."""
     import weaviate
@@ -227,3 +249,45 @@ def mock_httpx_get(monkeypatch):
     mock_func = MagicMock()
     monkeypatch.setattr("backend.ollama_client.httpx.get", mock_func)
     return mock_func
+
+
+_service_cache = {}  # Will store dicts with 'result' and 'timestamp'
+CACHE_DURATION = 5  # seconds
+
+
+def is_weaviate_available() -> bool:
+    """Check if Weaviate service is available (with caching)."""
+    current_time = time.time()
+    cache_key = "weaviate"
+
+    # Use cached result if recent enough
+    if cache_key in _service_cache and current_time - _service_cache[cache_key].get("timestamp", 0) < CACHE_DURATION:
+        return _service_cache[cache_key].get("result", False)
+
+    # Check service availability
+    hostname = get_weaviate_hostname()
+    result = is_http_service_available(f"http://{hostname}:8080", 2.0)  # Assuming a default timeout for this function
+
+    # Cache the result
+    _service_cache[cache_key] = {"result": result, "timestamp": current_time}
+
+    return result
+
+
+def is_ollama_available() -> bool:
+    """Check if Ollama service is available (with caching)."""
+    current_time = time.time()
+    cache_key = "ollama"
+
+    # Use cached result if recent enough
+    if cache_key in _service_cache and current_time - _service_cache[cache_key].get("timestamp", 0) < CACHE_DURATION:
+        return _service_cache[cache_key].get("result", False)
+
+    # Check service availability
+    hostname = "ollama" if os.getenv("TEST_DOCKER", "false").lower() == "true" else "localhost"
+    result = is_http_service_available(f"http://{hostname}:11434", 2.0)  # Assuming a default timeout for this function
+
+    # Cache the result
+    _service_cache[cache_key] = {"result": result, "timestamp": current_time}
+
+    return result
