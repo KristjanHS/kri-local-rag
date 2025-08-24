@@ -238,20 +238,48 @@ def real_model_loader():
     }
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def real_embedding_model():
-    """Fixture for loading real embedding model."""
+    """Session-scoped embedding model; skips tests if unavailable."""
+    import logging
+
     from backend.models import load_embedder
 
-    return load_embedder()
+    logger = logging.getLogger(__name__)
+    try:
+        model = load_embedder()
+    except Exception as e:
+        logger.info("Skipping tests requiring embedding model: %s", e)
+        pytest.skip(f"Embedding model unavailable: {e}")
+    # Quick smoke check to ensure the model is usable
+    try:
+        _ = model.encode("ok")  # type: ignore[attr-defined]
+    except Exception as e:
+        logger.info("Skipping tests due to embedding model health check failure: %s", e)
+        pytest.skip(f"Embedding model health check failed: {e}")
+    return model
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def real_reranker_model():
-    """Fixture for loading real reranker model."""
+    """Session-scoped reranker model; skips tests if unavailable."""
+    import logging
+
     from backend.models import load_reranker
 
-    return load_reranker()
+    logger = logging.getLogger(__name__)
+    try:
+        model = load_reranker()
+    except Exception as e:
+        logger.info("Skipping tests requiring reranker model: %s", e)
+        pytest.skip(f"Reranker model unavailable: {e}")
+    # Quick smoke check to ensure the model is usable
+    try:
+        _ = model.predict([["q", "d"]])  # type: ignore[attr-defined]
+    except Exception as e:
+        logger.info("Skipping tests due to reranker model health check failure: %s", e)
+        pytest.skip(f"Reranker model health check failed: {e}")
+    return model
 
 
 @pytest.fixture

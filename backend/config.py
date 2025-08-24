@@ -57,9 +57,9 @@ def _setup_logging():
             file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
             file_handler.setLevel(log_level)
             root_logger.addHandler(file_handler)
-        except (PermissionError, OSError):
-            # If file logging fails, continue with console-only logging
-            pass
+        except (PermissionError, OSError) as e:
+            # If file logging fails, log a warning and continue with console-only logging
+            logging.warning("Failed to configure file logging to '%s'. Error: %s", app_log_dir, e)
 
     # Suppress detailed HTTP request logging from httpx while keeping important info
     logging.getLogger("httpx").setLevel(logging.WARNING)

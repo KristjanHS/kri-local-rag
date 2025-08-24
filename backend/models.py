@@ -10,7 +10,6 @@ Based on models_guide.md recommendations:
 from __future__ import annotations
 
 import os
-import sys
 import threading
 import time
 from pathlib import Path
@@ -44,14 +43,11 @@ LOCAL_CACHE_PRIORITY = os.getenv("LOCAL_CACHE_PRIORITY", "true").lower() == "tru
 
 # Import model configuration from central config
 from backend.config import (
-    EMBED_COMMIT,
     EMBED_MODEL_PATH,
     EMBEDDING_MODEL,
     HF_CACHE_DIR,
-    RERANK_COMMIT,
     RERANK_MODEL_PATH,
     RERANKER_MODEL,
-    TRANSFORMERS_OFFLINE,
 )
 
 # Configuration is imported directly from config.py
@@ -113,26 +109,17 @@ def load_embedder() -> SentenceTransformerType:
                     logger.debug("Embedding model loaded successfully from local path")
                     return _embedding_model
 
-                # Fallback to downloading with pinned revision (development mode)
+                # Fallback to loading from cache or downloading (development mode)
                 logger.info(
-                    "Local embedding model not found, downloading: %s (attempt %d/%d)",
+                    "Local embedding model not found, loading: %s (attempt %d/%d)",
                     EMBEDDING_MODEL,
                     attempt + 1,
                     max_retries,
                 )
-                if EMBED_COMMIT:
-                    logger.debug("Using pinned revision: %s", EMBED_COMMIT)
-                    _embedding_model = SentenceTransformer(
-                        EMBEDDING_MODEL,
-                        cache_folder=HF_CACHE_DIR,
-                        revision=EMBED_COMMIT,
-                        local_files_only=TRANSFORMERS_OFFLINE,
-                    )
-                else:
-                    logger.warning("No pinned revision found for embedding model")
-                    _embedding_model = SentenceTransformer(
-                        EMBEDDING_MODEL, cache_folder=HF_CACHE_DIR, local_files_only=TRANSFORMERS_OFFLINE
-                    )
+                _embedding_model = SentenceTransformer(
+                    EMBEDDING_MODEL,
+                    cache_folder=HF_CACHE_DIR,
+                )
 
                 # Check for timeout in integration test mode
                 if INTEGRATION_TEST_MODE:
@@ -215,26 +202,17 @@ def load_reranker() -> CrossEncoderType:
                     logger.debug("Reranker model loaded successfully from local path")
                     return _cross_encoder
 
-                # Fallback to downloading with pinned revision (development mode)
+                # Fallback to loading from cache or downloading (development mode)
                 logger.info(
-                    "Local reranker model not found, downloading: %s (attempt %d/%d)",
+                    "Local reranker model not found, loading: %s (attempt %d/%d)",
                     RERANKER_MODEL,
                     attempt + 1,
                     max_retries,
                 )
-                if RERANK_COMMIT:
-                    logger.debug("Using pinned revision: %s", RERANK_COMMIT)
-                    _cross_encoder = CrossEncoder(
-                        RERANKER_MODEL,
-                        cache_folder=HF_CACHE_DIR,
-                        revision=RERANK_COMMIT,
-                        local_files_only=TRANSFORMERS_OFFLINE,
-                    )
-                else:
-                    logger.warning("No pinned revision found for reranker model")
-                    _cross_encoder = CrossEncoder(
-                        RERANKER_MODEL, cache_folder=HF_CACHE_DIR, local_files_only=TRANSFORMERS_OFFLINE
-                    )
+                _cross_encoder = CrossEncoder(
+                    RERANKER_MODEL,
+                    cache_folder=HF_CACHE_DIR,
+                )
 
                 # Check for timeout in integration test mode
                 if INTEGRATION_TEST_MODE:
@@ -285,58 +263,6 @@ def preload_models() -> None:
         logger.error("Failed to preload reranker model: %s", e)
 
 
-def preload_models_for_integration_tests() -> None:
-    """
-    Preload models specifically optimized for integration tests.
-    This function prioritizes local cache, has timeout protection, and includes retry logic.
-    """
-    logger.info("Preloading models for integration tests with retry capability...")
-    start_time = time.time()
-
-    # Enable integration test mode if not already set
-    original_integration_mode = os.environ.get("INTEGRATION_TEST_MODE")
-    if not INTEGRATION_TEST_MODE:
-        os.environ["INTEGRATION_TEST_MODE"] = "true"
-        # Reload configuration to pick up the new environment variable
-        import importlib
-
-        importlib.reload(sys.modules[__name__])
-        # Need to use the updated module reference
-        from backend.models import INTEGRATION_TEST_MODE as updated_integration_mode
-
-        if not updated_integration_mode:
-            logger.warning("Failed to enable integration test mode")
-
-    try:
-        load_embedder()
-        logger.info("✓ Embedding model preloaded for integration tests")
-    except TimeoutError as e:
-        logger.error("Embedding model preload timeout: %s", e)
-        raise
-    except Exception as e:
-        logger.error("Failed to preload embedding model for integration tests: %s", e)
-        # Don't raise here - allow reranker to still be attempted
-
-    try:
-        load_reranker()
-        logger.info("✓ Reranker model preloaded for integration tests")
-    except TimeoutError as e:
-        logger.error("Reranker model preload timeout: %s", e)
-        raise
-    except Exception as e:
-        logger.error("Failed to preload reranker model for integration tests: %s", e)
-        # Don't raise here - at least one model might have loaded successfully
-
-    total_time = time.time() - start_time
-    logger.info("Integration test model preload completed in %.2f seconds", total_time)
-
-    # Restore original integration test mode
-    if original_integration_mode is None:
-        os.environ.pop("INTEGRATION_TEST_MODE", None)
-    else:
-        os.environ["INTEGRATION_TEST_MODE"] = original_integration_mode
-
-
 def clear_model_cache() -> None:
     """
     Clear the global model cache. Useful for testing to ensure fresh model loading.
@@ -345,93 +271,6 @@ def clear_model_cache() -> None:
     _embedding_model = None
     _cross_encoder = None
     logger.info("Model cache cleared")
-
-
-def preload_models_with_health_check() -> dict:
-    """
-    Preload models and perform health checks for integration testing.
-
-    Returns:
-        dict: Contains status information about model loading and health
-    """
-    from backend.config import get_logger
-
-    logger = get_logger(__name__)
-    status = {
-        "embedding_model": {"loaded": False, "healthy": False, "error": None},
-        "reranker_model": {"loaded": False, "healthy": False, "error": None},
-        "preloaded_at": None,
-        "total_time": 0.0,
-    }
-
-    start_time = time.time()
-
-    # Enable integration test mode for optimal loading
-    original_integration_mode = os.environ.get("INTEGRATION_TEST_MODE")
-    if not INTEGRATION_TEST_MODE:
-        os.environ["INTEGRATION_TEST_MODE"] = "true"
-
-    try:
-        # Load and check embedding model
-        try:
-            embedder = load_embedder()
-            status["embedding_model"]["loaded"] = True
-
-            # Health check
-            try:
-                test_text = "Health check test sentence"
-                embedding = embedder.encode(test_text)  # type: ignore[attr-defined]
-                if hasattr(embedding, "shape") and len(embedding.shape) > 0:
-                    status["embedding_model"]["healthy"] = True
-                    logger.info("✓ Embedding model health check passed")
-                else:
-                    status["embedding_model"]["error"] = "Invalid embedding output"
-                    logger.warning("⚠️ Embedding model health check failed: invalid output")
-            except Exception as e:
-                status["embedding_model"]["error"] = str(e)
-                logger.warning("⚠️ Embedding model health check failed: %s", e)
-
-        except Exception as e:
-            status["embedding_model"]["error"] = str(e)
-            logger.error("❌ Failed to load embedding model: %s", e)
-
-        # Load and check reranker model
-        try:
-            reranker = load_reranker()
-            status["reranker_model"]["loaded"] = True
-
-            # Health check
-            try:
-                query = "test query"
-                doc = "test document"
-                scores = reranker.predict([[query, doc]])  # type: ignore[attr-defined]
-                if isinstance(scores, list) and len(scores) > 0:
-                    status["reranker_model"]["healthy"] = True
-                    logger.info("✓ Reranker model health check passed")
-                else:
-                    status["reranker_model"]["error"] = "Invalid reranker output"
-                    logger.warning("⚠️ Reranker model health check failed: invalid output")
-            except Exception as e:
-                status["reranker_model"]["error"] = str(e)
-                logger.warning("⚠️ Reranker model health check failed: %s", e)
-
-        except Exception as e:
-            status["reranker_model"]["error"] = str(e)
-            logger.error("❌ Failed to load reranker model: %s", e)
-
-    finally:
-        # Restore original integration test mode
-        if original_integration_mode is None:
-            os.environ.pop("INTEGRATION_TEST_MODE", None)
-        else:
-            os.environ["INTEGRATION_TEST_MODE"] = original_integration_mode
-
-    # Record timing
-    status["total_time"] = time.time() - start_time
-    status["preloaded_at"] = time.time()
-
-    logger.info(".2f")
-    return status
 
 
 def get_model_loading_status() -> dict:
@@ -486,19 +325,12 @@ def load_embedder_with_model(model_name: str) -> SentenceTransformerType:
         logger.info("Loading specific embedding model from local path: %s", EMBED_MODEL_PATH)
         return SentenceTransformer(EMBED_MODEL_PATH)
 
-    # Fallback to downloading with pinned revision (development mode)
-    logger.info("Local embedding model not found, downloading specific model: %s", model_name)
-    if EMBED_COMMIT:
-        logger.debug("Using pinned revision: %s", EMBED_COMMIT)
-        return SentenceTransformer(
-            model_name,
-            cache_folder=HF_CACHE_DIR,
-            revision=EMBED_COMMIT,
-            local_files_only=TRANSFORMERS_OFFLINE,
-        )
-    else:
-        logger.warning("No pinned revision found for embedding model")
-        return SentenceTransformer(model_name, cache_folder=HF_CACHE_DIR, local_files_only=TRANSFORMERS_OFFLINE)
+    # Fallback to loading from cache or downloading (development mode)
+    logger.info("Local embedding model not found, loading specific model: %s", model_name)
+    return SentenceTransformer(
+        model_name,
+        cache_folder=HF_CACHE_DIR,
+    )
 
 
 def get_cross_encoder() -> CrossEncoderType:

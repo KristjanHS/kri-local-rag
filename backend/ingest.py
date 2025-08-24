@@ -33,6 +33,7 @@ from backend.config import (
     CHUNK_SIZE,
     COLLECTION_NAME,
     EMBEDDING_MODEL,
+    HF_CACHE_DIR,
     WEAVIATE_BATCH_SIZE,
     WEAVIATE_CONCURRENT_REQUESTS,
     WEAVIATE_URL,
@@ -296,7 +297,7 @@ if __name__ == "__main__":
 
     # Load the embedding model once
     logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
-    model = SentenceTransformer(EMBEDDING_MODEL)
+    model = SentenceTransformer(EMBEDDING_MODEL, cache_folder=HF_CACHE_DIR)
     try:
         logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
         compiled_model = torch.compile(model, backend="inductor", mode="max-autotune")
