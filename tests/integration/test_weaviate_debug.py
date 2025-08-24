@@ -7,13 +7,26 @@ import os
 # Set debug logging level
 os.environ["LOG_LEVEL"] = "DEBUG"
 
+
 from backend.config import get_logger
 from backend.console import console
 from backend.retriever import get_top_k
 
 
-def test_weaviate_debug():
+def test_weaviate_debug(weaviate_client, sample_documents_path):
     """Test Weaviate debug logging with actual queries."""
+
+    # First, ensure we have data in Weaviate by running ingestion
+    from backend import ingest
+    from backend.retriever import _get_embedding_model
+
+    embedding_model = _get_embedding_model()
+    ingest.ingest(
+        directory=sample_documents_path,
+        collection_name="TestCollection",
+        weaviate_client=weaviate_client,
+        embedding_model=embedding_model,
+    )
 
     logger = get_logger("weaviate_test")
     logger.setLevel(logging.DEBUG)
@@ -47,4 +60,5 @@ def test_weaviate_debug():
 
 
 if __name__ == "__main__":
-    test_weaviate_debug()
+    # This test requires pytest fixtures, so it should be run with pytest
+    logging.warning("Run this test with: pytest tests/integration/test_weaviate_debug.py::test_weaviate_debug -v")

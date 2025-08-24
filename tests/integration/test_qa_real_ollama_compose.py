@@ -14,13 +14,23 @@ pytestmark = pytest.mark.requires_ollama
 
 
 @pytest.mark.requires_ollama
-def test_answer_uses_real_ollama_compose(mock_get_top_k):
+def test_answer_uses_real_ollama_compose(weaviate_client, sample_documents_path):
     """Test QA with real Ollama using both Docker and local environments."""
-    # Configure the mock provided by the fixture
-    mock_get_top_k.return_value = ["Paris is the capital of France."]
+    # First, ensure we have data in Weaviate by running ingestion
+    from backend import ingest
+    from backend.retriever import _get_embedding_model
+
+    embedding_model = _get_embedding_model()
+    ingest.ingest(
+        directory=sample_documents_path,
+        collection_name="TestCollection",
+        weaviate_client=weaviate_client,
+        embedding_model=embedding_model,
+    )
 
     # Ensure the required model is available (will download with visible progress if missing)
     assert ensure_model_available(OLLAMA_MODEL) is True
+
     question = "What is the capital of France?"
     # Use a small k to keep the prompt minimal; actual generation length is controlled by server/model
     from backend.qa_loop import _get_cross_encoder
