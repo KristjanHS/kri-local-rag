@@ -1,12 +1,12 @@
 """Test the full document ingestion pipeline using Compose services."""
 
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 from sentence_transformers import SentenceTransformer
 
 from backend import config, ingest
+from tests.integration.conftest import get_weaviate_hostname, is_running_in_docker
 
 # Mark the entire module as 'slow'
 pytestmark = pytest.mark.slow
@@ -69,9 +69,24 @@ def weaviate_collection_mock(mock_weaviate_connect):
 
 def test_ingest_pipeline_with_real_weaviate_compose(weaviate_client, sample_documents_path):
     """Test the full ingestion pipeline with a real Weaviate instance, using a local model."""
-    # Check if we're in the test environment
-    if not Path("/.dockerenv").exists():
-        pytest.skip("This test requires the Compose test environment. Run with 'make test-up' first.")
+    # Check if we're in the test environment (either Docker or with Weaviate running locally)
+    if not is_running_in_docker():
+        # When running locally, skip if Weaviate isn't available
+        try:
+            # Try to connect briefly to see if Weaviate is available
+            import weaviate
+
+            test_client = weaviate.connect_to_local(
+                host=get_weaviate_hostname(),
+                port=8080,
+                grpc_port=50051,
+            )
+            test_client.close()
+        except Exception:
+            pytest.skip(
+                "This test requires a running Weaviate instance. Run with 'make test-up' first "
+                "or start Weaviate locally."
+            )
 
     # Run the ingestion process on the test directory with only PDF files
     from backend.retriever import _get_embedding_model
@@ -93,9 +108,24 @@ def test_ingest_pipeline_with_real_weaviate_compose(weaviate_client, sample_docu
 
 def test_ingest_pipeline_loads_and_embeds_data_compose(weaviate_collection_mock, sample_documents_path):
     """Test the full ingestion pipeline from loading docs to inserting into Weaviate with a local model."""
-    # Check if we're in the test environment
-    if not Path("/.dockerenv").exists():
-        pytest.skip("This test requires the Compose test environment. Run with 'make test-up' first.")
+    # Check if we're in the test environment (either Docker or with Weaviate running locally)
+    if not is_running_in_docker():
+        # When running locally, skip if Weaviate isn't available
+        try:
+            # Try to connect briefly to see if Weaviate is available
+            import weaviate
+
+            test_client = weaviate.connect_to_local(
+                host=get_weaviate_hostname(),
+                port=8080,
+                grpc_port=50051,
+            )
+            test_client.close()
+        except Exception:
+            pytest.skip(
+                "This test requires a running Weaviate instance. Run with 'make test-up' first "
+                "or start Weaviate locally."
+            )
 
     # Provide a real embedding model for this integration test
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
@@ -133,9 +163,24 @@ def test_ingest_pipeline_loads_and_embeds_data_compose(weaviate_collection_mock,
 
 def test_ingest_pipeline_handles_no_embedding_model_compose(weaviate_collection_mock, sample_documents_path):
     """Test that the ingestion pipeline exits gracefully if no local embedding model is available."""
-    # Check if we're in the test environment
-    if not Path("/.dockerenv").exists():
-        pytest.skip("This test requires the Compose test environment. Run with 'make test-up' first.")
+    # Check if we're in the test environment (either Docker or with Weaviate running locally)
+    if not is_running_in_docker():
+        # When running locally, skip if Weaviate isn't available
+        try:
+            # Try to connect briefly to see if Weaviate is available
+            import weaviate
+
+            test_client = weaviate.connect_to_local(
+                host=get_weaviate_hostname(),
+                port=8080,
+                grpc_port=50051,
+            )
+            test_client.close()
+        except Exception:
+            pytest.skip(
+                "This test requires a running Weaviate instance. Run with 'make test-up' first "
+                "or start Weaviate locally."
+            )
 
     with pytest.raises(AttributeError):
         ingest.ingest(
@@ -148,9 +193,24 @@ def test_ingest_pipeline_handles_no_embedding_model_compose(weaviate_collection_
 
 def test_ingest_pipeline_is_idempotent_compose(weaviate_collection_mock, sample_documents_path):
     """Test that running ingestion multiple times doesn't create duplicate data, using a local model."""
-    # Check if we're in the test environment
-    if not Path("/.dockerenv").exists():
-        pytest.skip("This test requires the Compose test environment. Run with 'make test-up' first.")
+    # Check if we're in the test environment (either Docker or with Weaviate running locally)
+    if not is_running_in_docker():
+        # When running locally, skip if Weaviate isn't available
+        try:
+            # Try to connect briefly to see if Weaviate is available
+            import weaviate
+
+            test_client = weaviate.connect_to_local(
+                host=get_weaviate_hostname(),
+                port=8080,
+                grpc_port=50051,
+            )
+            test_client.close()
+        except Exception:
+            pytest.skip(
+                "This test requires a running Weaviate instance. Run with 'make test-up' first "
+                "or start Weaviate locally."
+            )
 
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
 
