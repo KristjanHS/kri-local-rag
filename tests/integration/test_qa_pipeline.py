@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.qa_loop import answer
-from backend.retriever import get_top_k
 
 # Mark the entire module as 'slow'
 pytestmark = pytest.mark.slow
@@ -73,36 +72,7 @@ def test_qa_pipeline_no_context():
     mock_get_top_k.assert_called_once()
 
 
-# -----------------------------------------------------------------------------
-# Retriever hybrid search parameters ------------------------------------------
-# -----------------------------------------------------------------------------
-
-
-def test_get_top_k_hybrid_parameters(mock_weaviate_connect):
-    """Verify that `get_top_k` issues a `hybrid()` query with the expected parameters."""
-    # Build a fake Weaviate client->collection->query chain
-    mock_client = MagicMock()
-    mock_collection = MagicMock()
-    mock_query = MagicMock()
-    mock_result = MagicMock()
-    mock_obj = MagicMock()
-    mock_obj.properties = {"content": "The capital of France is Paris."}
-    mock_result.objects = [mock_obj]
-
-    # Wire the mocks together
-    mock_query.hybrid.return_value = mock_result
-    mock_collection.query = mock_query
-    mock_client.collections.get.return_value = mock_collection
-    mock_weaviate_connect.return_value = mock_client
-
-    question = "What is the capital of France?"
-    _ = get_top_k(question, k=2)
-
-    # hybrid() should have been called once with correct kwargs
-    mock_query.hybrid.assert_called_once()
-    kwargs = mock_query.hybrid.call_args.kwargs
-    assert kwargs["query"] == question
-    assert kwargs["limit"] == 2
-
-    # Client should be closed in the finally block
-    mock_client.close.assert_called_once()
+"""
+The specific hybrid-parameter verification is covered in unit tests.
+This integration module focuses on QA pipeline behavior.
+"""

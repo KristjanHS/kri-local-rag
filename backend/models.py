@@ -110,7 +110,7 @@ def load_embedder() -> SentenceTransformerType:
                     return _embedding_model
 
                 # Fallback to loading from cache or downloading (development mode)
-                logger.info(
+                logger.debug(
                     "Local embedding model not found, loading: %s (attempt %d/%d)",
                     EMBEDDING_MODEL,
                     attempt + 1,
@@ -203,7 +203,7 @@ def load_reranker() -> CrossEncoderType:
                     return _cross_encoder
 
                 # Fallback to loading from cache or downloading (development mode)
-                logger.info(
+                logger.debug(
                     "Local reranker model not found, loading: %s (attempt %d/%d)",
                     RERANKER_MODEL,
                     attempt + 1,
@@ -326,7 +326,7 @@ def load_embedder_with_model(model_name: str) -> SentenceTransformerType:
         return SentenceTransformer(EMBED_MODEL_PATH)
 
     # Fallback to loading from cache or downloading (development mode)
-    logger.info("Local embedding model not found, loading specific model: %s", model_name)
+    logger.debug("Local embedding model not found, loading specific model: %s", model_name)
     return SentenceTransformer(
         model_name,
         cache_folder=HF_CACHE_DIR,
