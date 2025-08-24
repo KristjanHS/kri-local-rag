@@ -262,6 +262,7 @@ def test_something(mocker, mock_embedding_model):
     - ⚠️ Loss of some advanced features (detailed error context, service caching)
     - ⚠️ Need for clear migration documentation
     - ⚠️ Potential initial test failures during transition
+    - ✅ Fixed pre-commit linting errors (E501 line length in conftest.py)
 
 - [ ] **Core RAG Pipeline Components**
   - 🔄 Test retriever module with real models

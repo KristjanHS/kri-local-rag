@@ -240,8 +240,6 @@ def is_running_in_docker() -> bool:
     Returns:
         bool: True if running inside Docker, False otherwise
     """
-    import os
-
     # Use TEST_DOCKER environment variable for explicit control
     # This is much simpler and more reliable than file-based detection
     test_docker = os.getenv("TEST_DOCKER", "false").lower()
