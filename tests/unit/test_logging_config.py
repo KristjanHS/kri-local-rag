@@ -40,7 +40,7 @@ def reset_logging_state():
 
 
 def test_set_log_level_configures_handlers_correctly():
-    """Verify that set_log_level properly configures the root logger and console handler."""
+    """Verify that set_log_level properly configures the root logger and console/stream handler."""
     # Test setting different log levels
     test_cases = [
         ("DEBUG", logging.DEBUG),
@@ -57,10 +57,16 @@ def test_set_log_level_configures_handlers_correctly():
         root_logger = logging.getLogger()
         assert root_logger.level == expected_level, f"Root logger level should be {expected_level} for {level_name}"
 
-        # Verify console handler level
-        rich_handlers = [h for h in root_logger.handlers if isinstance(h, RichHandler)]
-        assert len(rich_handlers) == 1, "Should have exactly one RichHandler"
-        assert rich_handlers[0].level == expected_level, (
+        # Verify console-like handler level (RichHandler in TTY, StreamHandler otherwise)
+        console_handlers = [
+            h
+            for h in root_logger.handlers
+            if isinstance(h, (RichHandler, logging.StreamHandler))
+            and not isinstance(h, logging.FileHandler)
+            and not h.__class__.__name__.startswith("LogCapture")
+        ]
+        assert len(console_handlers) == 1, "Should have exactly one console handler"
+        assert console_handlers[0].level == expected_level, (
             f"Console handler level should be {expected_level} for {level_name}"
         )
 
@@ -96,9 +102,9 @@ def test_set_log_level_handles_edge_cases():
     assert root_logger.level == logging.INFO
 
 
-def test_single_rich_handler_and_no_duplicate_stream_handlers():
-    """Verify that importing key modules results in exactly one Rich console handler
-    and one file handler, with no duplicate StreamHandlers on the root logger.
+def test_single_console_handler_and_no_duplicate_stream_handlers():
+    """Verify that importing key modules results in exactly one console handler
+    and no duplicate extra StreamHandlers on the root logger. No default file handler.
     """
     # Import the modules that might trigger logging setup
     # These imports are used for their side effects to trigger logging configuration
@@ -115,17 +121,15 @@ def test_single_rich_handler_and_no_duplicate_stream_handlers():
     root_logger = logging.getLogger()
 
     # Assertions - exclude pytest's LogCaptureHandler from the count
-    rich_handlers = [h for h in root_logger.handlers if isinstance(h, RichHandler)]
-    file_handlers = [h for h in root_logger.handlers if isinstance(h, logging.handlers.TimedRotatingFileHandler)]
-    other_stream_handlers = [
+    console_handlers = [
         h
         for h in root_logger.handlers
-        if isinstance(h, logging.StreamHandler)
-        and not isinstance(h, RichHandler)
-        and not isinstance(h, logging.handlers.TimedRotatingFileHandler)
-        and not h.__class__.__name__.startswith("LogCapture")  # Exclude pytest handlers
+        if isinstance(h, (RichHandler, logging.StreamHandler))
+        and not isinstance(h, logging.FileHandler)
+        and not h.__class__.__name__.startswith("LogCapture")
     ]
+    file_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
 
-    assert len(rich_handlers) == 1, f"Expected 1 RichHandler, but found {len(rich_handlers)}"
-    assert len(file_handlers) == 1, f"Expected 1 TimedRotatingFileHandler, but found {len(file_handlers)}"
-    assert not other_stream_handlers, f"Expected no other StreamHandlers, but found {len(other_stream_handlers)}"
+    assert len(console_handlers) == 1, f"Expected 1 console handler, but found {len(console_handlers)}"
+    # By default we should not attach a file handler unless APP_LOG_DIR is set
+    assert len(file_handlers) == 0, f"Expected no FileHandler by default, but found {len(file_handlers)}"
