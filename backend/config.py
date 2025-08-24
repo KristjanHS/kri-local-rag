@@ -1,7 +1,6 @@
 import logging
-import logging.handlers
 import os
-import tempfile
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -16,90 +15,51 @@ LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 _logging_configured = False
 
 
-def _resolve_log_dir() -> Path:
-    """Return a writable log directory.
-    Order of preference:
-    1) APP_LOG_DIR env
-    2) LOG_DIR env
-    3) /app/logs (Docker runtime)
-    4) CWD/logs (dev)
-    5) System temp dir (e.g., /tmp/kri-local-rag-logs)
-    """
-    # Securely create a temporary directory as a fallback
-    fallback_dir = Path(tempfile.gettempdir()) / "kri-local-rag-logs"
-
-    candidate_strings = [
-        os.getenv("APP_LOG_DIR"),
-        os.getenv("LOG_DIR"),
-        "/app/logs",
-        str(Path.cwd() / "logs"),
-        str(fallback_dir),
-    ]
-
-    for candidate in candidate_strings:
-        if not candidate:
-            continue
-        candidate_path = Path(candidate)
-        try:
-            candidate_path.mkdir(parents=True, exist_ok=True)
-            # Check if the directory is writable
-            test_file = candidate_path / ".writable_test"
-            test_file.touch()
-            test_file.unlink()
-            return candidate_path
-        except (PermissionError, OSError):
-            continue
-
-    # This part should ideally not be reached if the temp dir is writable,
-    # but it's a safeguard.
-    try:
-        fallback_dir.mkdir(parents=True, exist_ok=True)
-        return fallback_dir
-    except (PermissionError, OSError) as e:
-        # If even the temp dir isn't writable, something is seriously wrong.
-        # Log to stderr as a last resort.
-        import sys
-
-        print(f"FATAL: Could not create any log directory. Error: {e}", file=sys.stderr)  # noqa: T201
-        # Exit or raise, as logging is critical and non-functional.
-        raise SystemExit(1) from e
-
-
 def _setup_logging():
     """Configure the root logger. This should only be called once."""
     global _logging_configured
     if _logging_configured:
         return
 
-    log_dir = _resolve_log_dir()
-    log_file = log_dir / "rag_system.log"
+    # Determine log level from environment
+    try:
+        log_level = getattr(logging, LOG_LEVEL)
+    except AttributeError:
+        log_level = logging.INFO
 
-    # Use a timed rotating file handler for full-fidelity DEBUG logs
-    file_handler = logging.handlers.TimedRotatingFileHandler(
-        log_file,
-        when="midnight",
-        backupCount=7,
-        utc=True,
-    )
-    file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-    file_handler.setLevel(logging.DEBUG)  # Capture all debug messages in the file
+    # Console handler: Rich for TTY, plain StreamHandler otherwise
+    if sys.stderr.isatty():
+        console_handler = RichHandler(
+            show_time=False,
+            show_path=False,
+            rich_tracebacks=True,
+            show_level=True,
+            log_time_format="[%X]",
+        )
+        console_handler.setFormatter(logging.Formatter("%(message)s"))
+    else:
+        console_handler = logging.StreamHandler(stream=sys.stderr)
+        console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    console_handler.setLevel(log_level)
 
-    # Use a rich handler for user-facing console output (message-only)
-    console_handler = RichHandler(
-        show_time=False,
-        show_path=False,
-        rich_tracebacks=True,
-        show_level=True,
-        log_time_format="[%X]",
-    )
-    console_handler.setFormatter(logging.Formatter("%(message)s"))
-    console_handler.setLevel(LOG_LEVEL)  # Respect user-configured level
-
-    # Configure the root logger to capture everything; handlers will filter
+    # Root logger configuration
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
-    root_logger.addHandler(file_handler)
+    root_logger.setLevel(log_level)
     root_logger.addHandler(console_handler)
+
+    # Optional file logging only when APP_LOG_DIR is explicitly provided
+    app_log_dir = os.getenv("APP_LOG_DIR")
+    if app_log_dir:
+        try:
+            log_dir_path = Path(app_log_dir)
+            log_dir_path.mkdir(parents=True, exist_ok=True)
+            file_handler = logging.FileHandler(log_dir_path / "rag_system.log")
+            file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+            file_handler.setLevel(log_level)
+            root_logger.addHandler(file_handler)
+        except (PermissionError, OSError):
+            # If file logging fails, continue with console-only logging
+            pass
 
     # Suppress detailed HTTP request logging from httpx while keeping important info
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -158,11 +118,11 @@ def set_log_level(level: str | None) -> None:
         root_logger = logging.getLogger()
         root_logger.setLevel(log_level)
 
-        # Find the console handler and set its level explicitly
+        # Find console-like handlers and set their level explicitly
         for handler in root_logger.handlers:
-            if isinstance(handler, RichHandler):
+            is_console_like = isinstance(handler, (RichHandler, logging.StreamHandler))
+            if is_console_like and not isinstance(handler, logging.FileHandler):
                 handler.setLevel(log_level)
-                break
 
         # Log the change using the configured logger
         logger = get_logger(__name__)
