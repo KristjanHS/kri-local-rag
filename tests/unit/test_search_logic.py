@@ -95,6 +95,39 @@ class TestHybridSearchFix:
         assert result == ["Test content 1", "Test content 2"]
         mock_client.close.assert_called_once()
 
+    def test_hybrid_search_fallback_to_bm25(self, mocker, mock_embedding_model: MagicMock):
+        """Test fallback to BM25 when hybrid search fails."""
+        from weaviate.exceptions import WeaviateQueryError
+
+        from backend.retriever import get_top_k
+
+        # Use mocker fixture for weaviate mocking (modern approach)
+        mock_connect = mocker.patch("backend.retriever.weaviate.connect_to_custom")
+        mock_client = MagicMock()
+        mock_collection = MagicMock()
+        mock_query = MagicMock()
+        mock_bm25_result = MagicMock()
+
+        mock_query.hybrid.side_effect = WeaviateQueryError("VectorFromInput was called without vectorizer", "GRPC")
+
+        class MockObject:
+            def __init__(self, content):
+                self.properties = {"content": content}
+
+        mock_obj = MockObject("BM25 result")
+        mock_bm25_result.objects = [mock_obj]
+        mock_query.bm25.return_value = mock_bm25_result
+
+        mock_connect.return_value = mock_client
+        mock_client.collections.get.return_value = mock_collection
+        mock_collection.query = mock_query
+
+        question = "test question"
+        result = get_top_k(question, k=5)
+
+        mock_query.bm25.assert_called_once_with(query=question, limit=5)
+        assert result == ["BM25 result"]
+
     def test_hybrid_search_with_empty_collection(self, mocker, mock_embedding_model: MagicMock):
         """Test hybrid search behavior with empty collection."""
         from backend.retriever import get_top_k
@@ -161,6 +194,40 @@ class TestHybridSearchFix:
         mock_query.hybrid.assert_called_once_with(vector=[0.1, 0.2, 0.3], query="test question", alpha=0.5, limit=1)
         mock_query.bm25.assert_not_called()
         assert result == ["Fallback must not be used"]
+
+    def test_hybrid_search_fallback_to_bm25_when_no_embedding_model(self, mocker):
+        """Test hybrid search falls back to BM25 when no embedding model is available."""
+        from weaviate.exceptions import WeaviateQueryError
+
+        from backend.retriever import get_top_k
+
+        # Use mocker to patch load_embedder to return None (modern approach)
+        mocker.patch("backend.retriever.load_embedder", return_value=None)
+
+        # Use mocker fixture for weaviate mocking (modern approach)
+        mock_connect = mocker.patch("backend.retriever.weaviate.connect_to_custom")
+        mock_client = MagicMock()
+        mock_collection = MagicMock()
+        mock_query = MagicMock()
+        mock_result = MagicMock()
+
+        class MockObject:
+            def __init__(self, content):
+                self.properties = {"content": content}
+
+        mock_result.objects = [MockObject("Fallback content")]
+
+        mock_query.hybrid.side_effect = WeaviateQueryError("No vectorizer", "GRPC")
+        mock_query.bm25.return_value = mock_result
+
+        mock_collection.query = mock_query
+        mock_client.collections.get.return_value = mock_collection
+        mock_connect.return_value = mock_client
+
+        result = get_top_k("test question", k=1)
+
+        mock_query.bm25.assert_called_once()
+        assert result == ["Fallback content"]
 
 
 class TestHybridSearchFailureDetection:
