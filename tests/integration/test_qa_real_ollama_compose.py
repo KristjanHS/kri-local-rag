@@ -16,7 +16,7 @@ pytestmark = pytest.mark.requires_ollama
 
 
 @pytest.mark.requires_ollama
-def test_answer_uses_real_ollama_compose(weaviate_client, sample_documents_path, monkeypatch):
+def test_answer_uses_real_ollama_compose(weaviate_client, clean_test_collection, sample_documents_path, monkeypatch):
     """Test QA with real Ollama using both Docker and local environments."""
     # First, ensure we have data in Weaviate by running ingestion
     from backend import ingest
@@ -67,39 +67,23 @@ def test_answer_uses_real_ollama_compose(weaviate_client, sample_documents_path,
     # Best-effort: check for a model process in Ollama after generation attempt
     try:
         # Prefer Docker Compose service name to avoid hardcoded container IDs
-        ps = subprocess.run(
-            [
-                "docker",
-                "compose",
-                "-f",
-                "docker/docker-compose.yml",
-                "exec",
-                "-T",
-                "ollama",
-                "ollama",
-                "ps",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
+        base_cmd = [
+            "-f",
+            "docker/docker-compose.yml",
+            "exec",
+            "-T",
+            "ollama",
+            "ollama",
+            "ps",
+        ]
+        run_kwargs = {"capture_output": True, "text": True, "timeout": 10}
+
+        # Try with Docker Compose v2 ("docker compose")
+        ps = subprocess.run(["docker", "compose"] + base_cmd, **run_kwargs)
+
+        # Fallback to legacy docker-compose CLI if v2 invocation fails
         if ps.returncode != 0:
-            # Fallback to legacy docker-compose CLI
-            ps = subprocess.run(
-                [
-                    "docker-compose",
-                    "-f",
-                    "docker/docker-compose.yml",
-                    "exec",
-                    "-T",
-                    "ollama",
-                    "ollama",
-                    "ps",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
+            ps = subprocess.run(["docker-compose"] + base_cmd, **run_kwargs)
         assert ps.returncode == 0
         assert OLLAMA_MODEL.split(":")[0] in ps.stdout
     except Exception:

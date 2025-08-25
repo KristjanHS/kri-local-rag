@@ -54,10 +54,10 @@ def _check_model_exists(model_name: str, models: list) -> bool:
     return False
 
 
-def _download_model_with_progress(model_name: str, base_url: str) -> bool:
+def _download_model_with_progress(model_name: str, base_url: str, timeout_seconds: int = 300) -> bool:
     """Download a model with progress tracking."""
     logger.info("Model '%s' not found. Downloading...", model_name)
-    logger.debug("Pulling from %s/api/pull with timeout=300s", base_url.rstrip("/"))
+    logger.debug("Pulling from %s/api/pull with timeout=%ds", base_url.rstrip("/"), timeout_seconds)
     logger.info("This may take several minutes depending on your internet speed.")
 
     try:
@@ -65,7 +65,7 @@ def _download_model_with_progress(model_name: str, base_url: str) -> bool:
             "POST",
             f"{base_url.rstrip('/')}/api/pull",
             json={"name": model_name},
-            timeout=300,  # 5 minutes timeout for download
+            timeout=timeout_seconds,  # Use configurable timeout
         ) as response:
             response.raise_for_status()
 
@@ -165,7 +165,7 @@ def pull_if_missing(model_name: str, timeout_seconds: int = 300) -> bool:
         logger.debug("Model presence check failed, proceeding to pull. Error: %s", e)
 
     # Pull (idempotent on server side)
-    return _download_model_with_progress(model_name, base_url)
+    return _download_model_with_progress(model_name, base_url, timeout_seconds=timeout_seconds)
 
 
 def test_ollama_connection() -> bool:

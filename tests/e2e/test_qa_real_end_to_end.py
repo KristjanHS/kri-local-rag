@@ -20,7 +20,7 @@ pytestmark = [pytest.mark.slow, pytest.mark.external]
 
 @pytest.mark.external
 def test_e2e_answer_with_real_services(
-    docker_services_ready, cross_encoder_cache_dir, weaviate_client, sample_documents_path
+    docker_services_ready, cross_encoder_cache_dir, weaviate_client, clean_test_collection, sample_documents_path
 ):  # noqa: ANN001
     """
     Asks a generic question; retrieval should find some context from example_data

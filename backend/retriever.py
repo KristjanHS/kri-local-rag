@@ -135,13 +135,9 @@ def get_top_k(
                 res = q.hybrid(query=question, alpha=alpha, limit=k)
                 logger.info("hybrid search used (alpha=%s)", alpha)
         except (TypeError, WeaviateQueryError) as e:
-            # Possible causes: old client without hybrid, empty collection error, vectorizer missing, etc.
-            logger.info("hybrid failed (%s); falling back to bm25", e)
-            try:
-                res = q.bm25(query=question, limit=k)
-            except Exception:
-                # If even BM25 fails (e.g., collection truly empty), return empty list
-                return []
+            # Hybrid search failed - this should not happen in tests with proper setup
+            logger.error("hybrid search failed (%s)", e)
+            raise RuntimeError(f"Hybrid search failed: {e}") from e
 
         logger.info("Found %d candidates.", len(res.objects))
 
