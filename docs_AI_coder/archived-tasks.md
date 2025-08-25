@@ -2,6 +2,194 @@
 
 This file records tasks that have been completed and moved out of the active TODO backlog.
 
+Migra from testcontainers:
+Necessary context: docs/testing_strategy.md, cursor_rules/AI_instructions.md
+
+Important info:
+* Tests must be run Inside test docker container, The Python executable is at /opt/venv/bin/python3
+
+# Migration Plan: Testcontainers → Compose-only (Minimal, Incremental, Verifiable)
+
+> Goal: remove Testcontainers with **small, reversible steps**, keeping tests reliable via Compose
+> healthchecks, startup ordering, isolation, and diagnostics.
+
+# Migration Progress Tracker: Testcontainers → Compose-only
+
+This document tracks the progress of the migration from Testcontainers to a Docker Compose-based testing setup.
+
+## Migration Steps
+
+- [x] **Step 1 — Add Healthchecks to Every Service**
+  - **Action**: Add `healthcheck` for `weaviate`, `ollama`, and `app`. Example:
+    ```yaml
+    services:
+      weaviate:
+        image: semitechnologies/weaviate:1.32.0
+        healthcheck:
+          test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1"]
+          interval: 5s
+          timeout: 3s
+          retries: 30
+          start_period: 30s
+    ```
+    Use `depends_on: { <svc>: { condition: service_healthy } }` for any dependent service.
+    **Rationale**: Compose can wait on **health** of dependencies; healthchecks define "ready."
+  - **Verification**: `docker compose up -d --wait --wait-timeout 120` returns success and `docker ps` shows services as **healthy**.
+
+- [x] **Step 2 — Introduce a Test Overlay File**
+  - **Action**: Create `compose.test.yml` for test-specific tweaks (pinned images, ephemeral volumes, fewer exposed ports). Merge with:
+    ```bash
+    docker compose -f compose.yml -f compose.test.yml config
+    ```
+    Ensure paths are correct (paths are resolved relative to the **first** `-f` file).
+  - **Verification**: `docker compose -f compose.yml -f compose.test.yml config --images` lists the expected tags.
+
+- [x] **Step 3 — Add "Up/Down/Logs" Test Harness Scripts**
+  - **Action**: Create tiny scripts (or Make targets):
+    - **Up**: `docker compose -f compose.yml -f compose.test.yml -p "$RUN_ID" up -d --wait --wait-timeout 120`
+    - **Down**: `docker compose -p "$RUN_ID" down -v`
+    - **Logs (on failure)**: `docker compose -p "$RUN_ID" logs -n 200 app weaviate ollama`
+    Use a **unique project name** (`-p`) per run to isolate networks/volumes.
+  - **Verification**: Running **Up** returns only after services are healthy; **Down** removes volumes; **Logs** show tailed output (-n).
+
+- [x] **Step 4 — Convert One TC Test (The Smallest) to Compose**
+  - **Action**: 
+    - Remove its Testcontainers fixture.
+    - Ensure the test targets the **Compose** services (use service DNS names; avoid host ports for internal deps).
+    - For CLI-style tests, run through the **app container**: `docker compose -p "$RUN_ID" exec -T app ./scripts/cli.sh …`
+  - **Verification**: ✅ Test passes when run inside the container. Created dedicated test file `tests/integration/test_weaviate_compose.py`.
+  - **Improvements Made**:
+    - Created dedicated test Dockerfile: `app.test.Dockerfile` for isolated test environment
+    - Updated test Compose file: `compose.test.yml` uses the new test Dockerfile
+    - Improved Makefile: Enhanced with unique RUN_ID and reliable lifecycle management
+    - Added volume mounts: Live code changes without rebuilds
+    - Implemented per-Dockerfile ignore: `app.test.Dockerfile.dockerignore` for clean builds
+
+- [x] **Step 5 — Spread Readiness & Race-proofing**
+  - **Action**: For any test that previously had "sleep" or fragile waits, rely on:
+    - `up --wait` + healthchecks (Step 1/3).
+    - If a *first call* can still race (e.g., model warmup), add a tiny retry loop in the test helper.
+  - **Verification**: ✅ Tests pass consistently without race conditions. Fixed API compatibility issues in `test_weaviate_compose.py`:
+    - Updated Weaviate client API calls (`get_all()` → `list_all()`)
+    - Fixed property creation syntax (`dataType` → `data_type`, using `Property` class)
+    - Added case-insensitive collection name comparison
+    - Tests run reliably with healthchecks and `up --wait`
+
+- [x] **Step 5.5 — Enhance Test Harness Robustness**
+  - **Action**: Improve `make test-up` to prevent duplicate test environments:
+    - Check if containers are already running with existing RUN_ID before starting new ones
+    - Automatically clean up stale `.run_id` files when containers aren't running
+    - Provide clear user guidance when containers are already running
+  - **Verification**: ✅ Prevents resource conflicts and improves developer experience:
+    - No more port binding errors from duplicate environments
+    - Intelligent state management handles stale files automatically
+    - Clear feedback and guidance for users
+    - All existing functionality (`test-down`, `test-logs`) continues to work seamlessly
+
+- [x] **Step 5.6 — Infrastructure Improvements & Optimization**
+  - **Action**: Enhanced the Compose-based testing infrastructure with production-ready improvements:
+    - **Hash-based rebuild detection**: Uses SHA-256 hash instead of file modification times for more reliable rebuilds
+    - **Optimized Docker build**: Removed unnecessary file copying, optimized `.dockerignore`, and proper version pinning
+    - **Improved Makefile**: Fixed missing targets, automatic logs directory creation, and COMPOSE variable for DRY principle
+    - **Pre-commit compliance**: All checks pass including Hadolint with proper version pinning
+    - **Removed redundant files**: Eliminated unnecessary `app.test.Dockerfile.dockerignore`
+  - **Verification**: ✅ All infrastructure improvements working correctly:
+    - Hash-based rebuild logic detects actual changes and prevents unnecessary rebuilds
+    - Docker builds are faster and more reliable
+    - All pre-commit checks pass consistently
+    - Existing tests continue to work with improved infrastructure
+
+- [x] **Step 6 — Batch-Convert the Remaining TC Tests**
+  - **Action**: Move the rest of the Testcontainers specs in **small batches** (2–3 at a time):
+    - Point them to the Compose services.
+    - Remove per-test containers; reuse the single stack from Step 3.
+  - **Status**: ✅ **COMPLETED** - All Testcontainers tests successfully converted or removed:
+    - **✅ Working Compose Tests** (All passing with existing test environment):
+      - `test_weaviate_compose.py` (2/2 tests pass) - ✅ Verified
+      - `test_vectorizer_enabled_compose.py` (1/1 test pass) - ✅ Verified  
+      - `test_ingest_pipeline_compose.py` (4/4 tests pass) - ✅ Verified
+      - `test_qa_real_ollama_compose.py` (1/1 test pass) - ✅ Verified
+    - **✅ Test Execution Method Verified**:
+      - Tests run **inside** the app container using: `docker compose -p <RUN_ID> exec -T app /opt/venv/bin/python3 -m pytest <test_file>`
+      - Python executable is at `/opt/venv/bin/python3` inside container (not `.venv/bin/python`)
+      - All core functionality tests have working Compose versions
+    - **✅ Redundant Tests Removed**:
+      - `test_backend_import_in_container.py`: Removed (Docker-in-Docker test, redundant in Compose environment)
+      - `test_frontend_requirements_in_container.py`: Removed (Docker-in-Docker test, redundant in Compose environment)
+      - `test_weaviate_integration.py`: Removed (redundant with `test_weaviate_compose.py`)
+    - **✅ Old Testcontainers Tests Removed**:
+      - `test_qa_real_ollama.py`: Removed (replaced by `test_qa_real_ollama_compose.py`)
+      - `test_vectorizer_enabled_integration.py`: Removed (replaced by `test_vectorizer_enabled_compose.py`)
+      - `test_ingest_pipeline.py`: Removed (replaced by `test_ingest_pipeline_compose.py`)
+    - **✅ Environment Tests Moved**:
+      - `test_python_setup.py`: Moved to `tests/unit/` (environment validation tests belong in unit tests)
+    - **✅ Integration Test Suite Cleaned**:
+      - Removed Testcontainers dependency from `tests/integration/conftest.py`
+      - Integration tests now collect 26 tests (down from 31)
+      - All tests pass without Testcontainers dependencies
+  - **Verification**: ✅ All integration tests pass successfully in Compose environment
+
+- [x] **Step 6.5 — Fix Model Cache Logic (Critical)**
+  - **Problem**: Environment variables pointed to `/app/model_cache` but volume was mounted at `/root/.cache/huggingface`, causing models to be re-downloaded each time
+  - **Root Cause**: Mismatch between `SENTENCE_TRANSFORMERS_HOME=/app/model_cache` and volume mount path `/root/.cache/huggingface`
+  - **Solution Applied**:
+    1. **Simplified model cache approach**: 
+       - **Ollama models**: Mounted to local `model_cache` directory via bind mount (`../model_cache:/root/.ollama`)
+       - **Hugging Face models**: Use default container cache location (no volume mount needed for small models)
+    2. **Removed environment variables** from both `app.Dockerfile` and `app.test.Dockerfile`:
+       - Removed `SENTENCE_TRANSFORMERS_HOME=/root/.cache/huggingface`
+       - Removed `CROSS_ENCODER_CACHE_DIR=/root/.cache/huggingface`
+    3. **Removed redundant model_cache copying** from Dockerfiles (models now persist appropriately)
+    4. **Fixed container permissions** for Ollama cache directory
+      - **Benefits**:
+    - **Simplified setup**: Only Ollama models (large) are persisted to local directory
+    - **Fast startup**: Hugging Face models (small) download quickly on first use
+    - **Persistent Ollama cache**: Large Ollama models persist across container restarts
+    - **Bandwidth efficient**: Ollama models cached locally in project directory
+    - **Clean separation**: Large models (Ollama) vs small models (Hugging Face) handled appropriately
+  - **Migration**: Use existing `model_cache/` directory for Ollama models (one-time setup)
+  - **Verification**: Test if Simplified cache approach implemented, only Ollama models use local directory
+
+
+- [x] **Step 7 — Wire CI for Compose-only (Minimal)**
+  - **Action**:
+    - Keep **unit tests** on every PR.
+    - Provide a **manual/scheduled** job for Compose tests that is intended to run only under local `act` (not on GitHub-hosted runners).
+  - **Verification**: ✅ **COMPLETED** - act-only Compose job implemented and simplified:
+    - **✅ Unit tests on PRs**: `fast_tests` runs on `pull_request` and `push`
+    - **✅ Compose integration job (act-only)**: `compose_integration_tests` gated by `github.actor == 'nektos/act'`
+    - **✅ Uses Makefile harness**: `make test-up`, `make test-run-integration`, `make test-down`, `make test-logs`
+    - **✅ Reuses `.run_id` when present**: Allows reusing a running environment; otherwise `make test-up` creates one
+    - **✅ Proper readiness and teardown**: `up --wait` and `down -v`, tailed logs on failure
+    - **✅ In-container Python**: Tests run via `/opt/venv/bin/python3` inside the app container
+
+- [x] **Step 8 — Remove Testcontainers Code & Dependency**
+  - **Action**: Delete TC fixtures/helpers and the TC package from `pyproject.toml`/`requirements`.
+  - **Verification**: ✅ **COMPLETED** - Testcontainers dependency successfully removed:
+    - **✅ Removed from pyproject.toml**: Deleted `"testcontainers>=3.7.0,<4.0"` from `[project.optional-dependencies.test]`
+    - **✅ No remaining imports**: No Python files contain `from testcontainers` or `import testcontainers` statements
+    - **✅ Updated documentation**: Fixed comment in e2e test file to reflect Docker Compose usage
+    - **✅ All tests pass**: Unit tests continue to pass after dependency removal
+    - **✅ Clean codebase**: No testcontainers code or dependencies remain in the project
+
+- [x] **Step 9 — Lock Parity & Document**
+  - **Action**:
+    - Pin image **tags** (preferred) or output a digest-locked overlay.
+    - Add a short **README** note: use `up --wait`, healthchecks, unique `-p`, and `down -v`.
+  - **Verification**: ✅ **COMPLETED**
+    - **✅ Ollama pinning documented**: `.env.example` provided with `OLLAMA_IMAGE=ollama/ollama:0.1.47`; copy to `.env` and adjust as needed
+    - **✅ Weaviate already pinned**: `cr.weaviate.io/semitechnologies/weaviate:1.32.0`
+    - **✅ README updated**: manual start uses `--wait`; notes on unique `-p` via Makefile and test teardown with `down -v`
+    - **ℹ️ Digest lock overlay skipped**: kept setup simple; tags are sufficient for dev/CI reproducibility
+
+- [x] **Step 10 — Finalize Migration Cleanup**
+  - **Action**: Remove obsolete test files and artifacts from the old Testcontainers approach:
+    - Check if `tests/integration/test_weaviate_integration.py` is already updated for new setup (in addiotion to `test_weaviate_compose.py`)
+    - change any other obsolete test files that were part of the old approach
+  - **Verify**: The test suite runs successfully without any failures related to missing files.
+
+
+
       #### P2.1 — Integration Tests with Real Local Models ✅ FULLY COMPLETED
 
     **Goal**: Configure integration tests to use real local models efficiently, ensuring proper caching and performance while maintaining test reliability.

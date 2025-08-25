@@ -108,7 +108,6 @@ test = [
     "pytest-html>=3.0,<4.0",
     "pytest-socket>=0.6.0,<1.0",
     "requests>=2.31,<3.0",
-    "testcontainers>=3.7.0,<4.0",
     "protobuf>=5.26,<7.0",
     "rich>=13.0,<14.0",
     "tomli>=2.0.0,<3.0; python_version<'3.11'",
@@ -169,3 +168,4 @@ docker_start = "make test-up"
 docker_stop = "make test-down"
 local_weaviate_start = "docker run -d -p 8080:8080 semitechnologies/weaviate:latest"
 local_ollama_start = "ollama serve"
+

@@ -78,8 +78,6 @@ services:
         condition: service_healthy
       ollama:
         condition: service_healthy
-    env_file:
-      - .env.docker
     environment:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
@@ -99,8 +97,6 @@ services:
       - ../data:/app/data # Live data access
       - ../logs:/app/logs # Live log access
       - ../tests:/app/tests # Mount tests for in-container testing
-    env_file:
-      - .env.docker
     command: ["python", "backend/ingest.py", "/app/data"]
 
 volumes:
