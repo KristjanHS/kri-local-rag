@@ -329,38 +329,3 @@ def mock_httpx_get(monkeypatch):
     mock_func = MagicMock()
     monkeypatch.setattr("backend.ollama_client.httpx.get", mock_func)
     return mock_func
-
-
-@pytest.fixture(scope="module")
-def sample_documents_path():
-    """Fixture for using the example_data directory (now only contains PDF files)."""
-    return "example_data/"
-
-
-@pytest.fixture(scope="module")
-def weaviate_client():
-    """Fixture for a real Weaviate client, ensuring the service is available."""
-    import logging
-
-    from backend import ingest
-
-    # Use a test-specific collection name to avoid conflicts
-    COLLECTION_NAME = "TestCollection"
-
-    logger = logging.getLogger(__name__)
-    logger.debug("Attempting to connect to Weaviate for integration tests...")
-    client = ingest.connect_to_weaviate()
-    logger.debug("Successfully connected to Weaviate.")
-    try:
-        if client.collections.exists(COLLECTION_NAME):
-            logger.debug("Deleting pre-existing test collection: %s", COLLECTION_NAME)
-            client.collections.delete(COLLECTION_NAME)
-    except Exception as e:
-        logger.warning("Error during pre-test cleanup of collection %s: %s", COLLECTION_NAME, e)
-    yield client
-    try:
-        if client.collections.exists(COLLECTION_NAME):
-            logger.debug("Deleting test collection after tests: %s", COLLECTION_NAME)
-            client.collections.delete(COLLECTION_NAME)
-    except Exception as e:
-        logger.warning("Error during post-test cleanup of collection %s: %s", COLLECTION_NAME, e)

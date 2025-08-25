@@ -125,6 +125,71 @@ def cross_encoder_cache_dir(project_root: Path) -> str:
 
 
 @pytest.fixture(scope="session")
+def sample_documents_path():
+    """Fixture for using the example_data directory (now only contains PDF files)."""
+    return "example_data/"
+
+
+@pytest.fixture(scope="session")
+def weaviate_client():
+    """Fixture for a real Weaviate client, ensuring the service is available."""
+    import logging
+
+    from backend import ingest
+
+    # Use a test-specific collection name to avoid conflicts
+    COLLECTION_NAME = "TestCollection"
+
+    logger = logging.getLogger(__name__)
+    logger.debug("Attempting to connect to Weaviate for integration tests...")
+    client = ingest.connect_to_weaviate()
+    logger.debug("Successfully connected to Weaviate.")
+    try:
+        if client.collections.exists(COLLECTION_NAME):
+            logger.debug("Deleting pre-existing test collection: %s", COLLECTION_NAME)
+            client.collections.delete(COLLECTION_NAME)
+    except Exception as e:
+        logger.warning("Error during pre-test cleanup of collection %s: %s", COLLECTION_NAME, e)
+    yield client
+    try:
+        if client.collections.exists(COLLECTION_NAME):
+            logger.debug("Deleting test collection after tests: %s", COLLECTION_NAME)
+            client.collections.delete(COLLECTION_NAME)
+    except Exception as e:
+        logger.warning("Error during post-test cleanup of collection %s: %s", COLLECTION_NAME, e)
+
+
+@pytest.fixture
+def clean_test_collection(weaviate_client):
+    """Ensure the shared 'TestCollection' is empty before and after each test.
+
+    This provides test isolation across integration and E2E tests that ingest
+    into the common collection name. It complements any session-level cleanup.
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+    collection_name = "TestCollection"
+
+    # Pre-test cleanup
+    try:
+        if weaviate_client.collections.exists(collection_name):
+            weaviate_client.collections.delete(collection_name)
+    except Exception as e:  # pragma: no cover - best-effort
+        logger.warning("Pre-test cleanup failed for collection %s: %s", collection_name, e)
+
+    try:
+        yield
+    finally:
+        # Post-test cleanup
+        try:
+            if weaviate_client.collections.exists(collection_name):
+                weaviate_client.collections.delete(collection_name)
+        except Exception as e:  # pragma: no cover - best-effort
+            logger.warning("Post-test cleanup failed for collection %s: %s", collection_name, e)
+
+
+@pytest.fixture(scope="session")
 def test_log_file(tmp_path_factory):
     """Creates a unique log file for the test session."""
     log_dir = tmp_path_factory.mktemp("logs")
@@ -202,6 +267,18 @@ def docker_services(request, test_log_file):
         subprocess.run(["docker", "compose", "-f", str(compose_file), "down"], check=True)
     except Exception as e:
         console.print(f"✗ Failed to tear down Docker services: {e}")
+
+
+@pytest.fixture(scope="session")
+def weaviate_compose_up():
+    """Ensure compose Weaviate is up for tests that need the real service.
+
+    Starts only the `weaviate` service using docker compose. Volumes are
+    preserved and global teardown is handled elsewhere (no down -v).
+    """
+    compose_file = str(Path(__file__).resolve().parents[1] / "docker" / "docker-compose.yml")
+    subprocess.run(["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "weaviate"], check=True)
+    yield
 
 
 @pytest.fixture(scope="session")
