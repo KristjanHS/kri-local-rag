@@ -74,13 +74,8 @@ jobs:
               print(f"Could not parse semgrep.sarif: {e}")
           PY
 
-      - name: Upload SARIF to code scanning
-        # Always try to upload, but skip on forked PRs and under act
-        if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) && github.actor != 'nektos/act' }}
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: semgrep.sarif
-          category: "semgrep"
+      # Note: Semgrep results are automatically published to the semgrep platform
+      # via the publishToken in the semgrep-action step above
 
       - name: Comment PR with findings
         if: github.event_name == 'pull_request'
@@ -104,7 +99,7 @@ jobs:
               const comment = `## Semgrep Security Scan Results\n\n` +
                 `🔍 **${findings} security findings** detected` +
                 `\n\nTop findings (max 10):\n${listItems}\n\n` +
-                `_Full details: Security → Code scanning alerts (filter by tool: Semgrep)._`;
+                `_Full details available in the Semgrep platform._`;
               github.rest.issues.createComment({
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
