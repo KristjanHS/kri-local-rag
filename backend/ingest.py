@@ -273,6 +273,15 @@ def ingest(
     """Main ingestion pipeline."""
     start_time = time.time()
 
+    # Apply torch.compile optimization to the embedding model
+    try:
+        logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
+        compiled_model = torch.compile(embedding_model, backend="inductor", mode="max-autotune")
+        embedding_model = cast(SentenceTransformer, compiled_model)
+        logger.info("torch.compile optimization completed.")
+    except Exception as e:
+        logger.warning(f"Could not apply torch.compile: {e}")
+
     chunked_docs = load_and_split_documents(directory)
     if not chunked_docs:
         return
