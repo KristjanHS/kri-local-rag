@@ -13,7 +13,7 @@ from backend.console import console
 from backend.retriever import get_top_k
 
 
-def test_weaviate_debug(weaviate_client, sample_documents_path):
+def test_weaviate_debug(weaviate_client, clean_test_collection, sample_documents_path):
     """Test Weaviate debug logging with actual queries."""
 
     # First, ensure we have data in Weaviate by running ingestion
@@ -45,18 +45,15 @@ def test_weaviate_debug(weaviate_client, sample_documents_path):
 
     for i, question in enumerate(test_questions, 1):
         console.print(f"--- Test Query {i}: '{question}' ---")
-        try:
-            chunks = get_top_k(question, k=3)
-            console.print(f"Found {len(chunks)} chunks")
-            if chunks:
-                console.print("Chunk previews:")
-                for j, chunk in enumerate(chunks[:2], 1):  # Show first 2 chunks
-                    preview = chunk[:100] + "..." if len(chunk) > 100 else chunk
-                    console.print(f"  {j}. {preview}")
-            console.print()
-        except Exception as e:
-            console.print(f"Error: {e}")
-            console.print()
+        chunks = get_top_k(question, k=3, collection_name="TestCollection")
+        console.print(f"Found {len(chunks)} chunks")
+        assert len(chunks) > 0, "Expected at least one retrieved chunk"
+        if chunks:
+            console.print("Chunk previews:")
+            for j, chunk in enumerate(chunks[:2], 1):  # Show first 2 chunks
+                preview = chunk[:100] + "..." if len(chunk) > 100 else chunk
+                console.print(f"  {j}. {preview}")
+        console.print()
 
 
 if __name__ == "__main__":

@@ -150,20 +150,5 @@ def run_cli_in_container(app_compose_up):
     return _run_cli
 
 
-@pytest.fixture
-def weaviate_client(weaviate_compose_up):
-    """Provide a connected Weaviate client using production connection logic.
-
-    Reuses backend.ingest.connect_to_weaviate to mirror app behavior. Depends on
-    the compose-managed `weaviate` service being up.
-    """
-    from backend.ingest import connect_to_weaviate
-
-    client = connect_to_weaviate()
-    try:
-        yield client
-    finally:
-        try:
-            client.close()
-        except Exception:
-            pass
+## Do not redefine `weaviate_client` here; use the shared fixture from tests/conftest.py
+## E2E tests that need real services should depend on `weaviate_compose_up` explicitly.

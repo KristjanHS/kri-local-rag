@@ -16,7 +16,7 @@ from backend import ingest
 from backend.retriever import _get_embedding_model
 
 
-def test_e2e_ingest_with_heavy_optimizations_into_real_weaviate(caplog, weaviate_client):
+def test_e2e_ingest_with_heavy_optimizations_into_real_weaviate(caplog, weaviate_client, clean_test_collection):
     """Verify ingestion works against production Weaviate with torch.compile."""
     import logging
 
@@ -24,8 +24,6 @@ def test_e2e_ingest_with_heavy_optimizations_into_real_weaviate(caplog, weaviate
     client = weaviate_client
 
     collection_name = "TestCollection"
-    if client.collections.exists(collection_name):
-        client.collections.delete(collection_name)
 
     data_dir = os.path.join("test_data")
     embedding_model = _get_embedding_model()
