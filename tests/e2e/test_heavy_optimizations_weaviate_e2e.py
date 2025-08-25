@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """E2E test: ingestion with heavy optimizations against a real Weaviate.
 
-Uses testcontainers to start Weaviate and runs the ingestion pipeline with
+Uses Docker Compose to start Weaviate and runs the ingestion pipeline with
 real CPU torch.compile optimizations enabled. Verifies data lands in the
 shared test collection and that optimization logs are emitted.
 """

@@ -13,6 +13,9 @@ import pytest
 REPORTS_DIR = Path("reports")
 LOGS_DIR = REPORTS_DIR / "logs"
 
+# Test collection name used across fixtures to ensure consistency
+TEST_COLLECTION_NAME = "TestCollection"
+
 
 def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: D401
     """Ensure report directories exist and unset conflicting env vars."""
@@ -137,26 +140,23 @@ def weaviate_client():
 
     from backend import ingest
 
-    # Use a test-specific collection name to avoid conflicts
-    COLLECTION_NAME = "TestCollection"
-
     logger = logging.getLogger(__name__)
     logger.debug("Attempting to connect to Weaviate for integration tests...")
     client = ingest.connect_to_weaviate()
     logger.debug("Successfully connected to Weaviate.")
     try:
-        if client.collections.exists(COLLECTION_NAME):
-            logger.debug("Deleting pre-existing test collection: %s", COLLECTION_NAME)
-            client.collections.delete(COLLECTION_NAME)
+        if client.collections.exists(TEST_COLLECTION_NAME):
+            logger.debug("Deleting pre-existing test collection: %s", TEST_COLLECTION_NAME)
+            client.collections.delete(TEST_COLLECTION_NAME)
     except Exception as e:
-        logger.warning("Error during pre-test cleanup of collection %s: %s", COLLECTION_NAME, e)
+        logger.warning("Error during pre-test cleanup of collection %s: %s", TEST_COLLECTION_NAME, e)
     yield client
     try:
-        if client.collections.exists(COLLECTION_NAME):
-            logger.debug("Deleting test collection after tests: %s", COLLECTION_NAME)
-            client.collections.delete(COLLECTION_NAME)
+        if client.collections.exists(TEST_COLLECTION_NAME):
+            logger.debug("Deleting test collection after tests: %s", TEST_COLLECTION_NAME)
+            client.collections.delete(TEST_COLLECTION_NAME)
     except Exception as e:
-        logger.warning("Error during post-test cleanup of collection %s: %s", COLLECTION_NAME, e)
+        logger.warning("Error during post-test cleanup of collection %s: %s", TEST_COLLECTION_NAME, e)
 
 
 @pytest.fixture
@@ -169,24 +169,23 @@ def clean_test_collection(weaviate_client):
     import logging
 
     logger = logging.getLogger(__name__)
-    collection_name = "TestCollection"
 
     # Pre-test cleanup
     try:
-        if weaviate_client.collections.exists(collection_name):
-            weaviate_client.collections.delete(collection_name)
+        if weaviate_client.collections.exists(TEST_COLLECTION_NAME):
+            weaviate_client.collections.delete(TEST_COLLECTION_NAME)
     except Exception as e:  # pragma: no cover - best-effort
-        logger.warning("Pre-test cleanup failed for collection %s: %s", collection_name, e)
+        logger.warning("Pre-test cleanup failed for collection %s: %s", TEST_COLLECTION_NAME, e)
 
     try:
         yield
     finally:
         # Post-test cleanup
         try:
-            if weaviate_client.collections.exists(collection_name):
-                weaviate_client.collections.delete(collection_name)
+            if weaviate_client.collections.exists(TEST_COLLECTION_NAME):
+                weaviate_client.collections.delete(TEST_COLLECTION_NAME)
         except Exception as e:  # pragma: no cover - best-effort
-            logger.warning("Post-test cleanup failed for collection %s: %s", collection_name, e)
+            logger.warning("Post-test cleanup failed for collection %s: %s", TEST_COLLECTION_NAME, e)
 
 
 @pytest.fixture(scope="session")
