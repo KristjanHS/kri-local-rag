@@ -85,22 +85,31 @@ def test_generate_response_handles_empty_and_exception(monkeypatch, caplog):
     assert any("Exception in generate_response" in m for m in msgs)
 
 
-def test_ensure_model_available_issues_single_pull_with_short_timeout(monkeypatch):
-    seen: dict[str, object] = {"method": None, "url": None, "json": None, "timeout": None}
+def test_ensure_model_available_streams_pull_with_300s_timeout(monkeypatch):
+    seen: dict[str, object] = {"method": None, "url": None, "timeout": None}
 
-    class FakeResp:
+    class FakeStream:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):  # noqa: D401, ARG001
+            return False
+
         def raise_for_status(self):
             return None
 
-    def fake_post(url, json, timeout):  # noqa: A002, ARG001
-        seen["method"] = "POST"
+        def iter_lines(self):
+            yield b'{"status": "verifying"}'
+            yield b'{"status": "complete"}'
+
+    def fake_stream(method, url, json, timeout):  # noqa: ARG001
+        seen["method"] = method
         seen["url"] = url
-        seen["json"] = json
         seen["timeout"] = timeout
-        return FakeResp()
+        return FakeStream()
 
     monkeypatch.setenv("DOCKER_ENV", "0")
-    monkeypatch.setattr(httpx, "post", fake_post)
+    monkeypatch.setattr(httpx, "stream", fake_stream)
 
     ok = oc.ensure_model_available("some/model:tag")
     assert ok is True
@@ -108,8 +117,7 @@ def test_ensure_model_available_issues_single_pull_with_short_timeout(monkeypatc
     seen_url = cast(str, seen["url"])
     assert seen["method"] == "POST"
     assert seen_url.endswith("/api/pull")
-    assert seen["json"] == {"name": "some/model:tag"}
-    assert isinstance(seen["timeout"], int) and seen["timeout"] <= 10
+    assert seen["timeout"] == 300
 
 
 def test_download_model_with_progress_uses_timeout_in_stream(monkeypatch):

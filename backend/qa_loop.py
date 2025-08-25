@@ -172,8 +172,7 @@ def answer(
 
     # ---------- 3) Prepare the prompt and payload -------------------------------------------------
     prompt_text = build_prompt(question, context_chunks)
-    logger.debug("Prompt being sent to Ollama:")
-    logger.debug(prompt_text)
+    logger.debug("Prompt being sent to Ollama (%d chars, %d chunks)", len(prompt_text), len(context_chunks))
 
     # ---------- 4) Query the LLM -------------------------------------------------
     # Use a simple print callback for CLI debug mode
@@ -207,6 +206,7 @@ def answer(
     if on_token is not None:
         console.print("Answer: ", end="")
 
+    logger.debug("About to call generate_response with model=%s context_tokens=%d", OLLAMA_MODEL, context_tokens)
     answer_text, updated_context = generate_response_func(
         prompt_text,
         OLLAMA_MODEL,
@@ -237,13 +237,14 @@ from weaviate.classes.query import Filter
 from weaviate.exceptions import WeaviateConnectionError
 
 from backend import config as app_config
+from backend.config import get_service_url
 
 
 def ensure_weaviate_ready_and_populated():
     client = None  # explicit reference to avoid dynamic locals()/globals() access
     try:
-        # Read connection settings dynamically at runtime so tests can override via env vars
-        weaviate_url = os.getenv("WEAVIATE_URL", app_config.WEAVIATE_URL)
+        # Read connection settings dynamically at runtime using centralized resolver
+        weaviate_url = get_service_url("weaviate")
         collection_name = os.getenv("COLLECTION_NAME", app_config.COLLECTION_NAME)
 
         parsed_url = urlparse(weaviate_url)

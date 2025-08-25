@@ -175,9 +175,31 @@ TRANSFORMERS_OFFLINE = transformers_offline_env in ("1", "true", "yes")
 
 # Ollama LLM settings (used by qa_loop.py)
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
-# Default to local Ollama endpoint but allow override via env variable.
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-WEAVIATE_URL = os.getenv("WEAVIATE_URL", "http://localhost:8080")
+
+
+# Centralized service URL resolution with localhost fallbacks
+def get_service_url(service: str) -> str:
+    """Resolve service URL from environment variables with localhost fallbacks.
+
+    Args:
+        service: Either "ollama" or "weaviate".
+
+    Returns:
+        The resolved service base URL.
+
+    Raises:
+        ValueError: If an unknown service name is provided.
+    """
+    if service == "ollama":
+        return os.getenv("OLLAMA_URL", "http://localhost:11434")
+    if service == "weaviate":
+        return os.getenv("WEAVIATE_URL", "http://localhost:8080")
+    raise ValueError(f"Unknown service: {service}")
+
+
+# Backwards-compatible constants sourced from the centralized resolver
+OLLAMA_URL = get_service_url("ollama")
+WEAVIATE_URL = get_service_url("weaviate")
 
 # Weaviate batching settings (tune for performance)
 # Larger batches can be faster but use more memory.
