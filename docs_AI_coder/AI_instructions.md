@@ -165,8 +165,6 @@ pytest -m "requires_weaviate and requires_ollama" # Both services
 - Clean rebuild: `./scripts/build_app.sh --no-cache && docker compose -f docker/docker-compose.yml up -d --force-recreate app`
 
 **Troubleshooting**:
-- Path issues: Use `.env.docker` relative to compose file location
-- Env file errors: Check `docker/.env.docker` exists and path is correct
 - Validate config: `docker compose -f docker/docker-compose.yml config`
 
 ## Quick Reference
