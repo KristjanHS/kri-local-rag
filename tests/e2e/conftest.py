@@ -58,11 +58,15 @@ def _cleanup_testcollection_after_session():  # type: ignore[no-redef]
         finally:
             try:
                 client.close()
-            except Exception:
-                pass
-    except Exception:
+            except Exception as e:
+                import logging
+
+                logging.warning("Failed to close Weaviate client during teardown: %s", e)
+    except Exception as e:
+        import logging
+
+        logging.warning("Failed to cleanup TestCollection during teardown: %s", e)
         # Best-effort cleanup only; do not fail the test suite on cleanup issues
-        pass
 
 
 @pytest.fixture(scope="session")

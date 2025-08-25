@@ -46,12 +46,12 @@ jobs:
       - name: Ruff static analysis
         uses: astral-sh/ruff-action@v1
         with:
-          version: "0.5.3"
+          version: "0.12.9"
           args: check --fix .
       - name: Ruff formatting check
         uses: astral-sh/ruff-action@v1
         with:
-          version: "0.5.3"
+          version: "0.12.9"
           args: format --check .
 
 

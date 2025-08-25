@@ -21,7 +21,6 @@ def test_e2e_ingest_with_heavy_optimizations_into_real_weaviate(caplog, weaviate
     import logging
 
     caplog.set_level(logging.INFO, logger="backend.ingest")
-    client = weaviate_client
 
     collection_name = "TestCollection"
 
@@ -30,11 +29,11 @@ def test_e2e_ingest_with_heavy_optimizations_into_real_weaviate(caplog, weaviate
     ingest.ingest(
         directory=data_dir,
         collection_name=collection_name,
-        weaviate_client=client,
+        weaviate_client=weaviate_client,
         embedding_model=embedding_model,
     )
 
-    collection = client.collections.get(collection_name)
+    collection = weaviate_client.collections.get(collection_name)
     count = collection.aggregate.over_all(total_count=True)
     assert count.total_count is not None and count.total_count >= 2
 
