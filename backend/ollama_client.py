@@ -144,12 +144,27 @@ def ensure_model_available(model_name: str) -> bool:
 
 
 def pull_if_missing(model_name: str, timeout_seconds: int = 300) -> bool:
-    """Request model pull with a simple progress indication.
+    """Ensure a model is available; pull only if it's missing.
 
-    Uses a streaming POST to /api/pull and logs minimal status/progress.
+    - First attempts to list available models via GET /api/tags
+    - If the model is present (exact or tag-prefixed match), returns immediately
+    - Otherwise, triggers a pull with progress via POST /api/pull
     """
     base_url = _get_ollama_base_url()
-    # Reuse the existing streaming helper for simplicity and a 300s timeout
+
+    # Quick existence check
+    try:
+        resp = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=5)
+        resp.raise_for_status()
+        models = resp.json().get("models", [])
+        if _check_model_exists(model_name, models):
+            logger.info("Model '%s' already available.", model_name)
+            return True
+    except Exception as e:
+        # Do not fail on detection issues; proceed to pull which is idempotent
+        logger.debug("Model presence check failed, proceeding to pull. Error: %s", e)
+
+    # Pull (idempotent on server side)
     return _download_model_with_progress(model_name, base_url)
 
 
