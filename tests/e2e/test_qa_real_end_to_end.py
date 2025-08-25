@@ -4,7 +4,9 @@ It relies on pytest-docker's services being available and the helper fixture
 to verify/populate Weaviate with example data.
 """
 
+import importlib
 import os
+import sys
 
 import pytest
 
@@ -17,7 +19,9 @@ pytestmark = [pytest.mark.slow, pytest.mark.external]
 
 
 @pytest.mark.external
-def test_e2e_answer_with_real_services(docker_services_ready):  # noqa: ANN001
+def test_e2e_answer_with_real_services(
+    docker_services_ready, cross_encoder_cache_dir, weaviate_client, sample_documents_path
+):  # noqa: ANN001
     """
     Asks a generic question; retrieval should find some context from example_data
     and the LLM should provide a coherent answer based on it.
@@ -28,8 +32,38 @@ def test_e2e_answer_with_real_services(docker_services_ready):  # noqa: ANN001
     if "RAG_FAKE_ANSWER" in os.environ:
         del os.environ["RAG_FAKE_ANSWER"]
 
+    # Set up CrossEncoder environment like integration tests
+    os.environ["RERANKER_CROSS_ENCODER_OPTIMIZATIONS"] = "false"
+    os.environ["SENTENCE_TRANSFORMERS_HOME"] = cross_encoder_cache_dir
+
+    # Reload qa_loop to ensure it picks up the changed environment variables
+    if "backend.qa_loop" in sys.modules:
+        importlib.reload(sys.modules["backend.qa_loop"])
+    qa_loop = importlib.import_module("backend.qa_loop")
+
+    # Explicitly load the CrossEncoder to ensure it's available
+    cross_encoder = qa_loop._get_cross_encoder()
+    assert cross_encoder is not None, "Expected CrossEncoder to be loaded from cache"
+
+    # Ensure TestCollection has data by ingesting sample documents
+    from backend import ingest
+    from backend.retriever import _get_embedding_model
+
+    embedding_model = _get_embedding_model()
+    ingest.ingest(
+        directory=sample_documents_path,
+        collection_name="TestCollection",
+        weaviate_client=weaviate_client,
+        embedding_model=embedding_model,
+    )
+
     # Ask a generic question; retrieval should find some context from example_data
-    result = answer("Give me a brief summary of the indexed content.", k=2, collection_name="TestCollection")
+    result = answer(
+        "Give me a brief summary of the indexed content.",
+        k=2,
+        collection_name="TestCollection",
+        cross_encoder=cross_encoder,
+    )
 
     assert isinstance(result, str) and result.strip(), "Expected non-empty model output"
     assert "I found no relevant context" not in result, "Expected retrieval to provide context from Weaviate"
