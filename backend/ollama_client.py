@@ -7,33 +7,24 @@ from typing import Optional
 import httpx
 
 from backend.config import OLLAMA_CONTEXT_TOKENS, OLLAMA_MODEL, OLLAMA_URL, get_logger
-from backend.windows_ip_in_wsl import get_windows_host_ip
 
 # Set up logging for this module
 logger = get_logger(__name__)
 
 
 def _get_ollama_base_url() -> str:
-    """Return the Ollama base URL for the current environment.
+    """Return the Ollama base URL.
 
-    Uses environment-appropriate hostname based on whether we're running
-    in Docker or locally.
+    Precedence:
+      1) OLLAMA_URL env/config
+      2) default localhost
     """
-    from backend.config import is_running_in_docker
-
-    is_docker = is_running_in_docker()
-
-    # When running inside Docker, use service name or Windows host IP
-    if is_docker:
-        # Try to get Windows host IP for WSL compatibility
-        ip = get_windows_host_ip()
-        if ip:
-            return f"http://{ip}:11434"
-        # Fall back to service name for Docker Compose
-        return "http://ollama:11434"
-
-    # When running outside Docker, use localhost
-    return OLLAMA_URL
+    if OLLAMA_URL:
+        logger.debug("_get_ollama_base_url: using OLLAMA_URL=%s", OLLAMA_URL)
+        return OLLAMA_URL
+    url = "http://localhost:11434"
+    logger.debug("_get_ollama_base_url: defaulting to %s", url)
+    return url
 
 
 def _detect_ollama_model() -> Optional[str]:
@@ -66,6 +57,7 @@ def _check_model_exists(model_name: str, models: list) -> bool:
 def _download_model_with_progress(model_name: str, base_url: str) -> bool:
     """Download a model with progress tracking."""
     logger.info("Model '%s' not found. Downloading...", model_name)
+    logger.debug("Pulling from %s/api/pull with timeout=300s", base_url.rstrip("/"))
     logger.info("This may take several minutes depending on your internet speed.")
 
     try:
@@ -151,27 +143,14 @@ def ensure_model_available(model_name: str) -> bool:
         return False
 
 
-def pull_if_missing(model_name: str, timeout_seconds: int = 10) -> bool:
-    """Attempt to pull the model once with a short timeout.
+def pull_if_missing(model_name: str, timeout_seconds: int = 300) -> bool:
+    """Request model pull with a simple progress indication.
 
-    Returns True if the request was issued successfully; False on error.
+    Uses a streaming POST to /api/pull and logs minimal status/progress.
     """
     base_url = _get_ollama_base_url()
-    url = f"{base_url.rstrip('/')}/api/pull"
-    try:
-        resp = httpx.post(url, json={"name": model_name}, timeout=timeout_seconds)
-        resp.raise_for_status()
-        logger.info("Pull requested for model '%s'", model_name)
-        return True
-    except httpx.TimeoutException:
-        logger.warning("Timed out while requesting pull for model '%s'", model_name)
-        return False
-    except httpx.ConnectError as e:
-        logger.error("Cannot connect to Ollama at %s: %s", base_url, e)
-        return False
-    except httpx.HTTPStatusError as e:
-        logger.error("Pull request failed for model '%s': %s", model_name, e)
-        return False
+    # Reuse the existing streaming helper for simplicity and a 300s timeout
+    return _download_model_with_progress(model_name, base_url)
 
 
 def test_ollama_connection() -> bool:
@@ -243,6 +222,7 @@ def generate_response(
 
     base_url = _get_ollama_base_url()
     url = f"{base_url.rstrip('/')}/api/generate"
+    logger.debug("generate_response: base_url=%s url=%s", base_url, url)
 
     payload = {
         "model": model_name,
@@ -291,6 +271,7 @@ def generate_response(
         logger.debug("Making HTTP request to Ollama...")
         if on_debug:
             on_debug("Making HTTP request to Ollama...")
+        logger.debug("httpx.stream POST timeout=300 json_keys=%s", list(payload.keys()))
         with httpx.stream("POST", url, json=payload, timeout=300) as resp:  # 5 minute timeout
             logger.debug("Response status: %d", resp.status_code)
             if on_debug:
