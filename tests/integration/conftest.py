@@ -10,6 +10,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from backend.config import get_service_url
+
 
 def get_integration_config() -> dict[str, Any]:
     """Get integration configuration from pyproject.toml."""
@@ -37,27 +39,6 @@ def is_http_service_available(url: str, timeout: float = 2.0) -> bool:
         return False
 
 
-def get_service_url(service: str, config: Optional[dict[str, Any]] = None) -> str:
-    """Get service URL based on TEST_DOCKER environment variable."""
-    if config is None:
-        config = get_integration_config()
-
-    services = config.get("services", {})
-    urls = config.get("urls", {})
-
-    if service not in services:
-        return ""
-
-    test_docker = os.getenv("TEST_DOCKER", "false").lower() == "true"
-
-    if test_docker:
-        url_key = f"{service}_docker"
-        return urls.get(url_key, f"http://{services[service]['host_docker']}:{services[service]['port']}")
-    else:
-        url_key = f"{service}_local"
-        return urls.get(url_key, f"http://{services[service]['host_local']}:{services[service]['port']}")
-
-
 def is_service_healthy(service: str, config: Optional[dict[str, Any]] = None) -> bool:
     """Check if a service is healthy using HTTP health endpoint."""
     if config is None:
@@ -69,7 +50,7 @@ def is_service_healthy(service: str, config: Optional[dict[str, Any]] = None) ->
     if service not in services:
         return False
 
-    service_url = get_service_url(service, config)
+    service_url = get_service_url(service)
     health_endpoint = services[service].get("health_endpoint", "")
     health_url = f"{service_url}{health_endpoint}"
     http_timeout = timeouts.get("http_timeout", 2.0)
@@ -110,7 +91,7 @@ def integration():
 
             health_urls = []
             for service in missing:
-                service_url = get_service_url(service, config)
+                service_url = get_service_url(service)
                 health_endpoint = config.get("services", {}).get(service, {}).get("health_endpoint", "")
                 if service_url and health_endpoint:
                     health_urls.append(f"{service_url}{health_endpoint}")
@@ -128,7 +109,7 @@ def integration():
         "test_docker": test_docker,
         "check_service_health": check_service_health,
         "require_services": require_services,
-        "get_service_url": lambda service: get_service_url(service, config),
+        "get_service_url": lambda service: get_service_url(service),
     }
 
 
@@ -195,17 +176,6 @@ def connect_to_weaviate_with_fallback(headers: dict[str, str] | None = None):
         )
     except Exception as e:
         raise ConnectionError(f"Failed to connect to Weaviate: {e}") from e
-
-
-def get_ollama_url() -> str:
-    """Get the appropriate Ollama URL."""
-    return get_service_url("ollama")
-
-
-def get_weaviate_hostname() -> str:
-    """Get the Weaviate hostname."""
-    weaviate_url = get_service_url("weaviate")
-    return weaviate_url.replace("http://", "").replace(":8080", "")
 
 
 def get_available_services() -> dict[str, bool]:

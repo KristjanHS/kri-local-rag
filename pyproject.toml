@@ -145,10 +145,10 @@ data_file = "reports/coverage/.coverage"
 # Integration test configuration - single source of truth
 # All integration test settings consolidated here
 
-# Service connection settings for different environments
+# Service health check endpoints
 [tool.integration.services]
-weaviate = { host_docker = "weaviate", host_local = "localhost", port = 8080, health_endpoint = "/v1/.well-known/ready" }
-ollama = { host_docker = "ollama", host_local = "localhost", port = 11434, health_endpoint = "/api/version" }
+weaviate = { health_endpoint = "/v1/.well-known/ready" }
+ollama = { health_endpoint = "/api/version" }
 
 # Timeout settings for service operations
 [tool.integration.timeouts]
@@ -158,17 +158,10 @@ cache_duration = 5.0              # seconds to cache service availability
 http_timeout = 2.0                # seconds for HTTP health checks
 model_loading_timeout = 30.0      # seconds for model loading operations
 
-# Environment-specific settings and URLs
+# Environment descriptions (for documentation)
 [tool.integration.environments]
-docker = { description = "Running inside Docker containers", test_docker = true }
-local = { description = "Running on local machine", test_docker = false }
-
-# Service URLs for different environments (Docker vs Local)
-[tool.integration.urls]
-weaviate_docker = "http://weaviate:8080"
-weaviate_local = "http://localhost:8080"
-ollama_docker = "http://ollama:11434"
-ollama_local = "http://localhost:11434"
+docker = { description = "Running inside Docker containers with service URLs set via environment variables" }
+local = { description = "Running on local machine with localhost URLs" }
 
 # Commands to start/stop services in different environments
 [tool.integration.commands]
