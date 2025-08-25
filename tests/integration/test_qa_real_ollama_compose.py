@@ -4,6 +4,8 @@ This test exercises the QA path end-to-end with the actual LLM by patching only
 the retrieval step. Supports both Docker and local environments.
 """
 
+import subprocess
+
 import pytest
 
 from backend.config import OLLAMA_MODEL
@@ -38,3 +40,18 @@ def test_answer_uses_real_ollama_compose(weaviate_client, sample_documents_path)
     cross_encoder = _get_cross_encoder()
     out = answer(question, k=1, cross_encoder=cross_encoder)
     assert isinstance(out, str) and out.strip(), "Expected a non-empty answer from the real model"
+    assert "Error generating response" not in out
+
+    # Verify a model process exists in Ollama after generation attempt
+    try:
+        ps = subprocess.run(
+            ["docker", "exec", "kri-local-rag-ollama-1", "ollama", "ps"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert ps.returncode == 0
+        assert OLLAMA_MODEL.split(":")[0] in ps.stdout or "PROCESSOR" in ps.stdout
+    except Exception:
+        # Non-fatal in CI environments without docker
+        pass

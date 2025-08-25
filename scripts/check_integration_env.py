@@ -19,11 +19,9 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from backend.config import is_running_in_docker
+    from backend.config import get_service_url, is_running_in_docker
     from tests.integration.conftest import (
         get_available_services,
-        get_ollama_url,
-        get_weaviate_hostname,
     )
 except ImportError as e:
     logger.error(f"Import error: {e}")
@@ -56,8 +54,8 @@ def check_environment():
 
     # Show connection details
     logger.info("\n🔗 Connection Details:")
-    logger.info(f"   Weaviate hostname: {get_weaviate_hostname()}")
-    logger.info(f"   Ollama URL:        {get_ollama_url()}")
+    logger.info(f"   Weaviate URL:      {get_service_url('weaviate')}")
+    logger.info(f"   Ollama URL:        {get_service_url('ollama')}")
 
     # Recommendations
     logger.info("\n💡 Recommendations:")

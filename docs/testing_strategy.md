@@ -44,7 +44,6 @@ Integration test utilities are centralized in `tests/integration/conftest.py` to
 - **`get_service_url(service)`**: Resolves service URLs based on `TEST_DOCKER` environment variable
 - **`is_service_healthy(service)`**: Performs HTTP health checks for services (Weaviate, Ollama)
 - **`get_available_services()`**: Returns a dictionary of service availability status
-- **`get_weaviate_hostname()`**: Extracts hostname from Weaviate URL for connection setup
 
 ### Usage Pattern
 
@@ -69,15 +68,23 @@ The `scripts/check_integration_env.py` script demonstrates proper usage by impor
 
 ## Environment Configuration
 
-**Environment Variable**: `TEST_DOCKER`
-- `true` → Docker services (`weaviate:8080`, `ollama:11434`)
-- `false`/`not set` → Local services (`localhost:8080`, `localhost:11434`)
+**Service URLs**: Use explicit environment variables for service endpoints
+- `OLLAMA_URL` → Ollama service endpoint (default: `http://localhost:11434`)
+- `WEAVIATE_URL` → Weaviate service endpoint (default: `http://localhost:8080`)
 
-**Configuration**: Centralized in `pyproject.toml` under `[tool.integration]`
+**Docker/Compose**: Services automatically set URLs for intra-container communication
+- `OLLAMA_URL=http://ollama:11434`
+- `WEAVIATE_URL=http://weaviate:8080`
+
+**Local Development**: Use localhost URLs
+- `OLLAMA_URL=http://localhost:11434`
+- `WEAVIATE_URL=http://localhost:8080`
+
+**Configuration**: Service URLs can be overridden via environment variables
 
 **Health Checks**:
-- Weaviate: `http://weaviate:8080/v1/.well-known/ready`
-- Ollama: `http://ollama:11434/api/version`
+- Weaviate: `{WEAVIATE_URL}/v1/.well-known/ready`
+- Ollama: `{OLLAMA_URL}/api/version`
 
 ## Key Testing Concepts
 
@@ -124,14 +131,15 @@ Integration tests combine real local models with mocked external services for ef
 ## Troubleshooting
 
 **Common Issues:**
-- **Services not available**: Set `TEST_DOCKER=true` and run `make test-up`
-- **Connection refused**: Verify `TEST_DOCKER` setting matches your environment
+- **Services not available**: Start services with `make test-up` (Docker) or manually (local)
+- **Connection refused**: Verify service URLs match your environment (localhost vs container names)
 - **Health check failures**: Services may be starting up, wait and retry
+- **Wrong service URLs**: Check environment variables and ensure they match your setup
 
 **Debug Commands:**
-- Check `TEST_DOCKER` setting: `echo "TEST_DOCKER=$TEST_DOCKER"`
-- Test Weaviate connectivity: `curl -i http://localhost:8080/v1/.well-known/ready`
-- Test Ollama connectivity: `curl -i http://localhost:11434/api/version`
+- Check service URLs: `echo "OLLAMA_URL=$OLLAMA_URL" && echo "WEAVIATE_URL=$WEAVIATE_URL"`
+- Test Weaviate connectivity: `curl -i $WEAVIATE_URL/v1/.well-known/ready`
+- Test Ollama connectivity: `curl -i $OLLAMA_URL/api/version`
 
 ---
 
