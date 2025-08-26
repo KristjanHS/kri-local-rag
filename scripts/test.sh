@@ -103,7 +103,7 @@ case "$command" in
     "$0" unit "$@"
     echo "=== Integration Tests ==="
     "$0" up
-    "$0" integration "$@"
+    (trap '"$0" down' EXIT; "$0" integration "$@")
     echo "=== E2E Tests ==="
     "$0" e2e "$@"
     echo "=== UI Tests ==="
@@ -119,41 +119,40 @@ case "$command" in
     enable_error_trap "$LOG_FILE" "$SCRIPT_NAME"
     enable_debug_trace "$LOG_FILE"
     
-    _red()   { printf "\e[31m%s\e[0m\n" "$*"; }
-    _green() { printf "\e[32m%s\e[0m\n" "$*"; }
-    _yellow(){ printf "\e[33m%s\e[0m\n" "$*"; }
-    
     need() {
       if ! command -v "$1" >/dev/null 2>&1; then
         if [[ "${CI_STRICT:-}" == "1" ]]; then
-          _red "ERROR: required tool '$1' not found in PATH" && exit 1
+          log ERROR "Required tool '$1' not found in PATH" | tee -a "$LOG_FILE"
+          exit 1
         else
-          _yellow "WARN : optional tool '$1' not found – skipping related step" && return 1
+          log WARN "Optional tool '$1' not found – skipping related step" | tee -a "$LOG_FILE"
+          return 1
         fi
       fi
     }
     
     # Ruff – static analysis & formatting (fast)
     if need ruff; then
-      _green "Running ruff (lint & format check)…" | tee -a "$LOG_FILE"
+      log INFO "Running ruff (lint & format check)…" | tee -a "$LOG_FILE"
       ruff check "$REPO_ROOT" | tee -a "$LOG_FILE"
     fi
     
     # Ruff formatting enforcement
     if need ruff; then
-      _green "Running ruff format --check …" | tee -a "$LOG_FILE"
+      log INFO "Running ruff format --check …" | tee -a "$LOG_FILE"
       ruff format --check "$REPO_ROOT" | tee -a "$LOG_FILE"
     fi
     
     # Pytest – unit & integration tests
     if [[ ! -x "$PY" ]]; then
-      _red "ERROR: $PY does not exist or is not executable. Create the venv first." | tee -a "$LOG_FILE" && exit 1
+      log ERROR "$PY does not exist or is not executable. Create the venv first." | tee -a "$LOG_FILE"
+      exit 1
     fi
     
-    _green "Running pytest (fast suite – default addopts) …" | tee -a "$LOG_FILE"
+    log INFO "Running pytest (fast suite – default addopts) …" | tee -a "$LOG_FILE"
     "$PY" -m pytest -q tests/ | tee -a "$LOG_FILE" || exit $?
     
-    _green "All local fast checks passed!" | tee -a "$LOG_FILE"
+    log INFO "All local fast checks passed!" | tee -a "$LOG_FILE"
     ;;
     
   ci)

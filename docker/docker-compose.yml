@@ -44,12 +44,12 @@ services:
 
   # ---------- RAG App Container (supports both web app and CLI) -----------------------------------------
   app:
-    image: kri-local-rag-app # single canonical image tag for the app
+    image: kri-local-rag-app
     build:
-      context: .. # project root
+      context: ..
       dockerfile: docker/app.Dockerfile
+      target: prod
       args:
-        # Pass pinned model commits for reproducibility (defaults from backend.config)
         EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
         EMBED_COMMIT: ${EMBED_COMMIT:-c9745ed1d9f207416be6d2e6f8de32d1f16199bf}
         RERANK_MODEL: ${RERANK_MODEL:-cross-encoder/ms-marco-MiniLM-L-6-v2}
@@ -81,6 +81,18 @@ services:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
       - WEAVIATE_URL=http://weaviate:8080
+
+  # ---------- Test App Container (profile: test) -----------------------------------------
+  app-test:
+    profiles: ["test"]
+    extends: app
+    image: kri-local-rag-app:test
+    build:
+      target: test
+    ports: []
+    command: ["tail", "-f", "/dev/null"]
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
 
   # ---------- One-off Ingestion Utility -----------------------------------------
   ingester:

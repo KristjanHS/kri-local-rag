@@ -9,11 +9,10 @@ BUILD_HASH_FILE := .test-build.hash
 
 # Only files that should trigger an image rebuild (no mounted app/test code here)
 BUILD_DEPS := requirements.txt requirements-dev.txt pyproject.toml \
-              docker/app.test.Dockerfile docker/docker-compose.yml \
-              docker/compose.test.yml
+              docker/app.Dockerfile docker/docker-compose.yml
 
-# Avoid repeating long compose invocations
-COMPOSE := docker compose -f docker/docker-compose.yml -f docker/compose.test.yml
+# Avoid repeating long compose invocations (use test profile)
+COMPOSE := docker compose -f docker/docker-compose.yml --profile test
 
 setup-hooks:
 	@echo "Configuring Git hooks path..."
@@ -39,7 +38,7 @@ test-up:
 _test-up-with-id:
 	@echo "Starting test environment with RUN_ID=$(RUN_ID)..."
 	@$(MAKE) build-if-needed RUN_ID=$(RUN_ID)
-	@$(COMPOSE) -p "$(RUN_ID)" up -d --wait --wait-timeout 120
+	@$(COMPOSE) -p "$(RUN_ID)" up -d --wait --wait-timeout 120 weaviate ollama app-test
 	@echo "Test environment started."
 
 build-if-needed:
@@ -81,7 +80,7 @@ test-down:
 
 _test-down-with-id:
 	@echo "Stopping test environment with RUN_ID=$(RUN_ID) ..."
-	@$(COMPOSE) -p "$(RUN_ID)" down -v
+	@$(COMPOSE) -p "$(RUN_ID)" down
 
 test-logs:
 	@if [ -f $(RUN_ID_FILE) ]; then \
@@ -93,13 +92,13 @@ test-logs:
 
 _test-logs-with-id:
 	@echo "Fetching logs for test environment with RUN_ID=$(RUN_ID) ..."
-	@$(COMPOSE) -p "$(RUN_ID)" logs -n 200 app weaviate ollama
+	@$(COMPOSE) -p "$(RUN_ID)" logs -n 200 app-test weaviate ollama
 
 # Run integration tests inside the app container using existing .run_id
 test-run-integration:
 	@if [ -f $(RUN_ID_FILE) ]; then \
 		RUN_ID=$$(cat $(RUN_ID_FILE)); \
-		$(COMPOSE) -p "$$RUN_ID" exec -T app /opt/venv/bin/python3 -m pytest tests/integration -q --junitxml=reports/junit_compose_integration.xml; \
+		$(COMPOSE) -p "$$RUN_ID" exec -T app-test /opt/venv/bin/python3 -m pytest tests/integration -q --junitxml=reports/junit_compose_integration.xml; \
 	else \
 		echo "No active test environment found. Run 'make test-up' first."; \
 		exit 1; \
