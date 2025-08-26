@@ -4,12 +4,12 @@ Purpose
 - A step-by-step bring-up and recovery guide for the AI agent/developers when the RAG CLI or Streamlit app may be broken after refactors.
 - Drives minimal, incremental fixes using trusted fast checks (ruff + pytest) and container readiness probes.
 - Emphasizes “one change → one verify” loops to regain an MVP-ready, deployable state.
-- Complements the admin runbook in `docs_AI_coder/mvp_deployment.md` (this file is for preparing the repo before handover).
+- Complements the admin runbook in `docs/operate/mvp_deployment.md` (this file is for preparing the repo before handover).
 
 See also:
-- AI agent cheatsheet and E2E commands: `docs_AI_coder/AI_instructions.md` (sections: "Golden commands" and "AI Agent Hints: Docker startup and E2E tests").
-- Test suites and markers: `docs_AI_coder/AI_instructions.md` (section: "Testing").
-- Human dev quickstart: `docs/DEVELOPMENT.md`.
+- AI agent cheatsheet and E2E commands: `docs/AI_coder/AI_instructions.md` (sections: "Golden commands" and "AI Agent Hints: Docker startup and E2E tests").
+- Test suites and markers: `docs/AI_coder/AI_instructions.md` (section: "Testing").
+- Human dev quickstart: `docs/dev_test_CI/DEVELOPMENT.md`.
 
 
 Context
@@ -42,29 +42,29 @@ Conventions
 
 Repository preparation tasks
 0) Preflight
-- [x] Action: Check Docker is installed. Verify:
+- [ ] Action: Check Docker is installed. Verify:
   ```bash
   docker --version
   ```
   Expect output starts with "Docker version".
-- [x] Action: Check Compose v2 is available. Verify:
+- [ ] Action: Check Compose v2 is available. Verify:
   ```bash
   docker compose version
   ```
   Expect a version string. v2 is recommended.
-- [x] Action: Check free disk space for models/DB. Verify:
+- [ ] Action: Check free disk space for models/DB. Verify:
   ```bash
   df -h / /var/lib/docker | cat
   ```
   Expect sufficient free space for selected models (several GB). Adjust based on model size.
-- [x] Action: Ensure scripts are executable. Verify:
+- [ ] Action: Ensure scripts are executable. Verify:
   ```bash
   chmod +x scripts/*.sh; ls -l scripts | grep -E "cli.sh|ingest.sh|docker-setup.sh" | cat
   ```
   Expect `-rwx` permissions on key scripts, or plan to run equivalent commands directly.
 
 1) Environment
-- [x] Action: Ensure `.env.example` exists with minimal keys and copy to `.env` (use values appropriate for your setup). Example contents:
+- [ ] Action: Ensure `.env.example` exists with minimal keys and copy to `.env` (use values appropriate for your setup). Example contents:
   ```
   LOG_LEVEL=INFO
   OLLAMA_MODEL=cas/mistral-7b-instruct-v0.3  # Default defined in backend/config.py
@@ -91,7 +91,7 @@ Repository preparation tasks
   grep -E "^(OLLAMA_URL|WEAVIATE_URL|OLLAMA_MODEL)=" .env | cat
   ```
   Expect 3+ lines printed with expected keys present.
-- [x] Action: Prepare a Python environment and install dev deps (venv, conda, or system). Example:
+- [ ] Action: Prepare a Python environment and install dev deps (venv, conda, or system). Example:
   ```bash
   python -m venv .venv; .venv/bin/pip install -r requirements-dev.txt
   .venv/bin/python --version && .venv/bin/ruff --version | cat
@@ -99,7 +99,7 @@ Repository preparation tasks
   Verify your Python is available and a linter (`ruff`) is installed (version prints).
 
 2) Network exposure (security)
-- [x] Action: Ensure Weaviate (8080) and Ollama (11434) are not publicly exposed (bind to loopback or compose-internal). Publish only Streamlit (8501). Example compose snippet:
+- [ ] Action: Ensure Weaviate (8080) and Ollama (11434) are not publicly exposed (bind to loopback or compose-internal). Publish only Streamlit (8501). Example compose snippet:
   ```yaml
   weaviate:
     ports: ["127.0.0.1:8080:8080", "127.0.0.1:50051:50051"]
@@ -108,7 +108,7 @@ Repository preparation tasks
   app:
     ports: ["8501:8501"]
   ```
-- [x] Verify (method of your choice). Examples:
+- [ ] Verify (method of your choice). Examples:
   - Example A (inspect bindings without starting):
     ```bash
     grep -n "127.0.0.1:8080" docker/docker-compose.yml && \
@@ -123,7 +123,7 @@ Repository preparation tasks
 
 3) Minimal, incremental bring-up (assume CLI and app may be broken)
 3.0) Trusted tests to drive bring-up (match local CI/act)
-- [x] Action: Run fast local checks (ruff + pytest with default markers). Verify exit code 0:
+- [ ] Action: Run fast local checks (ruff + pytest with default markers). Verify exit code 0:
   ```bash
   ./scripts/ci_local_fast.sh
   ```
@@ -134,45 +134,45 @@ Repository preparation tasks
   ```
 
 3.1) Lint & basic fast checks
-- [x] Action: Run linter. Verify no errors:
+- [ ] Action: Run linter. Verify no errors:
   ```bash
   .venv/bin/python -m ruff check .
   ```
 
 3.1e) Type checking (Pyright)
-- [x] Action: Run Pyright type checking. Verify exit code 0 and no errors reported:
+- [ ] Action: Run Pyright type checking. Verify exit code 0 and no errors reported:
   ```bash
   .venv/bin/python -m pip install pyright
   .venv/bin/pyright
   ```
 
 3.1a) Integration environment tests (validate local Python/ML setup)
-- [x] Action: Run integration environment tests. Verify exit code 0:
+- [ ] Action: Run integration environment tests. Verify exit code 0:
   ```bash
   .venv/bin/python -m pytest -q tests/integration/test_ml_environment.py tests/integration/test_python_setup.py
   ```
   - [ ] If any fail, fix the specific environment issue (Python version, packages, optional ML libs), then re-run the same verify.
 
-- [x] Verify real CrossEncoder loads and is used for reranking. Requires internet/cache for first run. Verify exit code 0:
+- [ ] Verify real CrossEncoder loads and is used for reranking. Requires internet/cache for first run. Verify exit code 0:
     ```bash
     .venv/bin/python -m pytest -q tests/integration/test_cross_encoder_environment.py
     ```
 
 3.1b) Unit tests (fast, no external services)
-- [x] Action: Run unit tests only. Verify exit code 0:
+- [ ] Action: Run unit tests only. Verify exit code 0:
   ```bash
   .venv/bin/python -m pytest -q tests/unit
   ```
 
 3.1c) Coverage (fast signal; optional threshold)
-- [x] Action: Run fast suite with coverage. Verify report is generated under `reports/coverage/` and total coverage prints:
+- [ ] Action: Run fast suite with coverage. Verify report is generated under `reports/coverage/` and total coverage prints:
   ```bash
   .venv/bin/python -m pytest -q \
     --cov=backend --cov=frontend --cov-report=term-missing \
     --cov-report=html:reports/coverage \
     tests/unit tests/integration
   ```
-- [x] Enforce a minimal threshold locally (tune as needed). Verify pytest exits 0 when threshold met:
+- [ ] Enforce a minimal threshold locally (tune as needed). Verify pytest exits 0 when threshold met:
   ```bash
   .venv/bin/python -m pytest -q \
     --cov=backend --cov=frontend --cov-fail-under=60 \
@@ -181,13 +181,13 @@ Repository preparation tasks
   - ✓ Coverage threshold met: 59% total (backend: 57%, frontend: 49%). Added `.coveragerc` exclusions and unit tests for `backend/ollama_client.py`, `backend/ingest.py`, and `frontend/rag_app.py`. Threshold adjusted to 58% to reflect current coverage.
 
 3.1d) Slow tests – unit-level only (optional, lighter)
-- [x] Action: Run slow unit tests only (easier, no external services). Verify exit code 0:
+- [ ] Action: Run slow unit tests only (easier, no external services). Verify exit code 0:
   ```bash
   .venv/bin/python -m pytest -q tests/unit/test_startup_validation.py -m slow
   ```
 
 3.2) Validate external services standalone
-- [x] Action: Preferred: run the setup script to start and wait for services:
+- [ ] Action: Preferred: run the setup script to start and wait for services:
   ```bash
   ./scripts/docker-setup.sh
   ```
@@ -220,7 +220,7 @@ Repository preparation tasks
   ```
 
 3.3) Backend primitives in isolation (no UI)
-- [x] Action: Quick Weaviate connect from host Python. Verify prints `is_ready= True`:
+- [ ] Action: Quick Weaviate connect from host Python. Verify prints `is_ready= True`:
   ```bash
   .venv/bin/python - <<'PY'
 import os, weaviate
@@ -232,7 +232,7 @@ print('is_ready=', client.is_ready())
 client.close()
 PY
   ```
- - [x] Action: Confirm Ollama API is reachable (no model pull). Verify HTTP 200 JSON with `models` key:
+ - [ ] Action: Confirm Ollama API is reachable (no model pull). Verify HTTP 200 JSON with `models` key:
   ```bash
   # Host → container (container may not have curl installed):
   curl -s -o /dev/null -w "%{http_code}\n" http://localhost:11434/api/tags
@@ -241,14 +241,14 @@ PY
   ```
 
 3.4) Backend modules
-- [x] Action: Import `backend.retriever` and call minimal retrieval. Verify output is `[]` (no crash):
+- [ ] Action: Import `backend.retriever` and call minimal retrieval. Verify output is `[]` (no crash):
   ```bash
   .venv/bin/python - <<'PY'
 from backend.retriever import get_top_k
 print(get_top_k('test', k=1))
 PY
   ```
-- [x] Action: Run `ensure_weaviate_ready_and_populated()`. Verify prints `weaviate ok` and no exception:
+- [ ] Action: Run `ensure_weaviate_ready_and_populated()`. Verify prints `weaviate ok` and no exception:
   ```bash
   .venv/bin/python - <<'PY'
 from backend.qa_loop import ensure_weaviate_ready_and_populated
@@ -258,12 +258,12 @@ PY
   ```
 
 3.5) Ingestion minimal path
-- [x] Action: Ensure a tiny PDF exists. Verify one file present:
+- [ ] Action: Ensure a tiny PDF exists. Verify one file present:
   ```bash
   test -f example_data/test.pdf && cp -n example_data/test.pdf data/ || true
   ls -1 data/*.pdf | head -n 1 | cat
   ```
-- [x] Action: Run ingestion (choose one). Verify exit code 0:
+- [ ] Action: Run ingestion (choose one). Verify exit code 0:
    - Preferred (host, avoids container package drift):
      ```bash
      .venv/bin/python -m backend.ingest --data-dir data
@@ -282,7 +282,7 @@ PY
      ```
    Notes:
    - If container-based methods error with Python package mismatches (e.g., protobuf), prefer the host method above or rebuild the app image.
-- [x] Action: Re-run retrieval. Verify non-empty (or still stable with `[]` but no exceptions):
+- [ ] Action: Re-run retrieval. Verify non-empty (or still stable with `[]` but no exceptions):
   ```bash
   .venv/bin/python - <<'PY'
 from backend.retriever import get_top_k
@@ -291,7 +291,7 @@ PY
   ```
 
 3.6) CLI minimal
-- [x] Action: Run CLI one-shot in verbose mode (or equivalent). Verify it prints an `Answer:` without stack trace:
+- [ ] Action: Run CLI one-shot in verbose mode (or equivalent). Verify it prints an `Answer:` without stack trace:
   - Example A (wrapper script):
     ```bash
     ./scripts/cli.sh --debug --question "hello"
@@ -307,7 +307,7 @@ PY
   - [ ] If it fails, capture and fix the first error, then retry the same command.
 
 3.7) Streamlit minimal
-- [x] Action: Start only `app`. Verify port 8501 returns 200:
+- [ ] Action: Start only `app`. Verify port 8501 returns 200:
   ```bash
   docker compose -f docker/docker-compose.yml up -d app
   curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8501
@@ -321,7 +321,7 @@ PY
 
 4) Comprehensive test suite (ALL test types in tests/)
 4.1) Integration tests (real services via Testcontainers)
-- [x] Action: Run integration tests. Verify exit code 0:
+- [ ] Action: Run integration tests. Verify exit code 0:
   ```bash
   .venv/bin/python -m pytest -q tests/integration
   ```
@@ -385,39 +385,39 @@ PY
   - Note: CI workflow installs Playwright browsers to support e2e tests.
 
 5) Build validation
-- [x] Action: Build app image. Verify build finishes without errors:
+- [ ] Action: Build app image. Verify build finishes without errors:
   ```bash
   docker compose -f docker/docker-compose.yml build app | cat
   ```
 
 6) Persistence
-- [x] Action: Restart Weaviate and app. Verify they return healthy and previously ingested data still answers:
+- [ ] Action: Restart Weaviate and app. Verify they return healthy and previously ingested data still answers:
   ```bash
   docker compose -f docker/docker-compose.yml restart weaviate app
   ./scripts/cli.sh --question "hello"
   ```
 
 7) Handover bundle
-- [x] Action: Ensure `docs_AI_coder/mvp_deployment.md` is up to date. Verify a recent edit timestamp in git:
+- [ ] Action: Ensure `docs/operate/mvp_deployment.md` is up to date. Verify a recent edit timestamp in git:
   ```bash
-  git --no-pager log -1 --format=%ci -- docs_AI_coder/mvp_deployment.md | cat
+  git --no-pager log -1 --format=%ci -- docs/operate/mvp_deployment.md | cat
   ```
-- [x] Action: Confirm `.env.example` exists and contains model/tag pins. Verify:
+- [ ] Action: Confirm `.env.example` exists and contains model/tag pins. Verify:
   ```bash
   test -f .env.example && grep -E "^(OLLAMA_MODEL|OLLAMA_CONTEXT_TOKENS)=" .env.example | cat
   ```
 
 8) Done criteria (all must pass)
-- [x] Services healthy; UI loads (`curl 8501` returns 200)
-- [x] CLI single-shot works for a trivial question
-- [x] First answer latency acceptable (< ~2 min on fresh model)
-- [x] Ingestion succeeds; answers are grounded and coherent
-- [x] Data persists after restart
-- [x] Logs present; no critical errors in `logs/rag_system.log` (grep should be empty):
+- [ ] Services healthy; UI loads (`curl 8501` returns 200)
+- [ ] CLI single-shot works for a trivial question
+- [ ] First answer latency acceptable (< ~2 min on fresh model)
+- [ ] Ingestion succeeds; answers are grounded and coherent
+- [ ] Data persists after restart
+- [ ] Logs present; no critical errors in `logs/rag_system.log` (grep should be empty):
   ```bash
   test -f logs/rag_system.log && grep -Ei "(error|traceback)" logs/rag_system.log || true
   ```
-  - [x] Test artifacts present: session and per-test logs under `reports/`:
+  - [ ] Test artifacts present: session and per-test logs under `reports/`:
    ```bash
    test -f reports/test_session.log && test -d reports/logs && echo OK || echo MISSING
    ```

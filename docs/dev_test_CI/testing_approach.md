@@ -1,4 +1,4 @@
-# Testing Strategy
+# Testing Approach
 
 A high-level guide to testing with real local models and external services.
 
@@ -143,4 +143,4 @@ Integration tests combine real local models with mocked external services for ef
 
 ---
 
-**Note**: This document provides a high-level overview for human readers. For detailed code examples and comprehensive testing guides, see `docs_AI_coder/AI_instructions.md`.
+**Note**: This document provides a high-level overview for human readers. For detailed code examples and comprehensive testing guides, see `docs/AI_coder/AI_instructions.md`.
