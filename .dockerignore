@@ -83,6 +83,9 @@ Dockerfile*
 docker-compose*
 .dockerignore
 
+# Security
+.secrets.baseline
+
 # Local development
 .local/
 local/

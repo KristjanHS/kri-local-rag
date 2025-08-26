@@ -30,11 +30,15 @@ jobs:
           python-version: "3.12"
       - name: Audit requirements.txt
         uses: pypa/gh-action-pip-audit@v1.1.0
+        env:
+          PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
         with:
           inputs: requirements.txt
       - name: Audit requirements-dev.txt
         if: hashFiles('requirements-dev.txt') != ''
         uses: pypa/gh-action-pip-audit@v1.1.0
+        env:
+          PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
         with:
           inputs: requirements-dev.txt
 

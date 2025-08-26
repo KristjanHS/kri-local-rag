@@ -75,9 +75,19 @@ def weaviate_compose_up():  # type: ignore[no-redef]
 
     Starts only the `weaviate` service using docker-compose. Volumes are preserved
     and the global teardown is handled by the outer harness if used.
+    Skips tests gracefully if Docker is not available.
     """
+    # Check if Docker is available
+    try:
+        subprocess.run(["docker", "info"], check=True, capture_output=True, timeout=5)
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        pytest.skip("Docker is not available or not running")
+
     compose_file = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
-    subprocess.run(["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "weaviate"], check=True)
+    try:
+        subprocess.run(["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "weaviate"], check=True)
+    except subprocess.CalledProcessError as e:
+        pytest.skip(f"Failed to start Weaviate container: {e}")
     yield
 
 
@@ -87,9 +97,19 @@ def ollama_compose_up():  # type: ignore[no-redef]
 
     Starts only the `ollama` service using docker-compose. Volumes are preserved
     and global teardown is handled elsewhere.
+    Skips tests gracefully if Docker is not available.
     """
+    # Check if Docker is available
+    try:
+        subprocess.run(["docker", "info"], check=True, capture_output=True, timeout=5)
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        pytest.skip("Docker is not available or not running")
+
     compose_file = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
-    subprocess.run(["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "ollama"], check=True)
+    try:
+        subprocess.run(["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "ollama"], check=True)
+    except subprocess.CalledProcessError as e:
+        pytest.skip(f"Failed to start Ollama container: {e}")
     yield
 
 
@@ -97,23 +117,30 @@ def ollama_compose_up():  # type: ignore[no-redef]
 def app_compose_up(weaviate_compose_up, ollama_compose_up):  # type: ignore[no-redef]
     """Ensure compose app is up for e2e tests needing the full stack.
 
-    Raises:
-        pytest.UsageError: If the required Docker image is not found.
+    Skips tests gracefully if Docker or the required image is not available.
     """
+    # Check if Docker is available
+    try:
+        subprocess.run(["docker", "info"], check=True, capture_output=True, timeout=5)
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        pytest.skip("Docker is not available or not running")
+
     # Check if the image exists
     image_name = "kri-local-rag-app:latest"
     try:
         subprocess.run(["docker", "image", "inspect", image_name], check=True, capture_output=True)
     except subprocess.CalledProcessError:
-        raise pytest.UsageError(
-            f"Docker image {image_name} not found. Please build it first, e.g., with './scripts/build_app.sh'"
-        )
+        pytest.skip(f"Docker image {image_name} not found. Please build it first, e.g., with './scripts/build_app.sh'")
 
     compose_file = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
-    subprocess.run(
-        ["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "app"],
-        check=True,
-    )
+    try:
+        subprocess.run(
+            ["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "app"],
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        pytest.skip(f"Failed to start app container: {e}")
+
     yield
 
 

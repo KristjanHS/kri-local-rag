@@ -1,7 +1,6 @@
 """Unit tests for the centralized logging configuration."""
 
 import logging
-import logging.handlers
 from unittest.mock import patch
 
 import pytest
