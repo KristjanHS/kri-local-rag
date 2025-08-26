@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -53,7 +54,20 @@ def _setup_logging():
         try:
             log_dir_path = Path(app_log_dir)
             log_dir_path.mkdir(parents=True, exist_ok=True)
-            file_handler = logging.FileHandler(log_dir_path / "rag_system.log")
+            # Rotating file handler: rotate at midnight, keep limited backups
+            backup_count_str = os.getenv("APP_LOG_BACKUP_COUNT", "5").strip()
+            try:
+                backup_count = max(0, int(backup_count_str))
+            except ValueError:
+                backup_count = 7
+
+            file_handler = TimedRotatingFileHandler(
+                filename=log_dir_path / "rag_system.log",
+                when="midnight",
+                backupCount=backup_count,
+                encoding="utf-8",
+                utc=True,
+            )
             file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
             file_handler.setLevel(log_level)
             root_logger.addHandler(file_handler)

@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from rich.logging import RichHandler
 
-from backend.config import set_log_level
+from backend.config import get_logger, set_log_level
 
 
 @pytest.fixture(autouse=True)
@@ -132,3 +132,22 @@ def test_single_console_handler_and_no_duplicate_stream_handlers():
     assert len(console_handlers) == 1, f"Expected 1 console handler, but found {len(console_handlers)}"
     # By default we should not attach a file handler unless APP_LOG_DIR is set
     assert len(file_handlers) == 0, f"Expected no FileHandler by default, but found {len(file_handlers)}"
+
+
+def test_file_logging_uses_timed_rotation_when_env_set(monkeypatch, tmp_path):
+    """Verify that setting APP_LOG_DIR creates a TimedRotatingFileHandler with retention."""
+    monkeypatch.setenv("APP_LOG_DIR", str(tmp_path))
+    monkeypatch.setenv("APP_LOG_BACKUP_COUNT", "5")
+
+    # Trigger logging setup
+    get_logger("test_file_rotation")
+
+    root_logger = logging.getLogger()
+    handlers = root_logger.handlers
+    # Expect one TimedRotatingFileHandler present
+    rotating_handlers = [h for h in handlers if h.__class__.__name__ == "TimedRotatingFileHandler"]
+    assert len(rotating_handlers) == 1, "TimedRotatingFileHandler should be configured when APP_LOG_DIR is set"
+
+    # Write a message to ensure file exists
+    root_logger.info("rotation smoke")
+    assert (tmp_path / "rag_system.log").exists(), "rag_system.log should be created"
