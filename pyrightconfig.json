@@ -18,6 +18,9 @@
         "backend"
     ],
     "reportMissingTypeStubs": false,
-    "reportUnusedImport": "warning",
-    "reportUnusedVariable": "warning"
+    "diagnosticSeverityOverrides": {
+        "reportMissingModuleSource": "none",
+        "reportUnusedImport": "warning",
+        "reportUnusedVariable": "warning"
+    }
 }
