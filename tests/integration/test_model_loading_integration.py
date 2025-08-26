@@ -341,10 +341,18 @@ def test_model_loading_error_handling(reset_global_cache):
                 f"Expected model loading exception, got {type(exc_info.value)}"
             )
 
-            # Verify it's related to missing model
+            # Verify it's related to missing model or network connectivity (offline mode)
             error_msg = str(exc_info.value).lower()
-            assert any(keyword in error_msg for keyword in ["not found", "no such file", "cannot find", "model"]), (
-                f"Expected missing model error, got: {error_msg}"
+            expected_keywords = [
+                "not found",
+                "no such file",
+                "cannot find",
+                "model",
+                "couldn't connect",
+                "offline mode",
+            ]
+            assert any(keyword in error_msg for keyword in expected_keywords), (
+                f"Expected missing model or network error, got: {error_msg}"
             )
 
     logger.info("✓ Error handling validated successfully")
