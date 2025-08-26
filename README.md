@@ -114,9 +114,9 @@ docker compose -f docker/docker-compose.yml logs -f ollama | cat
 
 ## Documentation
 
-- [Development Guide](docs/DEVELOPMENT.md) – More setup, testing, helper scripts, and power-user tips.
-- AI-coder guide: `docs_AI_coder/AI_instructions.md` – automation-friendly commands.
-- [Docker Management](docs/docker-management.md) – deeper service ops and troubleshooting.
+- [Development Guide](docs/dev_test_CI/DEVELOPMENT.md) – More setup, testing, helper scripts, and power-user tips.
+- AI-coder guide: `docs/AI_coder/AI_instructions.md` – automation-friendly commands.
+- [Docker Management](docs/operate/docker-management.md) – deeper service ops and troubleshooting.
 
 ## License
 

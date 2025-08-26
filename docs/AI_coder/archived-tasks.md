@@ -3,7 +3,7 @@
 This file records tasks that have been completed and moved out of the active TODO backlog.
 
 Migra from testcontainers:
-Necessary context: docs/testing_strategy.md, cursor_rules/AI_instructions.md
+Necessary context: docs/dev_test_CI/testing_approach.md, docs/AI_coder/AI_instructions.md
 
 Important info:
 * Tests must be run Inside test docker container, The Python executable is at /opt/venv/bin/python3
@@ -393,40 +393,40 @@ This document tracks the progress of the migration from Testcontainers to a Dock
         - ✅ Verify: Complete inventory of testing documentation across project
 
       - [x] **Task 7.1.2** — Create detailed documentation consolidation plan with specific content to move
-        - ✅ Action: Plan specific sections to add to testing_strategy.md
+        - ✅ Action: Plan specific sections to add to testing_approach.md
         - ✅ Action: Identify content to merge from each source document
         - ✅ Verify: Clear plan for consolidation without execution
 
-      - [x] **Task 7.1.3** — Merge integration test patterns from tests/README_integration.md into testing_strategy.md
+      - [x] **Task 7.1.3** — Merge integration test patterns from tests/README_integration.md into testing_approach.md
         - ✅ Action: Add integration test organization section
         - ✅ Action: Include test categories and service-specific tests
         - ✅ Action: Add writing new integration tests guidance
         - ✅ Verify: Integration patterns consolidated into single document
 
-      - [x] **Task 7.1.4** — Merge TEST_DOCKER environment guide from tests/TEST_DOCKER_GUIDE.md into testing_strategy.md
+      - [x] **Task 7.1.4** — Merge TEST_DOCKER environment guide from tests/TEST_DOCKER_GUIDE.md into testing_approach.md
         - ✅ Action: Add TEST_DOCKER environment variable section
         - ✅ Action: Include service URLs for different environments
         - ✅ Action: Add health check endpoints documentation
         - ✅ Verify: Environment control consolidated
 
-      - [x] **Task 7.1.5** — Merge migration guide content from tests/MIGRATION_GUIDE.md into testing_strategy.md
+      - [x] **Task 7.1.5** — Merge migration guide content from tests/MIGRATION_GUIDE.md into testing_approach.md
         - ✅ Action: Add migration patterns section
         - ✅ Action: Include common migration scenarios
         - ✅ Action: Document environment configuration migration
         - ✅ Verify: Migration guidance integrated
 
-      - [x] **Task 7.1.6** — Merge testing workflow info from docs/ci-cd-release-management.md into testing_strategy.md
+      - [x] **Task 7.1.6** — Merge testing workflow info from docs/dev_test_CI/ci-cd-release-mgmt.md into testing_approach.md
         - ✅ Action: Add CI/CD testing workflows section
         - ✅ Action: Include manual vs automated testing guidance
         - ✅ Action: Document testing project scripts
         - ✅ Verify: Workflow information consolidated
 
-      - [x] **Task 7.1.7** — Update docs/DEVELOPMENT.md to reference consolidated testing_strategy.md instead of individual guides
+      - [x] **Task 7.1.7** — Update docs/dev_test_CI/DEVELOPMENT.md to reference consolidated testing_approach.md instead of individual guides
         - ✅ Action: Replace individual testing doc references with consolidated reference
-        - ✅ Action: Update "More docs" section to point to testing_strategy.md
+        - ✅ Action: Update "More docs" section to point to testing_approach.md
         - ✅ Verify: Single reference to testing documentation
 
-      - [x] **Task 7.1.8** — Update documentation cross-references to point to consolidated testing_strategy.md
+      - [x] **Task 7.1.8** — Update documentation cross-references to point to consolidated testing_approach.md
         - ✅ Action: Find all references to individual testing docs
         - ✅ Action: Update them to point to consolidated document
         - ✅ Verify: No broken cross-references to old docs
@@ -535,7 +535,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
   - **Verify**: The "Skipping torch.compile optimization (tests or MagicMock instance)" debug message no longer appears during normal CLI usage.
 
 - [x] **Task 9 — Update Testing Strategy Documentation**
-  - **Action**: Update `docs/testing_strategy.md` to reflect that integration tests now follow the target approach.
+  - **Action**: Update `docs/dev_test_CI/testing_approach.md` to reflect that integration tests now follow the target approach.
   - **Action**: Add examples of the new fixture usage for integration tests.
   - **Verify**: Documentation accurately reflects the current testing approach and provides clear guidance for future development.
 
@@ -725,7 +725,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
   - Verify: CI fails if Renovate configuration is invalid, preventing deployment of broken configs.
 
 - [x] **Step 5: Create Configuration Testing Documentation** ✅ **COMPLETED**
-  - Action: Document the local Renovate testing workflow in `docs/DEVELOPMENT.md`.
+  - Action: Document the local Renovate testing workflow in `docs/dev_test_CI/DEVELOPMENT.md`.
   - Action: Include troubleshooting guide for common Renovate configuration issues.
   - Action: Add examples of valid configuration patterns and common pitfalls.
   - Verify: Documentation provides clear guidance for future Renovate configuration changes.
@@ -752,7 +752,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
   - Verify: CI uses npx instead of assuming global installation
 
 - [x] **Step 3: Update Documentation to Reflect npx Approach** ✅ **COMPLETED**
-  - Action: Update `docs/DEVELOPMENT.md` to use npx commands
+  - Action: Update `docs/dev_test_CI/DEVELOPMENT.md` to use npx commands
   - Action: Remove reference to system tools installation
   - Action: Add note about why npx is preferred over global installation
   - Verify: Documentation consistently recommends npx approach
@@ -852,7 +852,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
       - Verify: `pre-commit run yamlfmt --all-files` works correctly
     - [x] **Step 5: Update documentation and remove yamllint config** ✅ **COMPLETED**
       - Action: Removed `.yamllint.yml` file (no longer needed)
-      - Action: Updated `docs/DEVELOPMENT.md` with yamlfmt usage guidelines
+      - Action: Updated `docs/dev_test_CI/DEVELOPMENT.md` with yamlfmt usage guidelines
       - Action: Updated system tools installation to include yamlfmt instead of yamllint
       - Verify: Documentation provides clear yamlfmt guidelines, yamllint config removed
     - [x] **Step 6: Format all existing YAML files** ✅ **COMPLETED**
@@ -894,8 +894,8 @@ This document tracks the progress of the migration from Testcontainers to a Dock
   - Action: In `docker/app.Dockerfile`, move the `# hadolint ignore=DL3008` directive to the line immediately before the `RUN apt-get update ...` command so it is correctly detected.
   - Verify: Running `hadolint docker/app.Dockerfile` exits successfully with no errors.
 
-- [x] **Step 2: Document Security Strategy in `docs/docker-management.md`** ✅ **COMPLETED**
-  - Action: Add a brief section to `docs/docker-management.md` explaining the project's security strategy for OS packages in Docker (i.e., using `apt-get upgrade` on a pinned base image).
+- [x] **Step 2: Document Security Strategy in `docs/operate/docker-management.md`** ✅ **COMPLETED**
+  - Action: Add a brief section to `docs/operate/docker-management.md` explaining the project's security strategy for OS packages in Docker (i.e., using `apt-get upgrade` on a pinned base image).
   - Verify: The documentation is updated to clarify this for future development.
 
 **Status**: All steps completed. Dockerfile package pinning approach has been corrected and documented, ensuring the linter properly recognizes the intentional use of unpinned packages as part of the project's security strategy.
@@ -1111,7 +1111,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
 - [x] Step 5 — Guardrails and docs
   - Action: Add a unit test asserting a single Rich console handler and no duplicate stream handlers after importing `backend.retriever`, `backend.qa_loop`, etc.
   - Action: Add a CLI output test asserting default/quiet/verbose behaviors using `capsys`.
-  - Action: Update `README.md` and `docs/DEVELOPMENT.md` to document flags, precedence, and log file location.
+  - Action: Update `README.md` and `docs/dev_test_CI/DEVELOPMENT.md` to document flags, precedence, and log file location.
   - Verify: `.venv/bin/python -m pytest -q tests/unit/test_logging_config.py tests/integration/test_cli_output.py` passes.
 
 - [x] **IMPROVE: Logging Configuration Robustness (follow-up improvements)**
@@ -1133,7 +1133,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
   
   - [x] **Improvement 3: Documentation and examples**
     - Action: Add comprehensive docstring to `set_log_level` with usage examples
-    - Action: Document the logging configuration in `docs/DEVELOPMENT.md`
+    - Action: Document the logging configuration in `docs/dev_test_CI/DEVELOPMENT.md`
     - Action: Add type hints and improve function signatures where needed
     - Verify: New developers can understand and use the logging system correctly
 
@@ -1204,7 +1204,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
 
 - [x] Step 1.2.1 — Pre-push and docs
   - Action: Update pre-push hook to run only unit bundle by default: `.venv/bin/python -m pytest tests/unit --maxfail=1 -q` (respect `SKIP_TESTS=1`).
-  - Action: Update `docs/DEVELOPMENT.md` with bundle definitions, directory-based commands, and expectations (mocking policy, network rules, and when to promote a test to a heavier bundle).
+  - Action: Update `docs/dev_test_CI/DEVELOPMENT.md` with bundle definitions, directory-based commands, and expectations (mocking policy, network rules, and when to promote a test to a heavier bundle).
   - Verify: Fresh clone dev can follow docs to run each bundle successfully; pre-push remains quick.
 
 - [x] Step 1.3 — Deprecate `tests/environment/` by migrating tests
@@ -1253,9 +1253,9 @@ This document tracks the progress of the migration from Testcontainers to a Dock
 
   - [x] Fix: Reset cached globals to avoid cross-test state (best practices)
     - Action: Add autouse fixture in `tests/integration/conftest.py` that clears `RAG_FAKE_ANSWER` and resets caches only if respective modules are already imported: `backend.qa_loop._cross_encoder`, `backend.qa_loop._ollama_context`, and `backend.retriever._embedding_model` via `sys.modules`.
-    - Rationale: Aligns with `docs_AI_coder/AI_instructions.md` guidance to prevent flaky tests caused by cached globals and to not import modules inside fixtures (keeps patch decorators effective).
+    - Rationale: Aligns with `docs/AI_coder/AI_instructions.md` guidance to prevent flaky tests caused by cached globals and to not import modules inside fixtures (keeps patch decorators effective).
     - Verify: `.venv/bin/python -m pytest tests/integration -q` shows deterministic results; streaming test passes in isolation and alongside others.
-    - Validation: All integration tests pass (28/28); flaky-tests guidance updated and condensed in `docs_AI_coder/AI_instructions.md`.
+    - Validation: All integration tests pass (28/28); flaky-tests guidance updated and condensed in `docs/AI_coder/AI_instructions.md`.
 
 - [x] Step 4 — E2E bundle (all real components; network allowed)
   - Action: Provide a single dispatcher script `scripts/test.sh` with usage: `test.sh [unit|integration|e2e|ui]` that runs the standardized directory-based commands; for e2e it does `docker compose up -d --wait && pytest tests/e2e -q && docker compose down` with `set -euo pipefail`.
@@ -1337,16 +1337,16 @@ This document tracks the progress of the migration from Testcontainers to a Dock
   - Verify: `ls scripts/git-hooks` shows `pre-commit` and `pre-push`. The files are added in `git status`.
 
 - [x] Step 2 — Configure Git to Use the Centralized Hooks Directory
-  - Action: In `docs/DEVELOPMENT.md`, instruct developers to run `git config core.hooksPath scripts/git-hooks` once after cloning.
+  - Action: In `docs/dev_test_CI/DEVELOPMENT.md`, instruct developers to run `git config core.hooksPath scripts/git-hooks` once after cloning.
   - Action: Add a small script or a make target (e.g., `make setup-hooks`) to automate this configuration.
   - Verify: Running `git config --get core.hooksPath` returns `scripts/git-hooks`. Committing triggers the centralized hook.
 
 - [x] Step 3 — Clean Up and Document
-  - Action: Document the purpose of the shared hooks and the setup command in `docs/DEVELOPMENT.md`.
+  - Action: Document the purpose of the shared hooks and the setup command in `docs/dev_test_CI/DEVELOPMENT.md`.
   - Action: Remind developers they can still have local, untracked hooks in `.git/hooks/` if they need to override something for their own workflow, but the shared hooks should be the default.
   - Verify: The documentation is clear and easy for a new developer to follow.
 
-**Status**: All steps completed. Git hooks are centralized in `scripts/git-hooks/`, git is configured to use the centralized path, and documentation is complete in `docs/DEVELOPMENT.md`.
+**Status**: All steps completed. Git hooks are centralized in `scripts/git-hooks/`, git is configured to use the centralized path, and documentation is complete in `docs/dev_test_CI/DEVELOPMENT.md`.
 
 ## Archived on 2025-08-10
 
@@ -1425,7 +1425,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
    - Docker smoke: torch 2.7.1+cpu cuda False; protobuf 5.29.5; grpcio 1.63.0.
 
 6) Automation and upgrades
-   - Renovate configured for `requirements*.txt` and actions; added concise UV/upgrade guidance to `docs/DEVELOPMENT.md` and `.cursor/rules/uv-sandbox.mdc`.
+   - Renovate configured for `requirements*.txt` and actions; added concise UV/upgrade guidance to `docs/dev_test_CI/DEVELOPMENT.md` and `.cursor/rules/uv-sandbox.mdc`.
 
 ### P0.0d — ignoring call-arg ?
 
@@ -1445,7 +1445,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
 
 - Make wheels guidance concise
   - Action: Replace verbose wheel instructions with short, variable-based snippets for Docker and local venv.
-  - Status: Done in `docs/DEVELOPMENT.md`.
+  - Status: Done in `docs/dev_test_CI/DEVELOPMENT.md`.
  
 - Vector conversion helper clarity and robustness
   - Action: Refine `backend/vector_utils.py::to_float_list` to:
@@ -1523,7 +1523,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
   - Verify: CI runs green; core job uploads coverage HTML; Playwright browsers cached for UI job.
 
 - [x] P2.8 — Developer docs and DX commands
-  - Action: Updated `docs/DEVELOPMENT.md` and `docs_AI_coder/AI_instructions.md` with new `pytest` options.
+  - Action: Updated `docs/dev_test_CI/DEVELOPMENT.md` and `docs/AI_coder/AI_instructions.md` with new `pytest` options.
   - Verify: Documentation reflects the new testing commands.
 
  - [x] P2.9 — Optional hardening for unit/fast test suites
@@ -1532,7 +1532,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
         - Action: Update `tests/unit/conftest.py::_log_socket_block_status` to return immediately unless `UNITNETGUARD_FAIL_FAST=1` is set; avoid doing any socket probe/logging on the default path.
         - Verify: `.venv/bin/python -m pytest -q tests/unit` remains green; wall time improves vs current.
       - [x] Keep fail-fast as an opt-in toggle only
-        - Action: Document in `docs_AI_coder/AI_instructions.md` that setting `UNITNETGUARD_FAIL_FAST=1` enables the per-test probe and immediate failure on first detection.
+        - Action: Document in `docs/AI_coder/AI_instructions.md` that setting `UNITNETGUARD_FAIL_FAST=1` enables the per-test probe and immediate failure on first detection.
         - Verify: With `UNITNETGUARD_FAIL_FAST=1`, the first victim is reported; without it, suite runs with no per-test probe.
       - Rationale: Best practice with `pytest-socket` is to rely on a session-level block plus targeted opt-in allowances. A default per-test network probe adds overhead and can mask offenders; keeping it behind an env flag provides rapid diagnosis without slowing normal runs.
     - Speed up feedback
@@ -1573,7 +1573,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
       - [x] Action: In CI workflows, set `TEARDOWN_DOCKER=1` (or pass `--teardown-docker`) so the session fixture tears down services. Keep local default as keep-up for fast iterations.
       - [x] Verify: CI logs show `docker compose down -v` after tests; no leftover CI containers/volumes.
     - [x] Document fast-iteration defaults and the wrapper script
-      - [x] Action: Add a short section to `docs/DEVELOPMENT.md` describing: default keep-up policy, `--teardown-docker` and env toggles (`KEEP_DOCKER_UP`, `TEARDOWN_DOCKER`), and usage of `scripts/pytest_with_cleanup.sh`.
+      - [x] Action: Add a short section to `docs/dev_test_CI/DEVELOPMENT.md` describing: default keep-up policy, `--teardown-docker` and env toggles (`KEEP_DOCKER_UP`, `TEARDOWN_DOCKER`), and usage of `scripts/pytest_with_cleanup.sh`.
       - [x] Verify: Follow the doc steps locally to run `scripts/pytest_with_cleanup.sh tests/integration` (keeps up by default) and with `--teardown-docker` (cleans up compose and Testcontainers).
     - [x] Ensure sockets are enabled per-suite for all non-unit tests
       - [x] Action: Confirm we have autouse fixtures that temporarily `enable_socket()` in `tests/integration/`, `tests/environment/`, and `tests/e2e/` (added). No suite should rely on global allow-all.
@@ -1621,7 +1621,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
 - Pre-push (local)
   - [x] Make pre-push resilient if `act` is missing: detect and skip with a clear message
   - [x] Add `SKIP_LOCAL_SEC_SCANS=1` guard to optionally skip Semgrep/CodeQL locally when needed
-  - [x] Document the guard and prerequisites in `docs/DEVELOPMENT.md`
+  - [x] Document the guard and prerequisites in `docs/dev_test_CI/DEVELOPMENT.md`
 - Repo protection
   - [x] Configure branch protection to require "Code scanning results / CodeQL" and Semgrep check on PRs
 
