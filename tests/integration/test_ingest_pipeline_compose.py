@@ -1,4 +1,5 @@
-"""Test the full document ingestion pipeline using Compose services."""
+#!/usr/bin/env python3
+"""Integration test for the ingestion pipeline with real Weaviate compose service."""
 
 from unittest.mock import MagicMock
 
@@ -6,13 +7,14 @@ import pytest
 from sentence_transformers import SentenceTransformer
 
 from backend import config, ingest
+from tests.conftest import TEST_COLLECTION_NAME
 
 # Mark the entire module as 'slow'
 pytestmark = pytest.mark.slow
 
 # --- Constants ---
 EMBEDDING_MODEL = config.EMBEDDING_MODEL
-COLLECTION_NAME = "TestCollection"  # Use a dedicated test collection
+COLLECTION_NAME = TEST_COLLECTION_NAME  # Use the shared test collection constant
 
 
 @pytest.fixture

@@ -14,6 +14,7 @@ pytest_plugins = ["tests.e2e.fixtures_ingestion"]
 from backend.config import OLLAMA_MODEL
 from backend.ollama_client import pull_if_missing
 from backend.qa_loop import answer
+from tests.conftest import TEST_COLLECTION_NAME
 
 pytestmark = [pytest.mark.slow, pytest.mark.external]
 
@@ -52,7 +53,7 @@ def test_e2e_answer_with_real_services(
     embedding_model = _get_embedding_model()
     ingest.ingest(
         directory=sample_documents_path,
-        collection_name="TestCollection",
+        collection_name=TEST_COLLECTION_NAME,
         weaviate_client=weaviate_client,
         embedding_model=embedding_model,
     )
@@ -61,7 +62,7 @@ def test_e2e_answer_with_real_services(
     result = answer(
         "Give me a brief summary of the indexed content.",
         k=2,
-        collection_name="TestCollection",
+        collection_name=TEST_COLLECTION_NAME,
         cross_encoder=cross_encoder,
     )
 

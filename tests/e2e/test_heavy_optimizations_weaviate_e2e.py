@@ -14,6 +14,7 @@ pytestmark = [pytest.mark.slow]
 
 from backend import ingest
 from backend.retriever import _get_embedding_model
+from tests.conftest import TEST_COLLECTION_NAME
 
 
 def test_e2e_ingest_with_heavy_optimizations_into_real_weaviate(caplog, weaviate_client, clean_test_collection):
@@ -22,7 +23,7 @@ def test_e2e_ingest_with_heavy_optimizations_into_real_weaviate(caplog, weaviate
 
     caplog.set_level(logging.INFO, logger="backend.ingest")
 
-    collection_name = "TestCollection"
+    collection_name = TEST_COLLECTION_NAME
 
     data_dir = os.path.join("test_data")
     embedding_model = _get_embedding_model()

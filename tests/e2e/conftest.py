@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Pytest configuration and lightweight fixtures for the E2E test suite.
-
-Heavy docker service setup was moved to `tests/e2e/fixtures_ingestion.py` and
-should be imported explicitly by tests that require real ingestion/services.
-"""
+"""E2E test configuration and fixtures."""
 
 import subprocess
 from pathlib import Path
@@ -11,6 +7,9 @@ from urllib.parse import urlparse
 
 import pytest
 import weaviate
+
+# Import the test collection name constant from parent conftest
+from tests.conftest import TEST_COLLECTION_NAME
 
 
 @pytest.fixture(scope="session")
@@ -53,8 +52,8 @@ def _cleanup_testcollection_after_session():  # type: ignore[no-redef]
             grpc_secure=parsed.scheme == "https",
         )
         try:
-            if client.collections.exists("TestCollection"):
-                client.collections.delete("TestCollection")
+            if client.collections.exists(TEST_COLLECTION_NAME):
+                client.collections.delete(TEST_COLLECTION_NAME)
         finally:
             try:
                 client.close()

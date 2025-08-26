@@ -59,7 +59,11 @@ def _setup_logging():
             try:
                 backup_count = max(0, int(backup_count_str))
             except ValueError:
-                backup_count = 7
+                backup_count = 5
+                logging.warning(
+                    "Invalid value for APP_LOG_BACKUP_COUNT: '%s'. Defaulting to 5.",
+                    backup_count_str,
+                )
 
             file_handler = TimedRotatingFileHandler(
                 filename=log_dir_path / "rag_system.log",
