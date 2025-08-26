@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """E2E test: ingestion with heavy optimizations against a real Weaviate.
 
-Uses testcontainers to start Weaviate and runs the ingestion pipeline with
+Uses Docker Compose to start Weaviate and runs the ingestion pipeline with
 real CPU torch.compile optimizations enabled. Verifies data lands in the
 shared test collection and that optimization logs are emitted.
 """
@@ -14,6 +14,7 @@ pytestmark = [pytest.mark.slow]
 
 from backend import ingest
 from backend.retriever import _get_embedding_model
+from tests.conftest import TEST_COLLECTION_NAME
 
 
 def test_e2e_ingest_with_heavy_optimizations_into_real_weaviate(caplog, weaviate_client, clean_test_collection):
@@ -22,7 +23,7 @@ def test_e2e_ingest_with_heavy_optimizations_into_real_weaviate(caplog, weaviate
 
     caplog.set_level(logging.INFO, logger="backend.ingest")
 
-    collection_name = "TestCollection"
+    collection_name = TEST_COLLECTION_NAME
 
     data_dir = os.path.join("test_data")
     embedding_model = _get_embedding_model()

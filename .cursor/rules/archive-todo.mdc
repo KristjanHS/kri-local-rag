@@ -1,5 +1,5 @@
 ---
-description: "Archive completed task groups from product_todo.md"
+description: "When working on product_todo.md - archive the completed task groups"
 type: agent-select
 alwaysApply: false
 ---

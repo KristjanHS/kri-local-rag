@@ -18,9 +18,7 @@ fi
 # Avoid interference from the project's root venv
 unset VIRTUAL_ENV || true
 
-# Export both for maximum compatibility with tooling/instructions
-export PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cpu"
-export UV_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cpu"
+# No global extra index; indexes are declared in pyproject via [tool.uv.index]
 
 # Lock, create venv, sync, and validate dependency graph
 if [ -f "uv.lock" ]; then
