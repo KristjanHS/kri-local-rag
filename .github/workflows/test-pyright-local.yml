@@ -1,0 +1,28 @@
+name: Test Pyright Local
+
+on:
+  workflow_dispatch:
+
+jobs:
+  pyright:
+    name: Pyright
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip --root-user-action=ignore
+          pip install -r requirements-dev.txt --root-user-action=ignore
+      - name: Pyright type checking
+        run: pyright --project ./pyrightconfig.json

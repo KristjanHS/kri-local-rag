@@ -117,7 +117,7 @@ jobs:
           python -m pip install --upgrade pip --root-user-action=ignore
           pip install -r requirements-dev.txt --root-user-action=ignore
       - name: Pyright type checking
-        run: pyright
+        run: pyright --project ./pyrightconfig.json
 
 
   integration:
