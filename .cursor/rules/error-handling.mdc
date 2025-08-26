@@ -1,8 +1,0 @@
----
-description: "How to proceed after a validation (jsonlint) or test failure: stop and report"
-type: agent-select
-alwaysApply: false
----
-- On initial validation (for example `jsonlint`) or test failures, stop further edits.
-- This rule applies to first-attempt failures only. After 3 failed attempts, the problem-solving rule (see `problem-solving.mdc`) takes precedence.
-- Output the failure reason and suggested next steps.
