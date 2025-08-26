@@ -1,0 +1,8 @@
+---
+description: "After a failed attempt to fix a test error, apply this"
+type: agent-select
+alwaysApply: true
+---
+- When trying to solve an error or problem has failed for 1 time:
+  Describe what is the failing test trying to assert. Then describe what is the actual behavior of solution code covered by this test. Then make decision, which of them is wrong and needs modification: the test or the solution code?
+
