@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A local RAG implementation with Weaviate and Ollama."
 authors = [{ name="Kristjan Sillmann"}]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 
 [build-system]
 requires = ["setuptools"]
@@ -104,7 +104,7 @@ test = [
     "pytest-cov>=4.0,<5.0",
     "pytest-xdist>=3.0,<4.0",
     "pytest-mock>=3.0,<4.0",
-    "pytest-docker>=2.0,<3.0",
+    "pytest-docker>=3.0,<4.0",
     "pytest-html>=4.1,<5.0",
     "pytest-socket>=0.6.0,<1.0",
     "requests>=2.31,<3.0",

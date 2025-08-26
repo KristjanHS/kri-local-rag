@@ -36,7 +36,7 @@ pillow>=11.1.0
 
 # Web and Network
 httpx
-streamlit==1.47.0
+streamlit>=1.48.0
 
 # Utilities
 

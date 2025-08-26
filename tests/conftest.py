@@ -18,14 +18,10 @@ TEST_COLLECTION_NAME = "TestCollection"
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: D401
-    """Ensure report directories exist and unset conflicting env vars."""
-    # Only unset environment variables when running outside Docker containers
-    # (for host-based testing). When running inside containers, we want to
-    # preserve the environment variables set by Docker Compose.
-    test_docker = os.getenv("TEST_DOCKER", "false").lower() == "true"
-    if not test_docker:
-        os.environ.pop("WEAVIATE_URL", None)
-        os.environ.pop("OLLAMA_URL", None)
+    """Ensure report directories exist; preserve service URLs in local runs."""
+    # In local runs, keep WEAVIATE_URL/OLLAMA_URL so tests can use running services.
+    # Inside Docker, environment is managed by Compose.
+    _ = os.getenv("TEST_DOCKER", "false").lower() == "true"
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
