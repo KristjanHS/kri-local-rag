@@ -59,7 +59,6 @@ services:
     volumes:
       - ../backend:/app/backend # Live backend code
       - ../frontend:/app/frontend # Live frontend code
-      - ../tests:/app/tests # Live tests
       - ../data:/app/data # Live data access
       - ../example_data:/app/example_data:ro # Ensure example_data matches project layout
       - ../logs:/app/logs # Live log access
@@ -96,7 +95,10 @@ services:
       - ../backend:/app/backend # Live backend code
       - ../data:/app/data # Live data access
       - ../logs:/app/logs # Live log access
-      - ../tests:/app/tests # Mount tests for in-container testing
+    environment:
+      # Point the Python code to the other services inside the compose network
+      - OLLAMA_URL=http://ollama:11434
+      - WEAVIATE_URL=http://weaviate:8080
     command: ["python", "backend/ingest.py", "/app/data"]
 
 volumes:
