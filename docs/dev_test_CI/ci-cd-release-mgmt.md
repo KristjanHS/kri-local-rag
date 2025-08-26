@@ -127,6 +127,19 @@ pre-commit autoupdate
 
 # Fix common issues
 ruff check . --fix
+
+# For other tools, you may need to install dependencies manually:
+
+# yamlfmt (requires Go)
+go install github.com/google/yamlfmt/cmd/yamlfmt@latest
+
+# detect-secrets with plugins
+.venv/bin/python -m pip install "detect-secrets[gibberish,entropy,wordlist]"
+
+# Initialize detect-secrets baseline (if .secrets.baseline doesn't exist)
+.venv/bin/python -m detect_secrets scan --baseline .secrets.baseline
+
+# If Go is not available, you can skip yamlfmt by removing it from .pre-commit-config.yaml
 ```
 
 ## Release Process
