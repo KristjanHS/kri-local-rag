@@ -261,10 +261,10 @@ The new centralized model handling system provides these benefits:
 
 ### 📚 **Documentation**
 All documentation has been updated to reflect this new architecture:
-- `docs/DEVELOPMENT.md` - Added model system section
-- `docs/testing_strategy.md` - Updated with new testing patterns
-- `docs/cursor_hints.md` - Added architecture guidance
-- `docs_AI_coder/AI_instructions.md` - Updated testing and configuration guidance
+- `docs/dev_test_CI/DEVELOPMENT.md` - Added model system section
+- `docs/dev_test_CI/testing_approach.md` - Updated with new testing patterns
+- `docs/AI_coder/cursor_hints.md` - Added architecture guidance
+- `docs/AI_coder/AI_instructions.md` - Updated testing and configuration guidance
 
 ---
 

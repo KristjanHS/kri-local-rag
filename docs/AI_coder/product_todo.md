@@ -42,9 +42,9 @@ This file tracks outstanding tasks and planned improvements for the project.
 
 ## Quick References
 
-- **AI agent cheatsheet and E2E commands**: [`docs_AI_coder/AI_instructions.md`](AI_instructions.md)
-- **Human dev quickstart**: [`docs/DEVELOPMENT.md`](../docs/DEVELOPMENT.md)
-- **Testing approach**: [`docs/testing_strategy.md`](../docs/testing_strategy.md)
+- **AI agent cheatsheet and E2E commands**: [`docs/AI_coder/AI_instructions.md`](AI_instructions.md)
+- **Human dev quickstart**: [`docs/dev_test_CI/DEVELOPMENT.md`](../dev_test_CI/DEVELOPMENT.md)
+- **Testing approach**: [`docs/dev_test_CI/testing_approach.md`](../dev_test_CI/testing_approach.md)
 
 ## Prioritized Backlog
 
@@ -225,7 +225,7 @@ def test_something(mocker, mock_embedding_model):
       - ✅ Updated `tests/README_integration.md` with new simplified patterns
       - ✅ Created `tests/TEST_DOCKER_GUIDE.md` for environment variable usage
       - ✅ Created `tests/MIGRATION_GUIDE.md` from old to new patterns
-      - ✅ Updated `docs/DEVELOPMENT.md` with new integration test patterns
+      - ✅ Updated `docs/dev_test_CI/DEVELOPMENT.md` with new integration test patterns
       - ✅ Migrated existing tests to use new patterns (e.g., `test_weaviate_compose.py`)
       - ✅ Verified: Complete documentation suite for new developers
 
@@ -438,7 +438,7 @@ def test_something(mocker, mock_embedding_model):
   - Verify: Failures are actionable; runs are deterministic and isolated.
 
 - [ ] Step 8 — Wire into scripts/docs/CI (PENDING)
-  - Action: Document commands in `docs/DEVELOPMENT.md` and `AI_instructions.md`; mention in `scripts/test.sh e2e` help; add a CI job for the containerized CLI subset.
+  - Action: Document commands in `docs/dev_test_CI/DEVELOPMENT.md` and `AI_instructions.md`; mention in `scripts/test.sh e2e` help; add a CI job for the containerized CLI subset.
   - Verify: Fresh env runs `tests/e2e/*_container_e2e.py` green; CI job passes locally under `act` and on hosted runners.
 
 #### P5 — E2E retrieval failure: QA test returns no context (Weaviate)

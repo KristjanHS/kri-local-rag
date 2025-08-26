@@ -1,6 +1,6 @@
 # Development Quickstart
 
-Concise setup for human developers. For detailed, AI-automation-focused guidance, see `docs_AI_coder/AI_instructions.md`.
+Concise setup for human developers. For detailed, AI-automation-focused guidance, see `docs/AI_coder/AI_instructions.md`.
 
 ## Prerequisites
 - Python 3.12+ recommended (matches project requirement)
@@ -50,7 +50,7 @@ export TEST_DOCKER=false
 .venv/bin/python -m pytest tests/integration -q
 ```
 
-For detailed integration testing patterns, see `docs/testing_strategy.md`.
+For testing patterns, see `docs/dev_test_CI/testing_approach.md`.
 
 - E2E (full stack via Docker Compose):
 ```bash
@@ -97,7 +97,7 @@ Preferred startup: use the automated setup script which builds the image, starts
 ```bash
 ./scripts/docker-setup.sh
 ```
-See the root README for starting/stopping the stack and simple day-to-day commands. For deeper service operations and troubleshooting, see `docs/docker-management.md`.
+See the root README for starting/stopping the stack and simple day-to-day commands. For deeper service operations and troubleshooting, see `docs/operate/docker-management.md`.
 
 ## Wheels (CPU/GPU) — concise
 - Docker build (choose one channel):
@@ -131,9 +131,9 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 
 
 ## More docs
-- Detailed guidance used mostly by AI coder: `docs_AI_coder/AI_instructions.md`
-- Docker management and troubleshooting: `docs/docker-management.md`
-- **Testing strategy**: `docs/testing_strategy.md` - Complete guide to testing patterns, integration tests, and model management
+- Detailed guidance used mostly by AI coder: `docs/AI_coder/AI_instructions.md`
+- Docker management and troubleshooting: `docs/operate/docker-management.md`
+- **Testing strategy**: `docs/dev_test_CI/testing_approach.md` - Complete guide to testing patterns, integration tests, and model management
 
 
 ## Helper scripts
@@ -144,4 +144,4 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 - `scripts/cli.sh`: convenience wrapper to run the CLI inside Docker.
 - `scripts/check_integration_env.py`: Integration test environment checker (imports utilities from `tests/integration/conftest.py`).
 
-**Note**: Scripts that need integration test utilities should import them from `tests/integration/conftest.py` rather than duplicating the logic. See `docs/testing_strategy.md` for details.
+**Note**: Scripts that need integration test utilities should import them from `tests/integration/conftest.py` rather than duplicating the logic. See `docs/dev_test_CI/testing_approach.md` for details.
