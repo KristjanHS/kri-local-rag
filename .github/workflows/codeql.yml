@@ -20,8 +20,7 @@ jobs:
     # Add timeout to prevent hanging jobs
     timeout-minutes: 360
 
-    if: >-
-      ${{ github.event_name != 'pull_request' || github.actor != 'nektos/act' }}
+    if: ${{ github.actor != 'nektos/act' }}
     # Use concurrency to cancel in-progress jobs on new commits
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
