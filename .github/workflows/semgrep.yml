@@ -40,36 +40,8 @@ jobs:
           config: auto
           publishToken: ${{ secrets.SEMGREP_APP_TOKEN }}
 
-      - name: Summarize Semgrep findings to logs
-        if: ${{ always() }}
-        run: |
-          python - << 'PY'
-          import json
-          import os
-          import sys
-
-          path = "semgrep.sarif"
-          if not os.path.exists(path):
-              print("Semgrep findings: 0 (no semgrep.sarif found)")
-              sys.exit(0)
-
-          try:
-              with open(path, "r", encoding="utf-8") as f:
-                  sarif = json.load(f)
-              runs = sarif.get("runs") or []
-              results = (runs[0].get("results") if runs else []) or []
-              print(f"\nSemgrep findings: {len(results)}")
-              for i, r in enumerate(results, start=1):
-                  rule_id = r.get("ruleId") or (r.get("rule") or {}).get("id") or "unknown-rule"
-                  level = r.get("level") or (r.get("properties") or {}).get("severity") or "note"
-                  message = (r.get("message") or {}).get("text") or "(no message)"
-                  loc = ((r.get("locations") or [None])[0] or {}).get("physicalLocation") or {}
-                  file = (loc.get("artifactLocation") or {}).get("uri") or "unknown-file"
-                  line = (loc.get("region") or {}).get("startLine") or 1
-                  print(f"{i}. [{level}] {rule_id} at {file}:{line} - {message}")
-          except Exception as e:
-              print(f"Could not parse semgrep.sarif: {e}")
-          PY
+      # Security findings are available in GitHub's Security tab
+      # No local summary needed - rely on GitHub's Security tab as source of truth
 
       # Note: Semgrep results are automatically published to the semgrep platform
       # via the publishToken in the semgrep-action step above
@@ -147,33 +119,13 @@ jobs:
             --sarif \
             --output semgrep_local.sarif
 
-      - name: Summarize Semgrep findings to logs
+      # Local scan complete - results available in semgrep_local.sarif
+      # For production scans, check GitHub's Security tab
+
+      - name: Quick local summary
         if: ${{ always() }}
         run: |
-          python - << 'PY'
-          import json
-          import os
-          import sys
-
-          path = "semgrep_local.sarif"
-          if not os.path.exists(path):
-              print("Semgrep findings: 0 (no semgrep_local.sarif found)")
-              sys.exit(0)
-
-          try:
-              with open(path, "r", encoding="utf-8") as f:
-                  sarif = json.load(f)
-              runs = sarif.get("runs") or []
-              results = (runs[0].get("results") if runs else []) or []
-              print(f"\nSemgrep findings: {len(results)}")
-              for i, r in enumerate(results, start=1):
-                  rule_id = r.get("ruleId") or (r.get("rule") or {}).get("id") or "unknown-rule"
-                  level = r.get("level") or (r.get("properties") or {}).get("severity") or "note"
-                  message = (r.get("message") or {}).get("text") or "(no message)"
-                  loc = ((r.get("locations") or [None])[0] or {}).get("physicalLocation") or {}
-                  file = (loc.get("artifactLocation") or {}).get("uri") or "unknown-file"
-                  line = (loc.get("region") or {}).get("startLine") or 1
-                  print(f"{i}. [{level}] {rule_id} at {file}:{line} - {message}")
-          except Exception as e:
-              print(f"Could not parse semgrep_local.sarif: {e}")
-          PY
+          if [ -f "semgrep_local.sarif" ]; then
+            echo "Local Semgrep scan complete. Check semgrep_local.sarif for details."
+            echo "For production results, see GitHub's Security tab."
+          fi
