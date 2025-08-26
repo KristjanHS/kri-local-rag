@@ -11,6 +11,7 @@ import pytest
 from backend.config import OLLAMA_MODEL
 from backend.ollama_client import pull_if_missing
 from backend.qa_loop import answer
+from tests.conftest import TEST_COLLECTION_NAME
 
 pytestmark = pytest.mark.requires_ollama
 
@@ -25,7 +26,7 @@ def test_answer_uses_real_ollama_compose(weaviate_client, clean_test_collection,
     embedding_model = _get_embedding_model()
     ingest.ingest(
         directory=sample_documents_path,
-        collection_name="TestCollection",
+        collection_name=TEST_COLLECTION_NAME,
         weaviate_client=weaviate_client,
         embedding_model=embedding_model,
     )
@@ -55,7 +56,7 @@ def test_answer_uses_real_ollama_compose(weaviate_client, clean_test_collection,
 
     monkeypatch.setattr(oc.httpx, "stream", _stream_wrapper)
 
-    out = answer(question, k=1, cross_encoder=cross_encoder, collection_name="TestCollection")
+    out = answer(question, k=1, cross_encoder=cross_encoder, collection_name=TEST_COLLECTION_NAME)
     assert isinstance(out, str) and out.strip(), "Expected a non-empty answer from the real model"
     assert "Error generating response" not in out
     # The answer should mention limericks since that's what the document is about

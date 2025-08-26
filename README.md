@@ -23,7 +23,7 @@ Local RAG system using Weaviate, Ollama, and a CPU-optimized Python backend.
 
 Alternative (manual):
 ```bash
-docker compose -f docker/docker-compose.yml up -d --build
+docker compose -f docker/docker-compose.yml up -d --build --wait
 ```
 
 2) Open the web UI at `http://localhost:8501`
@@ -81,6 +81,9 @@ docker compose -f docker/docker-compose.yml up -d --build
 
 Notes:
 - By default the app expects `WEAVIATE_URL=http://weaviate:8080` and `OLLAMA_URL=http://ollama:11434` in Docker. When running fully locally without Docker networking, set them to `http://localhost:8080` and `http://localhost:11434` respectively.
+ - Compose uses service healthchecks; when starting manually, prefer `--wait` to block until ready.
+ - To pin the Ollama image, copy `.env.example` to `.env` and adjust `OLLAMA_IMAGE=ollama/ollama:<version>`.
+ - For tests, use the Makefile harness: `make test-up` (unique project name), `make test-run-integration`, then `make test-down` (tears down with `-v` for the test stack only).
 
 ---
 
