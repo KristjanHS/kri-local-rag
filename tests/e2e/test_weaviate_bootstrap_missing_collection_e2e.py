@@ -14,6 +14,8 @@ from urllib.parse import urlparse
 import pytest
 import weaviate
 
+from tests.conftest import TEST_COLLECTION_NAME
+
 pytestmark = [pytest.mark.slow]
 
 
@@ -46,7 +48,7 @@ def _collection_has_any_objects(client, collection_name: str) -> bool:
 
 def test_bootstrap_creates_missing_collection_and_cleans_example_data(tmp_path, weaviate_compose_up):
     # We'll target the explicit test collection name and local compose port
-    target_collection = "TestCollection"
+    target_collection = TEST_COLLECTION_NAME
     weaviate_url = "http://localhost:8080"
 
     with _env_vars({"WEAVIATE_URL": weaviate_url, "DOCKER_ENV": "", "COLLECTION_NAME": target_collection}):
@@ -78,7 +80,7 @@ def test_bootstrap_creates_missing_collection_and_cleans_example_data(tmp_path, 
             try:
                 client.collections.get(target_collection)
             except Exception as e:  # pragma: no cover - diagnostic in CI
-                pytest.fail(f"Collection 'TestCollection' does not exist after bootstrap: {e}")
+                pytest.fail(f"Collection '{TEST_COLLECTION_NAME}' does not exist after bootstrap: {e}")
 
             # - Example data should have been ingested and then removed, so the
             #   collection should now be empty

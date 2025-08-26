@@ -37,6 +37,9 @@ def test_models_load_from_local_paths_offline(monkeypatch: pytest.MonkeyPatch):
     embed_path = Path(EMBED_MODEL_PATH)
     rerank_path = Path(RERANK_MODEL_PATH)
 
+    # Local runs use the same model paths as container runs.
+    # If paths are absent, skip and instruct to set EMBED_MODEL_PATH/RERANK_MODEL_PATH.
+
     if not embed_path.exists() or not rerank_path.exists():
         pytest.skip("Local baked model paths not present; run inside Docker image with baked models.")
 

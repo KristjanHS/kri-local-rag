@@ -78,6 +78,57 @@ act workflow_dispatch -j pyright
 ./scripts/cleanup_docker_and_ci_cache.sh --restart-docker --builder-prune
 ```
 
+## Pre-commit Framework
+
+This project uses a comprehensive pre-commit framework for code quality, formatting, and security scanning.
+
+### Quick Setup
+```bash
+./scripts/setup-pre-commit.sh
+```
+
+### Included Tools
+
+- **Ruff**: Python linting and formatting
+- **YAMLfmt**: YAML file formatting
+- **Actionlint**: GitHub Actions validation
+- **Hadolint**: Dockerfile validation
+- **Bandit**: Python security scanning
+- **Pyright**: Static type checking
+- **Detect-secrets**: Secrets detection with baseline tracking
+
+### Usage
+
+**Automatic**: Hooks run on every `git commit`:
+```bash
+git add .
+git commit -m "Your commit message"
+```
+
+**Manual**: Run all hooks or specific ones:
+```bash
+pre-commit run --all-files
+pre-commit run ruff
+pre-commit run detect-secrets
+```
+
+### Configuration Files
+- `.pre-commit-config.yaml`: Main configuration
+- `.secrets.baseline`: Known secrets tracking
+- `scripts/git-hooks/pre-commit`: Git hook script
+
+### Troubleshooting
+```bash
+# Install pre-commit
+.venv/bin/python -m pip install pre-commit
+
+# Update hooks
+pre-commit autoupdate
+
+# Fix common issues
+ruff check . --fix
+```
+
 ## Release Process
 
 ### Promote `dev` to `main`

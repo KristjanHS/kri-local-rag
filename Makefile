@@ -50,6 +50,9 @@ build-if-needed:
 		echo "Build deps changed; rebuilding images..."; \
 		DOCKER_BUILDKIT=1 $(COMPOSE) -p "$(RUN_ID)" build 2>&1 \
 		  | tee $(LOG_DIR)/test-build-$(RUN_ID).log; \
+		# Update stable symlink and prune older test-build logs (keep latest 5) \
+		ln -sf "test-build-$(RUN_ID).log" "$(LOG_DIR)/test-build.log"; \
+		ls -1t $(LOG_DIR)/test-build-*.log 2>/dev/null | tail -n +6 | xargs -r rm --; \
 		echo $$NEW_HASH > $(BUILD_HASH_FILE); \
 	else \
 		echo "Build deps unchanged; skipping 'docker compose build'."; \
