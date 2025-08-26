@@ -148,6 +148,15 @@ def test_file_logging_uses_timed_rotation_when_env_set(monkeypatch, tmp_path):
     rotating_handlers = [h for h in handlers if h.__class__.__name__ == "TimedRotatingFileHandler"]
     assert len(rotating_handlers) == 1, "TimedRotatingFileHandler should be configured when APP_LOG_DIR is set"
 
+    # Verify backupCount is set correctly from environment variable
+    from logging.handlers import TimedRotatingFileHandler
+
+    rotating_handler = rotating_handlers[0]
+    assert isinstance(rotating_handler, TimedRotatingFileHandler)
+    assert rotating_handler.backupCount == 5, (
+        "backupCount should be set to 5 from APP_LOG_BACKUP_COUNT environment variable"
+    )
+
     # Write a message to ensure file exists
     root_logger.info("rotation smoke")
     assert (tmp_path / "rag_system.log").exists(), "rag_system.log should be created"

@@ -11,6 +11,7 @@ os.environ["LOG_LEVEL"] = "DEBUG"
 from backend.config import get_logger
 from backend.console import console
 from backend.retriever import get_top_k
+from tests.conftest import TEST_COLLECTION_NAME
 
 
 def test_weaviate_debug(weaviate_client, clean_test_collection, sample_documents_path):
@@ -23,7 +24,7 @@ def test_weaviate_debug(weaviate_client, clean_test_collection, sample_documents
     embedding_model = _get_embedding_model()
     ingest.ingest(
         directory=sample_documents_path,
-        collection_name="TestCollection",
+        collection_name=TEST_COLLECTION_NAME,
         weaviate_client=weaviate_client,
         embedding_model=embedding_model,
     )
@@ -45,7 +46,7 @@ def test_weaviate_debug(weaviate_client, clean_test_collection, sample_documents
 
     for i, question in enumerate(test_questions, 1):
         console.print(f"--- Test Query {i}: '{question}' ---")
-        chunks = get_top_k(question, k=3, collection_name="TestCollection")
+        chunks = get_top_k(question, k=3, collection_name=TEST_COLLECTION_NAME)
         console.print(f"Found {len(chunks)} chunks")
         assert len(chunks) > 0, "Expected at least one retrieved chunk"
         if chunks:
