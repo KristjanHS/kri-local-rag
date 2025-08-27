@@ -27,10 +27,16 @@ def get_weaviate_client() -> weaviate.WeaviateClient:
     if _client is not None:
         return _client
 
-    # Resolve URL from centralized config (with localhost defaults)
+    # Resolve URL from centralized config (preserves Docker service names vs localhost)
     parsed_url = urlparse(WEAVIATE_URL)
-    http_host = parsed_url.hostname or "localhost"
-    grpc_host = parsed_url.hostname or "localhost"
+    hostname = parsed_url.hostname
+
+    # Ensure we have a valid hostname (handles Docker service names and localhost)
+    if not hostname:
+        hostname = "localhost"
+
+    http_host = hostname
+    grpc_host = hostname
 
     try:
         logger.info(f"Connecting to Weaviate at {WEAVIATE_URL}")
