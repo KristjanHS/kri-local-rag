@@ -25,13 +25,6 @@ def test_e2e_ingest_with_heavy_optimizations_into_real_weaviate(caplog, weaviate
 
     collection_name = TEST_COLLECTION_NAME
 
-    # Clean up any existing collection before test
-    try:
-        if weaviate_client.collections.exists(collection_name):
-            weaviate_client.collections.delete(collection_name)
-    except Exception:
-        pass  # Ignore cleanup errors
-
     data_dir = os.path.join("test_data")
     embedding_model = _get_embedding_model()
     ingest.ingest(
@@ -54,10 +47,3 @@ def test_e2e_ingest_with_heavy_optimizations_into_real_weaviate(caplog, weaviate
 
     msgs = [rec.getMessage() for rec in caplog.records if rec.name == "backend.ingest"]
     assert any("torch.compile optimization completed" in m for m in msgs)
-
-    # Clean up collection after test
-    try:
-        if weaviate_client.collections.exists(collection_name):
-            weaviate_client.collections.delete(collection_name)
-    except Exception:
-        pass  # Ignore cleanup errors
