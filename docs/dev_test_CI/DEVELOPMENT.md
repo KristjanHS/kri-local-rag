@@ -117,7 +117,7 @@ export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu      # default
 # export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu121   # CUDA 12.1
 # export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/rocm6.1 # ROCm 6.1
 
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -r requirements-dev.txt
 ```
 
 - Quick smoke test of image:

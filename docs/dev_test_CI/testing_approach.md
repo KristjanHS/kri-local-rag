@@ -41,7 +41,7 @@ Integration test utilities are centralized in `tests/integration/conftest.py` to
 
 ### Core Utility Functions
 
-- **`get_service_url(service)`**: Resolves service URLs based on `TEST_DOCKER` environment variable
+- **`get_service_url(service)`**: Resolves service URLs from `OLLAMA_URL`/`WEAVIATE_URL` with localhost fallbacks
 - **`is_service_healthy(service)`**: Performs HTTP health checks for services (Weaviate, Ollama)
 - **`get_available_services()`**: Returns a dictionary of service availability status
 
@@ -61,6 +61,10 @@ from tests.integration.conftest import (
 def get_service_url(service):  # Duplicate implementation
     # ... implementation
 ```
+
+Note:
+- **Implementation source**: `get_service_url` lives in `backend/config.py` and is imported into `tests/integration/conftest.py`.
+- **Configuration**: Health endpoints and timeouts are read from `pyproject.toml` under the `[tool.integration]` section.
 
 ### Example: Integration Environment Checker
 

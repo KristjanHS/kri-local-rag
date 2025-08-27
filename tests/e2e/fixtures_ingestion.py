@@ -6,14 +6,13 @@ Weaviate/Ollama and data ingestion.
 
 import logging
 from pathlib import Path
-from urllib.parse import urlparse
 
 import pytest
-import weaviate
 
-from backend.config import COLLECTION_NAME, WEAVIATE_URL
+from backend.config import COLLECTION_NAME
 from backend.ingest import ingest
 from backend.qa_loop import ensure_weaviate_ready_and_populated
+from backend.weaviate_client import close_weaviate_client, get_weaviate_client
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,15 +30,7 @@ def docker_services_ready(weaviate_compose_up, ollama_compose_up):
     try:
         ensure_weaviate_ready_and_populated()
 
-        parsed = urlparse(WEAVIATE_URL)
-        client = weaviate.connect_to_custom(
-            http_host=parsed.hostname or "localhost",
-            http_port=parsed.port or 80,
-            grpc_host=parsed.hostname or "localhost",
-            grpc_port=50051,
-            http_secure=parsed.scheme == "https",
-            grpc_secure=parsed.scheme == "https",
-        )
+        client = get_weaviate_client()
         try:
             collection_exists = client.collections.exists(COLLECTION_NAME)
             has_data = False
@@ -67,7 +58,7 @@ def docker_services_ready(weaviate_compose_up, ollama_compose_up):
             else:
                 logger.info(f"--- Weaviate collection '{COLLECTION_NAME}' already populated. Skipping ingestion. ---")
         finally:
-            client.close()
+            close_weaviate_client()
 
         logger.info("--- All services are ready for tests. ---")
 

@@ -36,7 +36,6 @@ from backend.config import (
     HF_CACHE_DIR,
     WEAVIATE_BATCH_SIZE,
     WEAVIATE_CONCURRENT_REQUESTS,
-    WEAVIATE_URL,
     get_logger,
 )
 
@@ -54,6 +53,8 @@ def _get_weaviate_url() -> str:
 
     # Use the configured URL but replace hostname if needed
     from urllib.parse import urlparse, urlunparse
+
+    from backend.config import WEAVIATE_URL
 
     parsed_url = urlparse(WEAVIATE_URL)
 
@@ -148,24 +149,13 @@ def load_and_split_documents(path: str) -> List[Document]:
     return chunked_docs
 
 
-from urllib.parse import urlparse
+from backend.weaviate_client import get_weaviate_client
 
 
-def connect_to_weaviate() -> weaviate.WeaviateClient:
-    """Connect to the Weaviate instance."""
-    weaviate_url = _get_weaviate_url()
-    logger.info(f"Connecting to Weaviate at {weaviate_url}...")
-    parsed_url = urlparse(weaviate_url)
-    client = weaviate.connect_to_custom(
-        http_host=parsed_url.hostname or "localhost",
-        http_port=parsed_url.port or 80,
-        grpc_host=parsed_url.hostname or "localhost",
-        grpc_port=50051,
-        http_secure=parsed_url.scheme == "https",
-        grpc_secure=parsed_url.scheme == "https",
-    )
-    logger.info("Connection successful.")
-    return client
+def connect_to_weaviate():
+    """Deprecated: use backend.weaviate_client.get_weaviate_client instead."""
+    # Maintain backward compatibility for any external scripts
+    return get_weaviate_client()
 
 
 def _safe_created_at(source_path: Optional[str]) -> str:

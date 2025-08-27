@@ -11,6 +11,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.config import get_service_url
+from backend.weaviate_client import (
+    close_weaviate_client,
+    get_weaviate_client,
+)
 
 
 def get_integration_config() -> dict[str, Any]:
@@ -154,28 +158,38 @@ def pytest_collection_modifyitems(config, items):
 
 
 def connect_to_weaviate_with_fallback(headers: dict[str, str] | None = None):
-    """Connect to Weaviate using environment-appropriate settings."""
-    import weaviate
+    """Connect to Weaviate using centralized wrapper with health check.
 
+    Note: headers are currently unused by the wrapper but kept for API compatibility.
+    """
     if not is_service_healthy("weaviate"):
         weaviate_url = get_service_url("weaviate")
         raise ConnectionError(f"Weaviate not healthy at {weaviate_url}")
 
-    weaviate_url = get_service_url("weaviate")
-    hostname = weaviate_url.replace("http://", "").replace(":8080", "")
+    # Use centralized wrapper (provides caching and unified config)
+    return get_weaviate_client()
 
+
+@pytest.fixture(autouse=True)
+def _close_weaviate_wrapper_after_each_test():
+    """Ensure wrapper cache does not leak across tests."""
+    # Pre-emptively clear any cached client before running the test
+    close_weaviate_client()
     try:
-        return weaviate.connect_to_custom(
-            http_host=hostname,
-            http_port=8080,
-            grpc_host=hostname,
-            grpc_port=50051,
-            http_secure=False,
-            grpc_secure=False,
-            headers=headers,
-        )
-    except Exception as e:
-        raise ConnectionError(f"Failed to connect to Weaviate: {e}") from e
+        yield
+    finally:
+        # Always close and clear the cached client after the test
+        close_weaviate_client()
+
+
+@pytest.fixture
+def weaviate_client():
+    """Provide a client via the wrapper and ensure cleanup after use."""
+    client = get_weaviate_client()
+    try:
+        yield client
+    finally:
+        close_weaviate_client()
 
 
 def get_available_services() -> dict[str, bool]:
