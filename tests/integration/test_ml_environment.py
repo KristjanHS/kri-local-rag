@@ -3,11 +3,9 @@ import logging
 import pytest
 import torch
 
-# Mark the entire module as 'slow' (no environment marker needed)
-pytestmark = pytest.mark.slow
-
+# Integration tests for ML environment validation
 # --- Constants for ML Environment Validation ---
-from backend.config import DEFAULT_EMBEDDING_MODEL
+from backend.config import DEFAULT_EMBEDDING_MODEL, TRANSFORMERS_OFFLINE
 
 EXPECTED_MODEL_NAME = DEFAULT_EMBEDDING_MODEL
 
@@ -19,20 +17,23 @@ logger = logging.getLogger(__name__)
 @pytest.fixture(scope="session")
 def cached_sentence_transformer_model():
     """
-    Downloads and caches the SentenceTransformer model for the entire test session.
-    This avoids re-downloading the model for each test function.
+    Loads the SentenceTransformer model using the centralized loading function.
+    Works in both online and offline modes.
     """
-    from sentence_transformers import SentenceTransformer
+    from backend.models import load_model
 
-    logger.info(
-        f"--- Downloading and caching SentenceTransformer model: '{EXPECTED_MODEL_NAME}' for the session... ---"
-    )
     try:
-        model = SentenceTransformer(EXPECTED_MODEL_NAME, device="cpu")
-        logger.info("--- Model cached successfully. ---")
+        model = load_model(EXPECTED_MODEL_NAME, is_embedding=True)
+        logger.info("--- Model loaded successfully ---")
         return model
     except Exception as e:
-        pytest.fail(f"Failed to download or cache SentenceTransformer model. Error: {e}")
+        if TRANSFORMERS_OFFLINE:
+            pytest.fail(
+                f"INTEGRATION TEST FAILURE: No cached model available for '{EXPECTED_MODEL_NAME}' "
+                f"and TRANSFORMERS_OFFLINE=1 prevents downloads."
+            )
+        else:
+            pytest.fail(f"Failed to load model '{EXPECTED_MODEL_NAME}': {e}")
 
 
 def test_pytorch_is_cpu_only():

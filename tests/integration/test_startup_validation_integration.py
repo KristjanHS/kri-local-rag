@@ -91,7 +91,6 @@ class TestHybridSearchIntegration:
         assert result == ["Test content 1", "Test content 2"]
 
 
-@pytest.mark.slow
 class TestContainerReadiness:
     """Integration tests for container readiness and CLI behaviors."""
 

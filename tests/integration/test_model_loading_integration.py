@@ -14,8 +14,6 @@ from unittest.mock import patch
 
 import pytest
 
-pytestmark = [pytest.mark.slow, pytest.mark.integration]
-
 from backend.config import get_logger
 from backend.models import load_embedder, load_reranker, preload_models
 
@@ -330,10 +328,9 @@ def test_model_loading_error_handling(reset_global_cache):
 
     # Test with completely invalid model configuration that will definitely fail
     with patch("backend.models.EMBEDDING_MODEL", "definitely-invalid-model-name-that-cannot-exist"):
-        with patch("backend.models.EMBED_MODEL_PATH", "/completely/nonexistent/path/to/model"):
-            # This should raise an exception because the model name is invalid and no local model exists
-            with pytest.raises(Exception) as exc_info:
-                load_embedder()
+        # This should raise an exception because the model name is invalid
+        with pytest.raises(Exception) as exc_info:
+            load_embedder()
 
             # Should raise some kind of error
             assert exc_info.value is not None, "Should raise an error for invalid model configuration"

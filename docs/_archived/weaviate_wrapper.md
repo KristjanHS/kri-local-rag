@@ -106,14 +106,14 @@ To avoid compounding errors, we’ll first stabilize the test environment and mo
     - `.venv/bin/python -m pytest tests/integration -q -m 'not slow'`
     - `.venv/bin/python -m pytest tests/e2e -q` (optional; requires Docker)
 
-- [ ] 8) Cleanups and hardening
+- [x] 8) Cleanups and hardening
   - Remove now-unused helpers (e.g., `ingest._get_weaviate_url` if fully superseded).
   - Add a reusable fake-client fixture for unit tests to reduce per-test mocking.
   - Final checks:
     - `.venv/bin/python -m ruff check . --fix && .venv/bin/python -m ruff format .`
     - `.venv/bin/python -m pyright .`
     - `.venv/bin/python -m pytest tests/unit -q`
-    - `.venv/bin/python -m pytest tests/integration -q -m 'not slow'`
+    - `.venv/bin/python -m pytest tests/integration -q`
 
 ### Notes
 

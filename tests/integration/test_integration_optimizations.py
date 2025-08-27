@@ -33,7 +33,7 @@ def clean_environment():
     """
     # Save original environment state
     original_env = {}
-    env_vars_to_restore = ["INTEGRATION_TEST_MODE", "MODEL_LOAD_TIMEOUT", "LOCAL_CACHE_PRIORITY", "HF_HOME"]
+    env_vars_to_restore = ["MODEL_LOAD_TIMEOUT", "LOCAL_CACHE_PRIORITY", "HF_HOME"]
 
     for var in env_vars_to_restore:
         original_env[var] = os.environ.get(var)
@@ -73,15 +73,14 @@ def reset_models_cache():
     backend.models._cross_encoder = None
 
 
-def test_integration_test_mode_configuration(clean_environment, reset_models_cache):
+def test_model_loading_configuration(clean_environment, reset_models_cache):
     """
-    Test that integration test mode can be enabled and configured via environment variables.
+    Test that model loading configuration works correctly via environment variables.
 
-    This test validates the configuration system that controls integration test behavior,
-    ensuring environment variables properly override defaults and the system responds
-    correctly to configuration changes.
+    This test validates that environment variables can override default
+    configuration values for model loading behavior.
     """
-    logger.info("Testing integration test mode configuration...")
+    logger.info("Testing model loading configuration...")
 
     # Import fresh module to get default values
     import backend.models
@@ -89,9 +88,6 @@ def test_integration_test_mode_configuration(clean_environment, reset_models_cac
     importlib.reload(backend.models)
 
     # Test default values
-    assert backend.models.INTEGRATION_TEST_MODE is False, (
-        f"Expected INTEGRATION_TEST_MODE to be False by default, got {backend.models.INTEGRATION_TEST_MODE}"
-    )
     assert backend.models.MODEL_LOAD_TIMEOUT == 30.0, (
         f"Expected MODEL_LOAD_TIMEOUT to be 30.0 by default, got {backend.models.MODEL_LOAD_TIMEOUT}"
     )
@@ -101,7 +97,6 @@ def test_integration_test_mode_configuration(clean_environment, reset_models_cac
     logger.info("✓ Default configuration values validated")
 
     # Test environment variable configuration
-    os.environ["INTEGRATION_TEST_MODE"] = "true"
     os.environ["MODEL_LOAD_TIMEOUT"] = "60.0"
     os.environ["LOCAL_CACHE_PRIORITY"] = "false"
 
@@ -109,9 +104,6 @@ def test_integration_test_mode_configuration(clean_environment, reset_models_cac
     importlib.reload(backend.models)
 
     # Verify environment variables override defaults
-    assert backend.models.INTEGRATION_TEST_MODE is True, (
-        f"Expected INTEGRATION_TEST_MODE to be True after env var set, got {backend.models.INTEGRATION_TEST_MODE}"
-    )
     assert backend.models.MODEL_LOAD_TIMEOUT == 60.0, (
         f"Expected MODEL_LOAD_TIMEOUT to be 60.0 after env var set, got {backend.models.MODEL_LOAD_TIMEOUT}"
     )
@@ -121,46 +113,35 @@ def test_integration_test_mode_configuration(clean_environment, reset_models_cac
     logger.info("✓ Environment variable configuration override validated")
 
     # Test boolean parsing edge cases
-    os.environ["INTEGRATION_TEST_MODE"] = "false"
     os.environ["LOCAL_CACHE_PRIORITY"] = "0"
 
     importlib.reload(backend.models)
 
-    assert backend.models.INTEGRATION_TEST_MODE is False, (
-        f"Expected INTEGRATION_TEST_MODE to be False when set to 'false', got {backend.models.INTEGRATION_TEST_MODE}"
-    )
     assert backend.models.LOCAL_CACHE_PRIORITY is False, (
         f"Expected LOCAL_CACHE_PRIORITY to be False when set to '0', got {backend.models.LOCAL_CACHE_PRIORITY}"
     )
     logger.info("✓ Boolean parsing edge cases validated")
 
-    logger.info("✓ Integration test mode configuration test completed successfully")
+    logger.info("✓ Model loading configuration test completed successfully")
 
 
-def test_cache_priority_logic_integration_test_mode(clean_environment, reset_models_cache, integration_model_cache):
+def test_cache_priority_logic_configuration(clean_environment, reset_models_cache, integration_model_cache):
     """
-    Test that cache priority logic works correctly in integration test mode.
+    Test that cache priority logic works correctly with environment configuration.
 
-    This test validates that the cache priority system functions properly within
-    the existing integration test infrastructure. It uses the session-level cache
-    setup and tests that the configuration and functions work as expected.
+    This test validates that the cache priority system functions properly and
+    that environment variables can control cache behavior.
     """
-    logger.info("Testing cache priority logic in integration test mode...")
+    logger.info("Testing cache priority logic configuration...")
 
-    # Enable integration test mode
-    os.environ["INTEGRATION_TEST_MODE"] = "true"
-
-    # Reload module to pick up environment changes
+    # Test with default LOCAL_CACHE_PRIORITY
     import backend.models
 
     importlib.reload(backend.models)
 
-    # Verify integration test mode is active
-    assert backend.models.INTEGRATION_TEST_MODE is True, (
-        f"Expected INTEGRATION_TEST_MODE to be True, got {backend.models.INTEGRATION_TEST_MODE}"
-    )
+    # Verify default LOCAL_CACHE_PRIORITY is True
     assert backend.models.LOCAL_CACHE_PRIORITY is True, (
-        f"Expected LOCAL_CACHE_PRIORITY to be True, got {backend.models.LOCAL_CACHE_PRIORITY}"
+        f"Expected LOCAL_CACHE_PRIORITY to be True by default, got {backend.models.LOCAL_CACHE_PRIORITY}"
     )
 
     # Verify HF_CACHE_DIR is properly set (should be the integration test cache directory)
@@ -185,7 +166,7 @@ def test_cache_priority_logic_integration_test_mode(clean_environment, reset_mod
     assert os.path.exists(backend.models.HF_CACHE_DIR), f"Cache directory should exist: {backend.models.HF_CACHE_DIR}"
     logger.info("✓ Cache directory existence validated")
 
-    logger.info("✓ Cache priority logic in integration test mode validated successfully")
+    logger.info("✓ Cache priority logic configuration validated successfully")
 
 
 def test_timeout_functionality_configuration(clean_environment, reset_models_cache):
@@ -197,8 +178,7 @@ def test_timeout_functionality_configuration(clean_environment, reset_models_cac
     """
     logger.info("Testing timeout functionality configuration...")
 
-    # Enable integration test mode with custom timeout
-    os.environ["INTEGRATION_TEST_MODE"] = "true"
+    # Set custom timeout
     os.environ["MODEL_LOAD_TIMEOUT"] = "45.5"
 
     # Reload module to pick up environment changes
@@ -207,9 +187,6 @@ def test_timeout_functionality_configuration(clean_environment, reset_models_cac
     importlib.reload(backend.models)
 
     # Verify timeout configuration
-    assert backend.models.INTEGRATION_TEST_MODE is True, (
-        f"Expected INTEGRATION_TEST_MODE to be True, got {backend.models.INTEGRATION_TEST_MODE}"
-    )
     assert backend.models.MODEL_LOAD_TIMEOUT == 45.5, (
         f"Expected MODEL_LOAD_TIMEOUT to be 45.5, got {backend.models.MODEL_LOAD_TIMEOUT}"
     )
@@ -249,20 +226,15 @@ def test_environment_variable_precedence(clean_environment, reset_models_cache):
 
     importlib.reload(backend.models)
 
-    default_integration_mode = backend.models.INTEGRATION_TEST_MODE
     default_timeout = backend.models.MODEL_LOAD_TIMEOUT
     default_cache_priority = backend.models.LOCAL_CACHE_PRIORITY
 
     # Test 2: Set environment variables and verify they override defaults
-    os.environ["INTEGRATION_TEST_MODE"] = "true"
     os.environ["MODEL_LOAD_TIMEOUT"] = "90.0"
     os.environ["LOCAL_CACHE_PRIORITY"] = "false"
 
     importlib.reload(backend.models)
 
-    assert backend.models.INTEGRATION_TEST_MODE != default_integration_mode, (
-        "Environment variable should override default for INTEGRATION_TEST_MODE"
-    )
     assert backend.models.MODEL_LOAD_TIMEOUT != default_timeout, (
         "Environment variable should override default for MODEL_LOAD_TIMEOUT"
     )
@@ -271,15 +243,11 @@ def test_environment_variable_precedence(clean_environment, reset_models_cache):
     )
 
     # Test 3: Clear environment variables and verify defaults are restored
-    os.environ.pop("INTEGRATION_TEST_MODE", None)
     os.environ.pop("MODEL_LOAD_TIMEOUT", None)
     os.environ.pop("LOCAL_CACHE_PRIORITY", None)
 
     importlib.reload(backend.models)
 
-    assert backend.models.INTEGRATION_TEST_MODE == default_integration_mode, (
-        "Default should be restored when environment variable is removed"
-    )
     assert backend.models.MODEL_LOAD_TIMEOUT == default_timeout, (
         "Default should be restored when environment variable is removed"
     )
@@ -299,7 +267,8 @@ def test_configuration_validation_edge_cases(clean_environment, reset_models_cac
     """
     logger.info("Testing configuration validation edge cases...")
 
-    test_cases = [
+    # Test boolean parsing for LOCAL_CACHE_PRIORITY
+    boolean_test_cases = [
         # (env_value, expected_result, test_description)
         ("true", True, "lowercase true"),
         ("TRUE", True, "uppercase TRUE"),
@@ -310,23 +279,18 @@ def test_configuration_validation_edge_cases(clean_environment, reset_models_cac
         ("", False, "empty string"),
     ]
 
-    for env_value, expected, description in test_cases:
-        os.environ["INTEGRATION_TEST_MODE"] = env_value
+    for env_value, expected, description in boolean_test_cases:
         os.environ["LOCAL_CACHE_PRIORITY"] = env_value
 
         import backend.models
 
         importlib.reload(backend.models)
 
-        assert backend.models.INTEGRATION_TEST_MODE == expected, (
-            f"INTEGRATION_TEST_MODE should be {expected} for {description}, got {backend.models.INTEGRATION_TEST_MODE}"
-        )
         assert backend.models.LOCAL_CACHE_PRIORITY == expected, (
             f"LOCAL_CACHE_PRIORITY should be {expected} for {description}, got {backend.models.LOCAL_CACHE_PRIORITY}"
         )
 
         # Clean up for next iteration
-        os.environ.pop("INTEGRATION_TEST_MODE", None)
         os.environ.pop("LOCAL_CACHE_PRIORITY", None)
 
     # Test numeric timeout values

@@ -51,9 +51,9 @@ def _get_embedding_model(model_name: str | None = None) -> Any:
     try:
         if model_name is not None:
             # For testing - load specific model without using global cache
-            from backend.models import load_embedder_with_model
+            from backend.models import load_model
 
-            return load_embedder_with_model(model_name)
+            return load_model(model_name, is_embedding=True)
 
         # Use cached model if available
         if _embedding_model is None:
