@@ -22,24 +22,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# ---------- Models stage: fetch pinned model snapshots ----------
-FROM python:3.12.3-slim AS models
-
-# Install minimal dependencies for model downloading
-RUN pip install --no-cache-dir pip==24.2 \
-    && pip install --no-cache-dir huggingface_hub==0.34.4
-
-# Download models with pinned commits
-ARG EMBEDDING_MODEL EMBED_COMMIT RERANK_MODEL RERANK_COMMIT
-ENV EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
-ENV RERANK_MODEL=${RERANK_MODEL:-cross-encoder/ms-marco-MiniLM-L-6-v2}
-ENV EMBED_COMMIT=${EMBED_COMMIT}
-ENV RERANK_COMMIT=${RERANK_COMMIT}
-
-COPY scripts/download_models.py /tmp/download_models.py
-RUN mkdir -p /models/emb /models/rerank \
-    && python /tmp/download_models.py \
-    && rm /tmp/download_models.py
+# ---------- Models downloaded at runtime using HuggingFace caching ----------
 
 # ---------- Builder stage: resolve and install Python deps + package into a venv ----------
 FROM python:3.12.3-slim AS builder
@@ -48,9 +31,6 @@ ENV VENV_PATH=/opt/venv
 ARG TORCH_WHEEL_INDEX=https://download.pytorch.org/whl/cpu
 ENV PIP_EXTRA_INDEX_URL=${TORCH_WHEEL_INDEX}
 WORKDIR /app
-
-# Copy downloaded models from models stage
-COPY --from=models /models /models
 
 # Copy only files needed for package installation (not mounted app code)
 COPY requirements.txt ./
@@ -93,9 +73,6 @@ WORKDIR /app
 # Bring in the prebuilt virtualenv from the builder stage
 COPY --from=builder ${VENV_PATH} ${VENV_PATH}
 
-# Copy downloaded models from the builder stage
-COPY --from=builder /models /models
-
 # Copy application assets that are not part of the Python package
 COPY frontend/ /app/frontend/
 COPY example_data/ /app/example_data/
@@ -105,11 +82,7 @@ ENV OMP_NUM_THREADS=6
 ENV MKL_NUM_THREADS=6
 ENV DNNL_PRIMITIVE_CACHE_CAPACITY=1024
 
-# Model configuration for offline-first operation (production defaults - Production must enforce offline mode for security and reliability
-ENV TRANSFORMERS_OFFLINE=1
-ENV SENTENCE_TRANSFORMERS_HOME=/models
-ENV EMBED_MODEL_PATH=/models/emb
-ENV RERANK_MODEL_PATH=/models/rerank
+# Model caching configuration
 ENV HF_HOME=/data/hf
 
 EXPOSE 8501
@@ -117,7 +90,7 @@ EXPOSE 8501
 # Create non-root user and directories, and set permissions
 RUN useradd -ms /bin/bash appuser \
     && mkdir -p backend frontend data logs /data/hf \
-    && chown -R appuser:appuser /app /data /models
+    && chown -R appuser:appuser /app /data
 
 USER appuser
 
@@ -130,9 +103,6 @@ ENV VENV_PATH=/opt/venv
 ARG TORCH_WHEEL_INDEX=https://download.pytorch.org/whl/cpu
 ENV PIP_EXTRA_INDEX_URL=${TORCH_WHEEL_INDEX}
 WORKDIR /app
-
-# Copy downloaded models from models stage for testing
-COPY --from=models /models /models
 
 # Copy only files needed for package installation (not mounted app code)
 COPY requirements.txt ./
@@ -169,19 +139,11 @@ WORKDIR /app
 # Bring in the prebuilt virtualenv from the builder-test stage
 COPY --from=builder-test ${VENV_PATH} ${VENV_PATH}
 
-# Copy downloaded models from the builder-test stage for testing
-COPY --from=builder-test /models /models
-
 # Copy static assets (these will be overridden by volume mounts in development)
 COPY example_data/ /app/example_data/
 
-# Model configuration for flexible testing (supports both offline and online modes)
-# Tests can override these environment variables as needed
-ENV SENTENCE_TRANSFORMERS_HOME=/models
-ENV EMBED_MODEL_PATH=/models/emb
-ENV RERANK_MODEL_PATH=/models/rerank
+# Model caching for testing
 ENV HF_HOME=/data/hf
-# Leave TRANSFORMERS_OFFLINE unset by default for flexible testing
 
 # Create directories and set up user
 RUN mkdir -p backend frontend tests data logs \
