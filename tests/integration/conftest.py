@@ -343,3 +343,15 @@ def mock_httpx_get(monkeypatch):
     mock_func = MagicMock()
     monkeypatch.setattr("backend.ollama_client.httpx.get", mock_func)
     return mock_func
+
+
+@pytest.fixture
+def clean_test_collection():
+    """Provide the test collection name.
+
+    The weaviate_client fixture already handles collection cleanup.
+    This fixture simply provides the collection name for tests that expect it.
+    """
+    from tests.conftest import TEST_COLLECTION_NAME
+
+    return TEST_COLLECTION_NAME

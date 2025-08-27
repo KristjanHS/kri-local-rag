@@ -38,41 +38,6 @@ from backend.config import (
     WEAVIATE_CONCURRENT_REQUESTS,
     get_logger,
 )
-
-
-def _get_weaviate_url() -> str:
-    """
-    Get the appropriate Weaviate URL based on the current environment.
-
-    Returns:
-        str: Weaviate URL with appropriate hostname for current environment
-    """
-    from backend.config import is_running_in_docker
-
-    is_docker = is_running_in_docker()
-
-    # Use the configured URL but replace hostname if needed
-    from urllib.parse import urlparse, urlunparse
-
-    from backend.config import WEAVIATE_URL
-
-    parsed_url = urlparse(WEAVIATE_URL)
-
-    if is_docker and parsed_url.hostname == "localhost":
-        # Replace localhost with weaviate hostname when in Docker
-        new_netloc = parsed_url.netloc.replace("localhost", "weaviate")
-        new_parsed = parsed_url._replace(netloc=new_netloc)
-        return urlunparse(new_parsed)
-    elif not is_docker and parsed_url.hostname == "weaviate":
-        # Replace weaviate with localhost when running locally
-        new_netloc = parsed_url.netloc.replace("weaviate", "localhost")
-        new_parsed = parsed_url._replace(netloc=new_netloc)
-        return urlunparse(new_parsed)
-    else:
-        # URL is already appropriate for the environment
-        return WEAVIATE_URL
-
-
 from backend.vector_utils import to_float_list
 
 # --- Logging Setup ---

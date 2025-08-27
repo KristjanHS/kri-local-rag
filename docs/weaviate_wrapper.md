@@ -37,14 +37,14 @@ To avoid compounding errors, we’ll first stabilize the test environment and mo
   - [x] Ensure `tests/e2e/*` use the wrapper and close it in teardown.
   - [x] Verify: `.venv/bin/python -m pytest tests/e2e -q`
 
-- [ ] 7) Cleanups and final checks
-  - [ ] Remove `ingest._get_weaviate_url` once wrapper normalization is in place.
-  - [ ] Verify:
-    - [ ] `.venv/bin/python -m ruff check . --fix && .venv/bin/python -m ruff format .`
-    - [ ] `.venv/bin/python -m pyright .`
-    - [ ] `.venv/bin/python -m pytest tests/unit -q`
-    - [ ] `.venv/bin/python -m pytest tests/integration -q`
-    - [ ] `.venv/bin/python -m pytest tests/e2e -q`
+- [x] 7) Cleanups and final checks
+  - [x] Remove `ingest._get_weaviate_url` once wrapper normalization is in place.
+  - [x] Verify:
+    - [x] `.venv/bin/python -m ruff check . --fix && .venv/bin/python -m ruff format .`
+    - [x] `.venv/bin/python -m pyright .`
+    - [x] `.venv/bin/python -m pytest tests/unit -q`
+    - [x] `.venv/bin/python -m pytest tests/integration -q`
+    - [x] `.venv/bin/python -m pytest tests/e2e -q`
 
 ## Weaviate wrapper refactor plan (incremental with test checkpoints)
 
