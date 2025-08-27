@@ -100,6 +100,7 @@ def get_top_k(
        (e.g. older Weaviate versions without the hybrid module).
     """
 
+    # Get Weaviate client - note: client is cached and should be closed at application level
     client = get_weaviate_client()
     # Use provided collection_name or fall back to default
     target_collection = collection_name or COLLECTION_NAME

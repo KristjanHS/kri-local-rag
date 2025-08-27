@@ -153,9 +153,12 @@ Repository preparation tasks
   ✓ All 34 integration tests passed successfully
 
 - [x] Verify real CrossEncoder loads and is used for reranking. Requires internet/cache for first run ( TRANSFORMERS_OFFLINE=0 ). Verify exit code 0:
+  ```bash
+  .venv/bin/python -m pytest -q tests/integration/test_cross_encoder_environment.py
+  ```
 
 3.2) Validate external services standalone
-- [ ] Action: Preferred: run the setup script to start and wait for services:
+- [x] Action: Preferred: run the setup script to start and wait for services:
   ```bash
   ./scripts/docker-setup.sh
   ```
@@ -171,7 +174,8 @@ Repository preparation tasks
   docker compose -f docker/docker-compose.yml exec -T ollama ollama list >/dev/null && echo OLLAMA_OK
   ```
   Expect Weaviate readiness JSON and HTTP 200 from Ollama. The models list may be empty if none are pulled yet.
- - [ ] If readiness fails, make activity visible and debug incrementally, then retry the same Verify:
+ - [x] ✓ All services are up and healthy: Weaviate (127.0.0.1:8080), Ollama (127.0.0.1:11434), Streamlit app (8501). Default Ollama model 'cas/mistral-7b-instruct-v0.3' already present.
+ - If readiness fails, make activity visible and debug incrementally, then retry the same Verify:
   ```bash
   # Show status and recent logs
   docker compose -f docker/docker-compose.yml ps
@@ -188,7 +192,7 @@ Repository preparation tasks
   ```
 
 3.3) Backend primitives in isolation (no UI)
-- [ ] Action: Quick Weaviate connect from host Python. Verify prints `is_ready= True`:
+- [x] Action: Quick Weaviate connect from host Python. Verify prints `is_ready= True`:
   ```bash
   .venv/bin/python - <<'PY'
 import os, weaviate
@@ -200,7 +204,7 @@ print('is_ready=', client.is_ready())
 client.close()
 PY
   ```
- - [ ] Action: Confirm Ollama API is reachable (no model pull). Verify HTTP 200 JSON with `models` key:
+ - [x] Action: Confirm Ollama API is reachable (no model pull). Verify HTTP 200 JSON with `models` key:
   ```bash
   # Host → container (container may not have curl installed):
   curl -s -o /dev/null -w "%{http_code}\n" http://localhost:11434/api/tags
@@ -209,14 +213,16 @@ PY
   ```
 
 3.4) Backend modules
-- [ ] Action: Import `backend.retriever` and call minimal retrieval. Verify output is `[]` (no crash):
+- [x] Action: Import `backend.retriever` and call minimal retrieval. Verify output is `[]` (no crash):
   ```bash
   .venv/bin/python - <<'PY'
 from backend.retriever import get_top_k
+from backend.weaviate_client import close_weaviate_client
 print(get_top_k('test', k=1))
+close_weaviate_client()
 PY
   ```
-- [ ] Action: Run `ensure_weaviate_ready_and_populated()`. Verify prints `weaviate ok` and no exception:
+- [x] Action: Run `ensure_weaviate_ready_and_populated()`. Verify prints `weaviate ok` and no exception:
   ```bash
   .venv/bin/python - <<'PY'
 from backend.qa_loop import ensure_weaviate_ready_and_populated
@@ -226,37 +232,54 @@ PY
   ```
 
 3.5) Ingestion minimal path
-- [ ] Action: Ensure a tiny PDF exists. Verify one file present:
+- [x] Action: Ensure a tiny PDF exists. Verify one file present:
   ```bash
   test -f example_data/test.pdf && cp -n example_data/test.pdf data/ || true
   ls -1 data/*.pdf | head -n 1 | cat
   ```
-- [ ] Action: Run ingestion (choose one). Verify exit code 0:
+  ✓ PDF file present: data/210717IS21-FuseAgilityRoadmap.pdf
+- [x] Action: Run ingestion (choose one). Verify exit code 0:
+  *Note: The ingestion process now shows both file count and page count for clarity*
    - Preferred (host, avoids container package drift):
      ```bash
-     .venv/bin/python -m backend.ingest --data-dir data
+     .venv/bin/python -m backend.ingest --data-dir example_data
      ```
    - Example A (helper script; uses a temporary container):
      ```bash
-     ./scripts/ingest.sh data
+     ./scripts/ingest.sh example_data
      ```
    - Example B (compose profile):
      ```bash
-     docker compose -f docker/docker-compose.yml --profile ingest up --build --abort-on-container-exit
+     docker compose -f docker/docker-compose.yml --profile ingest up --abort-on-container-exit
      ```
+     *Note: Only add `--build` flag when you've made code changes that require rebuilding the image*
    - Example C (inside app container):
      ```bash
      docker compose -f docker/docker-compose.yml exec app python -m backend.ingest --data-dir /app/data
      ```
    Notes:
    - If container-based methods error with Python package mismatches (e.g., protobuf), prefer the host method above or rebuild the app image.
-- [ ] Action: Re-run retrieval. Verify non-empty (or still stable with `[]` but no exceptions):
+  ✓ Ingestion completed successfully: 3869 chunks processed and ingested
+- [x] Action: Re-run retrieval. Verify non-empty (or still stable with `[]` but no exceptions):
   ```bash
   .venv/bin/python - <<'PY'
 from backend.retriever import get_top_k
-print(get_top_k('test', k=1))
+from backend.weaviate_client import close_weaviate_client
+
+try:
+    result = get_top_k('test', k=1)
+    print(result)
+finally:
+    # Ensure the client is properly closed to prevent resource leaks
+    close_weaviate_client()
 PY
   ```
+  ✓ Retrieval test successful: Found relevant content from ingested PDF and properly closed Weaviate connection
+
+**Note:** Always use proper connection management when working with Weaviate clients:
+- Wrap Weaviate operations in try/finally blocks
+- Call `close_weaviate_client()` to prevent ResourceWarnings and memory leaks
+- See `backend/weaviate_client.py` for the available management functions
 
 3.6) CLI minimal
 - [ ] Action: Run CLI one-shot in verbose mode (or equivalent). Verify it prints an `Answer:` without stack trace:
