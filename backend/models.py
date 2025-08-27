@@ -9,8 +9,6 @@ Based on models_guide.md recommendations:
 
 from __future__ import annotations
 
-import os
-
 # For manual vectorization - proper type annotations
 from typing import Any
 
@@ -27,9 +25,6 @@ _cross_encoder: Any = None
 # Set up logging for this module
 logger = get_logger(__name__)
 
-# Model loading configuration
-MODEL_LOAD_TIMEOUT = float(os.getenv("MODEL_LOAD_TIMEOUT", "30.0"))  # seconds
-LOCAL_CACHE_PRIORITY = os.getenv("LOCAL_CACHE_PRIORITY", "true").lower() == "true"
 
 # Import model configuration from central config
 from backend.config import (
