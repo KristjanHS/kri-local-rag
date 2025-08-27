@@ -5,7 +5,7 @@ import torch
 
 # Integration tests for ML environment validation
 # --- Constants for ML Environment Validation ---
-from backend.config import DEFAULT_EMBEDDING_MODEL, TRANSFORMERS_OFFLINE
+from backend.config import DEFAULT_EMBEDDING_MODEL
 
 EXPECTED_MODEL_NAME = DEFAULT_EMBEDDING_MODEL
 
@@ -27,13 +27,7 @@ def cached_sentence_transformer_model():
         logger.info("--- Model loaded successfully ---")
         return model
     except Exception as e:
-        if TRANSFORMERS_OFFLINE:
-            pytest.fail(
-                f"INTEGRATION TEST FAILURE: No cached model available for '{EXPECTED_MODEL_NAME}' "
-                f"and TRANSFORMERS_OFFLINE=1 prevents downloads."
-            )
-        else:
-            pytest.fail(f"Failed to load model '{EXPECTED_MODEL_NAME}': {e}")
+        pytest.fail(f"Failed to load model '{EXPECTED_MODEL_NAME}': {e}")
 
 
 def test_pytorch_is_cpu_only():

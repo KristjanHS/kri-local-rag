@@ -31,7 +31,6 @@ else:
 
 # Provide a module-level hook for tests to patch without importing heavy deps.
 # Tests can patch `backend.retriever.SentenceTransformer` directly.
-SentenceTransformer: Any | None = None
 
 # Cache the embedding model instance after first load
 _embedding_model: Any = None

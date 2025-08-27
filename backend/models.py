@@ -1,15 +1,13 @@
 """
-Model loading utilities following best practices for reproducible, offline-capable deployments.
+Simple model loading utilities using HuggingFace's built-in caching mechanism.
 
-Based on models_guide.md recommendations:
-- Offline-first approach with baked models in production
-- Fallback to downloads with pinned commits in development
-- Proper error handling and caching
+This module provides a straightforward way to load and cache ML models:
+- Automatic caching by HuggingFace transformers
+- Module-level caching to avoid reloading
+- Clean error handling and logging
 """
 
 from __future__ import annotations
-
-import os
 
 # For manual vectorization - proper type annotations
 from typing import Any
@@ -27,14 +25,10 @@ _cross_encoder: Any = None
 # Set up logging for this module
 logger = get_logger(__name__)
 
-# Model loading configuration
-MODEL_LOAD_TIMEOUT = float(os.getenv("MODEL_LOAD_TIMEOUT", "30.0"))  # seconds
-LOCAL_CACHE_PRIORITY = os.getenv("LOCAL_CACHE_PRIORITY", "true").lower() == "true"
 
 # Import model configuration from central config
 from backend.config import (
     EMBEDDING_MODEL,
-    HF_CACHE_DIR,
     RERANKER_MODEL,
 )
 
@@ -84,7 +78,6 @@ def get_model_status() -> dict:
     return {
         "embedding_model_cached": _embedding_model is not None,
         "reranker_model_cached": _cross_encoder is not None,
-        "hf_cache_dir": HF_CACHE_DIR,
     }
 
 
@@ -103,12 +96,13 @@ def load_model(model_name: str, is_embedding: bool) -> Any:
         RuntimeError: If model cannot be loaded
     """
     try:
+        logger.info("Loading %s model: %s", "embedding" if is_embedding else "reranker", model_name)
+
         if is_embedding:
-            logger.info("Loading embedding model: %s", model_name)
             return SentenceTransformer(model_name)
         else:
-            logger.info("Loading reranker model: %s", model_name)
             return CrossEncoder(model_name)
+
     except ImportError as e:
         error_msg = "sentence-transformers not available. Install with: pip install sentence-transformers"
         raise RuntimeError(error_msg) from e
