@@ -2,6 +2,26 @@
 # Multi-stage build for smaller, production-focused image
 ##########
 
+# ---------- Base stage: common OS dependencies ----------
+FROM python:3.12.3-slim AS base
+
+# OS runtime dependencies only (no dev/build tools)
+# Use pinned versions for better reproducibility while maintaining security
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
+    wget=1.21.3-1+deb12u1 \
+    libmagic1=1:5.44-3 \
+    poppler-utils=22.12.0-2+deb12u1 \
+    tesseract-ocr=5.3.0-2 \
+    tesseract-ocr-eng=1:4.1.0-2 \
+    libgl1=1.6.0-1 \
+    libglib2.0-0=2.74.6-2+deb12u6 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # ---------- Models stage: fetch pinned model snapshots ----------
 FROM python:3.12.3-slim AS models
 
@@ -60,8 +80,8 @@ RUN ${VENV_PATH}/bin/python /tmp/download_nltk_data.py ${NLTK_DATA} \
     && rm /tmp/download_nltk_data.py
 
 
-# ---------- Final stage: minimal runtime with only what we need ----------
-FROM python:3.12.3-slim AS prod
+# ---------- Final stage for Production: minimal runtime with only what we need ----------
+FROM base AS prod
 
 ENV VENV_PATH=/opt/venv
 ENV PATH="${VENV_PATH}/bin:${PATH}"
@@ -69,23 +89,6 @@ ENV PATH="${VENV_PATH}/bin:${PATH}"
 ENV NLTK_DATA=${VENV_PATH}/nltk_data
 
 WORKDIR /app
-
-# OS runtime dependencies only (no dev/build tools)
-# Use pinned versions for better reproducibility while maintaining security
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update \
-    && apt-get upgrade -y --no-install-recommends \
-    && apt-get install -y --no-install-recommends \
-    wget=1.21.3-1+deb12u1 \
-    libmagic1=1:5.44-3 \
-    poppler-utils=22.12.0-2+deb12u1 \
-    tesseract-ocr=5.3.0-2 \
-    tesseract-ocr-eng=1:4.1.0-2 \
-    libgl1=1.6.0-1 \
-    libglib2.0-0=2.74.6-2+deb12u6 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
 
 # Bring in the prebuilt virtualenv from the builder stage
 COPY --from=builder ${VENV_PATH} ${VENV_PATH}
@@ -153,8 +156,8 @@ COPY scripts/download_nltk_data.py /tmp/
 RUN ${VENV_PATH}/bin/python /tmp/download_nltk_data.py ${NLTK_DATA} \
     && rm /tmp/download_nltk_data.py
 
-# ---------- Final stage for tests: minimal runtime with test dependencies ----------
-FROM python:3.12.3-slim AS test
+# ---------- Final stage for Testing: minimal runtime with test dependencies ----------
+FROM base AS test
 
 ENV VENV_PATH=/opt/venv
 ENV PATH="${VENV_PATH}/bin:${PATH}"
@@ -162,22 +165,6 @@ ENV PATH="${VENV_PATH}/bin:${PATH}"
 ENV NLTK_DATA=${VENV_PATH}/nltk_data
 
 WORKDIR /app
-
-# OS runtime dependencies
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update \
-    && apt-get upgrade -y --no-install-recommends \
-    && apt-get install -y --no-install-recommends \
-    wget=1.21.3-1+deb12u1 \
-    libmagic1=1:5.44-3 \
-    poppler-utils=22.12.0-2+deb12u1 \
-    tesseract-ocr=5.3.0-2 \
-    tesseract-ocr-eng=1:4.1.0-2 \
-    libgl1=1.6.0-1 \
-    libglib2.0-0=2.74.6-2+deb12u6 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
 
 # Bring in the prebuilt virtualenv from the builder-test stage
 COPY --from=builder-test ${VENV_PATH} ${VENV_PATH}

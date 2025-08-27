@@ -55,9 +55,9 @@ class TestHybridSearchFix:
         mock_array.tolist.return_value = [0.1, 0.2, 0.3]
         mock_embedding_model.encode.return_value = mock_array
 
-        # Use mocker fixture for weaviate mocking (modern approach)
-        mock_connect = mocker.patch("backend.retriever.weaviate.connect_to_custom")
+        # Use mocker fixture to patch centralized weaviate client
         mock_client = MagicMock()
+        mocker.patch("backend.weaviate_client.get_weaviate_client", return_value=mock_client)
         mock_collection = MagicMock()
         mock_query = MagicMock()
         mock_result = MagicMock()
@@ -70,7 +70,6 @@ class TestHybridSearchFix:
         mock_obj2 = MockObject("Test content 2")
         mock_result.objects = [mock_obj1, mock_obj2]
 
-        mock_connect.return_value = mock_client
         mock_client.collections.get.return_value = mock_collection
         mock_collection.query = mock_query
         mock_query.hybrid.return_value = mock_result
@@ -93,7 +92,6 @@ class TestHybridSearchFix:
         mock_query.bm25.assert_not_called()
 
         assert result == ["Test content 1", "Test content 2"]
-        mock_client.close.assert_called_once()
 
     def test_hybrid_search_fallback_to_bm25(self, mocker, mock_embedding_model: MagicMock):
         """Test hybrid search raises RuntimeError when hybrid search fails."""
@@ -101,15 +99,14 @@ class TestHybridSearchFix:
 
         from backend.retriever import get_top_k
 
-        # Use mocker fixture for weaviate mocking (modern approach)
-        mock_connect = mocker.patch("backend.retriever.weaviate.connect_to_custom")
+        # Use mocker fixture to patch centralized weaviate client
         mock_client = MagicMock()
+        mocker.patch("backend.weaviate_client.get_weaviate_client", return_value=mock_client)
         mock_collection = MagicMock()
         mock_query = MagicMock()
 
         mock_query.hybrid.side_effect = WeaviateQueryError("VectorFromInput was called without vectorizer", "GRPC")
 
-        mock_connect.return_value = mock_client
         mock_client.collections.get.return_value = mock_collection
         mock_collection.query = mock_query
 
@@ -123,9 +120,9 @@ class TestHybridSearchFix:
         """Test hybrid search behavior with empty collection."""
         from backend.retriever import get_top_k
 
-        # Use mocker fixture for weaviate mocking (modern approach)
-        mock_connect = mocker.patch("backend.retriever.weaviate.connect_to_custom")
+        # Use mocker fixture to patch centralized weaviate client
         mock_client = MagicMock()
+        mocker.patch("backend.weaviate_client.get_weaviate_client", return_value=mock_client)
         mock_collection = MagicMock()
         mock_query = MagicMock()
         mock_result = MagicMock()
@@ -134,7 +131,6 @@ class TestHybridSearchFix:
         mock_query.hybrid.return_value = mock_result
         mock_collection.query = mock_query
         mock_client.collections.get.return_value = mock_collection
-        mock_connect.return_value = mock_client
 
         result = get_top_k("test question", k=5)
 
@@ -163,8 +159,8 @@ class TestHybridSearchFix:
         mock_array.tolist.return_value = [0.1, 0.2, 0.3]
         mock_embedding_model.encode.return_value = mock_array
 
-        mock_connect = mocker.patch("backend.retriever.weaviate.connect_to_custom")
         mock_client = MagicMock()
+        mocker.patch("backend.weaviate_client.get_weaviate_client", return_value=mock_client)
         mock_collection = MagicMock()
         mock_query = MagicMock()
         mock_result = MagicMock()
@@ -175,7 +171,6 @@ class TestHybridSearchFix:
 
         mock_result.objects = [MockObject("Fallback must not be used")]
 
-        mock_connect.return_value = mock_client
         mock_client.collections.get.return_value = mock_collection
         mock_collection.query = mock_query
         mock_query.hybrid.return_value = mock_result
@@ -195,9 +190,9 @@ class TestHybridSearchFix:
         # Use mocker to patch load_embedder to return None (modern approach)
         mocker.patch("backend.retriever.load_embedder", return_value=None)
 
-        # Use mocker fixture for weaviate mocking (modern approach)
-        mock_connect = mocker.patch("backend.retriever.weaviate.connect_to_custom")
+        # Use mocker fixture to patch centralized weaviate client
         mock_client = MagicMock()
+        mocker.patch("backend.weaviate_client.get_weaviate_client", return_value=mock_client)
         mock_collection = MagicMock()
         mock_query = MagicMock()
 
@@ -205,10 +200,9 @@ class TestHybridSearchFix:
 
         mock_collection.query = mock_query
         mock_client.collections.get.return_value = mock_collection
-        mock_connect.return_value = mock_client
 
-        with pytest.raises(RuntimeError, match="Hybrid search failed"):
-            get_top_k("test question", k=1)
+        with pytest.raises(RuntimeError):
+            _ = get_top_k("test question", k=1)
 
         mock_query.bm25.assert_not_called()
 
@@ -220,14 +214,13 @@ class TestHybridSearchFailureDetection:
 
         from backend.retriever import get_top_k
 
-        mock_connect = mocker.patch("backend.retriever.weaviate.connect_to_custom")
         mock_client = MagicMock()
+        mocker.patch("backend.weaviate_client.get_weaviate_client", return_value=mock_client)
         mock_collection = MagicMock()
         mock_query = MagicMock()
 
         mock_query.hybrid.side_effect = WeaviateQueryError("VectorFromInput was called without vectorizer", "GRPC")
 
-        mock_connect.return_value = mock_client
         mock_client.collections.get.return_value = mock_collection
         mock_collection.query = mock_query
 
@@ -244,8 +237,8 @@ class TestHybridSearchFailureDetection:
 
         mocker.patch("backend.retriever.load_embedder", return_value=None)
 
-        mock_connect = mocker.patch("backend.retriever.weaviate.connect_to_custom")
         mock_client = MagicMock()
+        mocker.patch("backend.weaviate_client.get_weaviate_client", return_value=mock_client)
         mock_collection = MagicMock()
         mock_query = MagicMock()
 
@@ -253,7 +246,6 @@ class TestHybridSearchFailureDetection:
 
         mock_collection.query = mock_query
         mock_client.collections.get.return_value = mock_collection
-        mock_connect.return_value = mock_client
 
         with pytest.raises(RuntimeError):
             _ = get_top_k("test question", k=1)

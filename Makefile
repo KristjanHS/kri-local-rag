@@ -80,7 +80,7 @@ test-down:
 
 _test-down-with-id:
 	@echo "Stopping test environment with RUN_ID=$(RUN_ID) ..."
-	@$(COMPOSE) -p "$(RUN_ID)" down
+	@$(COMPOSE) -p "$(RUN_ID)" down -v
 
 test-logs:
 	@if [ -f $(RUN_ID_FILE) ]; then \

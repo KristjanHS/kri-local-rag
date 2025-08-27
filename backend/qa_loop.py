@@ -230,34 +230,22 @@ def answer(
 
 # ---------- CLI --------------------------------------------------
 import argparse
-from urllib.parse import urlparse
 
-import weaviate
 from weaviate.classes.query import Filter
 from weaviate.exceptions import WeaviateConnectionError
 
 from backend import config as app_config
 from backend.config import get_service_url
+from backend.weaviate_client import close_weaviate_client, get_weaviate_client
 
 
 def ensure_weaviate_ready_and_populated():
-    client = None  # explicit reference to avoid dynamic locals()/globals() access
+    client = None
     try:
-        # Read connection settings dynamically at runtime using centralized resolver
+        # Resolve settings and get centralized client
         weaviate_url = get_service_url("weaviate")
         collection_name = os.getenv("COLLECTION_NAME", app_config.COLLECTION_NAME)
-
-        parsed_url = urlparse(weaviate_url)
-        http_host = parsed_url.hostname or "localhost"
-        grpc_host = parsed_url.hostname or "localhost"
-        client = weaviate.connect_to_custom(
-            http_host=http_host,
-            http_port=parsed_url.port or 80,
-            grpc_host=grpc_host,
-            grpc_port=50051,
-            http_secure=parsed_url.scheme == "https",
-            grpc_secure=parsed_url.scheme == "https",
-        )
+        client = get_weaviate_client()
         logger.debug("1. Attempting to connect to Weaviate at %s...", weaviate_url)
         client.is_ready()  # Raises if not ready
         logger.info("   ✓ Connection successful.")
@@ -336,8 +324,7 @@ def ensure_weaviate_ready_and_populated():
         raise Exception(f"An unexpected error occurred during Weaviate check: {e}") from e
     finally:
         try:
-            if client is not None and hasattr(client, "is_connected") and client.is_connected():
-                client.close()
+            close_weaviate_client()
         except Exception as e:
             logger.debug("Failed to close Weaviate client gracefully: %s", e)
 

@@ -1,20 +1,18 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from urllib.parse import urlparse
 
 # Defer torch import to runtime to avoid heavy import-time side effects
-import weaviate
 from weaviate.exceptions import WeaviateQueryError
 
 from backend.config import (
     COLLECTION_NAME,
     DEFAULT_HYBRID_ALPHA,
-    WEAVIATE_URL,
     get_logger,
 )
 from backend.models import load_embedder
 from backend.vector_utils import to_float_list
+from backend.weaviate_client import get_weaviate_client
 
 # Optional dependency note: If sentence-transformers is not installed, we handle
 # ImportError: gracefully inside the lazy loader (_get_embedding_model).
@@ -97,75 +95,62 @@ def get_top_k(
        (e.g. older Weaviate versions without the hybrid module).
     """
 
-    parsed_url = urlparse(WEAVIATE_URL)
-    http_host = parsed_url.hostname or "localhost"
-    grpc_host = parsed_url.hostname or "localhost"
-    client = weaviate.connect_to_custom(
-        http_host=http_host,
-        http_port=parsed_url.port or 80,
-        grpc_host=grpc_host,
-        grpc_port=50051,
-        http_secure=parsed_url.scheme == "https",
-        grpc_secure=parsed_url.scheme == "https",
-    )
+    client = get_weaviate_client()
+    # Use provided collection_name or fall back to default
+    target_collection = collection_name or COLLECTION_NAME
+    collection = client.collections.get(target_collection)
+
+    q = collection.query
+    q = _apply_metadata_filter(q, metadata_filter)
+
     try:
-        # Use provided collection_name or fall back to default
-        target_collection = collection_name or COLLECTION_NAME
-        collection = client.collections.get(target_collection)
+        # For manual vectorization, we need to provide the vector ourselves
+        if embedding_model is None:
+            embedding_model = _get_embedding_model()
 
-        q = collection.query
-        q = _apply_metadata_filter(q, metadata_filter)
+        if embedding_model is not None:
+            # Vectorize the query using the same model as ingestion
+            query_vector_raw = embedding_model.encode(question)
+            # Normalize to a plain Python list of floats for Weaviate client
+            query_vector: List[float] = to_float_list(query_vector_raw)
+            # Hybrid search with manually provided vector
+            res = q.hybrid(vector=query_vector, query=question, alpha=alpha, limit=k)
+            logger.info("hybrid search used with manual vectorization (alpha=%s)", alpha)
+        else:
+            # Fallback: try hybrid search without manual vectorization (legacy behavior)
+            # This might fail if no vectorizer is configured
+            res = q.hybrid(query=question, alpha=alpha, limit=k)
+            logger.info("hybrid search used (alpha=%s)", alpha)
+    except (TypeError, WeaviateQueryError) as e:
+        # Hybrid search failed - this should not happen in tests with proper setup
+        logger.error("hybrid search failed (%s)", e)
+        raise RuntimeError(f"Hybrid search failed: {e}") from e
 
-        try:
-            # For manual vectorization, we need to provide the vector ourselves
-            if embedding_model is None:
-                embedding_model = _get_embedding_model()
+    logger.info("Found %d candidates.", len(res.objects))
 
-            if embedding_model is not None:
-                # Vectorize the query using the same model as ingestion
-                query_vector_raw = embedding_model.encode(question)
-                # Normalize to a plain Python list of floats for Weaviate client
-                query_vector: List[float] = to_float_list(query_vector_raw)
-                # Hybrid search with manually provided vector
-                res = q.hybrid(vector=query_vector, query=question, alpha=alpha, limit=k)
-                logger.info("hybrid search used with manual vectorization (alpha=%s)", alpha)
-            else:
-                # Fallback: try hybrid search without manual vectorization (legacy behavior)
-                # This might fail if no vectorizer is configured
-                res = q.hybrid(query=question, alpha=alpha, limit=k)
-                logger.info("hybrid search used (alpha=%s)", alpha)
-        except (TypeError, WeaviateQueryError) as e:
-            # Hybrid search failed - this should not happen in tests with proper setup
-            logger.error("hybrid search failed (%s)", e)
-            raise RuntimeError(f"Hybrid search failed: {e}") from e
+    # Weaviate returns objects already ordered by relevance. If a distance
+    # attribute is present we sort on it just in case.
+    objects = res.objects
+    if objects and hasattr(objects[0], "distance"):
+        objects.sort(key=lambda o: getattr(o, "distance", 0.0))
 
-        logger.info("Found %d candidates.", len(res.objects))
+    # Extract content and show chunk heads at INFO level
+    chunks = []
+    for i, obj in enumerate(objects):
+        content = str(obj.properties.get("content", ""))
+        chunks.append(content)
 
-        # Weaviate returns objects already ordered by relevance. If a distance
-        # attribute is present we sort on it just in case.
-        objects = res.objects
-        if objects and hasattr(objects[0], "distance"):
-            objects.sort(key=lambda o: getattr(o, "distance", 0.0))
+        # Show the head of each chunk at INFO level
+        head = content[:100].replace("\n", " ").replace("\r", " ").strip()
+        if len(content) > 100:
+            head += "..."
+        logger.info("Chunk %d: %s", i + 1, head)
 
-        # Extract content and show chunk heads at INFO level
-        chunks = []
-        for i, obj in enumerate(objects):
-            content = str(obj.properties.get("content", ""))
-            chunks.append(content)
+        # Keep detailed debug logging for when needed
+        distance = getattr(obj, "distance", "N/A")
+        score = getattr(obj, "score", "N/A")
+        logger.debug("  Distance: %s", distance)
+        logger.debug("  Score: %s", score)
+        logger.debug("  Content length: %d characters", len(content))
 
-            # Show the head of each chunk at INFO level
-            head = content[:100].replace("\n", " ").replace("\r", " ").strip()
-            if len(content) > 100:
-                head += "..."
-            logger.info("Chunk %d: %s", i + 1, head)
-
-            # Keep detailed debug logging for when needed
-            distance = getattr(obj, "distance", "N/A")
-            score = getattr(obj, "score", "N/A")
-            logger.debug("  Distance: %s", distance)
-            logger.debug("  Score: %s", score)
-            logger.debug("  Content length: %d characters", len(content))
-
-        return chunks
-    finally:
-        client.close()
+    return chunks
