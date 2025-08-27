@@ -128,16 +128,18 @@ def sample_documents_path():
     return "example_data/"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def weaviate_client():
     """Fixture for a real Weaviate client, ensuring the service is available."""
     import logging
 
-    from backend import ingest
+    from backend.weaviate_client import close_weaviate_client, get_weaviate_client
 
     logger = logging.getLogger(__name__)
     logger.debug("Attempting to connect to Weaviate for integration tests...")
-    client = ingest.connect_to_weaviate()
+
+    # Use wrapper consistently - each test gets its own client instance
+    client = get_weaviate_client()
     logger.debug("Successfully connected to Weaviate.")
     try:
         if client.collections.exists(TEST_COLLECTION_NAME):
@@ -147,40 +149,18 @@ def weaviate_client():
         logger.warning("Error during pre-test cleanup of collection %s: %s", TEST_COLLECTION_NAME, e)
     yield client
     try:
-        if client.collections.exists(TEST_COLLECTION_NAME):
-            logger.debug("Deleting test collection after tests: %s", TEST_COLLECTION_NAME)
-            client.collections.delete(TEST_COLLECTION_NAME)
+        # Get a fresh client for cleanup since the yielded client might be closed
+        fresh_client = get_weaviate_client()
+        try:
+            if fresh_client.collections.exists(TEST_COLLECTION_NAME):
+                logger.debug("Deleting test collection after tests: %s", TEST_COLLECTION_NAME)
+                fresh_client.collections.delete(TEST_COLLECTION_NAME)
+        finally:
+            close_weaviate_client()
     except Exception as e:
         logger.warning("Error during post-test cleanup of collection %s: %s", TEST_COLLECTION_NAME, e)
-
-
-@pytest.fixture
-def clean_test_collection(weaviate_client):
-    """Ensure the shared 'TestCollection' is empty before and after each test.
-
-    This provides test isolation across integration and E2E tests that ingest
-    into the common collection name. It complements any session-level cleanup.
-    """
-    import logging
-
-    logger = logging.getLogger(__name__)
-
-    # Pre-test cleanup
-    try:
-        if weaviate_client.collections.exists(TEST_COLLECTION_NAME):
-            weaviate_client.collections.delete(TEST_COLLECTION_NAME)
-    except Exception as e:  # pragma: no cover - best-effort
-        logger.warning("Pre-test cleanup failed for collection %s: %s", TEST_COLLECTION_NAME, e)
-
-    try:
-        yield
     finally:
-        # Post-test cleanup
-        try:
-            if weaviate_client.collections.exists(TEST_COLLECTION_NAME):
-                weaviate_client.collections.delete(TEST_COLLECTION_NAME)
-        except Exception as e:  # pragma: no cover - best-effort
-            logger.warning("Post-test cleanup failed for collection %s: %s", TEST_COLLECTION_NAME, e)
+        close_weaviate_client()
 
 
 @pytest.fixture(scope="session")

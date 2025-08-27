@@ -29,13 +29,13 @@ To avoid compounding errors, we’ll first stabilize the test environment and mo
   - [x] Replaced normalization test with minimal config test: `tests/unit/test_config_get_service_url_unit.py` (asserts default and env override behavior; no network).
   - [x] Verified: `.venv/bin/python -m ruff check . --fix && .venv/bin/python -m ruff format .`, `.venv/bin/python -m pyright .`, `.venv/bin/python -m pytest tests/unit/test_config_get_service_url_unit.py -q`
 
-- [ ] 5) Bring integration tests back (light set)
-  - [ ] Replace any remaining direct client creations in integration fixtures with `get_weaviate_client()` and ensure teardown calls `close_weaviate_client()`.
-  - [ ] Verify: `.venv/bin/python -m pytest tests/integration -q -m 'not slow'`
+- [x] 5) Bring integration tests back (light set)
+  - [x] Replace any remaining direct client creations in integration fixtures with `get_weaviate_client()` and ensure teardown calls `close_weaviate_client()`.
+  - [x] Verify: `.venv/bin/python -m pytest tests/integration -q -m 'not slow'`
 
-- [ ] 6) Run e2e tests
-  - [ ] Ensure `tests/e2e/*` use the wrapper and close it in teardown.
-  - [ ] Verify: `.venv/bin/python -m pytest tests/e2e -q`
+- [x] 6) Run e2e tests
+  - [x] Ensure `tests/e2e/*` use the wrapper and close it in teardown.
+  - [x] Verify: `.venv/bin/python -m pytest tests/e2e -q`
 
 - [ ] 7) Cleanups and final checks
   - [ ] Remove `ingest._get_weaviate_url` once wrapper normalization is in place.

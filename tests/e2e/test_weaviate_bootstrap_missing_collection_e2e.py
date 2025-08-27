@@ -66,17 +66,22 @@ def test_bootstrap_creates_missing_collection_and_cleans_example_data(tmp_path, 
 
             ensure_weaviate_ready_and_populated()
 
-            # After bootstrap:
-            # - The collection should exist (robust check via get)
+            # After bootstrap, get a fresh client since bootstrap may have closed it
+            fresh_client = get_weaviate_client()
             try:
-                client.collections.get(target_collection)
-            except Exception as e:  # pragma: no cover - diagnostic in CI
-                pytest.fail(f"Collection '{TEST_COLLECTION_NAME}' does not exist after bootstrap: {e}")
+                # After bootstrap:
+                # - The collection should exist (robust check via get)
+                try:
+                    fresh_client.collections.get(target_collection)
+                except Exception as e:  # pragma: no cover - diagnostic in CI
+                    pytest.fail(f"Collection '{TEST_COLLECTION_NAME}' does not exist after bootstrap: {e}")
 
-            # - Example data should have been ingested and then removed, so the
-            #   collection should now be empty
-            has_objects = _collection_has_any_objects(client, target_collection)
-            assert has_objects is False
+                # - Example data should have been ingested and then removed, so the
+                #   collection should now be empty
+                has_objects = _collection_has_any_objects(fresh_client, target_collection)
+                assert has_objects is False
+            finally:
+                close_weaviate_client()
         finally:
             try:
                 close_weaviate_client()
