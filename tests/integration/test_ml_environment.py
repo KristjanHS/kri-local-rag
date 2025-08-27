@@ -20,10 +20,10 @@ def cached_sentence_transformer_model():
     Loads the SentenceTransformer model using the centralized loading function.
     Works in both online and offline modes.
     """
-    from backend.models import load_model
-
     try:
-        model = load_model(EXPECTED_MODEL_NAME, is_embedding=True)
+        from sentence_transformers import SentenceTransformer
+
+        model = SentenceTransformer(EXPECTED_MODEL_NAME)
         logger.info("--- Model loaded successfully ---")
         return model
     except Exception as e:
