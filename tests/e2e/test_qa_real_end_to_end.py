@@ -46,13 +46,6 @@ def test_e2e_answer_with_real_services(
     cross_encoder = qa_loop._get_cross_encoder()
     assert cross_encoder is not None, "Expected CrossEncoder to be loaded from cache"
 
-    # Clean up any existing collection before test
-    try:
-        if weaviate_client.collections.exists(TEST_COLLECTION_NAME):
-            weaviate_client.collections.delete(TEST_COLLECTION_NAME)
-    except Exception:
-        pass  # Ignore cleanup errors
-
     # Ensure TestCollection has data by ingesting sample documents
     from backend import ingest
     from backend.retriever import _get_embedding_model
@@ -76,10 +69,3 @@ def test_e2e_answer_with_real_services(
 
     assert isinstance(result, str) and result.strip(), "Expected non-empty model output"
     assert "I found no relevant context" not in result, "Expected retrieval to provide context from Weaviate"
-
-    # Clean up collection after test
-    try:
-        if weaviate_client.collections.exists(TEST_COLLECTION_NAME):
-            weaviate_client.collections.delete(TEST_COLLECTION_NAME)
-    except Exception:
-        pass  # Ignore cleanup errors

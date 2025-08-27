@@ -154,6 +154,14 @@ Examples:
         console_stderr = Console(file=sys.stderr)
         console_stderr.print(f"[bold red]Error:[/] {e}")
         sys.exit(1)
+    finally:
+        # Ensure Weaviate client is properly closed to prevent resource leaks
+        try:
+            from backend.weaviate_client import close_weaviate_client
+
+            close_weaviate_client()
+        except Exception as e:
+            logger.debug("Failed to close Weaviate client gracefully: %s", e)
 
 
 if __name__ == "__main__":

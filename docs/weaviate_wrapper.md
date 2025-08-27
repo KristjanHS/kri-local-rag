@@ -48,16 +48,16 @@ To avoid compounding errors, we’ll first stabilize the test environment and mo
 
 ## Weaviate wrapper refactor plan (incremental with test checkpoints)
 
-- [ ] 1) Create centralized client wrapper
+- [x] 1) Create centralized client wrapper
   - Files: `backend/weaviate_client.py`
   - [x] Add `get_weaviate_client()` and `close_weaviate_client()`
-  - [ ] Include hostname normalization for Docker vs local
+  - [x] Include hostname normalization for Docker vs local
   - Tests to run:
     - `.venv/bin/python -m ruff check . --fix && .venv/bin/python -m ruff format .`
     - `.venv/bin/python -m pyright .`
     - `.venv/bin/python -m pytest tests/unit/test_weaviate_guard.py -q`
 
-- [ ] 2) Migrate retriever to use wrapper
+- [x] 2) Migrate retriever to use wrapper
   - Files: `backend/retriever.py`
   - [x] Replace direct `weaviate.connect_to_custom(...)` with `from backend.weaviate_client import get_weaviate_client` and use it.
   - Update unit tests to mock wrapper instead of direct Weaviate:
@@ -66,22 +66,22 @@ To avoid compounding errors, we’ll first stabilize the test environment and mo
   - Tests to run:
     - `.venv/bin/python -m pytest tests/unit/test_search_logic.py -q`
 
-- [ ] 3) Migrate delete_collection to wrapper
+- [x] 3) Migrate delete_collection to wrapper
   - Files: `backend/delete_collection.py`
   - [x] Use `get_weaviate_client()` and `close_weaviate_client()`.
   - Tests to run:
     - `.venv/bin/python -m pytest tests/unit/test_weaviate_client_close.py -q`
     - `.venv/bin/python -m pytest tests/unit/test_weaviate_guard.py -q`
 
-- [ ] 4) Migrate ingest helper to wrapper (keep shim)
+- [x] 4) Migrate ingest helper to wrapper (keep shim)
   - Files: `backend/ingest.py`
   - [x] Make `connect_to_weaviate()` return `get_weaviate_client()` for backward compatibility.
-  - [ ] Later cleanup: remove `_get_weaviate_url()` when all call sites are wrapper-based.
+  - [x] Later cleanup: remove `_get_weaviate_url()` when all call sites are wrapper-based.
   - Tests to run:
     - `.venv/bin/python -m pytest tests/unit/test_ingest_logic.py -q`
     - `.venv/bin/python -m pytest tests/integration/test_ingest_pipeline_compose.py -q -m 'not slow'`
 
-- [ ] 5) Migrate qa_loop readiness to wrapper
+- [x] 5) Migrate qa_loop readiness to wrapper
   - Files: `backend/qa_loop.py`
   - [x] Replace direct connection with `get_weaviate_client()` and `close_weaviate_client()` in `ensure_weaviate_ready_and_populated()`.
   - Update unit tests to mock wrapper instead of `weaviate.connect_to_custom`:
@@ -90,7 +90,7 @@ To avoid compounding errors, we’ll first stabilize the test environment and mo
     - `.venv/bin/python -m pytest tests/unit/test_weaviate_client_close.py -q`
     - `.venv/bin/python -m pytest tests/unit/test_debug.py::test_cli_debug_paths -q`
 
-- [ ] 6) Update test safety guard and shared fixtures
+- [x] 6) Update test safety guard and shared fixtures
   - Files: `tests/conftest.py`
   - [x] Keep guard blocking `weaviate.connect_to_custom` in unit tests; add guard for `backend.weaviate_client.get_weaviate_client`.
   - Update e2e/integration fixtures that create direct clients to use wrapper:
@@ -99,7 +99,7 @@ To avoid compounding errors, we’ll first stabilize the test environment and mo
     - `.venv/bin/python -m pytest tests/unit -q`
     - `.venv/bin/python -m pytest tests/e2e/conftest.py -q` (teardown-only check; may skip if Docker unavailable)
 
-- [ ] 7) Sweep remaining call sites and tests
+- [x] 7) Sweep remaining call sites and tests
   - Files: `backend/qa_loop.py` (any missed), `tests/integration/test_weaviate_compose.py`, `tests/integration/conftest.py`, `tests/e2e/*`.
   - Replace direct `weaviate.connect_to_custom` with wrapper usage or adjust mocks to patch wrapper only.
   - Tests to run:

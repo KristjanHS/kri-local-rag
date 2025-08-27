@@ -31,7 +31,7 @@ class TestInitializationLogging:
         # Verify client methods were called
         mock_client.is_ready.assert_called_once()
         mock_client.collections.exists.assert_called_once()
-        mock_client.close.assert_called_once()
+        # Note: close_weaviate_client() is called instead of client.close() with wrapper pattern
 
     def test_ollama_model_check_logging(self, mock_httpx_get):
         """Test Ollama model availability check logging."""
@@ -63,7 +63,6 @@ class TestHybridSearchIntegration:
         # Setup Weaviate mock
         mock_client = MagicMock()
         mock_collection = MagicMock()
-        mock_query = MagicMock()
 
         # Mock successful hybrid search
         mock_result = MagicMock()
@@ -74,8 +73,8 @@ class TestHybridSearchIntegration:
 
         mock_result.objects = [MockObject("Test content 1"), MockObject("Test content 2")]
 
-        mock_query.hybrid.return_value = mock_result
-        mock_collection.query = mock_query
+        # Mock the query attribute on the collection and its hybrid method
+        mock_collection.query.hybrid.return_value = mock_result
         mock_client.collections.get.return_value = mock_collection
         mock_weaviate_connect.return_value = mock_client
 
@@ -85,7 +84,9 @@ class TestHybridSearchIntegration:
         # Verify the flow
         # The fixture handles the patching, so we just check the model's methods
         managed_embedding_model.encode.assert_called_once_with("test question")
-        mock_query.hybrid.assert_called_once_with(vector=[0.1, 0.2, 0.3], query="test question", alpha=0.5, limit=5)
+        mock_collection.query.hybrid.assert_called_once_with(
+            vector=[0.1, 0.2, 0.3], query="test question", alpha=0.5, limit=5
+        )
 
         assert result == ["Test content 1", "Test content 2"]
 

@@ -56,11 +56,12 @@ def test_deterministic_uuid(mock_docs):
     assert uuid1 != uuid3
 
 
-@patch("backend.ingest.weaviate")
-def test_batch_upload_is_used(mock_weaviate, mock_docs):
+@patch("backend.weaviate_client.get_weaviate_client")
+def test_batch_upload_is_used(mock_get_client, mock_docs):
     """Verifies that the batch upload context manager is used."""
     # Arrange
-    mock_client = mock_weaviate.connect_to_custom.return_value
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
     mock_collection = mock_client.collections.get.return_value
     # The new mock target
     mock_batch_cm = mock_collection.batch.fixed_size.return_value
@@ -75,11 +76,12 @@ def test_batch_upload_is_used(mock_weaviate, mock_docs):
     assert mock_batch_cm.__enter__.called
 
 
-@patch("backend.ingest.weaviate")
-def test_object_properties_are_correct(mock_weaviate, mock_docs):
+@patch("backend.weaviate_client.get_weaviate_client")
+def test_object_properties_are_correct(mock_get_client, mock_docs):
     """Verifies that the object properties are correctly extracted from the documents."""
     # Arrange
-    mock_client = mock_weaviate.connect_to_custom.return_value
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
     mock_collection = mock_client.collections.get.return_value
     mock_batch_cm = mock_collection.batch.fixed_size.return_value
     mock_batch_cm.__enter__.return_value = mock_batch_cm
@@ -102,11 +104,12 @@ def test_object_properties_are_correct(mock_weaviate, mock_docs):
     assert second_call_kwargs["properties"]["source_file"] == "test.md"
 
 
-@patch("backend.ingest.weaviate")
-def test_vectors_are_generated_and_added(mock_weaviate, mock_docs):
+@patch("backend.weaviate_client.get_weaviate_client")
+def test_vectors_are_generated_and_added(mock_get_client, mock_docs):
     """Verifies that the model is called to generate vectors and that they are added to the batch."""
     # Arrange
-    mock_client = mock_weaviate.connect_to_custom.return_value
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
     mock_collection = mock_client.collections.get.return_value
     mock_batch_cm = mock_collection.batch.fixed_size.return_value
     mock_batch_cm.__enter__.return_value = mock_batch_cm

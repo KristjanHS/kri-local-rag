@@ -439,3 +439,9 @@ if __name__ == "__main__":
 
     except (EOFError, KeyboardInterrupt):
         console.print("\n[bold]Exiting RAG CLI.[/]")
+    finally:
+        # Ensure Weaviate client is properly closed to prevent resource leaks
+        try:
+            close_weaviate_client()
+        except Exception as e:
+            logger.debug("Failed to close Weaviate client gracefully: %s", e)
