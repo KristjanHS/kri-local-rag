@@ -151,12 +151,9 @@ def weaviate_client():
     try:
         # Get a fresh client for cleanup since the yielded client might be closed
         fresh_client = get_weaviate_client()
-        try:
-            if fresh_client.collections.exists(TEST_COLLECTION_NAME):
-                logger.debug("Deleting test collection after tests: %s", TEST_COLLECTION_NAME)
-                fresh_client.collections.delete(TEST_COLLECTION_NAME)
-        finally:
-            close_weaviate_client()
+        if fresh_client.collections.exists(TEST_COLLECTION_NAME):
+            logger.debug("Deleting test collection after tests: %s", TEST_COLLECTION_NAME)
+            fresh_client.collections.delete(TEST_COLLECTION_NAME)
     except Exception as e:
         logger.warning("Error during post-test cleanup of collection %s: %s", TEST_COLLECTION_NAME, e)
     finally:

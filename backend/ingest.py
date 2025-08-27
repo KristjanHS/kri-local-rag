@@ -117,7 +117,7 @@ def load_and_split_documents(path: str) -> List[Document]:
 from backend.weaviate_client import get_weaviate_client
 
 
-def connect_to_weaviate():
+def connect_to_weaviate() -> weaviate.WeaviateClient:
     """Deprecated: use backend.weaviate_client.get_weaviate_client instead."""
     # Maintain backward compatibility for any external scripts
     return get_weaviate_client()
