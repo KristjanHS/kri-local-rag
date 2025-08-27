@@ -2,12 +2,9 @@
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from backend.qa_loop import answer
 
-# Mark the entire module as 'slow'
-pytestmark = pytest.mark.slow
+# Integration tests for QA pipeline functionality
 
 
 # -----------------------------------------------------------------------------

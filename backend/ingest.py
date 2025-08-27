@@ -26,14 +26,16 @@ import weaviate
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, UnstructuredMarkdownLoader
+
+# Direct import since sentence-transformers is a required runtime dependency
 from sentence_transformers import SentenceTransformer
 
+# SentenceTransformer is now loaded via backend.models for consistency
 from backend.config import (
     CHUNK_OVERLAP,
     CHUNK_SIZE,
     COLLECTION_NAME,
     EMBEDDING_MODEL,
-    HF_CACHE_DIR,
     WEAVIATE_BATCH_SIZE,
     WEAVIATE_CONCURRENT_REQUESTS,
     get_logger,
@@ -229,14 +231,16 @@ def optimize_embedding_model(embedding_model: SentenceTransformer) -> SentenceTr
 
     try:
         logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
-        compiled_model = torch.compile(embedding_model, backend="inductor", mode="max-autotune")
+        compiled_model = cast(
+            SentenceTransformer, torch.compile(embedding_model, backend="inductor", mode="max-autotune")
+        )
         # Mark the compiled instance so future calls are a no-op.
         try:
             setattr(compiled_model, "_is_torch_compiled", True)  # type: ignore[attr-defined]
         except (AttributeError, TypeError) as attr_err:
             logger.debug("Could not set _is_torch_compiled flag on compiled model: %s", attr_err)
         logger.info("torch.compile optimization completed.")
-        return cast(SentenceTransformer, compiled_model)
+        return compiled_model
     except Exception as e:
         logger.warning(f"Could not apply torch.compile: {e}")
         return embedding_model
@@ -278,7 +282,9 @@ if __name__ == "__main__":
 
     # Load the embedding model once
     logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
-    model = SentenceTransformer(EMBEDDING_MODEL, cache_folder=HF_CACHE_DIR)
+    from backend.models import load_embedder
+
+    model = load_embedder()
 
     try:
         ingest(

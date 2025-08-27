@@ -8,9 +8,7 @@ import importlib
 import os
 import sys
 
-import pytest
-
-pytestmark = [pytest.mark.slow]
+# Integration tests for cross-encoder environment
 
 
 def test_cross_encoder_is_loaded_and_used_for_reranking(cross_encoder_cache_dir):

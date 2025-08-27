@@ -56,17 +56,16 @@ with st.sidebar.expander("Ingest PDFs"):
 
             with st.spinner("Ingesting ..."):
                 # Ingest operates on a directory; use the save directory
-                from sentence_transformers import SentenceTransformer
-
-                from backend.config import COLLECTION_NAME, EMBEDDING_MODEL, HF_CACHE_DIR
+                from backend.config import COLLECTION_NAME
                 from backend.ingest import (
                     connect_to_weaviate,
                     ingest,
                 )
+                from backend.models import load_embedder
 
                 client = connect_to_weaviate()
                 try:
-                    model = SentenceTransformer(EMBEDDING_MODEL, cache_folder=HF_CACHE_DIR)
+                    model = load_embedder()
                     ingest(
                         directory=save_dir,
                         collection_name=COLLECTION_NAME,

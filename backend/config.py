@@ -172,8 +172,6 @@ DEFAULT_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 DEFAULT_OLLAMA_MODEL = "cas/mistral-7b-instruct-v0.3"
 
 # Model paths and caching
-EMBED_MODEL_PATH = os.getenv("EMBED_MODEL_PATH", "/app/models/emb")
-RERANK_MODEL_PATH = os.getenv("RERANK_MODEL_PATH", "/app/models/rerank")
 HF_CACHE_DIR = os.getenv("HF_HOME", "/data/hf")
 
 # Working model names (with environment variable overrides)
