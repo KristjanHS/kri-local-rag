@@ -6,8 +6,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend import config, ingest
-from backend.models import load_model
 from tests.conftest import TEST_COLLECTION_NAME
+
+# Import SentenceTransformer for direct model loading
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    SentenceTransformer = None
 
 # Integration test for the ingestion pipeline with real Weaviate compose service
 
@@ -62,7 +67,9 @@ def test_ingest_pipeline_with_real_weaviate_compose(weaviate_client, sample_docu
 def test_ingest_pipeline_loads_and_embeds_data_compose(weaviate_collection_mock, sample_documents_path):
     """Test the full ingestion pipeline from loading docs to inserting into Weaviate with a local model."""
     # Provide a real embedding model for this integration test
-    embedding_model = load_model(EMBEDDING_MODEL, is_embedding=True)
+    if SentenceTransformer is None:
+        pytest.skip("sentence-transformers not available")
+    embedding_model = SentenceTransformer(EMBEDDING_MODEL)
 
     # Run the ingestion process
     ingest.ingest(
@@ -110,7 +117,9 @@ def test_ingest_pipeline_handles_no_embedding_model_compose(weaviate_collection_
 @pytest.mark.requires_weaviate
 def test_ingest_pipeline_is_idempotent_compose(weaviate_collection_mock, sample_documents_path):
     """Test that running ingestion multiple times doesn't create duplicate data, using a local model."""
-    embedding_model = load_model(EMBEDDING_MODEL, is_embedding=True)
+    if SentenceTransformer is None:
+        pytest.skip("sentence-transformers not available")
+    embedding_model = SentenceTransformer(EMBEDDING_MODEL)
 
     # Run ingestion once
     ingest.ingest(

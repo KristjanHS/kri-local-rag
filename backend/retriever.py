@@ -17,6 +17,12 @@ from backend.weaviate_client import get_weaviate_client
 # Optional dependency note: If sentence-transformers is not installed, we handle
 # ImportError: gracefully inside the lazy loader (_get_embedding_model).
 
+# Import SentenceTransformer for direct model loading
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    SentenceTransformer = None
+
 # For manual vectorization – import type only for type-checkers
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from sentence_transformers import SentenceTransformer as SentenceTransformerType  # type: ignore
@@ -51,9 +57,9 @@ def _get_embedding_model(model_name: str | None = None) -> Any:
     try:
         if model_name is not None:
             # For testing - load specific model without using global cache
-            from backend.models import load_model
-
-            return load_model(model_name, is_embedding=True)
+            if SentenceTransformer is None:
+                raise ImportError("sentence-transformers not available")
+            return SentenceTransformer(model_name)
 
         # Use cached model if available
         if _embedding_model is None:

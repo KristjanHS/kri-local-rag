@@ -104,13 +104,9 @@ def load_model(model_name: str, is_embedding: bool) -> Any:
     """
     try:
         if is_embedding:
-            from sentence_transformers import SentenceTransformer  # type: ignore
-
             logger.info("Loading embedding model: %s", model_name)
             return SentenceTransformer(model_name)
         else:
-            from sentence_transformers.cross_encoder import CrossEncoder  # type: ignore
-
             logger.info("Loading reranker model: %s", model_name)
             return CrossEncoder(model_name)
     except ImportError as e:

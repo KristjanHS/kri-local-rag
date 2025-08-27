@@ -31,7 +31,7 @@ else:
 logger = get_logger(__name__)
 
 # Test constants
-MODEL_LOAD_TIMEOUT = 120  # seconds - allow generous time for first download
+MODEL_LOAD_TIMEOUT = 120  # seconds - reasonable timeout for model loading operations
 TEST_SENTENCE = "This is a test sentence for model validation."
 EXPECTED_EMBEDDING_DIM = 384  # For all-MiniLM-L6-v2
 
