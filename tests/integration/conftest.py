@@ -346,7 +346,7 @@ def mock_httpx_get(monkeypatch):
 
 
 @pytest.fixture
-def clean_test_collection():
+def test_collection_name():
     """Provide the test collection name.
 
     The weaviate_client fixture already handles collection cleanup.
