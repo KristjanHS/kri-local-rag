@@ -73,10 +73,10 @@ To avoid compounding errors, we’ll first stabilize the test environment and mo
     - `.venv/bin/python -m pytest tests/unit/test_weaviate_client_close.py -q`
     - `.venv/bin/python -m pytest tests/unit/test_weaviate_guard.py -q`
 
-- [ ] 4) Migrate ingest helper to wrapper (keep shim)
+- [x] 4) Migrate ingest helper to wrapper (keep shim)
   - Files: `backend/ingest.py`
   - [x] Make `connect_to_weaviate()` return `get_weaviate_client()` for backward compatibility.
-  - [ ] Later cleanup: remove `_get_weaviate_url()` when all call sites are wrapper-based.
+  - [x] Later cleanup: remove `_get_weaviate_url()` when all call sites are wrapper-based.
   - Tests to run:
     - `.venv/bin/python -m pytest tests/unit/test_ingest_logic.py -q`
     - `.venv/bin/python -m pytest tests/integration/test_ingest_pipeline_compose.py -q -m 'not slow'`
@@ -99,7 +99,7 @@ To avoid compounding errors, we’ll first stabilize the test environment and mo
     - `.venv/bin/python -m pytest tests/unit -q`
     - `.venv/bin/python -m pytest tests/e2e/conftest.py -q` (teardown-only check; may skip if Docker unavailable)
 
-- [ ] 7) Sweep remaining call sites and tests
+- [x] 7) Sweep remaining call sites and tests
   - Files: `backend/qa_loop.py` (any missed), `tests/integration/test_weaviate_compose.py`, `tests/integration/conftest.py`, `tests/e2e/*`.
   - Replace direct `weaviate.connect_to_custom` with wrapper usage or adjust mocks to patch wrapper only.
   - Tests to run:
