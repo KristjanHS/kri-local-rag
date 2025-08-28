@@ -118,7 +118,9 @@ def app_compose_up(weaviate_compose_up, ollama_compose_up):  # type: ignore[no-r
     try:
         subprocess.run(["docker", "image", "inspect", image_name], check=True, capture_output=True)
     except subprocess.CalledProcessError:
-        pytest.skip(f"Docker image {image_name} not found. Please build it first, e.g., with './scripts/build_app.sh'")
+        pytest.skip(
+            f"Docker image {image_name} not found. Please build it first, e.g., with './scripts/docker/build_app.sh'"
+        )
 
     compose_file = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
     try:

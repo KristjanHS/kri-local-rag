@@ -10,7 +10,7 @@ Concise setup for human developers. For detailed, AI-automation-focused guidance
 This project uses a unified script to set up a complete development environment, including a Python virtualenv, all dependencies, and required system tools.
 
 ```bash
-bash scripts/setup-dev-env.sh
+bash scripts/dev/setup-dev-env.sh
 ```
 
 After setup, activate the virtual environment to use the installed tools:
@@ -95,7 +95,7 @@ reranker = load_reranker()
 ## Docker (optional)
 Preferred startup: use the automated setup script which builds the image, starts services, and waits for health checks.
 ```bash
-./scripts/docker-setup.sh
+./scripts/docker/docker-setup.sh
 ```
 See the root README for starting/stopping the stack and simple day-to-day commands. For deeper service operations and troubleshooting, see `docs/operate/docker-management.md`.
 
@@ -138,10 +138,9 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 
 ## Helper scripts
 
-- `scripts/docker-setup.sh`: one-time Docker environment bootstrap.
-- `scripts/docker-reset.sh`: full Docker cleanup (containers, images, volumes).
-- `scripts/build_app.sh`: build the `app` image; accepts `--no-cache`.
+- `scripts/docker/docker-setup.sh`: one-time Docker environment bootstrap.
+- `scripts/docker/docker-reset.sh`: full Docker cleanup (containers, images, volumes).
+- `scripts/docker/build_app.sh`: build the `app` image; accepts `--no-cache`.
 - `scripts/cli.sh`: convenience wrapper to run the CLI inside Docker.
-- `scripts/check_integration_env.py`: Integration test environment checker (imports utilities from `tests/integration/conftest.py`).
 
 **Note**: Scripts that need integration test utilities should import them from `tests/integration/conftest.py` rather than duplicating the logic. See `docs/dev_test_CI/testing_approach.md` for details.

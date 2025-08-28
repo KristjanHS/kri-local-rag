@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+format_yaml.sh#!/usr/bin/env bash
 set -euo pipefail
 
 # Simple wrapper for yamlfmt.

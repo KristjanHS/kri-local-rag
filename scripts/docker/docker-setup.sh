@@ -56,10 +56,10 @@ echo -e "${BOLD}Services that will be started: ${SERVICES_UP[*]}${NC}"
 echo -e "${BOLD}Starting the automatic setup for the RAG project...${NC}"
 
 # Source centralized configuration
-source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 
-# Get default Ollama model from config
-DEFAULT_OLLAMA_MODEL=$(python3 -c "from backend.config import DEFAULT_OLLAMA_MODEL; print(DEFAULT_OLLAMA_MODEL)")
+# Default Ollama model (hardcoded to avoid import issues)
+DEFAULT_OLLAMA_MODEL="cas/mistral-7b-instruct-v0.3"
 
 # Setup logging (timestamped file + stable symlink) and traps
 SCRIPT_NAME=$(get_script_name "${BASH_SOURCE[0]}")
@@ -69,14 +69,14 @@ enable_debug_trace "$LOG_FILE"
 log INFO "Starting $SCRIPT_NAME" | tee -a "$LOG_FILE"
 
 # Ensure helper scripts are executable
-chmod +x scripts/cli.sh scripts/ingest.sh scripts/docker-reset.sh scripts/build_app.sh || true
+chmod +x scripts/cli.sh scripts/ingest.sh scripts/docker/docker-reset.sh scripts/docker/build_app.sh || true
 
 # --- Step 1: Build Docker Images ---
 echo ""
 log INFO "Starting Docker image build process" | tee -a "$LOG_FILE"
 echo -e "${BOLD}--- Step 1: Building custom Docker images... ---${NC}"
 echo "This may take a few minutes. Detailed output is being saved to '$LOG_FILE'."
-run_step "Build app image" "$LOG_FILE" ./scripts/build_app.sh
+run_step "Build app image" "$LOG_FILE" ./scripts/docker/build_app.sh
 echo -e "${GREEN}✓ Build complete.${NC}"
 
 
@@ -137,5 +137,5 @@ echo -e "You can access the Streamlit app at: ${BOLD}http://localhost:8501${NC}"
 echo "To open an interactive RAG CLI shell, run: ./scripts/cli.sh (starts qa_loop.py by default)"
 echo ""
 echo "To stop all services, run: docker compose --file $DOCKER_COMPOSE_FILE down"
-echo "To completely reset the environment, run: ./scripts/docker-reset.sh"
+echo "To completely reset the environment, run: ./scripts/docker/docker-reset.sh"
 echo "" 

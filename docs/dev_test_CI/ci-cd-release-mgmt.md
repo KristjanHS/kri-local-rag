@@ -57,7 +57,8 @@ The `.actrc` file uses optimized Docker images and automatically removes contain
 act -l
 
 # Run CI locally
-./scripts/ci_act.sh
+# Note: ci_act.sh script not found in current structure
+# Consider using: act workflow_dispatch -W .github/workflows/python-lint-test.yml
 
 # Run specific workflows
 act workflow_dispatch -W .github/workflows/codeql.yml
@@ -72,10 +73,10 @@ act workflow_dispatch -j pyright
 ### Troubleshooting
 ```bash
 # Clean up CI cache
-./scripts/cleanup_docker_and_ci_cache.sh
+./scripts/docker/cleanup_docker_and_ci_cache.sh
 
 # Aggressive cleanup
-./scripts/cleanup_docker_and_ci_cache.sh --restart-docker --builder-prune
+./scripts/docker/cleanup_docker_and_ci_cache.sh --restart-docker --builder-prune
 ```
 
 ## Pre-commit Framework
@@ -84,7 +85,7 @@ This project uses a comprehensive pre-commit framework for code quality, formatt
 
 ### Quick Setup
 ```bash
-./scripts/setup-pre-commit.sh
+./scripts/dev/setup-pre-commit.sh
 ```
 
 ### Included Tools
@@ -147,13 +148,13 @@ go install github.com/google/yamlfmt/cmd/yamlfmt@latest
 ### Promote `dev` to `main`
 ```bash
 # Normal release
-./scripts/promote_dev_to_main.sh
+./scripts/ci/promote_dev_to_main.sh
 
 # Dry run (no push)
-./scripts/promote_dev_to_main.sh --dry-run
+./scripts/ci/promote_dev_to_main.sh --dry-run
 
 # Auto-resolve all conflicts
-./scripts/promote_dev_to_main.sh --prefer-dev-all
+./scripts/ci/promote_dev_to_main.sh --prefer-dev-all
 ```
 
 ### What the Release Script Does
@@ -196,12 +197,12 @@ go install github.com/google/yamlfmt/cmd/yamlfmt@latest
 ## Project Scripts
 
 ### CI Scripts
-- `scripts/ci_act.sh`: Run full CI locally
-- `scripts/cleanup_docker_and_ci_cache.sh`: Cleanup Docker and act cache
-- `scripts/ci_local_fast.sh`: Fast local CI testing
+- `scripts/ci_act.sh`: Run full CI locally (not found in current structure)
+- `scripts/docker/cleanup_docker_and_ci_cache.sh`: Cleanup Docker and act cache
+- `scripts/ci_local_fast.sh`: Fast local CI testing (not found in current structure)
 
 ### Release Scripts
-- `scripts/promote_dev_to_main.sh`: Safe dev → main promotion
+- `scripts/ci/promote_dev_to_main.sh`: Safe dev → main promotion
 
 ## Security & Best Practices
 

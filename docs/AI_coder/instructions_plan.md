@@ -69,7 +69,7 @@ This plan outlines the steps to create a comprehensive `instructions.md` file th
 
 2.  **Automation Scripts**:
     -   Document the key scripts in the `scripts/` directory (`docker-setup.sh`, `cli.sh`, etc.).
-    -   Explain the role of `config.sh`.
+    -   Explain the role of `common.sh`.
 
 ## Phase 6: Final Review
 

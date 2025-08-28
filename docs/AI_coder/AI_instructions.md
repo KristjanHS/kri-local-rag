@@ -4,10 +4,10 @@ Action-first cheatsheet for automations.
 
 ### Golden Commands
 
-- **Start services**: `./scripts/docker-setup.sh`
+- **Start services**: `./scripts/docker/docker-setup.sh`
 - **Stop services**: `docker compose -f docker/docker-compose.yml down`
 - **Run E2E tests**: `.venv/bin/python -m pytest -q tests/e2e --disable-warnings --maxfail=1`
-- **Quick dev setup**: `bash scripts/setup-dev-env.sh`
+- **Quick dev setup**: `bash scripts/dev/setup-dev-env.sh`
 - **Run QA loop**: `.venv/bin/python -m backend.qa_loop`
 
 Ports: app `http://localhost:8501`, Weaviate `http://localhost:8080`, Ollama `http://localhost:11434`.
@@ -153,16 +153,16 @@ pytest -m "requires_weaviate and requires_ollama" # Both services
 - Install: `.venv/bin/python -m pip install -r requirements-dev.txt && .venv/bin/python -m pip install -e .`
 
 **Quick Commands**:
-- Setup dev env: `bash scripts/setup-dev-env.sh`
+- Setup dev env: `bash scripts/dev/setup-dev-env.sh`
 - Activate venv: `source .venv/bin/activate`
 - Run QA loop: `.venv/bin/python -m backend.qa_loop`
 
 ## Docker Workflow
 
 **Quick Commands**:
-- Build app: `./scripts/build_app.sh --no-cache`
+- Build app: `./scripts/docker/build_app.sh --no-cache`
 - Restart app: `docker compose -f docker/docker-compose.yml up -d --force-recreate app`
-- Clean rebuild: `./scripts/build_app.sh --no-cache && docker compose -f docker/docker-compose.yml up -d --force-recreate app`
+- Clean rebuild: `./scripts/docker/build_app.sh --no-cache && docker compose -f docker/docker-compose.yml up -d --force-recreate app`
 
 **Troubleshooting**:
 - Validate config: `docker compose -f docker/docker-compose.yml config`

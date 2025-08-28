@@ -6,7 +6,7 @@
 set -e
 
 # Source centralized configuration
-source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 
 # Setup logging
 SCRIPT_NAME=$(get_script_name "${BASH_SOURCE[0]}")
