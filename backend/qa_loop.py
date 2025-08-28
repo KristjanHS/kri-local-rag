@@ -7,7 +7,8 @@ from __future__ import annotations
 import os
 import sys
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Callable
+import threading
 
 from rich.rule import Rule
 
@@ -120,13 +121,13 @@ def answer(
     k: int = 3,
     *,
     metadata_filter: Optional[Dict[str, Any]] = None,
-    on_token=None,
-    on_debug=None,
-    stop_event=None,
+    on_token: Optional[Callable[[str], None]] = None,
+    on_debug: Optional[Callable[[str], None]] = None,
+    stop_event: Optional[threading.Event] = None,
     context_tokens: int = 8192,
     collection_name: Optional[str] = None,
-    get_top_k_func=get_top_k,
-    generate_response_func=generate_response,
+    get_top_k_func: Callable[..., List[str]] = get_top_k,
+    generate_response_func: Callable[..., tuple[str, Optional[list[int]]]] = generate_response,
 ) -> str:
     """Return an answer from the LLM using RAG with optional debug output and streaming callbacks.
     Can be interrupted with stop_event.
@@ -176,14 +177,14 @@ def answer(
 
     # ---------- 4) Query the LLM -------------------------------------------------
     # Use a simple print callback for CLI debug mode
-    def cli_on_debug(msg):
+    def cli_on_debug(msg: str) -> None:
         logger.debug("[Ollama Debug] %s", msg)
 
     # Collect tokens for CLI output
-    collected_tokens = []
+    collected_tokens: list[str] = []
     first_token_processed = False
 
-    def cli_on_token(token):
+    def cli_on_token(token: str) -> None:
         nonlocal first_token_processed
 
         # Trim leading whitespace from the first token only
@@ -281,9 +282,9 @@ def ensure_weaviate_ready_and_populated():
 
             logger.info("   → Ingesting example test PDF from %s", test_pdf_path)
             # Reuse the already connected client to avoid separate gRPC/port issues in tests
-            from backend.retriever import _get_embedding_model
+            from backend.models import load_embedder
 
-            embedding_model = _get_embedding_model()
+            embedding_model = load_embedder()
             ingest(
                 test_pdf_path,
                 collection_name=collection_name,
@@ -382,7 +383,7 @@ if __name__ == "__main__":
     # Build metadata filter dict (AND-combination of provided fields)
     meta_filter: Optional[Dict[str, Any]] = None
     if args.source or args.language:
-        clauses = []
+        clauses: list[Dict[str, Any]] = []
         if args.source:
             clauses.append({"path": ["source"], "operator": "Equal", "valueText": args.source})
         if args.language:
@@ -393,10 +394,10 @@ if __name__ == "__main__":
         else:
             meta_filter = {"operator": "And", "operands": clauses}
 
-    # Load models once
-    from backend.retriever import _get_embedding_model
+    # Load models once (public loader)
+    from backend.models import load_embedder
 
-    embedding_model = _get_embedding_model()
+    embedding_model = load_embedder()
     cross_encoder = _get_cross_encoder()
 
     if args.question:

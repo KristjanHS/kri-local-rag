@@ -58,6 +58,13 @@ echo -e "${BOLD}Starting the automatic setup for the RAG project...${NC}"
 # Source centralized configuration
 source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 
+# Setup logging (timestamped file + stable symlink) and traps early
+SCRIPT_NAME=$(get_script_name "${BASH_SOURCE[0]}")
+LOG_FILE=$(init_script_logging "$SCRIPT_NAME")
+enable_error_trap "$LOG_FILE" "$SCRIPT_NAME"
+enable_debug_trace "$LOG_FILE"
+log INFO "Starting $SCRIPT_NAME" | tee -a "$LOG_FILE"
+
 # Default Ollama model (hardcoded to avoid import issues)
 DEFAULT_OLLAMA_MODEL="cas/mistral-7b-instruct-v0.3"
 
@@ -66,12 +73,13 @@ check_model_synchronization() {
     local config_file="$PROJECT_ROOT/backend/config.py"
     local hardcoded_model="$DEFAULT_OLLAMA_MODEL"
     
-    # Extract the model value from Python config using grep and sed
+    # Extract the model value from Python config using awk (robust under set -eo pipefail)
     local python_model
-    python_model=$(grep "^DEFAULT_OLLAMA_MODEL =" "$config_file" | sed 's/.*= "\(.*\)"/\1/' || echo "")
+    python_model=$(awk -F"['\"]" '/^DEFAULT_OLLAMA_MODEL\s*=/ {print $2}' "$config_file")
     
     if [ -z "$python_model" ]; then
-        log WARN "Could not extract DEFAULT_OLLAMA_MODEL from $config_file" | tee -a "$LOG_FILE"
+        # Guard against uninitialized LOG_FILE under set -u
+        log WARN "Could not extract DEFAULT_OLLAMA_MODEL from $config_file" | tee -a "${LOG_FILE:-/dev/null}"
         return 1
     fi
     
@@ -82,23 +90,18 @@ check_model_synchronization() {
         echo -e "${YELLOW}These values differ! Please update the hardcoded value in docker-setup.sh to match.${NC}"
         echo -e "${YELLOW}This ensures consistency between the setup script and application configuration.${NC}"
         echo ""
-        log WARN "Model synchronization check failed: hardcoded='$hardcoded_model' vs python='$python_model'" | tee -a "$LOG_FILE"
+        # Guard against uninitialized LOG_FILE under set -u
+        log WARN "Model synchronization check failed: hardcoded='$hardcoded_model' vs python='$python_model'" | tee -a "${LOG_FILE:-/dev/null}"
         return 1
     else
-        log INFO "Model synchronization check passed: '$hardcoded_model'" | tee -a "$LOG_FILE"
+        # Guard against uninitialized LOG_FILE under set -u
+        log INFO "Model synchronization check passed: '$hardcoded_model'" | tee -a "${LOG_FILE:-/dev/null}"
         return 0
     fi
 }
 
 # Check model synchronization before proceeding
 check_model_synchronization
-
-# Setup logging (timestamped file + stable symlink) and traps
-SCRIPT_NAME=$(get_script_name "${BASH_SOURCE[0]}")
-LOG_FILE=$(init_script_logging "$SCRIPT_NAME")
-enable_error_trap "$LOG_FILE" "$SCRIPT_NAME"
-enable_debug_trace "$LOG_FILE"
-log INFO "Starting $SCRIPT_NAME" | tee -a "$LOG_FILE"
 
 # Ensure helper scripts are executable
 chmod +x scripts/cli.sh scripts/ingest.sh scripts/docker/docker-reset.sh scripts/docker/build_app.sh || true

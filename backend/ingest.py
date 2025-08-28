@@ -19,7 +19,7 @@ import hashlib
 import os
 import time
 from datetime import datetime, timezone
-from typing import List, Optional, cast
+from typing import Any, List, Optional, cast
 
 import torch
 import weaviate
@@ -102,7 +102,7 @@ def load_and_split_documents(path: str) -> List[Document]:
                 loader = DirectoryLoader(
                     path,
                     glob=glob_pattern,
-                    loader_cls=loader_cls,
+                    loader_cls=cast(Any, loader_cls),
                     show_progress=True,
                     use_multithreading=True,
                 )
@@ -150,7 +150,9 @@ def deterministic_uuid(doc: Document) -> str:
     """Generate a deterministic UUID for a document chunk."""
     # usedforsecurity=False is not available in all python versions, nosec is safer
     content_hash = hashlib.md5(doc.page_content.encode("utf-8")).hexdigest()  # nosec B324
-    source_file = os.path.basename(doc.metadata.get("source", "unknown"))
+    meta_for_uuid = cast(dict[str, Any], cast(Any, doc).metadata)
+    source: str = cast(str, meta_for_uuid.get("source", "unknown"))
+    source_file = os.path.basename(source)
     return hashlib.md5(f"{source_file}:{content_hash}".encode("utf-8")).hexdigest()  # nosec B324
 
 
@@ -186,17 +188,20 @@ def process_and_upload_chunks(
         concurrent_requests=WEAVIATE_CONCURRENT_REQUESTS,
     ) as batch:
         for idx, doc in enumerate(docs, start=1):
+            meta: dict[str, Any] = cast(dict[str, Any], cast(Any, doc).metadata)
             uuid = deterministic_uuid(doc)
-            vector_tensor = model.encode(doc.page_content)
+            vector_tensor = cast(Any, model).encode(doc.page_content)
             # Normalize to a plain Python list of floats for the Weaviate client
             vector: List[float] = to_float_list(vector_tensor)
 
-            properties = {
+            src: Optional[str] = cast(Optional[str], meta.get("source", None))
+            src_safe: str = src or "unknown"
+            properties: dict[str, str] = {
                 "content": doc.page_content,
-                "source_file": os.path.basename(doc.metadata.get("source", "unknown")),
-                "source": os.path.splitext(doc.metadata.get("source", "unknown"))[1],
+                "source_file": os.path.basename(src_safe),
+                "source": os.path.splitext(src_safe)[1],
                 # Derive created_at from source file if it exists; fall back to now.
-                "created_at": _safe_created_at(doc.metadata.get("source")),
+                "created_at": _safe_created_at(src),
             }
 
             # This logic remains manual as requested, but uses batching for efficiency
@@ -240,8 +245,10 @@ def optimize_embedding_model(embedding_model: SentenceTransformer) -> SentenceTr
 
     try:
         logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
+        torch_compile = getattr(torch, "compile")
         compiled_model = cast(
-            SentenceTransformer, torch.compile(embedding_model, backend="inductor", mode="max-autotune")
+            SentenceTransformer,
+            torch_compile(embedding_model, backend="inductor", mode="max-autotune"),
         )
         # Mark the compiled instance so future calls are a no-op.
         try:

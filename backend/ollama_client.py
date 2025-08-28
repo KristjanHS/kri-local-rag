@@ -2,7 +2,8 @@
 """Ollama client utilities for model management and inference."""
 
 import json
-from typing import Optional
+from typing import Optional, Callable
+import threading
 
 import httpx
 
@@ -44,7 +45,7 @@ def _detect_ollama_model() -> Optional[str]:
     return None
 
 
-def _check_model_exists(model_name: str, models: list) -> bool:
+def _check_model_exists(model_name: str, models: list[dict[str, str]]) -> bool:
     """Check if a model exists in the list of available models."""
     for model in models:
         model_name_from_list = model.get("name", "")
@@ -222,12 +223,12 @@ def test_ollama_connection() -> bool:
 def generate_response(
     prompt: str,
     model_name: str = OLLAMA_MODEL,
-    context: Optional[list] = None,
-    on_token=None,
-    on_debug=None,
-    stop_event=None,
-    context_tokens: int = 8192,
-) -> tuple[str, Optional[list]]:
+    context: Optional[list[int]] = None,
+    on_token: Optional[Callable[[str], None]] = None,
+    on_debug: Optional[Callable[[str], None]] = None,
+    stop_event: Optional[threading.Event] = None,
+    context_tokens: Optional[int] = 8192,
+) -> tuple[str, Optional[list[int]]]:
     """Generate a response from Ollama for the given prompt, optionally streaming tokens and debug info via callbacks.
     Can be interrupted with stop_event."""
     import sys
@@ -239,7 +240,7 @@ def generate_response(
     url = f"{base_url.rstrip('/')}/api/generate"
     logger.debug("generate_response: base_url=%s url=%s", base_url, url)
 
-    payload = {
+    payload: dict[str, object] = {
         "model": model_name,
         "prompt": prompt,
         "stream": True,
@@ -376,3 +377,7 @@ def generate_response(
         if on_debug:
             on_debug(f"Exception in generate_response: {e}")
         return f"[Error generating response: {e}]", context
+
+
+# Keep selected helpers referenced to satisfy strict static checks and tests
+_KEEP_FOR_TESTS = (_detect_ollama_model, _verify_model_download)

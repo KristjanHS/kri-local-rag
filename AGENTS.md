@@ -1,5 +1,11 @@
 # Repository Guidelines
 
+## Standards & Rules
+- **Run commands from the project root.**
+- **Run Pytest as a module:** `.venv/bin/python -m pytest tests/` to avoid `ImportError` issues.
+- **Use `.venv/bin/python` for Python execution** to ensure consistent virtual environment usage.
+- See `docs/CODEX_RULES.md` for linting/formatting, typing, testing policy, imports/deps, Docker safety, logging, and after‑edits guidance.
+
 ## Project Structure & Modules
 - `backend/`: ingestion (`ingest.py`), retrieval/QA (`qa_loop.py`), Weaviate/Ollama clients, config.
 - `frontend/`: Streamlit UI (`rag_app.py`).
@@ -15,27 +21,9 @@
 - Test harness: `make test-up` → `make test-run-integration` → `make test-down`.
 - Pytest locally: `pytest -q` (coverage outputs to `reports/coverage`).
 
-## Coding Style & Naming
-- Python 3.12; 4‑space indent; max line length 120; prefer double quotes.
-- Lint/format: Ruff (`ruff`, `ruff format`) and type check with Pyright.
-- Names: modules/functions/vars `snake_case`; classes `PascalCase`; constants `UPPER_SNAKE`.
-- Hooks: `make setup-hooks` to enable pre‑commit (ruff, pyright, bandit, detect‑secrets, hadolint, actionlint, yamlfmt).
-
-## Testing Guidelines
-- Framework: Pytest with markers: `slow`, `docker`, `external`, `requires_weaviate`, `requires_ollama`, `integration`.
-- File naming: `tests/**/test_*.py`; keep unit tests fast and isolated; integration/e2e may target running compose.
-- Useful env for tests/dev: `RAG_SKIP_STARTUP_CHECKS=1`, `RAG_FAKE_ANSWER="..."`.
-- Run subsets: `pytest tests/unit -q`, `pytest -m "integration and not slow"`.
-
 ## Commit & Pull Request Guidelines
 - Commits: concise, imperative subject; group related changes; no secrets. Run pre‑commit before pushing.
-- PRs: describe intent, key changes, and test coverage; link issues; include run instructions and UI screenshots if relevant.
 - Requirements: CI must pass (lint, type, tests); update docs (`README.md`, `docs/**`) when behavior changes.
 
 ## Security & Configuration
-- Copy `.env.example` → `.env`; set `WEAVIATE_URL`, `OLLAMA_URL`, optional `OLLAMA_IMAGE`.
 - Do not commit secrets; baseline in `.secrets.baseline` is enforced by pre‑commit.
-- First run downloads models; allow time or pre‑pull via setup script.
-
-## Codex CLI Alignment
-- Codex sessions follow `docs/CODEX_RULES.md`, which mirrors `.cursor/rules/*` for consistent behavior across tools.
