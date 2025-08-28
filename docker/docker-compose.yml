@@ -107,7 +107,7 @@ services:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
       - WEAVIATE_URL=http://weaviate:8080
-    command: ["python", "backend/ingest.py", "/app/data"]
+    command: ["python", "-m", "backend.ingest", "--data-dir", "/app/data"]
 
 volumes:
   weaviate_db:

@@ -70,19 +70,23 @@ def load_and_split_documents(path: str) -> List[Document]:
 
     # 1) Single file path support
     docs: List[Document] = []
+    file_count = 0
     if os.path.isfile(path):
         ext = os.path.splitext(path)[1].lower()
         if ext == ".pdf":
             loader = pdf_loader_cls(path)
             docs.extend(loader.load())
+            file_count = 1
         elif ext == ".md":
             loader = UnstructuredMarkdownLoader(path)
             docs.extend(loader.load())
+            file_count = 1
         else:
             logger.warning(f"Unsupported file extension '{ext}' for path '{path}'.")
             return []
     else:
         # 2) Directory path with glob patterns
+        import glob
 
         loader_configs = {
             "**/*.pdf": pdf_loader_cls,
@@ -90,6 +94,11 @@ def load_and_split_documents(path: str) -> List[Document]:
         }
         for glob_pattern, loader_cls in loader_configs.items():
             try:
+                # Count files first
+                pattern_path = os.path.join(path, glob_pattern)
+                matching_files = glob.glob(pattern_path, recursive=True)
+                file_count += len(matching_files)
+
                 loader = DirectoryLoader(
                     path,
                     glob=glob_pattern,
@@ -107,7 +116,7 @@ def load_and_split_documents(path: str) -> List[Document]:
         logger.warning(f"No documents found in '{path}'.")
         return []
 
-    logger.info(f"Loaded {len(docs)} documents.")
+    logger.info(f"Loaded {len(docs)} pages from {file_count} files.")
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
     chunked_docs = text_splitter.split_documents(docs)
