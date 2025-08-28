@@ -1,8 +1,4 @@
 {
-    "include": [
-        "backend",
-        "tests"
-    ],
     "exclude": [
         "**/.venv/**",
         "**/__pycache__/**",
@@ -11,16 +7,21 @@
     ],
     "venvPath": ".",
     "venv": ".venv",
-    "typeCheckingMode": "standard",
-    "pythonVersion": "3.12",
-    "pythonPlatform": "Linux",
-    "extraPaths": [
+    "include": [
         "backend"
     ],
-    "reportMissingTypeStubs": false,
-    "diagnosticSeverityOverrides": {
-        "reportMissingModuleSource": "none",
-        "reportUnusedImport": "warning",
-        "reportUnusedVariable": "warning"
-    }
+    "typeCheckingMode": "standard",
+    "strict": [
+        "backend/**"
+    ],
+    "pythonVersion": "3.12",
+    "pythonPlatform": "Linux",
+    "reportMissingModuleSource": "warning",
+    "reportMissingTypeStubs": "none",
+    "reportMissingImports": "error",
+    "reportUnusedImport": "warning",
+    "reportUnusedVariable": "warning",
+    "reportUndefinedVariable": "error",
+    "reportUnknownMemberType": "warning",
+    "useLibraryCodeForTypes": true
 }

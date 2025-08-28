@@ -136,12 +136,12 @@ def get_top_k(
 
     # Weaviate returns objects already ordered by relevance. If a distance
     # attribute is present we sort on it just in case.
-    objects = res.objects
+    objects: list[Any] = list(res.objects)
     if objects and hasattr(objects[0], "distance"):
         objects.sort(key=lambda o: getattr(o, "distance", 0.0))
 
     # Extract content and show chunk heads at INFO level
-    chunks = []
+    chunks: list[str] = []
     for i, obj in enumerate(objects):
         content = str(obj.properties.get("content", ""))
         chunks.append(content)
