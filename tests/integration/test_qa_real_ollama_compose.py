@@ -17,7 +17,7 @@ pytestmark = pytest.mark.requires_ollama
 
 
 @pytest.mark.requires_ollama
-def test_answer_uses_real_ollama_compose(weaviate_client, clean_test_collection, sample_documents_path, monkeypatch):
+def test_answer_uses_real_ollama_compose(weaviate_client, test_collection_name, sample_documents_path, monkeypatch):
     """Test QA with real Ollama using both Docker and local environments."""
     # First, ensure we have data in Weaviate by running ingestion
     from backend import ingest

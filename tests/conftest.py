@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import os
-import types
 from pathlib import Path
 from typing import Iterator
 
@@ -129,16 +128,18 @@ def sample_documents_path():
     return "example_data/"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def weaviate_client():
     """Fixture for a real Weaviate client, ensuring the service is available."""
     import logging
 
-    from backend import ingest
+    from backend.weaviate_client import close_weaviate_client, get_weaviate_client
 
     logger = logging.getLogger(__name__)
     logger.debug("Attempting to connect to Weaviate for integration tests...")
-    client = ingest.connect_to_weaviate()
+
+    # Use wrapper consistently - each test gets its own client instance
+    client = get_weaviate_client()
     logger.debug("Successfully connected to Weaviate.")
     try:
         if client.collections.exists(TEST_COLLECTION_NAME):
@@ -148,40 +149,15 @@ def weaviate_client():
         logger.warning("Error during pre-test cleanup of collection %s: %s", TEST_COLLECTION_NAME, e)
     yield client
     try:
-        if client.collections.exists(TEST_COLLECTION_NAME):
+        # Get a fresh client for cleanup since the yielded client might be closed
+        fresh_client = get_weaviate_client()
+        if fresh_client.collections.exists(TEST_COLLECTION_NAME):
             logger.debug("Deleting test collection after tests: %s", TEST_COLLECTION_NAME)
-            client.collections.delete(TEST_COLLECTION_NAME)
+            fresh_client.collections.delete(TEST_COLLECTION_NAME)
     except Exception as e:
         logger.warning("Error during post-test cleanup of collection %s: %s", TEST_COLLECTION_NAME, e)
-
-
-@pytest.fixture
-def clean_test_collection(weaviate_client):
-    """Ensure the shared 'TestCollection' is empty before and after each test.
-
-    This provides test isolation across integration and E2E tests that ingest
-    into the common collection name. It complements any session-level cleanup.
-    """
-    import logging
-
-    logger = logging.getLogger(__name__)
-
-    # Pre-test cleanup
-    try:
-        if weaviate_client.collections.exists(TEST_COLLECTION_NAME):
-            weaviate_client.collections.delete(TEST_COLLECTION_NAME)
-    except Exception as e:  # pragma: no cover - best-effort
-        logger.warning("Pre-test cleanup failed for collection %s: %s", TEST_COLLECTION_NAME, e)
-
-    try:
-        yield
     finally:
-        # Post-test cleanup
-        try:
-            if weaviate_client.collections.exists(TEST_COLLECTION_NAME):
-                weaviate_client.collections.delete(TEST_COLLECTION_NAME)
-        except Exception as e:  # pragma: no cover - best-effort
-            logger.warning("Post-test cleanup failed for collection %s: %s", TEST_COLLECTION_NAME, e)
+        close_weaviate_client()
 
 
 @pytest.fixture(scope="session")
@@ -294,114 +270,4 @@ def docker_services_ready():  # noqa: D401
     yield
 
 
-# ---------------------------------------------------------------------------
-# Safety guard: prevent real external connections in light tests
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(autouse=True)
-def _guard_against_real_external_services(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest):
-    """Block real Weaviate and Ollama connections for unit tests.
-
-    Applies to any test that is located in the 'tests/unit' directory.
-    """
-    # Get the path of the test being run
-    test_path = Path(request.node.fspath)
-
-    # Apply the guard only if the test is inside the 'tests/unit' directory
-    if "tests/unit" not in str(test_path.parent):
-        return
-
-    # ---- Weaviate guard ----
-    def _raise_connect_to_custom(*_args, **_kwargs):  # type: ignore[no-redef]
-        raise AssertionError(
-            "This test must not create real Weaviate clients. "
-            "Patch 'qa_loop.weaviate.connect_to_custom' to use a fake client."
-        )
-
-    # Patch the top-level weaviate module if available
-    try:
-        import weaviate as _weaviate_mod  # type: ignore
-
-        monkeypatch.setattr(_weaviate_mod, "connect_to_custom", _raise_connect_to_custom, raising=False)
-    except Exception:
-        pass
-
-    # Patch the reference used by backend.qa_loop, which light tests commonly exercise
-    try:
-        import backend.qa_loop as _qa_loop
-
-        if hasattr(_qa_loop, "weaviate") and hasattr(_qa_loop.weaviate, "connect_to_custom"):
-            monkeypatch.setattr(_qa_loop.weaviate, "connect_to_custom", _raise_connect_to_custom, raising=False)
-        else:
-            monkeypatch.setattr(
-                _qa_loop, "weaviate", types.SimpleNamespace(connect_to_custom=_raise_connect_to_custom), raising=False
-            )
-    except Exception:
-        pass
-
-    # Also patch the reference used by backend.retriever
-    try:
-        import backend.retriever as _retriever
-
-        if hasattr(_retriever, "weaviate") and hasattr(_retriever.weaviate, "connect_to_custom"):
-            monkeypatch.setattr(_retriever.weaviate, "connect_to_custom", _raise_connect_to_custom, raising=False)
-        else:
-            monkeypatch.setattr(
-                _retriever, "weaviate", types.SimpleNamespace(connect_to_custom=_raise_connect_to_custom), raising=False
-            )
-    except Exception:
-        pass
-
-    # ---- Ollama guard (httpx) ----
-    try:
-        from urllib.parse import urlparse as _urlparse
-
-        import httpx as _httpx_mod  # type: ignore
-
-        _orig_get = getattr(_httpx_mod, "get", None)
-        _orig_stream = getattr(_httpx_mod, "stream", None)
-
-        def _is_ollama_url(url_value: object) -> bool:
-            try:
-                if not isinstance(url_value, str):
-                    return False
-                parsed = _urlparse(url_value)
-                is_ollama_port = parsed.port == 11434
-                is_ollama_path = parsed.path.startswith("/api/generate") or parsed.path.startswith("/api/tags")
-                return bool(is_ollama_port or is_ollama_path)
-            except Exception:
-                return False
-
-        def _guarded_get(url, *args, **kwargs):  # type: ignore[no-redef]
-            if _is_ollama_url(url):
-                raise AssertionError(
-                    "This test must not call the real Ollama HTTP endpoints. "
-                    "Patch 'httpx.get' or the caller to use a fake response."
-                )
-            if callable(_orig_get):
-                return _orig_get(url, *args, **kwargs)
-            raise RuntimeError("httpx.get not available")
-
-        def _guarded_stream(*args, **kwargs):  # type: ignore[no-redef]
-            # httpx.stream(method, url, ...)
-            url_arg = None
-            if len(args) >= 2:
-                url_arg = args[1]
-            elif "url" in kwargs:
-                url_arg = kwargs["url"]
-            if _is_ollama_url(url_arg):
-                raise AssertionError(
-                    "This test must not stream from real Ollama. "
-                    "Patch 'httpx.stream' or the caller to use a fake stream."
-                )
-            if callable(_orig_stream):
-                return _orig_stream(*args, **kwargs)
-            raise RuntimeError("httpx.stream not available")
-
-        if callable(_orig_get):
-            monkeypatch.setattr(_httpx_mod, "get", _guarded_get, raising=False)
-        if callable(_orig_stream):
-            monkeypatch.setattr(_httpx_mod, "stream", _guarded_stream, raising=False)
-    except Exception:
-        pass
+# (Unit-test-only fixtures have been moved to tests/unit/conftest.py)

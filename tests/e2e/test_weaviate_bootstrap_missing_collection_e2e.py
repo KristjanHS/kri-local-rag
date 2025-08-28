@@ -9,11 +9,10 @@ This prepares Weaviate by starting the docker-compose service (no rebuild of the
 
 import os
 from contextlib import contextmanager
-from urllib.parse import urlparse
 
 import pytest
-import weaviate
 
+from backend.weaviate_client import close_weaviate_client, get_weaviate_client
 from tests.conftest import TEST_COLLECTION_NAME
 
 pytestmark = [pytest.mark.slow]
@@ -52,16 +51,8 @@ def test_bootstrap_creates_missing_collection_and_cleans_example_data(tmp_path, 
     weaviate_url = "http://localhost:8080"
 
     with _env_vars({"WEAVIATE_URL": weaviate_url, "DOCKER_ENV": "", "COLLECTION_NAME": target_collection}):
-        # Connect a client to the compose Weaviate (gRPC 50051 is exposed in compose)
-        parsed = urlparse(weaviate_url)
-        client = weaviate.connect_to_custom(
-            http_host=parsed.hostname or "localhost",
-            http_port=parsed.port or 80,
-            grpc_host=parsed.hostname or "localhost",
-            grpc_port=50051,
-            http_secure=parsed.scheme == "https",
-            grpc_secure=parsed.scheme == "https",
-        )
+        # Connect a client to the compose Weaviate via centralized wrapper
+        client = get_weaviate_client()
         try:
             # Run the bootstrap function with the collection name provided via environment
             from backend.qa_loop import ensure_weaviate_ready_and_populated
@@ -75,19 +66,24 @@ def test_bootstrap_creates_missing_collection_and_cleans_example_data(tmp_path, 
 
             ensure_weaviate_ready_and_populated()
 
-            # After bootstrap:
-            # - The collection should exist (robust check via get)
+            # After bootstrap, get a fresh client since bootstrap may have closed it
+            fresh_client = get_weaviate_client()
             try:
-                client.collections.get(target_collection)
-            except Exception as e:  # pragma: no cover - diagnostic in CI
-                pytest.fail(f"Collection '{TEST_COLLECTION_NAME}' does not exist after bootstrap: {e}")
+                # After bootstrap:
+                # - The collection should exist (robust check via get)
+                try:
+                    fresh_client.collections.get(target_collection)
+                except Exception as e:  # pragma: no cover - diagnostic in CI
+                    pytest.fail(f"Collection '{TEST_COLLECTION_NAME}' does not exist after bootstrap: {e}")
 
-            # - Example data should have been ingested and then removed, so the
-            #   collection should now be empty
-            has_objects = _collection_has_any_objects(client, target_collection)
-            assert has_objects is False
+                # - Example data should have been ingested and then removed, so the
+                #   collection should now be empty
+                has_objects = _collection_has_any_objects(fresh_client, target_collection)
+                assert has_objects is False
+            finally:
+                close_weaviate_client()
         finally:
             try:
-                client.close()
+                close_weaviate_client()
             except Exception:
                 pass

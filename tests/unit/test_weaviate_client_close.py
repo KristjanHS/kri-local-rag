@@ -1,5 +1,3 @@
-import types
-
 import backend.qa_loop as qa_loop
 
 
@@ -27,11 +25,10 @@ def test_ensure_weaviate_ready_and_populated_closes_client(monkeypatch):
 
     fake_client = FakeClient()
 
-    def fake_connect_to_custom(**kwargs):  # type: ignore[no-redef]
-        return fake_client
-
-    # Monkeypatch the weaviate connection factory used by the function
-    monkeypatch.setattr(qa_loop, "weaviate", types.SimpleNamespace(connect_to_custom=fake_connect_to_custom))
+    # Monkeypatch the centralized weaviate client getter used by the function
+    monkeypatch.setattr("backend.weaviate_client.get_weaviate_client", lambda: fake_client, raising=True)
+    # Ensure the wrapper cache points at our fake so the wrapper's closer closes it
+    monkeypatch.setattr("backend.weaviate_client._client", fake_client, raising=True)
 
     # Run the function under test
     qa_loop.ensure_weaviate_ready_and_populated()

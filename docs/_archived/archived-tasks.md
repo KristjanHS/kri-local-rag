@@ -577,7 +577,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
   - **Context**: Before refactoring the tests, the application itself was made robust and the testing environment was stabilized. This involved making the CrossEncoder a hard dependency and ensuring models were cached for offline use.
   - [x] **Task 1.1: Centralize and Configure the Model Cache.**
     - **Action**: Ensured the `model_cache` directory was at the project root, ignored by Git, included in the Docker build context, and copied into the container with the `SENTENCE_TRANSFORMERS_HOME` environment variable correctly set.
-    - **Verify**: The command `./scripts/test.sh integration` passed without requiring network access to download models.
+    - **Verify**: The command `./scripts/dev/test.sh integration` passed without requiring network access to download models.
   - [x] **Task 1.2: Remove Cross-Encoder Fallback Logic.**
     - **Action**: Modified `_score_chunks()` in `backend/qa_loop.py` to remove the keyword-based and neutral-score fallbacks. If the CrossEncoder model failed to load, the function raised a clear `RuntimeError`.
     - **Verify**: The code in `_score_chunks()` was simplified, containing only the CrossEncoder scoring path. The test suite had failures that the next phase addressed.
@@ -1243,7 +1243,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
 
 - [x] Step 1.7 — Remove unused pytest-docker config and prefer explicit Compose in scripts
   - Action: If not using `pytest-docker` plugin features directly, delete `[tool.pytest.docker]*` sections from `pyproject.toml` to reduce confusion.
-  - Action: Prefer e2e orchestration via `scripts/test.sh e2e` that wraps `docker compose up -d --build && pytest tests/e2e -q && docker compose down -v`.
+  - Action: Prefer e2e orchestration via `scripts/dev/test.sh e2e` that wraps `docker compose up -d --build && pytest tests/e2e -q && docker compose down -v`.
   - Verify: No plugin warnings on run; e2e orchestration flows through the script.
 
 - [x] Step 3 — Integration bundle (one real component; network allowed)
@@ -1258,17 +1258,17 @@ This document tracks the progress of the migration from Testcontainers to a Dock
     - Validation: All integration tests pass (28/28); flaky-tests guidance updated and condensed in `docs/AI_coder/AI_instructions.md`.
 
 - [x] Step 4 — E2E bundle (all real components; network allowed)
-  - Action: Provide a single dispatcher script `scripts/test.sh` with usage: `test.sh [unit|integration|e2e|ui]` that runs the standardized directory-based commands; for e2e it does `docker compose up -d --wait && pytest tests/e2e -q && docker compose down` with `set -euo pipefail`.
-  - Verify: `bash scripts/test.sh unit|integration|e2e|ui` runs the intended bundle with minimal flags.
+  - Action: Provide a single dispatcher script `scripts/dev/test.sh` with usage: `test.sh [unit|integration|e2e|ui]` that runs the standardized directory-based commands; for e2e it does `docker compose up -d --wait && pytest tests/e2e -q && docker compose down` with `set -euo pipefail`.
+  - Verify: `bash scripts/dev/test.sh unit|integration|e2e|ui` runs the intended bundle with minimal flags.
   
   ##### Hotfix Log — 2025-08-14
 - [x] Ensure real QA e2e test uses ingestion fixture
   - **Action**: Explicitly import `docker_services_ready` from `tests/e2e/fixtures_ingestion.py` in `tests/e2e/test_qa_real_end_to_end.py` so Weaviate is bootstrapped and populated before calling `answer()`.
   - **Rationale**: Tests should prepare their environment; `answer()` should not implicitly bootstrap databases. This aligns with best practices of explicit test setup and isolation.
-  - **Verify**: `bash scripts/test.sh e2e` runs green.
+  - **Verify**: `bash scripts/dev/test.sh e2e` runs green.
 
 - [x] Preserve volumes during e2e teardown and clean up only test data
-  - **Action**: Change `scripts/test.sh` e2e teardown to `docker compose down` (without `-v`) to avoid removing persistent volumes.
+  - **Action**: Change `scripts/dev/test.sh` e2e teardown to `docker compose down` (without `-v`) to avoid removing persistent volumes.
   - **Action**: Add session autouse fixture in `tests/e2e/conftest.py` to delete only the `TestCollection` at the end of the e2e session.
   - **Rationale**: Prevent accidental production data loss while ensuring ephemeral test data does not persist.
   - **Verify**: After e2e, volumes remain; `TestCollection` is removed.
@@ -1573,8 +1573,8 @@ This document tracks the progress of the migration from Testcontainers to a Dock
       - [x] Action: In CI workflows, set `TEARDOWN_DOCKER=1` (or pass `--teardown-docker`) so the session fixture tears down services. Keep local default as keep-up for fast iterations.
       - [x] Verify: CI logs show `docker compose down -v` after tests; no leftover CI containers/volumes.
     - [x] Document fast-iteration defaults and the wrapper script
-      - [x] Action: Add a short section to `docs/dev_test_CI/DEVELOPMENT.md` describing: default keep-up policy, `--teardown-docker` and env toggles (`KEEP_DOCKER_UP`, `TEARDOWN_DOCKER`), and usage of `scripts/pytest_with_cleanup.sh`.
-      - [x] Verify: Follow the doc steps locally to run `scripts/pytest_with_cleanup.sh tests/integration` (keeps up by default) and with `--teardown-docker` (cleans up compose and Testcontainers).
+      - [x] Action: Add a short section to `docs/dev_test_CI/DEVELOPMENT.md` describing: default keep-up policy, `--teardown-docker` and env toggles (`KEEP_DOCKER_UP`, `TEARDOWN_DOCKER`), and usage of `scripts/dev/test.sh pytest`.
+      - [x] Verify: Follow the doc steps locally to run `scripts/dev/test.sh pytest tests/integration` (keeps up by default) and with `--teardown-docker` (cleans up compose and Testcontainers).
     - [x] Ensure sockets are enabled per-suite for all non-unit tests
       - [x] Action: Confirm we have autouse fixtures that temporarily `enable_socket()` in `tests/integration/`, `tests/environment/`, and `tests/e2e/` (added). No suite should rely on global allow-all.
       - [x] Verify: Representative tests in each suite can reach real services without `SocketBlockedError` while unit tests remain blocked by default.

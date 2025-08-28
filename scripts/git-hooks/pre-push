@@ -8,8 +8,8 @@
 set -Eeuo pipefail
 
 # Source the shared config file
-# shellcheck source=../scripts/config.sh
-source "$(git rev-parse --show-toplevel)/scripts/config.sh"
+# shellcheck source=../scripts/common.sh
+source "$(git rev-parse --show-toplevel)/scripts/common.sh"
 
 # Provide both lowercase and uppercase names for compatibility with helper scripts
 script_name="pre-push"
@@ -33,15 +33,16 @@ fi
 # Default to skipping heavy security scans locally for faster pushes.
 # Opt-in by setting SKIP_LOCAL_SEC_SCANS=0 when you want to run them.
 SKIP_LOCAL_SEC_SCANS=${SKIP_LOCAL_SEC_SCANS:-1}
-if [[ "$SKIP_LOCAL_SEC_SCANS" == "1" ]]; then
-  log INFO "SKIP_LOCAL_SEC_SCANS=1 — security scans will be skipped" | tee -a "$LOG_FILE"
-fi
 
 # Optional local skip toggles (developer ergonomics)
 # Default to skipping lint for faster pushes (opt-in for thorough checks)
 SKIP_LINT=${SKIP_LINT:-1}
 SKIP_PYRIGHT=${SKIP_PYRIGHT:-1}
 SKIP_TESTS=${SKIP_TESTS:-0}
+
+if [[ "$SKIP_LOCAL_SEC_SCANS" == "1" ]]; then
+  log INFO "SKIP_LOCAL_SEC_SCANS=1 — security scans will be skipped" | tee -a "$LOG_FILE"
+fi
 if [[ "$SKIP_LINT" == "1" ]]; then
   log INFO "SKIP_LINT=1 — lint checks will be skipped" | tee -a "$LOG_FILE"
 fi
@@ -72,7 +73,7 @@ if [[ "$SKIP_LINT" != "1" ]]; then
     log INFO "Running yamlfmt --lint …" | tee -a "$LOG_FILE"
     yamlfmt --lint "**/*.yml" "**/*.yaml" 2>&1 | sed 's/^/[yamlfmt] /' | tee -a "$LOG_FILE"
   else
-    log WARN "'yamlfmt' not found. Skipping YAML formatting checks. Install: './scripts/install-system-tools.sh'" | tee -a "$LOG_FILE"
+    log WARN "'yamlfmt' not found. Skipping YAML formatting checks. Install: './scripts/ci/install-system-tools.sh'" | tee -a "$LOG_FILE"
   fi
 else
   log INFO "Skipping yamlfmt due to SKIP_LINT=1" | tee -a "$LOG_FILE"
