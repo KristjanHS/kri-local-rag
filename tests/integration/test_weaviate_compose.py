@@ -4,8 +4,9 @@
 import logging
 
 import pytest
-import weaviate
 from weaviate.classes.config import DataType, Property
+
+from backend.weaviate_client import close_weaviate_client, get_weaviate_client
 
 logger = logging.getLogger(__name__)
 
@@ -18,20 +19,13 @@ def test_weaviate_service_is_ready(integration):
     hostname = weaviate_url.replace("http://", "").replace(":8080", "")
 
     logger.info(f"Connecting to Weaviate at {hostname}:8080")
-    client = weaviate.connect_to_custom(
-        http_host=hostname,
-        http_port=8080,
-        grpc_host=hostname,
-        grpc_port=50051,
-        http_secure=False,
-        grpc_secure=False,
-    )
+    client = get_weaviate_client()
 
     try:
         assert client.is_ready()
         logger.info("✓ Weaviate service is ready and accepting connections")
     finally:
-        client.close()
+        close_weaviate_client()
 
 
 @pytest.mark.requires_weaviate
@@ -42,14 +36,7 @@ def test_weaviate_basic_operations(integration):
     hostname = weaviate_url.replace("http://", "").replace(":8080", "")
 
     logger.info(f"Connecting to Weaviate at {hostname}:8080 for basic operations test")
-    client = weaviate.connect_to_custom(
-        http_host=hostname,
-        http_port=8080,
-        grpc_host=hostname,
-        grpc_port=50051,
-        http_secure=False,
-        grpc_secure=False,
-    )
+    client = get_weaviate_client()
 
     try:
         # Test basic connectivity
@@ -88,4 +75,4 @@ def test_weaviate_basic_operations(integration):
         logger.info("✓ Weaviate basic operations test passed")
 
     finally:
-        client.close()
+        close_weaviate_client()

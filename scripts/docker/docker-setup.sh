@@ -56,10 +56,42 @@ echo -e "${BOLD}Services that will be started: ${SERVICES_UP[*]}${NC}"
 echo -e "${BOLD}Starting the automatic setup for the RAG project...${NC}"
 
 # Source centralized configuration
-source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 
-# Get default Ollama model from config
-DEFAULT_OLLAMA_MODEL=$(python3 -c "from backend.config import DEFAULT_OLLAMA_MODEL; print(DEFAULT_OLLAMA_MODEL)")
+# Default Ollama model (hardcoded to avoid import issues)
+DEFAULT_OLLAMA_MODEL="cas/mistral-7b-instruct-v0.3"
+
+# Function to check if hardcoded model matches the Python config
+check_model_synchronization() {
+    local config_file="$PROJECT_ROOT/backend/config.py"
+    local hardcoded_model="$DEFAULT_OLLAMA_MODEL"
+    
+    # Extract the model value from Python config using grep and sed
+    local python_model
+    python_model=$(grep "^DEFAULT_OLLAMA_MODEL =" "$config_file" | sed 's/.*= "\(.*\)"/\1/' || echo "")
+    
+    if [ -z "$python_model" ]; then
+        log WARN "Could not extract DEFAULT_OLLAMA_MODEL from $config_file" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    
+    if [ "$hardcoded_model" != "$python_model" ]; then
+        echo -e "${YELLOW}${BOLD}⚠️  Model Synchronization Warning${NC}"
+        echo -e "${YELLOW}Hardcoded model in docker-setup.sh: ${BOLD}$hardcoded_model${NC}"
+        echo -e "${YELLOW}Python config model: ${BOLD}$python_model${NC}"
+        echo -e "${YELLOW}These values differ! Please update the hardcoded value in docker-setup.sh to match.${NC}"
+        echo -e "${YELLOW}This ensures consistency between the setup script and application configuration.${NC}"
+        echo ""
+        log WARN "Model synchronization check failed: hardcoded='$hardcoded_model' vs python='$python_model'" | tee -a "$LOG_FILE"
+        return 1
+    else
+        log INFO "Model synchronization check passed: '$hardcoded_model'" | tee -a "$LOG_FILE"
+        return 0
+    fi
+}
+
+# Check model synchronization before proceeding
+check_model_synchronization
 
 # Setup logging (timestamped file + stable symlink) and traps
 SCRIPT_NAME=$(get_script_name "${BASH_SOURCE[0]}")
@@ -69,14 +101,14 @@ enable_debug_trace "$LOG_FILE"
 log INFO "Starting $SCRIPT_NAME" | tee -a "$LOG_FILE"
 
 # Ensure helper scripts are executable
-chmod +x scripts/cli.sh scripts/ingest.sh scripts/docker-reset.sh scripts/build_app.sh || true
+chmod +x scripts/cli.sh scripts/ingest.sh scripts/docker/docker-reset.sh scripts/docker/build_app.sh || true
 
 # --- Step 1: Build Docker Images ---
 echo ""
 log INFO "Starting Docker image build process" | tee -a "$LOG_FILE"
 echo -e "${BOLD}--- Step 1: Building custom Docker images... ---${NC}"
 echo "This may take a few minutes. Detailed output is being saved to '$LOG_FILE'."
-run_step "Build app image" "$LOG_FILE" ./scripts/build_app.sh
+run_step "Build app image" "$LOG_FILE" ./scripts/docker/build_app.sh
 echo -e "${GREEN}✓ Build complete.${NC}"
 
 
@@ -137,5 +169,5 @@ echo -e "You can access the Streamlit app at: ${BOLD}http://localhost:8501${NC}"
 echo "To open an interactive RAG CLI shell, run: ./scripts/cli.sh (starts qa_loop.py by default)"
 echo ""
 echo "To stop all services, run: docker compose --file $DOCKER_COMPOSE_FILE down"
-echo "To completely reset the environment, run: ./scripts/docker-reset.sh"
+echo "To completely reset the environment, run: ./scripts/docker/docker-reset.sh"
 echo "" 

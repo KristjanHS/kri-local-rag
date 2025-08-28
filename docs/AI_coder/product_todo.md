@@ -416,8 +416,7 @@ def test_something(mocker, mock_embedding_model):
   - Action: Ensure scripts/CI build `kri-local-rag-app` once; helper should raise `pytest.UsageError` if image missing.
     - **Status**: Implemented.
       - `tests/e2e/conftest.py`: Modified `app_compose_up` fixture to check for `kri-local-rag-app:latest` image and raise `pytest.UsageError` if missing.
-      - `scripts/build_app_if_missing.sh`: Created new script to build image only if missing.
-      - `scripts/test_e2e.sh`: Updated to call `scripts/build_app_if_missing.sh` before running tests.
+
       - `docker/app.Dockerfile`: Fixed build issue by adding `COPY frontend/ /app/frontend/` before `pip install .` in the builder stage.
   - Verify: Second run is faster due to image reuse.
     - **Status**: Partially verified. The build process now correctly attempts to build the image if missing. However, tests are currently failing due to Weaviate-related issues.
@@ -438,7 +437,7 @@ def test_something(mocker, mock_embedding_model):
   - Verify: Failures are actionable; runs are deterministic and isolated.
 
 - [ ] Step 8 — Wire into scripts/docs/CI (PENDING)
-  - Action: Document commands in `docs/dev_test_CI/DEVELOPMENT.md` and `AI_instructions.md`; mention in `scripts/test.sh e2e` help; add a CI job for the containerized CLI subset.
+  - Action: Document commands in `docs/dev_test_CI/DEVELOPMENT.md` and `AI_instructions.md`; mention in `scripts/dev/test.sh e2e` help; add a CI job for the containerized CLI subset.
   - Verify: Fresh env runs `tests/e2e/*_container_e2e.py` green; CI job passes locally under `act` and on hosted runners.
 
 #### P5 — E2E retrieval failure: QA test returns no context (Weaviate)
@@ -473,15 +472,6 @@ def test_something(mocker, mock_embedding_model):
  - [ ] **Task 7 — Add minimal guardrails**
    - **Action**: In the E2E setup fixture, add a log statement for the collection name being used. Create a new, small test that intentionally queries a non-existent collection.
    - **Verify**: The test logs show the correct collection name, and the new test confirms that querying an empty/non-existent collection returns an empty list rather than crashing.
-
-#### P6 — Minimalist Scripts Directory Cleanup
-
-- **Goal**: Reorganize the `scripts/` directory for better clarity with minimal effort. Group related scripts into subdirectories. Avoid complex refactoring or new patterns like dispatchers.
-
-- [ ] **Phase 1: Create Grouping Directories and a `common.sh`**
-  - Action: Create the new directory structure: `scripts/test/`, `scripts/lint/`, `scripts/docker/`, `scripts/ci/`, `scripts/dev/`.
-  - Action: Create a single `scripts/common.sh` file. Initially, it will only contain `set -euo pipefail` and basic color variables for logging.
-  - Verify: The new directories and the `common.sh` file exist and are accessible.
 
 #### P7 — Torch.compile Optimization Debugging and Performance
 

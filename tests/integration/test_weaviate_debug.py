@@ -14,7 +14,7 @@ from backend.retriever import get_top_k
 from tests.conftest import TEST_COLLECTION_NAME
 
 
-def test_weaviate_debug(weaviate_client, clean_test_collection, sample_documents_path):
+def test_weaviate_debug(weaviate_client, test_collection_name, sample_documents_path):
     """Test Weaviate debug logging with actual queries."""
 
     # First, ensure we have data in Weaviate by running ingestion

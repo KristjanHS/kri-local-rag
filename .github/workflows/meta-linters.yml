@@ -29,6 +29,7 @@ concurrency:
 jobs:
   actionlint:
     name: Actionlint (workflows)
+    if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,15 +39,17 @@ jobs:
           args: -color
   yamlfmt:
     name: "Yamlfmt (repo YAML)"
+    if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: "Install yamlfmt"
-        run: ./scripts/install-system-tools.sh
+        run: ./scripts/ci/install-system-tools.sh
       - name: "Run yamlfmt in lint mode"
         run: yamlfmt --lint "**/*.yml" "**/*.yaml"
   hadolint:
     name: Hadolint (Dockerfiles)
+    if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

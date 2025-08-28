@@ -4,13 +4,17 @@
 from unittest.mock import MagicMock
 
 import pytest
-from sentence_transformers import SentenceTransformer
 
 from backend import config, ingest
 from tests.conftest import TEST_COLLECTION_NAME
 
-# Mark the entire module as 'slow'
-pytestmark = pytest.mark.slow
+# Import SentenceTransformer for direct model loading
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    SentenceTransformer = None
+
+# Integration test for the ingestion pipeline with real Weaviate compose service
 
 # --- Constants ---
 EMBEDDING_MODEL = config.EMBEDDING_MODEL
@@ -63,6 +67,8 @@ def test_ingest_pipeline_with_real_weaviate_compose(weaviate_client, sample_docu
 def test_ingest_pipeline_loads_and_embeds_data_compose(weaviate_collection_mock, sample_documents_path):
     """Test the full ingestion pipeline from loading docs to inserting into Weaviate with a local model."""
     # Provide a real embedding model for this integration test
+    if SentenceTransformer is None:
+        pytest.skip("sentence-transformers not available")
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
 
     # Run the ingestion process
@@ -111,6 +117,8 @@ def test_ingest_pipeline_handles_no_embedding_model_compose(weaviate_collection_
 @pytest.mark.requires_weaviate
 def test_ingest_pipeline_is_idempotent_compose(weaviate_collection_mock, sample_documents_path):
     """Test that running ingestion multiple times doesn't create duplicate data, using a local model."""
+    if SentenceTransformer is None:
+        pytest.skip("sentence-transformers not available")
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
 
     # Run ingestion once

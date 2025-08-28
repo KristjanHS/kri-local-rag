@@ -16,7 +16,7 @@ Local RAG system using Weaviate, Ollama, and a CPU-optimized Python backend.
 
 1) Start services (recommended)
 ```bash
-./scripts/docker-setup.sh
+./scripts/docker/docker-setup.sh
 ```
 - Builds the app image, starts Weaviate, Ollama, and the app, and waits until services are healthy.
 - The first run can take a while due to downloading base images and models.
@@ -115,7 +115,7 @@ docker compose -f docker/docker-compose.yml logs -f ollama | cat
 ## Documentation
 
 - [Development Guide](docs/dev_test_CI/DEVELOPMENT.md) – More setup, testing, helper scripts, and power-user tips.
-- AI-coder guide: `docs/AI_coder/AI_instructions.md` – automation-friendly commands.
+- [AI-coder guide](docs/AI_coder/AI_instructions.md) – automation-friendly commands.
 - [Docker Management](docs/operate/docker-management.md) – deeper service ops and troubleshooting.
 
 ## License

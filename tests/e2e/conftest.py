@@ -3,10 +3,10 @@
 
 import subprocess
 from pathlib import Path
-from urllib.parse import urlparse
 
 import pytest
-import weaviate
+
+from backend.weaviate_client import close_weaviate_client, get_weaviate_client
 
 # Import the test collection name constant from parent conftest
 from tests.conftest import TEST_COLLECTION_NAME
@@ -39,24 +39,13 @@ def _cleanup_testcollection_after_session():  # type: ignore[no-redef]
     """
     yield
     try:
-        # Late import to avoid side-effects during collection
-        from backend.config import WEAVIATE_URL
-
-        parsed = urlparse(WEAVIATE_URL)
-        client = weaviate.connect_to_custom(
-            http_host=parsed.hostname or "localhost",
-            http_port=parsed.port or 80,
-            grpc_host=parsed.hostname or "localhost",
-            grpc_port=50051,
-            http_secure=parsed.scheme == "https",
-            grpc_secure=parsed.scheme == "https",
-        )
+        client = get_weaviate_client()
         try:
             if client.collections.exists(TEST_COLLECTION_NAME):
                 client.collections.delete(TEST_COLLECTION_NAME)
         finally:
             try:
-                client.close()
+                close_weaviate_client()
             except Exception as e:
                 import logging
 
@@ -129,7 +118,9 @@ def app_compose_up(weaviate_compose_up, ollama_compose_up):  # type: ignore[no-r
     try:
         subprocess.run(["docker", "image", "inspect", image_name], check=True, capture_output=True)
     except subprocess.CalledProcessError:
-        pytest.skip(f"Docker image {image_name} not found. Please build it first, e.g., with './scripts/build_app.sh'")
+        pytest.skip(
+            f"Docker image {image_name} not found. Please build it first, e.g., with './scripts/docker/build_app.sh'"
+        )
 
     compose_file = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
     try:
