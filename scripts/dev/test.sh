@@ -10,6 +10,10 @@ PY=".venv/bin/python"
 COMPOSE_FILE="$REPO_ROOT/docker/docker-compose.yml"
 COMPOSE_TEST_FILE="$REPO_ROOT/docker/compose.test.yml"
 
+# Default behavior: keep containers up for fast iterations
+KEEP_UP=true
+TEARDOWN=false
+
 usage() {
   cat >&2 <<EOF
 Usage: $0 <command> [options...]
@@ -19,6 +23,7 @@ Test Commands:
   integration             Run integration tests (requires test environment)
   e2e                     Run end-to-end tests (full stack, auto-teardown)
   ui                      Run UI tests (Playwright, no coverage)
+  pytest                  Run pytest directly with cleanup (like pytest_with_cleanup.sh)
   all                     Run all test suites in sequence
   
 CI Commands:
@@ -39,11 +44,67 @@ Examples:
   $0 up && $0 integration # Start env, run integration tests
   $0 all                  # Run all test suites
 
+Cleanup Options:
+  --keep-docker-up        Keep Docker containers up for fast iterations (default)
+  --teardown-docker       Tear down Docker containers after test completion
+
+Environment Variables:
+  TEARDOWN_DOCKER=1       Same as --teardown-docker
+  KEEP_DOCKER_UP=1        Same as --keep-docker-up
+
 For pytest options, append after -- :
   $0 unit -- -k test_specific_function
   $0 integration -- --tb=long
+  $0 pytest -- --keep-docker-up tests/
 EOF
   exit 1
+}
+
+# Parse command line arguments for cleanup options
+for arg in "$@"; do
+  if [[ "$arg" == "--keep-docker-up" ]]; then
+    KEEP_UP=true
+    TEARDOWN=false
+    break
+  elif [[ "$arg" == "--teardown-docker" ]]; then
+    TEARDOWN=true
+    KEEP_UP=false
+  fi
+done
+
+# Env overrides
+if [[ -n "${TEARDOWN_DOCKER:-}" ]] && [[ "$TEARDOWN_DOCKER" != "0" ]] && [[ "$TEARDOWN_DOCKER" != "false" ]]; then
+  TEARDOWN=true
+  KEEP_UP=false
+fi
+if [[ -n "${KEEP_DOCKER_UP:-}" ]] && [[ "$KEEP_DOCKER_UP" != "0" ]] && [[ "$KEEP_DOCKER_UP" != "false" ]]; then
+  KEEP_UP=true
+  TEARDOWN=false
+fi
+
+# Comprehensive cleanup function
+cleanup() {
+  # Skip cleanup unless teardown explicitly requested
+  if [[ "$TEARDOWN" != true ]] && [[ "$KEEP_UP" == true ]]; then
+    echo "[test.sh] Skipping cleanup (keep requested)."
+    return 0
+  fi
+
+  echo "[test.sh] Cleaning up docker compose services (down -v)…"
+  docker compose -f "$COMPOSE_FILE" down -v || true
+
+  echo "[test.sh] Cleaning up Testcontainers leftovers (containers, networks)…"
+  # Remove Testcontainers-managed containers
+  mapfile -t TC_CONTAINERS < <(docker ps -aq -f "label=org.testcontainers") || true
+  if [[ ${#TC_CONTAINERS[@]} -gt 0 ]]; then
+    docker rm -f "${TC_CONTAINERS[@]}" || true
+  fi
+
+  # Remove Testcontainers-managed networks
+  mapfile -t TC_NETWORKS < <(docker network ls -q -f "label=org.testcontainers") || true
+  if [[ ${#TC_NETWORKS[@]} -gt 0 ]]; then
+    docker network rm "${TC_NETWORKS[@]}" || true
+  fi
 }
 
 if [[ $# -lt 1 ]]; then
@@ -78,15 +139,7 @@ case "$command" in
     set -x
     docker compose -f "$COMPOSE_FILE" up -d --wait
     set +x
-    # Ensure cleanup on exit unless KEEP_DOCKER_UP=1
-    cleanup() {
-      if [[ -n "${KEEP_DOCKER_UP:-}" && "$KEEP_DOCKER_UP" != "0" && "$KEEP_DOCKER_UP" != "false" ]]; then
-        echo "[test.sh] Leaving Docker stack up (KEEP_DOCKER_UP set)."
-        return 0
-      fi
-      echo "[test.sh] Tearing down Docker stack (down, preserving volumes)…"
-      docker compose -f "$COMPOSE_FILE" down || true
-    }
+    # Use the comprehensive cleanup function
     trap cleanup EXIT INT TERM
     "$PY" -m pytest tests/e2e -q "$@"
     ;;
@@ -96,7 +149,14 @@ case "$command" in
     # UI suite requires no coverage and Playwright browsers installed
     exec "$PY" -m pytest tests/ui --no-cov -q "$@"
     ;;
-    
+
+  pytest)
+    echo "Running pytest with cleanup..."
+    trap cleanup EXIT INT TERM
+    # Ensure pytest uses our virtualenv Python
+    exec "$PY" -m pytest "$@"
+    ;;
+
   all)
     echo "Running all test suites..."
     echo "=== Unit Tests ==="
@@ -113,7 +173,7 @@ case "$command" in
     
   fast)
     echo "Running fast local checks..."
-    source "$SCRIPT_DIR/config.sh"
+    source "$SCRIPT_DIR/../common.sh"
     SCRIPT_NAME="test_fast"
     LOG_FILE=$(init_script_logging "$SCRIPT_NAME")
     enable_error_trap "$LOG_FILE" "$SCRIPT_NAME"
@@ -157,7 +217,7 @@ case "$command" in
     
   ci)
     echo "Running full CI simulation (act)..."
-    source "$SCRIPT_DIR/config.sh"
+    source "$SCRIPT_DIR/../common.sh"
     SCRIPT_NAME="test_ci"
     LOG_FILE=$(init_script_logging "$SCRIPT_NAME")
     enable_error_trap "$LOG_FILE" "$SCRIPT_NAME"

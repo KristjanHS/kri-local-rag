@@ -22,6 +22,7 @@ concurrency:
 jobs:
   pip-audit:
     name: pip-audit (deps)
+    if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +45,7 @@ jobs:
 
   trivy-fs:
     name: Trivy FS (vuln+config+secrets)
+    if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -68,7 +68,7 @@ Note:
 
 ### Example: Integration Environment Checker
 
-The `scripts/check_integration_env.py` script demonstrates proper usage by importing utilities from `conftest.py` rather than duplicating the logic.
+Scripts should import utilities from `tests/integration/conftest.py` rather than duplicating the logic.
 
 ## Environment Configuration
 

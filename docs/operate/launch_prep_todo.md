@@ -59,7 +59,7 @@ Repository preparation tasks
   Expect sufficient free space for selected models (several GB). Adjust based on model size. ✓ 882G available on / filesystem.
 - [x] Action: Ensure scripts are executable. Verify:
   ```bash
-  chmod +x scripts/*.sh; ls -l scripts | grep -E "cli.sh|ingest.sh|docker-setup.sh" | cat
+  chmod +x scripts/*.sh scripts/docker/*.sh; ls -l scripts/cli.sh scripts/ingest.sh scripts/docker/docker-setup.sh | cat
   ```
   Expect `-rwx` permissions on key scripts, or plan to run equivalent commands directly. ✓ All key scripts have -rwx permissions.
 
@@ -160,7 +160,7 @@ Repository preparation tasks
 3.2) Validate external services standalone
 - [x] Action: Preferred: run the setup script to start and wait for services:
   ```bash
-  ./scripts/docker-setup.sh
+  ./scripts/docker/docker-setup.sh
   ```
   Manual alternative: start only `weaviate` and `ollama`. Verify readiness (or equivalent checks):
   ```bash

@@ -55,7 +55,7 @@ RUN ${VENV_PATH}/bin/pip install .
 # Download required NLTK data for UnstructuredMarkdownLoader
 # Using dedicated script for robust download with proper error handling
 ENV NLTK_DATA=${VENV_PATH}/nltk_data
-COPY scripts/download_nltk_data.py /tmp/
+COPY scripts/dev/download_nltk_data.py /tmp/
 RUN ${VENV_PATH}/bin/python /tmp/download_nltk_data.py ${NLTK_DATA} \
     && rm /tmp/download_nltk_data.py
 
@@ -122,7 +122,7 @@ RUN python -m venv ${VENV_PATH} \
 # Download required NLTK data for UnstructuredMarkdownLoader
 # Using dedicated script for robust download with proper error handling
 ENV NLTK_DATA=${VENV_PATH}/nltk_data
-COPY scripts/download_nltk_data.py /tmp/
+COPY scripts/dev/download_nltk_data.py /tmp/
 RUN ${VENV_PATH}/bin/python /tmp/download_nltk_data.py ${NLTK_DATA} \
     && rm /tmp/download_nltk_data.py
 

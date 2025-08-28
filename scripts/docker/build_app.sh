@@ -5,7 +5,7 @@ set -Eeuo pipefail
 
 # Source centralized config (ensures we run from project root and logs dir exists)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/config.sh"
+source "$SCRIPT_DIR/../common.sh"
 
 mkdir -p "$LOGS_DIR"
 SCRIPT_NAME="build_app"

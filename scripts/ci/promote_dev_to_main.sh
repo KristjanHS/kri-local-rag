@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/promote_dev_to_main.sh – Safely promote changes from dev → main
+# scripts/ci/promote_dev_to_main.sh – Safely promote changes from dev → main
 #
 # Features
 # - Verifies clean working tree and up-to-date branches
@@ -10,16 +10,16 @@
 # - Pushes main and shows live progress; logs to logs/promote_dev_to_main.log
 #
 # Usage
-#   ./scripts/promote_dev_to_main.sh                 # normal run (dev → main)
-#   ./scripts/promote_dev_to_main.sh --dry-run       # run all checks; skip push
-#   ./scripts/promote_dev_to_main.sh --create-pr     # if push to protected 'main' is blocked, auto-create PR dev → main
+#   ./scripts/ci/promote_dev_to_main.sh                 # normal run (dev → main)
+#   ./scripts/ci/promote_dev_to_main.sh --dry-run       # run all checks; skip push
+#   ./scripts/ci/promote_dev_to_main.sh --create-pr     # if push to protected 'main' is blocked, auto-create PR dev → main
 #
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source shared config (moves CWD to project root and prepares logs dir)
-source "${SCRIPT_DIR}/config.sh"
+source "${SCRIPT_DIR}/common.sh"
 
 SCRIPT_NAME="$(get_script_name "$0")"
 LOG_FILE="$(get_log_file "$SCRIPT_NAME")"
@@ -387,7 +387,7 @@ else
     if push_main_once; then
       :
     else
-      _red "Push failed again. Consider running: ./scripts/cleanup_docker_and_ci_cache.sh and retrying." | tee -a "$LOG_FILE"
+      _red "Push failed again. Consider running: ./scripts/docker/cleanup_docker_and_ci_cache.sh and retrying." | tee -a "$LOG_FILE"
       _yellow "You can also bypass locally with --no-verify if tests already passed: git push --no-verify origin ${TO_BRANCH}" | tee -a "$LOG_FILE"
       switch_to_branch "$FROM_BRANCH"
       exit 1
