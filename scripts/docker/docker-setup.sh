@@ -61,6 +61,38 @@ source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 # Default Ollama model (hardcoded to avoid import issues)
 DEFAULT_OLLAMA_MODEL="cas/mistral-7b-instruct-v0.3"
 
+# Function to check if hardcoded model matches the Python config
+check_model_synchronization() {
+    local config_file="$PROJECT_ROOT/backend/config.py"
+    local hardcoded_model="$DEFAULT_OLLAMA_MODEL"
+    
+    # Extract the model value from Python config using grep and sed
+    local python_model
+    python_model=$(grep "^DEFAULT_OLLAMA_MODEL =" "$config_file" | sed 's/.*= "\(.*\)"/\1/' || echo "")
+    
+    if [ -z "$python_model" ]; then
+        log WARN "Could not extract DEFAULT_OLLAMA_MODEL from $config_file" | tee -a "$LOG_FILE"
+        return 1
+    fi
+    
+    if [ "$hardcoded_model" != "$python_model" ]; then
+        echo -e "${YELLOW}${BOLD}⚠️  Model Synchronization Warning${NC}"
+        echo -e "${YELLOW}Hardcoded model in docker-setup.sh: ${BOLD}$hardcoded_model${NC}"
+        echo -e "${YELLOW}Python config model: ${BOLD}$python_model${NC}"
+        echo -e "${YELLOW}These values differ! Please update the hardcoded value in docker-setup.sh to match.${NC}"
+        echo -e "${YELLOW}This ensures consistency between the setup script and application configuration.${NC}"
+        echo ""
+        log WARN "Model synchronization check failed: hardcoded='$hardcoded_model' vs python='$python_model'" | tee -a "$LOG_FILE"
+        return 1
+    else
+        log INFO "Model synchronization check passed: '$hardcoded_model'" | tee -a "$LOG_FILE"
+        return 0
+    fi
+}
+
+# Check model synchronization before proceeding
+check_model_synchronization
+
 # Setup logging (timestamped file + stable symlink) and traps
 SCRIPT_NAME=$(get_script_name "${BASH_SOURCE[0]}")
 LOG_FILE=$(init_script_logging "$SCRIPT_NAME")
