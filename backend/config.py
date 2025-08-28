@@ -126,7 +126,7 @@ def set_log_level(level: str | None) -> None:
         _setup_logging()
 
     # Input validation
-    if level is None or not isinstance(level, str) or not level.strip():
+    if level is None or not level.strip():
         level = "INFO"
     else:
         level = level.strip().upper()
