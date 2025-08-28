@@ -52,3 +52,5 @@ rich>=13,<14
 # for Windows (but doesn't hurt on Linux)
 # https://github.com/Unstructured-IO/unstructured/issues/2237
 # python-magic-bin==0.4.14
+anyio>=4.4.0 # not directly required, pinned by Snyk to avoid a vulnerability
+h11>=0.16.0 # not directly required, pinned by Snyk to avoid a vulnerability
