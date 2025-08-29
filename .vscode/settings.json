@@ -44,5 +44,6 @@
     "geminicodeassist.inlineSuggestions.enableAuto": false,
     "geminicodeassist.chat.defaultDiffLayout": "Side by side diff",
     "geminicodeassist.chat.defaultCodeBlockDisplay": "Expanded",
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+    "chatgpt.openOnStartup": true
 }

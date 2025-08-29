@@ -1,19 +1,10 @@
-from urllib.parse import urlparse
-
 import weaviate
 from weaviate.classes.config import Configure, DataType, Property
 
-from backend.config import COLLECTION_NAME, WEAVIATE_URL
+from backend.config import COLLECTION_NAME
+from backend.weaviate_client import close_weaviate_client, get_weaviate_client
 
-parsed_url = urlparse(WEAVIATE_URL)
-client = weaviate.connect_to_custom(
-    http_host=parsed_url.hostname or "localhost",
-    http_port=parsed_url.port or 80,
-    grpc_host=parsed_url.hostname or "localhost",
-    grpc_port=50051,
-    http_secure=parsed_url.scheme == "https",
-    grpc_secure=parsed_url.scheme == "https",
-)
+client = get_weaviate_client()
 
 
 def ensure_collection(client: weaviate.WeaviateClient):
@@ -37,4 +28,4 @@ def ensure_collection(client: weaviate.WeaviateClient):
 try:
     client.collections.delete(COLLECTION_NAME)
 finally:
-    client.close()
+    close_weaviate_client()

@@ -6,7 +6,7 @@
 set -e
 
 # Source centralized configuration
-source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 
 # Setup logging
 SCRIPT_NAME=$(get_script_name "${BASH_SOURCE[0]}")
@@ -47,8 +47,14 @@ echo ""
 log_message "INFO" "Removing project-specific Docker images"
 echo "--- Removing project-specific Docker images... ---"
 # Find all images with names starting with 'kri-local-rag-' and forcefully remove them.
-# The '|| true' ensures that the script doesn't fail if no such images are found.
-docker rmi -f $(docker images 'kri-local-rag-*' -q) 2>&1 | tee -a "$LOG_FILE" || true
+# Check if any images exist before attempting to remove them.
+PROJECT_IMAGES=$(docker images 'kri-local-rag-*' -q)
+if [ -n "$PROJECT_IMAGES" ]; then
+    docker rmi -f $PROJECT_IMAGES 2>&1 | tee -a "$LOG_FILE" || true
+else
+    log_message "INFO" "No project-specific images found to remove"
+    echo "No project-specific images found to remove."
+fi
 
 echo ""
 log_message "INFO" "Pruning unused Docker resources"

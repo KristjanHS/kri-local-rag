@@ -6,7 +6,7 @@
 set -Eeuo pipefail
 
 # Source centralized configuration
-source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 # Setup logging (timestamped file + stable symlink) and traps
 SCRIPT_NAME=$(get_script_name "${BASH_SOURCE[0]}")
@@ -18,6 +18,7 @@ log INFO "Starting $SCRIPT_NAME" | tee -a "$LOG_FILE"
 # Default to data/ (mapped to data/ in project root) if no argument provided
 if [ $# -lt 1 ]; then
   DATA_PATH="$DEFAULT_DATA_PATH"
+  REL_PATH="$DATA_PATH"
   log INFO "No data path provided, using default: $DATA_PATH" | tee -a "$LOG_FILE"
 else
   # Use the resolve_path function to handle both relative and absolute paths

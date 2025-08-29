@@ -19,59 +19,27 @@ import hashlib
 import os
 import time
 from datetime import datetime, timezone
-from typing import List, Optional, cast
+from typing import Any, List, Optional, cast
 
 import torch
 import weaviate
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, UnstructuredMarkdownLoader
+
+# Direct import since sentence-transformers is a required runtime dependency
 from sentence_transformers import SentenceTransformer
 
+# SentenceTransformer is now loaded via backend.models for consistency
 from backend.config import (
     CHUNK_OVERLAP,
     CHUNK_SIZE,
     COLLECTION_NAME,
     EMBEDDING_MODEL,
-    HF_CACHE_DIR,
     WEAVIATE_BATCH_SIZE,
     WEAVIATE_CONCURRENT_REQUESTS,
-    WEAVIATE_URL,
     get_logger,
 )
-
-
-def _get_weaviate_url() -> str:
-    """
-    Get the appropriate Weaviate URL based on the current environment.
-
-    Returns:
-        str: Weaviate URL with appropriate hostname for current environment
-    """
-    from backend.config import is_running_in_docker
-
-    is_docker = is_running_in_docker()
-
-    # Use the configured URL but replace hostname if needed
-    from urllib.parse import urlparse, urlunparse
-
-    parsed_url = urlparse(WEAVIATE_URL)
-
-    if is_docker and parsed_url.hostname == "localhost":
-        # Replace localhost with weaviate hostname when in Docker
-        new_netloc = parsed_url.netloc.replace("localhost", "weaviate")
-        new_parsed = parsed_url._replace(netloc=new_netloc)
-        return urlunparse(new_parsed)
-    elif not is_docker and parsed_url.hostname == "weaviate":
-        # Replace weaviate with localhost when running locally
-        new_netloc = parsed_url.netloc.replace("weaviate", "localhost")
-        new_parsed = parsed_url._replace(netloc=new_netloc)
-        return urlunparse(new_parsed)
-    else:
-        # URL is already appropriate for the environment
-        return WEAVIATE_URL
-
-
 from backend.vector_utils import to_float_list
 
 # --- Logging Setup ---
@@ -102,19 +70,23 @@ def load_and_split_documents(path: str) -> List[Document]:
 
     # 1) Single file path support
     docs: List[Document] = []
+    file_count = 0
     if os.path.isfile(path):
         ext = os.path.splitext(path)[1].lower()
         if ext == ".pdf":
             loader = pdf_loader_cls(path)
             docs.extend(loader.load())
+            file_count = 1
         elif ext == ".md":
             loader = UnstructuredMarkdownLoader(path)
             docs.extend(loader.load())
+            file_count = 1
         else:
             logger.warning(f"Unsupported file extension '{ext}' for path '{path}'.")
             return []
     else:
         # 2) Directory path with glob patterns
+        import glob
 
         loader_configs = {
             "**/*.pdf": pdf_loader_cls,
@@ -122,10 +94,15 @@ def load_and_split_documents(path: str) -> List[Document]:
         }
         for glob_pattern, loader_cls in loader_configs.items():
             try:
+                # Count files first
+                pattern_path = os.path.join(path, glob_pattern)
+                matching_files = glob.glob(pattern_path, recursive=True)
+                file_count += len(matching_files)
+
                 loader = DirectoryLoader(
                     path,
                     glob=glob_pattern,
-                    loader_cls=loader_cls,
+                    loader_cls=cast(Any, loader_cls),
                     show_progress=True,
                     use_multithreading=True,
                 )
@@ -139,7 +116,7 @@ def load_and_split_documents(path: str) -> List[Document]:
         logger.warning(f"No documents found in '{path}'.")
         return []
 
-    logger.info(f"Loaded {len(docs)} documents.")
+    logger.info(f"Loaded {len(docs)} pages from {file_count} files.")
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
     chunked_docs = text_splitter.split_documents(docs)
@@ -148,24 +125,13 @@ def load_and_split_documents(path: str) -> List[Document]:
     return chunked_docs
 
 
-from urllib.parse import urlparse
+from backend.weaviate_client import get_weaviate_client
 
 
 def connect_to_weaviate() -> weaviate.WeaviateClient:
-    """Connect to the Weaviate instance."""
-    weaviate_url = _get_weaviate_url()
-    logger.info(f"Connecting to Weaviate at {weaviate_url}...")
-    parsed_url = urlparse(weaviate_url)
-    client = weaviate.connect_to_custom(
-        http_host=parsed_url.hostname or "localhost",
-        http_port=parsed_url.port or 80,
-        grpc_host=parsed_url.hostname or "localhost",
-        grpc_port=50051,
-        http_secure=parsed_url.scheme == "https",
-        grpc_secure=parsed_url.scheme == "https",
-    )
-    logger.info("Connection successful.")
-    return client
+    """Deprecated: use backend.weaviate_client.get_weaviate_client instead."""
+    # Maintain backward compatibility for any external scripts
+    return get_weaviate_client()
 
 
 def _safe_created_at(source_path: Optional[str]) -> str:
@@ -184,7 +150,9 @@ def deterministic_uuid(doc: Document) -> str:
     """Generate a deterministic UUID for a document chunk."""
     # usedforsecurity=False is not available in all python versions, nosec is safer
     content_hash = hashlib.md5(doc.page_content.encode("utf-8")).hexdigest()  # nosec B324
-    source_file = os.path.basename(doc.metadata.get("source", "unknown"))
+    meta_for_uuid = cast(dict[str, Any], cast(Any, doc).metadata)
+    source: str = cast(str, meta_for_uuid.get("source", "unknown"))
+    source_file = os.path.basename(source)
     return hashlib.md5(f"{source_file}:{content_hash}".encode("utf-8")).hexdigest()  # nosec B324
 
 
@@ -220,17 +188,20 @@ def process_and_upload_chunks(
         concurrent_requests=WEAVIATE_CONCURRENT_REQUESTS,
     ) as batch:
         for idx, doc in enumerate(docs, start=1):
+            meta: dict[str, Any] = cast(dict[str, Any], cast(Any, doc).metadata)
             uuid = deterministic_uuid(doc)
-            vector_tensor = model.encode(doc.page_content)
+            vector_tensor = cast(Any, model).encode(doc.page_content)
             # Normalize to a plain Python list of floats for the Weaviate client
             vector: List[float] = to_float_list(vector_tensor)
 
-            properties = {
+            src: Optional[str] = cast(Optional[str], meta.get("source", None))
+            src_safe: str = src or "unknown"
+            properties: dict[str, str] = {
                 "content": doc.page_content,
-                "source_file": os.path.basename(doc.metadata.get("source", "unknown")),
-                "source": os.path.splitext(doc.metadata.get("source", "unknown"))[1],
+                "source_file": os.path.basename(src_safe),
+                "source": os.path.splitext(src_safe)[1],
                 # Derive created_at from source file if it exists; fall back to now.
-                "created_at": _safe_created_at(doc.metadata.get("source")),
+                "created_at": _safe_created_at(src),
             }
 
             # This logic remains manual as requested, but uses batching for efficiency
@@ -274,14 +245,18 @@ def optimize_embedding_model(embedding_model: SentenceTransformer) -> SentenceTr
 
     try:
         logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
-        compiled_model = torch.compile(embedding_model, backend="inductor", mode="max-autotune")
+        torch_compile = getattr(torch, "compile")
+        compiled_model = cast(
+            SentenceTransformer,
+            torch_compile(embedding_model, backend="inductor", mode="max-autotune"),
+        )
         # Mark the compiled instance so future calls are a no-op.
         try:
             setattr(compiled_model, "_is_torch_compiled", True)  # type: ignore[attr-defined]
         except (AttributeError, TypeError) as attr_err:
             logger.debug("Could not set _is_torch_compiled flag on compiled model: %s", attr_err)
         logger.info("torch.compile optimization completed.")
-        return cast(SentenceTransformer, compiled_model)
+        return compiled_model
     except Exception as e:
         logger.warning(f"Could not apply torch.compile: {e}")
         return embedding_model
@@ -323,7 +298,9 @@ if __name__ == "__main__":
 
     # Load the embedding model once
     logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
-    model = SentenceTransformer(EMBEDDING_MODEL, cache_folder=HF_CACHE_DIR)
+    from backend.models import load_embedder
+
+    model = load_embedder()
 
     try:
         ingest(

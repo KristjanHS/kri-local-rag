@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# scripts/setup-pre-commit.sh - Setup pre-commit framework with all advanced options
+# scripts/dev/setup-pre-commit.sh - Setup pre-commit framework with all advanced options
 set -Eeuo pipefail
 
 # Source the shared config file
-# shellcheck source=scripts/config.sh
-source "$(git rev-parse --show-toplevel)/scripts/config.sh"
+# shellcheck source=scripts/common.sh
+source "$(git rev-parse --show-toplevel)/scripts/common.sh"
 
 # --- Start Logging ---
 script_name="setup-pre-commit"

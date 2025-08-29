@@ -23,7 +23,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/config.sh"
+source "${SCRIPT_DIR}/../common.sh"
 
 SCRIPT_NAME="$(get_script_name "$0")"
 setup_logging "$SCRIPT_NAME"

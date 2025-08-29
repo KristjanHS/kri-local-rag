@@ -72,3 +72,117 @@ def reset_embedding_model_cache():
     from backend import retriever
 
     retriever._embedding_model = None
+
+
+# ---------------------------------------------------------------------------
+# Unit-only Weaviate client fakes and cache hygiene
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _fake_weaviate_client_default(monkeypatch: pytest.MonkeyPatch):
+    """Provide a minimal fake Weaviate client for unit tests by default.
+
+    Tests that need custom behavior can still patch
+    `backend.weaviate_client.get_weaviate_client` or
+    `backend.retriever.get_weaviate_client` and will override this.
+    """
+
+    class _FakeQuery:
+        def hybrid(self, *args, **kwargs):  # noqa: D401
+            class _Res:
+                objects = []
+
+            return _Res()
+
+        def bm25(self, *args, **kwargs):  # noqa: D401, pragma: no cover
+            class _Res:
+                objects = []
+
+            return _Res()
+
+    class _FakeCollection:
+        def __init__(self):
+            self.query = _FakeQuery()
+
+    class _FakeCollections:
+        def __init__(self):
+            self._existing = set()
+
+        def exists(self, name):  # noqa: D401
+            return name in self._existing
+
+        def get(self, _name):  # noqa: D401
+            return _FakeCollection()
+
+    class _FakeWeaviateClient:
+        def __init__(self):
+            self.collections = _FakeCollections()
+            self._closed = False
+
+        def close(self):  # noqa: D401
+            self._closed = True
+
+    def _fake_get_client():
+        return _FakeWeaviateClient()
+
+    # Patch the centralized wrapper
+    import backend.weaviate_client as _wc
+
+    monkeypatch.setattr(_wc, "get_weaviate_client", _fake_get_client, raising=False)
+
+    # Ensure retriever uses the wrapper indirection so tests can patch wrapper
+    import backend.retriever as _retriever_mod
+
+    def _shim_retriever_get_client():
+        from backend import weaviate_client as __wc
+
+        return __wc.get_weaviate_client()
+
+    monkeypatch.setattr(_retriever_mod, "get_weaviate_client", _shim_retriever_get_client, raising=False)
+
+    # Ensure qa_loop uses the wrapper indirection as well
+    try:
+        import backend.qa_loop as _qa_loop_mod
+
+        def _shim_qa_get_client():
+            from backend import weaviate_client as __wc
+
+            return __wc.get_weaviate_client()
+
+        monkeypatch.setattr(_qa_loop_mod, "get_weaviate_client", _shim_qa_get_client, raising=False)
+    except Exception:
+        pass
+
+
+@pytest.fixture(autouse=True)
+def _clear_weaviate_wrapper_cache():
+    """Clear the centralized wrapper client cache before and after each unit test."""
+    try:
+        from backend.weaviate_client import close_weaviate_client
+
+        close_weaviate_client()
+        yield
+        close_weaviate_client()
+    except Exception:
+        # If the module isn't importable in some unit contexts, just continue
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _guard_weaviate_connect_to_custom(monkeypatch: pytest.MonkeyPatch):
+    """Block direct weaviate.connect_to_custom usage in unit tests by default.
+
+    Individual tests can override by monkeypatching the same attribute.
+    """
+    try:
+        import weaviate  # type: ignore
+
+        def _raise_connect_to_custom(*_args, **_kwargs):  # type: ignore[no-redef]
+            raise AssertionError(
+                "This test must not create real Weaviate clients. Patch 'weaviate.connect_to_custom' or the wrapper."
+            )
+
+        monkeypatch.setattr(weaviate, "connect_to_custom", _raise_connect_to_custom, raising=False)
+    except Exception:
+        pass
