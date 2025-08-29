@@ -154,7 +154,7 @@ validation:
 
 ui:
   # Whether to show chain-of-thought/thinking (should remain false in most setups).
-  show_thinking: true
+  show_thinking: false
   # Display the current plan steps in the UI when available.
   show_plan: true
   # Color output preference.
