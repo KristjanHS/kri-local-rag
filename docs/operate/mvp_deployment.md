@@ -26,7 +26,7 @@ WEAVIATE_URL=http://localhost:8080
 
 ### Start core services (recommended)
 ```
-./scripts/docker-setup.sh
+./scripts/docker/docker-setup.sh
 ```
 Manual alternative (advanced users):
 ```

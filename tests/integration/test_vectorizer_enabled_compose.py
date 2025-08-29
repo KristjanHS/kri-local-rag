@@ -10,12 +10,11 @@ import pytest
 from weaviate.classes.config import Configure, DataType, Property
 
 from backend import retriever
-
 from tests.integration.conftest import connect_to_weaviate_with_fallback
 
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
-pytestmark = [pytest.mark.slow, pytest.mark.requires_weaviate]
+pytestmark = pytest.mark.requires_weaviate
 
 
 # Connection function is now provided by conftest.py

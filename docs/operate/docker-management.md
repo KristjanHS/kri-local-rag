@@ -34,7 +34,7 @@
 
 ## Service Operations (advanced)
 
-Refer to the root README for common operations. Prefer using `scripts/docker-setup.sh` to build and start all services with health checks. Below are additional/advanced commands not covered there:
+Refer to the root README for common operations. Prefer using `scripts/docker/docker-setup.sh` to build and start all services with health checks. Below are additional/advanced commands not covered there:
 
 ```bash
 # Rebuild all images with no cache (slower, clean rebuild)

@@ -10,6 +10,10 @@ PY=".venv/bin/python"
 COMPOSE_FILE="$REPO_ROOT/docker/docker-compose.yml"
 COMPOSE_TEST_FILE="$REPO_ROOT/docker/compose.test.yml"
 
+# Default behavior: keep containers up for fast iterations
+KEEP_UP=true
+TEARDOWN=false
+
 usage() {
   cat >&2 <<EOF
 Usage: $0 <command> [options...]
@@ -19,6 +23,7 @@ Test Commands:
   integration             Run integration tests (requires test environment)
   e2e                     Run end-to-end tests (full stack, auto-teardown)
   ui                      Run UI tests (Playwright, no coverage)
+  pytest                  Run pytest directly with cleanup (like pytest_with_cleanup.sh)
   all                     Run all test suites in sequence
   
 CI Commands:
@@ -39,11 +44,67 @@ Examples:
   $0 up && $0 integration # Start env, run integration tests
   $0 all                  # Run all test suites
 
+Cleanup Options:
+  --keep-docker-up        Keep Docker containers up for fast iterations (default)
+  --teardown-docker       Tear down Docker containers after test completion
+
+Environment Variables:
+  TEARDOWN_DOCKER=1       Same as --teardown-docker
+  KEEP_DOCKER_UP=1        Same as --keep-docker-up
+
 For pytest options, append after -- :
   $0 unit -- -k test_specific_function
   $0 integration -- --tb=long
+  $0 pytest -- --keep-docker-up tests/
 EOF
   exit 1
+}
+
+# Parse command line arguments for cleanup options
+for arg in "$@"; do
+  if [[ "$arg" == "--keep-docker-up" ]]; then
+    KEEP_UP=true
+    TEARDOWN=false
+    break
+  elif [[ "$arg" == "--teardown-docker" ]]; then
+    TEARDOWN=true
+    KEEP_UP=false
+  fi
+done
+
+# Env overrides
+if [[ -n "${TEARDOWN_DOCKER:-}" ]] && [[ "$TEARDOWN_DOCKER" != "0" ]] && [[ "$TEARDOWN_DOCKER" != "false" ]]; then
+  TEARDOWN=true
+  KEEP_UP=false
+fi
+if [[ -n "${KEEP_DOCKER_UP:-}" ]] && [[ "$KEEP_DOCKER_UP" != "0" ]] && [[ "$KEEP_DOCKER_UP" != "false" ]]; then
+  KEEP_UP=true
+  TEARDOWN=false
+fi
+
+# Comprehensive cleanup function
+cleanup() {
+  # Skip cleanup unless teardown explicitly requested
+  if [[ "$TEARDOWN" != true ]] && [[ "$KEEP_UP" == true ]]; then
+    echo "[test.sh] Skipping cleanup (keep requested)."
+    return 0
+  fi
+
+  echo "[test.sh] Cleaning up docker compose services (down -v)…"
+  docker compose -f "$COMPOSE_FILE" down -v || true
+
+  echo "[test.sh] Cleaning up Testcontainers leftovers (containers, networks)…"
+  # Remove Testcontainers-managed containers
+  mapfile -t TC_CONTAINERS < <(docker ps -aq -f "label=org.testcontainers") || true
+  if [[ ${#TC_CONTAINERS[@]} -gt 0 ]]; then
+    docker rm -f "${TC_CONTAINERS[@]}" || true
+  fi
+
+  # Remove Testcontainers-managed networks
+  mapfile -t TC_NETWORKS < <(docker network ls -q -f "label=org.testcontainers") || true
+  if [[ ${#TC_NETWORKS[@]} -gt 0 ]]; then
+    docker network rm "${TC_NETWORKS[@]}" || true
+  fi
 }
 
 if [[ $# -lt 1 ]]; then
@@ -78,15 +139,7 @@ case "$command" in
     set -x
     docker compose -f "$COMPOSE_FILE" up -d --wait
     set +x
-    # Ensure cleanup on exit unless KEEP_DOCKER_UP=1
-    cleanup() {
-      if [[ -n "${KEEP_DOCKER_UP:-}" && "$KEEP_DOCKER_UP" != "0" && "$KEEP_DOCKER_UP" != "false" ]]; then
-        echo "[test.sh] Leaving Docker stack up (KEEP_DOCKER_UP set)."
-        return 0
-      fi
-      echo "[test.sh] Tearing down Docker stack (down, preserving volumes)…"
-      docker compose -f "$COMPOSE_FILE" down || true
-    }
+    # Use the comprehensive cleanup function
     trap cleanup EXIT INT TERM
     "$PY" -m pytest tests/e2e -q "$@"
     ;;
@@ -96,14 +149,21 @@ case "$command" in
     # UI suite requires no coverage and Playwright browsers installed
     exec "$PY" -m pytest tests/ui --no-cov -q "$@"
     ;;
-    
+
+  pytest)
+    echo "Running pytest with cleanup..."
+    trap cleanup EXIT INT TERM
+    # Ensure pytest uses our virtualenv Python
+    exec "$PY" -m pytest "$@"
+    ;;
+
   all)
     echo "Running all test suites..."
     echo "=== Unit Tests ==="
     "$0" unit "$@"
     echo "=== Integration Tests ==="
     "$0" up
-    "$0" integration "$@"
+    (trap '"$0" down' EXIT; "$0" integration "$@")
     echo "=== E2E Tests ==="
     "$0" e2e "$@"
     echo "=== UI Tests ==="
@@ -113,52 +173,51 @@ case "$command" in
     
   fast)
     echo "Running fast local checks..."
-    source "$SCRIPT_DIR/config.sh"
+    source "$SCRIPT_DIR/../common.sh"
     SCRIPT_NAME="test_fast"
     LOG_FILE=$(init_script_logging "$SCRIPT_NAME")
     enable_error_trap "$LOG_FILE" "$SCRIPT_NAME"
     enable_debug_trace "$LOG_FILE"
     
-    _red()   { printf "\e[31m%s\e[0m\n" "$*"; }
-    _green() { printf "\e[32m%s\e[0m\n" "$*"; }
-    _yellow(){ printf "\e[33m%s\e[0m\n" "$*"; }
-    
     need() {
       if ! command -v "$1" >/dev/null 2>&1; then
         if [[ "${CI_STRICT:-}" == "1" ]]; then
-          _red "ERROR: required tool '$1' not found in PATH" && exit 1
+          log ERROR "Required tool '$1' not found in PATH" | tee -a "$LOG_FILE"
+          exit 1
         else
-          _yellow "WARN : optional tool '$1' not found – skipping related step" && return 1
+          log WARN "Optional tool '$1' not found – skipping related step" | tee -a "$LOG_FILE"
+          return 1
         fi
       fi
     }
     
     # Ruff – static analysis & formatting (fast)
     if need ruff; then
-      _green "Running ruff (lint & format check)…" | tee -a "$LOG_FILE"
+      log INFO "Running ruff (lint & format check)…" | tee -a "$LOG_FILE"
       ruff check "$REPO_ROOT" | tee -a "$LOG_FILE"
     fi
     
     # Ruff formatting enforcement
     if need ruff; then
-      _green "Running ruff format --check …" | tee -a "$LOG_FILE"
+      log INFO "Running ruff format --check …" | tee -a "$LOG_FILE"
       ruff format --check "$REPO_ROOT" | tee -a "$LOG_FILE"
     fi
     
     # Pytest – unit & integration tests
     if [[ ! -x "$PY" ]]; then
-      _red "ERROR: $PY does not exist or is not executable. Create the venv first." | tee -a "$LOG_FILE" && exit 1
+      log ERROR "$PY does not exist or is not executable. Create the venv first." | tee -a "$LOG_FILE"
+      exit 1
     fi
     
-    _green "Running pytest (fast suite – default addopts) …" | tee -a "$LOG_FILE"
+    log INFO "Running pytest (fast suite – default addopts) …" | tee -a "$LOG_FILE"
     "$PY" -m pytest -q tests/ | tee -a "$LOG_FILE" || exit $?
     
-    _green "All local fast checks passed!" | tee -a "$LOG_FILE"
+    log INFO "All local fast checks passed!" | tee -a "$LOG_FILE"
     ;;
     
   ci)
     echo "Running full CI simulation (act)..."
-    source "$SCRIPT_DIR/config.sh"
+    source "$SCRIPT_DIR/../common.sh"
     SCRIPT_NAME="test_ci"
     LOG_FILE=$(init_script_logging "$SCRIPT_NAME")
     enable_error_trap "$LOG_FILE" "$SCRIPT_NAME"

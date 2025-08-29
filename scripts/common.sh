@@ -1,6 +1,8 @@
-#!/bin/bash
-# Centralized configuration for all shell scripts
-# This file defines all important paths and common logging utilities.
+#!/usr/bin/env bash
+# Common shell script utilities and configuration
+# This file provides shared functionality for all scripts in the scripts/ directory
+
+set -euo pipefail
 
 # Get the project root directory (one level up from scripts/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -34,13 +36,13 @@ export DEFAULT_LOG_LEVEL="${DEFAULT_LOG_LEVEL:-INFO}"
 # Function to validate that required directories exist
 validate_directories() {
     local missing_dirs=()
-    
+
     for dir in "$DATA_DIR" "$LOGS_DIR" "$BACKEND_DIR"; do
         if [ ! -d "$dir" ]; then
             missing_dirs+=("$dir")
         fi
     done
-    
+
     if [ ${#missing_dirs[@]} -gt 0 ]; then
         echo "Warning: The following directories are missing:"
         printf '  %s\n' "${missing_dirs[@]}"
@@ -74,6 +76,13 @@ resolve_path() {
 }
 
 # --------------------------- Logging utilities ------------------------------
+
+# Color codes for logging
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
 # LOG_LEVEL controls verbosity (DEBUG, INFO, WARN, ERROR). Default: INFO
 export LOG_LEVEL=${LOG_LEVEL:-INFO}
@@ -228,5 +237,22 @@ get_script_name() {
     basename "$script_path" .sh
 }
 
+# Legacy logging functions for backwards compatibility
+log_info() {
+    log INFO "$1"
+}
+
+log_success() {
+    log INFO "$1"
+}
+
+log_warning() {
+    log WARN "$1"
+}
+
+log_error() {
+    log ERROR "$1"
+}
+
 # Validate directories on source
-validate_directories 
+validate_directories
