@@ -29,4 +29,4 @@ else
 fi
 
 log INFO "Starting PDF ingestion with data path: $REL_PATH" | tee -a "$LOG_FILE"
-docker compose -f "$DOCKER_COMPOSE_FILE" run --rm "$APP_SERVICE" python -m backend.ingest --reset-collection --data-dir "$REL_PATH" 2>&1 | tee -a "$LOG_FILE"
+docker compose -f "$DOCKER_COMPOSE_FILE" run --rm "$APP_SERVICE" python -m backend.ingest --data-dir "$REL_PATH" 2>&1 | tee -a "$LOG_FILE"
