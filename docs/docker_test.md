@@ -22,10 +22,10 @@ Use this checklist to validate recent Dockerfile/Compose changes in small chunks
 
 ## Quick app smoke
 - [x] CLI smoke: `docker compose -f docker/docker-compose.yml exec -T app /opt/venv/bin/python -m backend.qa_loop --question "hello"`
-- [ ] UI smoke (manual): open http://localhost:8501
+- [x] UI smoke (manual): open http://localhost:8501
 
 ## Ingestion (small sample)
-- [ ] Ingest example data: `./scripts/ingest.sh ./example_data`
+- [x] Ingest example data: `./scripts/ingest.sh ./example_data`
 
 ## Test profile (compose)
 - [ ] Start test env: `make test-up` (app-test builds with INSTALL_DEV=1, idles)

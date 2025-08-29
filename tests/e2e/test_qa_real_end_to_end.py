@@ -16,7 +16,7 @@ from backend.ollama_client import pull_if_missing
 from backend.qa_loop import answer
 from tests.conftest import TEST_COLLECTION_NAME
 
-pytestmark = [pytest.mark.slow, pytest.mark.external]
+pytestmark = [pytest.mark.slow, pytest.mark.external, pytest.mark.requires_weaviate, pytest.mark.requires_ollama]
 
 
 @pytest.mark.external

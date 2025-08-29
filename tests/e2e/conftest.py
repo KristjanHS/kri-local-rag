@@ -8,6 +8,25 @@ import pytest
 
 from backend.weaviate_client import close_weaviate_client, get_weaviate_client
 
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Skip e2e tests that require external services when unavailable."""
+    # Reuse the integration suite's centralized health checker to avoid duplication
+    from tests.integration.conftest import is_service_healthy  # type: ignore
+
+    for item in items:
+        if item.get_closest_marker("requires_weaviate"):
+            if not is_service_healthy("weaviate"):
+                item.add_marker(
+                    pytest.mark.skip(reason="Weaviate service not available. Run docker compose or use make test-up.")
+                )
+        if item.get_closest_marker("requires_ollama"):
+            if not is_service_healthy("ollama"):
+                item.add_marker(
+                    pytest.mark.skip(reason="Ollama service not available. Run docker compose or use make test-up.")
+                )
+
+
 # Import the test collection name constant from parent conftest
 from tests.conftest import TEST_COLLECTION_NAME
 

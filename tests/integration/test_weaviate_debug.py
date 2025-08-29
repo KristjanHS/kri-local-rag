@@ -3,9 +3,13 @@
 
 import logging
 import os
+import pytest
 
 # Set debug logging level
 os.environ["LOG_LEVEL"] = "DEBUG"
+
+# Skip when Weaviate is not available (matches other Weaviate tests)
+pytestmark = pytest.mark.requires_weaviate
 
 
 from backend.config import get_logger

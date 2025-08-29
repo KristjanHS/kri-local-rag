@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-pytestmark = [pytest.mark.slow]
+pytestmark = [pytest.mark.slow, pytest.mark.requires_weaviate]
 
 from backend import ingest
 from backend.retriever import _get_embedding_model
