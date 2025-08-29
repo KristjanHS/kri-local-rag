@@ -1,30 +1,77 @@
-# Repository Guidelines
+## Purpose  
+This file tells coding agents how to work on this repository **safely and correctly**: where to run from, which
+commands to execute, quality gates to pass, and project conventions. Agents should follow these rules unless a human
+explicitly overrides them.
 
-## Standards & Rules
-- **Run commands from the project root.**
-- **Run Pytest as a module:** `.venv/bin/python -m pytest tests/unit -q` and  `.venv/bin/python -m pytest tests/integration -q`
-- **Run pre-commit checks locally:** `cd /home/kristjans/projects/kri-local-rag && pre-commit run --all-files`
-- **Use `.venv/bin/python` for Python execution** to ensure consistent virtual environment usage.
-- See `docs/CODEX_RULES.md` for linting/formatting, typing, testing policy, imports/deps, Docker safety, logging, and after‑edits guidance.
+## Repo profile (read me first)  
+- **Project root:** `/home/kristjans/projects/kri-local-rag`  
+- **Primary stack:** Python 3.12 (via `.venv`), Streamlit UI, Weaviate, Ollama, Docker Compose.  
+- **Top modules:**  
+  - `backend/` — ingestion (`ingest.py`), retrieval/QA (`qa_loop.py`), Weaviate/Ollama clients, config.  
+  - `frontend/` — Streamlit app (`rag_app.py`).  
+  - `scripts/` — Docker + developer helpers (`docker/docker-setup.sh`, `ingest.sh`, `cli.sh`).  
+  - `tests/` — `unit/`, `integration/`, `e2e/`, `ui/` with `conftest.py`.  
+  - `docker/` — compose + Dockerfiles.  
+  - `reports/` — artifacts, coverage.  
+  - `data/`, `example_data/` — sample datasets.
 
-## Project Structure & Modules
-- `backend/`: ingestion (`ingest.py`), retrieval/QA (`qa_loop.py`), Weaviate/Ollama clients, config.
-- `frontend/`: Streamlit UI (`rag_app.py`).
-- `scripts/`: Docker and developer helpers (`docker/docker-setup.sh`, `ingest.sh`, `cli.sh`).
-- `tests/`: `unit/`, `integration/`, `e2e/`, `ui/` with `conftest.py` fixtures.
-- `docker/`: compose and Dockerfiles. Artifacts/coverage in `reports/`, sample data in `data/`, `example_data/`.
+## Golden rules (non-negotiable)  
+1) **Run commands from repo root.** If you need a shell: `cd /home/kristjans/projects/kri-local-rag`.  
+2) **Use the project venv:** run Python via `.venv/bin/python` (never the system interpreter).  
+3) **Never commit secrets**; `.secrets.baseline` is enforced. If you touch secrets, stop and ask a human.  
 
-## Build, Test, and Dev Commands
-- Start stack (recommended): `./scripts/docker/docker-setup.sh` — builds app and starts Weaviate, Ollama, Streamlit.
-- Web UI: visit `http://localhost:8501` (dev run: `streamlit run frontend/rag_app.py`).
-- Ingest docs: `./scripts/ingest.sh ./data` — runs ingestion in the app container.
-- CLI Q&A: `./scripts/cli.sh` or `python -m backend.qa_loop --question "..."`.
-- Test harness: `make test-up` → `make test-run-integration` → `make test-down`.
-- Pytest locally: `pytest -q` (coverage outputs to `reports/coverage`).
+## Setup & environment  
+- Create/activate venv if missing and install deps as needed (ask before changing pinned versions).  
+- Docker is available; prefer the provided scripts to start services.  
+- Network calls to external services must be isolated behind Docker where possible.
 
-## Commit & Pull Request Guidelines
-- Commits: concise, imperative subject; group related changes; no secrets. Run pre‑commit before pushing.
-- Requirements: CI must pass (lint, type, tests); update docs (`README.md`, `docs/**`) when behavior changes.
+## Common tasks (agents may run these automatically)  
+> Agents: prefer these exact commands and **stop on first failure**.
 
-## Security & Configuration
-- Do not commit secrets; baseline in `.secrets.baseline` is enforced by pre‑commit.
+- **Start full stack (recommended path):**  
+  `./scripts/docker/docker-setup.sh`  
+  _Builds app, starts Weaviate, Ollama, Streamlit._
+
+- **Open Web UI:** visit `http://localhost:8501`.  
+  _Dev alternative:_ `streamlit run frontend/rag_app.py`.
+
+- **Ingest documents (from host `./data`):**  
+  `./scripts/ingest.sh ./data`  
+  _Runs ingestion inside the app container._
+
+- **CLI Q&A:**  
+  `./scripts/cli.sh`  
+  or  
+  `.venv/bin/python -m backend.qa_loop --question "..."`
+
+## Testing & quality gates (must pass before you conclude work)  
+- **Local fast path (as module):**  
+  `.venv/bin/python -m pytest tests/unit -q`  
+  `.venv/bin/python -m pytest tests/integration -q`  
+  _Coverage outputs to `reports/coverage`._
+
+- **Full integration harness (dockerized):**  
+  `make test-up` → `make test-run-integration` → `make test-down`
+
+- **Pre-commit (mandatory) bash command:**  
+  `pre-commit run --all-files`
+
+- **If UI or logs change intentionally:** update any snapshots or expectations the tests rely on.  
+  _If failing, fix the code or tests; do **not** disable checks._
+
+## Code style & conventions  
+- Obey `docs/CODEX_RULES.md` for lint, type checks, import order, logging, and Docker safety posture.  
+- Keep lines ≤120 chars. Prefer small, composable functions and explicit error handling.  
+- Add or update tests when changing behavior.
+
+## Safe edit policy  
+- For risky edits (schema changes, cross-module refactors), propose a plan in the PR description first.  
+- Never change Dockerfiles, Compose, or security-sensitive configs without clearly stating risks and mitigations.  
+
+## Glossary (min spec for agents)  
+- **Weaviate:** vector DB used for retrieval.  
+- **Ollama:** local model runner backing embeddings/LLM endpoints.  
+- **RAG:** retrieval-augmented generation; our system wires ingestion → index → retrieval → answer.
+
+## Agent etiquette  
+- When in doubt about security or data handling, stop and request human guidance.
