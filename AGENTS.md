@@ -2,7 +2,8 @@
 
 ## Standards & Rules
 - **Run commands from the project root.**
-- **Run Pytest as a module:** `.venv/bin/python -m pytest tests/` to avoid `ImportError` issues.
+- **Run Pytest as a module:** `.venv/bin/python -m pytest tests/unit -q` and  `.venv/bin/python -m pytest tests/integration -q`
+- **Run pre-commit checks locally:** `cd /home/kristjans/projects/kri-local-rag && pre-commit run --all-files`
 - **Use `.venv/bin/python` for Python execution** to ensure consistent virtual environment usage.
 - See `docs/CODEX_RULES.md` for linting/formatting, typing, testing policy, imports/deps, Docker safety, logging, and after‑edits guidance.
 
