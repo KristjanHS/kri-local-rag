@@ -73,7 +73,7 @@ def clear_model_cache() -> None:
     logger.info("Model cache cleared")
 
 
-def get_model_status() -> dict:
+def get_model_status() -> dict[str, bool]:
     """Get current status of model loading for monitoring."""
     return {
         "embedding_model_cached": _embedding_model is not None,

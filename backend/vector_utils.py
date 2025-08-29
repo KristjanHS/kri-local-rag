@@ -7,7 +7,7 @@ plain Python lists of floats suitable for clients like Weaviate.
 from __future__ import annotations
 
 import numbers
-from typing import Any, Sequence
+from typing import Any, Sequence, cast
 
 from backend.config import get_logger
 
@@ -46,8 +46,9 @@ def to_float_list(vector_like: Any) -> list[float]:
 
     # numpy.ndarray → list[float]
     if np is not None and isinstance(vector_like, np.ndarray):
-        arr: Any = vector_like
-        return [float(x) for x in arr.reshape(-1).tolist()]
+        arr: Any = cast(Any, vector_like)
+        flat: list[Any] = arr.reshape(-1).tolist()
+        return [float(x) for x in flat]
 
     # Python sequence → list[float]
     if isinstance(vector_like, numbers.Real):
@@ -61,12 +62,15 @@ def to_float_list(vector_like: Any) -> list[float]:
     if callable(tolist_method):
         as_list: Any = tolist_method()
         if isinstance(as_list, Sequence):
-            return [float(x) for x in as_list]
+            as_seq: Sequence[Any] = cast(Sequence[Any], as_list)
+            return [float(x) for x in as_seq]
         try:
-            return [float(x) for x in list(as_list)]
+            seq: list[Any] = list(as_list)
+            return [float(x) for x in seq]
         except Exception as e:
             logger.debug("Could not convert to_list() result to list of floats: %s", e)
 
     # Last resort: attempt to iterate and coerce to float
     iterable_candidate: Any = vector_like
-    return [float(x) for x in list(iterable_candidate)]
+    seq2: list[Any] = list(iterable_candidate)
+    return [float(x) for x in seq2]
