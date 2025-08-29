@@ -33,7 +33,7 @@ sandbox:
 tools:
   shell:
     # Default timeout for shell commands (ms).
-    default_timeout_ms: 120000
+    default_timeout_ms: 600000
     # Output capture limits (Codex CLI truncates around these values).
     max_output_lines: 256
     max_output_bytes: 10240

@@ -257,9 +257,10 @@ def ensure_weaviate_ready_and_populated():
             # First-time setup: create the collection, ingest examples, then clean up.
             logger.info("   → Collection does not exist. Running one-time initialization...")
             # Defer heavy import to avoid torch initialization during module import
-            from backend.ingest import create_collection_if_not_exists, ingest
+            from backend.ingest import ingest
+            from backend.weaviate_client import ensure_collection
 
-            create_collection_if_not_exists(client, collection_name)
+            ensure_collection(client, collection_name)
 
             # Ingest example data to ensure all modules are warm; hard-fail if it's missing.
             # Get the absolute path to the project root, which is the parent of the 'backend' directory
