@@ -154,6 +154,14 @@ if submitted and question.strip():
         with st.spinner("Thinking..."):
             # Lazy import to avoid heavy deps during module import
             from backend.qa_loop import answer
+            from backend.models import load_reranker
+
+            try:
+                cross_encoder = load_reranker()
+            except Exception as e:
+                logger.error("Failed to load CrossEncoder: %s", e)
+                st.error("CrossEncoder model could not be loaded. Ensure the model is available or try again later.")
+                raise
 
             answer(
                 question,
@@ -162,6 +170,7 @@ if submitted and question.strip():
                 on_debug=on_debug,
                 stop_event=st.session_state.stop_event,
                 context_tokens=context_tokens,
+                cross_encoder=cross_encoder,
             )
     # After streaming, keep showing the debug info
     debug_placeholder.text("\n".join(st.session_state["debug_lines"]))

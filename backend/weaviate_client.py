@@ -1,6 +1,7 @@
 from urllib.parse import urlparse
 
 import weaviate
+from weaviate.classes.config import Configure
 from weaviate.exceptions import WeaviateConnectionError
 
 from backend.config import WEAVIATE_URL, get_logger
@@ -66,3 +67,34 @@ def close_weaviate_client():
             logger.warning(f"Error closing Weaviate connection: {e}")
         finally:
             _client = None
+
+
+def delete_collection_if_exists(client: weaviate.WeaviateClient, collection_name: str) -> None:
+    """Delete a collection if it exists."""
+    if client.collections.exists(collection_name):
+        client.collections.delete(collection_name)
+        logger.info(f"→ Collection '{collection_name}' deleted.")
+    else:
+        logger.info(f"→ Collection '{collection_name}' does not exist; nothing to delete.")
+
+
+def reset_collection(client: weaviate.WeaviateClient, collection_name: str) -> None:
+    """Delete the collection if present and recreate it for manual vectorization."""
+    delete_collection_if_exists(client, collection_name)
+    client.collections.create(
+        name=collection_name,
+        vector_config=Configure.Vectors.self_provided(),
+    )
+    logger.info(f"→ Collection '{collection_name}' created for manual vectorization.")
+
+
+def ensure_collection(client: weaviate.WeaviateClient, collection_name: str) -> None:
+    """Create the collection if it does not exist, configured for manual vectors."""
+    if not client.collections.exists(collection_name):
+        client.collections.create(
+            name=collection_name,
+            vector_config=Configure.Vectors.self_provided(),
+        )
+        logger.info(f"→ Collection '{collection_name}' created for manual vectorization.")
+    else:
+        logger.info(f"→ Collection '{collection_name}' already exists.")
