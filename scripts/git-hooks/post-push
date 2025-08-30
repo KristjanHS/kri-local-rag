@@ -104,21 +104,45 @@ else
             CREATE_OUT=$(gh pr create --base "$BASE_BRANCH" --head "$HEAD_BRANCH" --fill --label auto-generated 2>&1 || true)
           fi
           CREATE_RC=$?
-          if [[ $CREATE_RC -ne 0 ]]; then
+          
+          # Extract PR URL from the output (works for both success and "already exists" cases)
+          PR_URL=""
+          if [[ $CREATE_RC -eq 0 ]]; then
+            # Success case: extract URL from output
+            PR_URL=$(echo "$CREATE_OUT" | grep -o 'https://github.com/[^/]*/[^/]*/pull/[0-9]+' | head -1 || true)
+          else
             log INFO "gh pr create exited with $CREATE_RC"
             printf "%s\n" "$CREATE_OUT" | sed 's/^/[gh] /' >/dev/null
+            
+            # Check if the error indicates an existing PR
+            if echo "$CREATE_OUT" | grep -q "already exists"; then
+              # Extract URL from the "already exists" message
+              PR_URL=$(echo "$CREATE_OUT" | grep -o 'https://github.com/[^/]*/[^/]*/pull/[0-9]+' | head -1 || true)
+            elif echo "$CREATE_OUT" | grep -q "No commits between"; then
+              # Handle case where there are no unique commits to create a PR
+              log INFO "No unique commits between $HEAD_BRANCH and $BASE_BRANCH; skipping PR creation"
+              # Try to find existing PR anyway
+              if [[ -n "$REPO" ]]; then
+                PR_URL=$(gh pr list -R "$REPO" --state open --head "$HEAD_BRANCH" --json url -q '.[0].url' 2>/dev/null || true)
+              else
+                PR_URL=$(gh pr list --state open --head "$HEAD_BRANCH" --json url -q '.[0].url' 2>/dev/null || true)
+              fi
+            fi
           fi
-          # Resolve PR URL via view, then fallback to list
-          if [[ -n "$REPO" ]]; then
-            PR_URL=$(gh pr view -R "$REPO" --head "$HEAD_BRANCH" --json url -q .url 2>/dev/null || true)
-          else
-            PR_URL=$(gh pr view --head "$HEAD_BRANCH" --json url -q .url 2>/dev/null || true)
+          
+          # Fallback: try to resolve PR URL via view/list if not found in output
+          if [[ -z "$PR_URL" ]]; then
+            if [[ -n "$REPO" ]]; then
+              PR_URL=$(gh pr view -R "$REPO" --head "$HEAD_BRANCH" --json url -q .url 2>/dev/null || true)
+            else
+              PR_URL=$(gh pr view --head "$HEAD_BRANCH" --json url -q .url 2>/dev/null || true)
+            fi
           fi
           if [[ -z "$PR_URL" ]]; then
             if [[ -n "$REPO" ]]; then
               PR_URL=$(gh pr list -R "$REPO" --state open --search "head:$HEAD_BRANCH base:$BASE_BRANCH" --json url -q '.[0].url' 2>/dev/null || true)
             else
-              PR_URL=$(gh pr list --state open --head "$HEAD_BRANCH" --json url -q '.[0].url' 2>/dev/null || true)
+              PR_URL=$(gh pr list -R "$REPO" --state open --head "$HEAD_BRANCH" --json url -q '.[0].url' 2>/dev/null || true)
             fi
           fi
           if [[ -n "$PR_URL" ]]; then
