@@ -1,13 +1,77 @@
 // .vscode/tasks.json
 {
-    "version": "2.0.0",
-    "tasks": [
-      {
-        "label": "clean-pycache",
-        "type":  "shell",
-        "command": "find . -type d -name '__pycache__' -exec rm -rf {} +",
-        "problemMatcher": []
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "clean-pycache",
+      "type": "shell",
+      "command": "find . -type d -name '__pycache__' -exec rm -rf {} +",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Integration Tests",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "-m",
+        "pytest",
+        "tests/integration",
+        "-q",
+        "--junitxml=reports/junit_integration.xml"
+      ],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "problemMatcher": [
+        {
+          "pattern": {
+            "regexp": "^(.*):(\\d+):(\\d+):\\s+(error|warning|info):\\s+(.*)$",
+            "file": 1,
+            "line": 2,
+            "column": 3,
+            "severity": 4,
+            "message": 5
+          },
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": "^.*Running integration tests.*$",
+            "endsPattern": "^.*Integration tests completed.*$"
+          }
+        }
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
       }
-    ]
-  }
-  
+    },
+    {
+      "label": "Run Tests with Notifications",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "cd ${workspaceFolder} && scripts/dev/test-notification.sh integration"
+      ],
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    }
+  ]
+}
