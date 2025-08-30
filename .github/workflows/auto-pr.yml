@@ -1,18 +1,12 @@
-name: Auto Create Pull Request
+name: Auto Create Pull Request (manual)
 
 on:
-  push:
-    branches-ignore:
-      - main
-      - master
-      - develop
-    paths-ignore:
-      - '**.md'
-      - '.github/workflows/auto-pr.yml'
+  workflow_dispatch: {}
 
 jobs:
   create-pr:
     runs-on: ubuntu-latest
+    # Kept for manual runs only; local post-push hook handles auto PR creation
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
