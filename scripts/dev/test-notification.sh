@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Test notification script for integration tests
-# Provides desktop notifications, terminal bells, and colored output
+# Simple test notification script
+# Provides terminal notifications, colored output, and logging
 
 set -Eeuo pipefail
 
@@ -18,16 +18,13 @@ enable_error_trap "$LOG_FILE" "$script_name"
 TEST_TYPE=${1:-integration}
 NOTIFY_ON_SUCCESS=${NOTIFY_ON_SUCCESS:-true}
 NOTIFY_ON_FAILURE=${NOTIFY_ON_FAILURE:-true}
-PLAY_SOUND=${PLAY_SOUND:-true}
 
-log INFO "Running $TEST_TYPE tests with notifications..."
+log INFO "Running $TEST_TYPE tests..."
 
 # Check if virtual environment exists
 if [[ ! -x ".venv/bin/python" ]]; then
     log ERROR ".venv/bin/python not found"
-    if [[ "$NOTIFY_ON_FAILURE" == "true" ]] && command -v notify-send >/dev/null 2>&1; then
-        notify-send -u critical -i dialog-error "Test Setup Failed" "Missing .venv/bin/python"
-    fi
+    echo -e "\033[31m✗ Test setup failed: Missing .venv/bin/python\033[0m"
     exit 1
 fi
 
@@ -84,37 +81,12 @@ fi
 
 if [[ $TEST_RC -eq 0 ]]; then
     log INFO "$TEST_NAME passed in $DURATION_STR ✓"
-    
-    if [[ "$NOTIFY_ON_SUCCESS" == "true" ]] && command -v notify-send >/dev/null 2>&1; then
-        notify-send -u normal -i dialog-ok "$TEST_NAME Passed" "Completed in $DURATION_STR"
-    fi
-    
     echo -e "\033[32m✓ $TEST_NAME passed in $DURATION_STR\033[0m"
-    
-    if [[ "$PLAY_SOUND" == "true" ]]; then
-        # Play a subtle success sound (if available)
-        if command -v paplay >/dev/null 2>&1; then
-            paplay /usr/share/sounds/freedesktop/stereo/complete.oga 2>/dev/null || true
-        fi
-    fi
 else
     log ERROR "$TEST_NAME failed (exit $TEST_RC) after $DURATION_STR"
-    
-    if [[ "$NOTIFY_ON_FAILURE" == "true" ]] && command -v notify-send >/dev/null 2>&1; then
-        notify-send -u critical -i dialog-error "$TEST_NAME Failed" "Exit code: $TEST_RC - Duration: $DURATION_STR"
-    fi
-    
-    # Terminal bell and colored output
     echo -e "\a\033[31m✗ $TEST_NAME failed (exit $TEST_RC) after $DURATION_STR\033[0m"
     echo -e "\033[33mCheck the logs above and fix the failing tests.\033[0m"
     echo -e "\033[33mLog file: $LOG_FILE\033[0m"
-    
-    if [[ "$PLAY_SOUND" == "true" ]]; then
-        # Play error sound
-        if command -v paplay >/dev/null 2>&1; then
-            paplay /usr/share/sounds/freedesktop/stereo/dialog-error.oga 2>/dev/null || true
-        fi
-    fi
 fi
 
 exit "$TEST_RC"
