@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Any, Optional
 
 import pytest
 
@@ -42,6 +42,54 @@ def _ensure_logs_dir() -> Iterator[None]:
 
 
 ## Removed per-test failure log path emission.
+
+# -------- Shared service health helpers (used by integration + e2e) --------
+from backend.config import get_service_url
+
+
+def get_integration_config() -> dict[str, Any]:
+    """Read integration config from pyproject.toml (service health endpoints/timeouts)."""
+    try:
+        import tomllib  # Python 3.11+
+    except ImportError:
+        return {}
+
+    try:
+        with open("pyproject.toml", "rb") as f:
+            config = tomllib.load(f)
+        return config.get("tool", {}).get("integration", {})
+    except Exception:
+        return {}
+
+
+def is_http_service_available(url: str, timeout: float = 2.0) -> bool:
+    """Boolean check to a health URL; returns False on any exception."""
+    try:
+        import requests
+
+        response = requests.get(url, timeout=timeout)
+        return response.status_code == 200
+    except Exception:
+        return False
+
+
+def is_service_healthy(service: str, config: Optional[dict[str, Any]] = None) -> bool:
+    """Check if a named service is healthy using HTTP endpoint from pyproject config."""
+    if config is None:
+        config = get_integration_config()
+
+    services = config.get("services", {})
+    timeouts = config.get("timeouts", {})
+
+    if service not in services:
+        return False
+
+    service_url = get_service_url(service)
+    health_endpoint = services[service].get("health_endpoint", "")
+    health_url = f"{service_url}{health_endpoint}"
+    http_timeout = timeouts.get("http_timeout", 2.0)
+
+    return is_http_service_available(health_url, http_timeout)
 
 
 #!/usr/bin/env python3

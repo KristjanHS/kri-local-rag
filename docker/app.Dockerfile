@@ -22,15 +22,25 @@ COPY cli.py .
 RUN python -m venv ${VENV_PATH} \
     && ${VENV_PATH}/bin/pip install --upgrade pip
 
-# Install runtime (and optionally dev) dependencies into venv in one layer
+# Install base dependencies
+# - For regular builds (INSTALL_DEV=0): install runtime reqs now for better cache reuse
+# - For dev/test builds (INSTALL_DEV=1): skip here to avoid double-install (dev reqs include runtime)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    ${VENV_PATH}/bin/pip install -r requirements.txt \
-    && if [ "${INSTALL_DEV}" = "1" ]; then ${VENV_PATH}/bin/pip install -r requirements-dev.txt; fi
+    if [ "${INSTALL_DEV}" = "1" ]; then \
+      echo "Skipping requirements.txt preinstall for dev build"; \
+    else \
+      ${VENV_PATH}/bin/pip install -r requirements.txt; \
+    fi
 
-# Install our backend package (non-editable) into the venv
+# Install our package and dev deps (if requested)
 COPY backend/ /app/backend/
 COPY frontend/ /app/frontend/
-RUN ${VENV_PATH}/bin/pip install .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    if [ "${INSTALL_DEV}" = "1" ]; then \
+      ${VENV_PATH}/bin/pip install -r requirements-dev.txt; \
+    else \
+      ${VENV_PATH}/bin/pip install .; \
+    fi
 
 # Download required NLTK data for UnstructuredMarkdownLoader
 ENV NLTK_DATA=${VENV_PATH}/nltk_data
