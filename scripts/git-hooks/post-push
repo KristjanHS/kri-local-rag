@@ -17,6 +17,9 @@ LOG_FILE=$(init_script_logging "$script_name")
 enable_error_trap "$LOG_FILE" "$script_name"
 enable_debug_trace "$LOG_FILE"
 
+# Mirror all stdout/stderr to the log file
+exec > >(tee -a "$LOG_FILE") 2>&1
+
 log INFO "Post-push hook triggered (repo: $ROOT_DIR)"
 
 if [[ "${SKIP_POST_PUSH_TESTS:-0}" == "1" ]]; then
@@ -32,10 +35,12 @@ fi
 
 log INFO "Running local integration tests via .venv/bin/python …"
 mkdir -p reports || true
-CMD=( .venv/bin/python -m pytest tests/integration -q )
+# Allow optional extra pytest args via POST_PUSH_PYTEST_ARGS
+EXTRA_ARGS=${POST_PUSH_PYTEST_ARGS:-}
+CMD=( .venv/bin/python -m pytest tests/integration -q ${EXTRA_ARGS} )
 log INFO "Command: ${CMD[*]}"
 set -o pipefail
-"${CMD[@]}" 2>&1 | sed 's/^/[integration-local] /' | tee -a "$LOG_FILE" || true
+"${CMD[@]}" 2>&1 | sed 's/^/[integration-local] /' || true
 TEST_RC=${PIPESTATUS[0]:-1}
 
 if [[ $TEST_RC -eq 0 ]]; then
@@ -54,29 +59,74 @@ fi
 
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 BASE_BRANCH=${AUTO_PR_BASE:-main}
+# Allow overriding the head branch explicitly (defaults to the current branch)
+HEAD_BRANCH=${AUTO_PR_HEAD:-$CURRENT_BRANCH}
 
 if [[ "${SKIP_AUTO_PR:-0}" == "1" ]]; then
   log INFO "SKIP_AUTO_PR=1 — skipping PR creation"
 else
-  if [[ "$CURRENT_BRANCH" =~ ^(main|master|develop)$ ]]; then
-    log INFO "On protected branch '$CURRENT_BRANCH' — not creating PR."
+  # Skip only when the PR head equals the base (e.g., main→main)
+  if [[ "$HEAD_BRANCH" == "$BASE_BRANCH" ]]; then
+    log INFO "Head equals base ('$HEAD_BRANCH'); not creating PR."
   else
     if command -v gh >/dev/null 2>&1; then
       if [[ $TEST_RC -ne 0 && "${AUTO_PR_ALWAYS:-0}" != "1" ]]; then
         log WARN "Tests failed; skipping PR creation (set AUTO_PR_ALWAYS=1 to override)."
       else
-        log INFO "Creating or viewing PR via 'gh pr create --fill'…"
-        # Try to create a PR with standard flags; if it already exists, fall back to viewing it.
-        if gh pr create --base "$BASE_BRANCH" --head "$CURRENT_BRANCH" --fill --label auto-generated >/dev/null 2>&1; then
-          : # created successfully
+        # Ensure gh is authenticated
+        if ! gh auth status >/dev/null 2>&1; then
+          log WARN "GitHub CLI not authenticated. Run: gh auth login"
         else
-          log INFO "PR may already exist; showing existing PR URL."
-        fi
-        PR_URL=$(gh pr view --head "$CURRENT_BRANCH" --json url -q .url 2>/dev/null || echo '')
-        if [[ -n "$PR_URL" ]]; then
-          log INFO "PR: $PR_URL"
-        else
-          log WARN "Unable to resolve PR URL. You can run: gh pr create --base $BASE_BRANCH --head $CURRENT_BRANCH --fill"
+          # Optionally ensure the head branch has an upstream and is pushed
+          if [[ "${AUTO_PR_PUSH_IF_NEEDED:-1}" == "1" ]]; then
+            if ! git rev-parse --abbrev-ref --symbolic-full-name @{u} >/dev/null 2>&1; then
+              remote=${AUTO_PR_REMOTE:-origin}
+              log INFO "No upstream set for '$HEAD_BRANCH'; pushing to '$remote'…"
+              if ! git push -u "$remote" "$HEAD_BRANCH" 2>&1 | sed 's/^/[git] /' | tee -a "$LOG_FILE" >/dev/null; then
+                log WARN "Failed to push branch '$HEAD_BRANCH' to '$remote'. PR creation may fail."
+              fi
+            fi
+          fi
+
+          # Resolve the GitHub repository name (owner/repo)
+          REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo "")
+          if [[ -z "$REPO" ]]; then
+            log WARN "Unable to resolve GitHub repo from gh CLI. Ensure remote points to GitHub."
+          else
+            log INFO "Repository: $REPO"
+          fi
+
+          log INFO "Creating or viewing PR via 'gh pr create --fill' (head=$HEAD_BRANCH, base=$BASE_BRANCH)…"
+          # Try to create; if it fails, capture output for diagnostics
+          if [[ -n "$REPO" ]]; then
+            CREATE_OUT=$(gh pr create -R "$REPO" --base "$BASE_BRANCH" --head "$HEAD_BRANCH" --fill --label auto-generated 2>&1 || true)
+          else
+            CREATE_OUT=$(gh pr create --base "$BASE_BRANCH" --head "$HEAD_BRANCH" --fill --label auto-generated 2>&1 || true)
+          fi
+          CREATE_RC=$?
+          if [[ $CREATE_RC -ne 0 ]]; then
+            log INFO "gh pr create exited with $CREATE_RC"
+            printf "%s\n" "$CREATE_OUT" | sed 's/^/[gh] /' >/dev/null
+          fi
+          # Resolve PR URL via view, then fallback to list
+          if [[ -n "$REPO" ]]; then
+            PR_URL=$(gh pr view -R "$REPO" --head "$HEAD_BRANCH" --json url -q .url 2>/dev/null || true)
+          else
+            PR_URL=$(gh pr view --head "$HEAD_BRANCH" --json url -q .url 2>/dev/null || true)
+          fi
+          if [[ -z "$PR_URL" ]]; then
+            if [[ -n "$REPO" ]]; then
+              PR_URL=$(gh pr list -R "$REPO" --state open --search "head:$HEAD_BRANCH base:$BASE_BRANCH" --json url -q '.[0].url' 2>/dev/null || true)
+            else
+              PR_URL=$(gh pr list --state open --head "$HEAD_BRANCH" --json url -q '.[0].url' 2>/dev/null || true)
+            fi
+          fi
+          if [[ -n "$PR_URL" ]]; then
+            log INFO "PR: $PR_URL"
+          else
+            log WARN "Unable to resolve PR URL. Try: gh pr create --base $BASE_BRANCH --head $HEAD_BRANCH --fill"
+            log INFO "Also verify: gh auth status; and that branch is pushed to origin."
+          fi
         fi
       fi
     else
