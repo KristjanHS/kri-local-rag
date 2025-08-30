@@ -1,6 +1,6 @@
 .PHONY: setup-hooks test-up test-down test-logs test-up-force-build test-clean \
         _test-up-with-id _test-down-with-id _test-logs-with-id build-if-needed \
-        test-run-integration integration-local
+        test-run-integration integration-local push-pr
 
 # Stable project/session handling
 RUN_ID_FILE := .run_id
@@ -117,3 +117,7 @@ integration-local:
 		exit 1; \
 	fi
 	@.venv/bin/python -m pytest tests/integration -q ${PYTEST_ARGS}
+
+# Convenience: push, then run local integration tests, then create/show PR
+push-pr:
+	@bash scripts/dev/pushpr.sh ${ARGS}

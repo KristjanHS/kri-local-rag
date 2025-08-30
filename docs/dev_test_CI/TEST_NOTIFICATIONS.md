@@ -13,18 +13,16 @@ The project includes a simple, reliable notification system for test results:
 
 ## Quick Start
 
-### 1. Automatic Notifications (Post-Push)
+### 1. Simple Push → Test → PR (local)
 
-After every `git push`, integration tests run automatically with notifications:
+Use the local helper to push, run integration tests in your venv, and create a PR:
 
 ```bash
-git push origin your-branch
+make push-pr
+# or
+scripts/dev/pushpr.sh            # default: origin HEAD → PR to main
+scripts/dev/pushpr.sh origin HEAD
 ```
-
-You'll see:
-- Colored success/failure output in terminal
-- Terminal bell sound for failures
-- Log file location for debugging
 
 ### 2. Manual Test Notifications
 
@@ -56,14 +54,14 @@ Or use the test explorer:
 
 ### Environment Variables
 
-Control test behavior:
+Customize the push-pr flow:
 
 ```bash
-# Skip post-push tests entirely
-export SKIP_POST_PUSH_TESTS=1
+# Change PR base branch
+BASE=develop make push-pr
 
-# Add extra pytest arguments
-export POST_PUSH_PYTEST_ARGS="-x --tb=short"
+# Add extra pytest args to integration run
+PYTEST_ARGS="-x --tb=short" make integration-local
 ```
 
 ### VS Code Settings
@@ -97,8 +95,7 @@ If tests fail consistently:
 
 3. **Check logs:**
    ```bash
-   tail -f logs/test-notification.log
-   tail -f logs/post-push.log
+  tail -f logs/test-notification.log
    ```
 
 ### Missing Terminal Bells
@@ -121,10 +118,10 @@ Add custom pytest arguments:
 
 ```bash
 # With extra args
-POST_PUSH_PYTEST_ARGS="-x --tb=short" ./scripts/dev/test-notification.sh integration
+PYTEST_ARGS="-x --tb=short" ./scripts/dev/test-notification.sh integration
 
 # Debug mode
-POST_PUSH_PYTEST_ARGS="-s -v" ./scripts/dev/test-notification.sh integration
+PYTEST_ARGS="-s -v" ./scripts/dev/test-notification.sh integration
 ```
 
 ### Integration with CI/CD
@@ -148,9 +145,9 @@ The notification script includes timing:
 ## File Locations
 
 - **Notification script:** `scripts/dev/test-notification.sh`
-- **Post-push hook:** `scripts/git-hooks/post-push`
+- (no automatic post-commit or post-push hooks enabled by default)
 - **VS Code config:** `.vscode/tasks.json`, `.vscode/settings.json`
-- **Logs:** `logs/test-notification.log`, `logs/post-push.log`
+- **Logs:** `logs/test-notification.log`
 
 ## Best Practices
 
