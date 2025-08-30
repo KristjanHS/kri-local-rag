@@ -116,4 +116,4 @@ integration-local:
 		echo ">> e.g., python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt"; \
 		exit 1; \
 	fi
-	@.venv/bin/python -m pytest tests/integration -q
+	@.venv/bin/python -m pytest tests/integration -q ${PYTEST_ARGS}
