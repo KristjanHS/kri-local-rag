@@ -27,14 +27,11 @@ fi
 if [[ ! -x ".venv/bin/python" ]]; then
   log ERROR ".venv/bin/python not found — cannot run integration tests"
   log INFO "Create venv: python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt"
-  # Send notification for setup issue
-  if command -v notify-send >/dev/null 2>&1; then
-    notify-send -u critical -i dialog-error "Integration Tests Setup Failed" "Missing .venv/bin/python - please run setup"
-  fi
+  echo -e "\033[31m✗ Integration tests setup failed: Missing .venv/bin/python\033[0m"
   exit 1
 fi
 
-log INFO "Running integration tests with notifications..."
+log INFO "Running integration tests..."
 # Use the dedicated test notification script
 if [[ -x "scripts/dev/test-notification.sh" ]]; then
   # Use the new notification script
@@ -54,21 +51,10 @@ else
   
   if [[ $TEST_RC -eq 0 ]]; then
     log INFO "Post-push: integration tests passed ✓"
-    # Success notification
-    if command -v notify-send >/dev/null 2>&1; then
-      notify-send -u normal -i dialog-ok "Integration Tests Passed" "All integration tests completed successfully"
-    fi
     echo -e "\033[32m✓ Integration tests passed\033[0m"
   else
     log ERROR "Post-push: integration tests failed (exit $TEST_RC)."
     log INFO "Fix the failing tests and push again."
-    
-    # Failure notification with sound
-    if command -v notify-send >/dev/null 2>&1; then
-      notify-send -u critical -i dialog-error "Integration Tests Failed" "Tests failed with exit code $TEST_RC - check logs"
-    fi
-    
-    # Terminal bell and colored output
     echo -e "\a\033[31m✗ Integration tests failed (exit $TEST_RC)\033[0m"
     echo -e "\033[33mCheck the logs above and fix the failing tests.\033[0m"
     echo -e "\033[33mLog file: $LOG_FILE\033[0m"

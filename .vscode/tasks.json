@@ -53,7 +53,7 @@
       }
     },
     {
-      "label": "Run Integration Tests with Notifications",
+      "label": "Run Tests with Notifications",
       "type": "shell",
       "command": "bash",
       "args": [
