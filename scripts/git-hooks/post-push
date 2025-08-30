@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# DEPRECATED: This hook is no longer used.
+# Auto PR creation is now handled by GitHub Actions (.github/workflows/auto-pr.yml)
+# This file is kept for reference only.
+
+echo "Auto PR creation is now handled by GitHub Actions."
+echo "See .github/workflows/auto-pr.yml for details."
+exit 0

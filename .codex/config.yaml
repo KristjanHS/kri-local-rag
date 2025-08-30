@@ -132,7 +132,7 @@ privacy:
 
 retries:
   # Global retry policy for transient tool errors (not user code failures).
-  max_attempts: 1
+  max_attempts: 3
   backoff_ms: 1000
 
 limits:

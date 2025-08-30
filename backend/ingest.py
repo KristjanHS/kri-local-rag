@@ -16,9 +16,9 @@ Key Features:
 
 import argparse
 import hashlib
-import uuid
 import os
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any, List, Optional, cast
 
@@ -152,7 +152,8 @@ def deterministic_uuid(doc: Document) -> str:
     # Combine the source file basename with a SHA-256 of the content
     # and derive a stable RFC 4122 UUIDv5 from that name.
     content_hash = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
-    meta_for_uuid = cast(dict[str, Any], cast(Any, doc).metadata)
+    # Avoid direct attribute access that Pyright may mark as Unknown
+    meta_for_uuid = cast(dict[str, Any], getattr(doc, "metadata", {}))
     source: str = cast(str, meta_for_uuid.get("source", "unknown"))
     source_file = os.path.basename(source)
     name = f"{source_file}:{content_hash}"
@@ -179,7 +180,8 @@ def process_and_upload_chunks(
         concurrent_requests=WEAVIATE_CONCURRENT_REQUESTS,
     ) as batch:
         for idx, doc in enumerate(docs, start=1):
-            meta: dict[str, Any] = cast(dict[str, Any], cast(Any, doc).metadata)
+            # Avoid direct attribute access that Pyright may mark as Unknown
+            meta: dict[str, Any] = cast(dict[str, Any], getattr(doc, "metadata", {}))
             uuid = deterministic_uuid(doc)
             vector_tensor = cast(Any, model).encode(doc.page_content)
             # Normalize to a plain Python list of floats for the Weaviate client

@@ -1,0 +1,30 @@
+name: Auto Create Pull Request
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - master
+      - develop
+    paths-ignore:
+      - '**.md'
+      - '.github/workflows/auto-pr.yml'
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: "feat: Auto-generated PR for ${{ github.ref_name }}"
+          labels: auto-generated
+          base: main
+          branch: ${{ github.ref_name }}
+          delete-branch: false
