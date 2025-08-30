@@ -32,6 +32,7 @@ venv/
 ENV/
 env/
 .env
+node_modules/
 
 # IDE
 .vscode/
@@ -52,6 +53,18 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Build/test artifacts and caches
+reports/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.cache/
+model_cache/
+.run_id
+.test-build.hash
+.test-build-timestamp
 
 # Temporary files
 *.tmp
@@ -90,4 +103,5 @@ docker-compose*
 .local/
 local/
 
-
+# OS
+.DS_Store

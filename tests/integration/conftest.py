@@ -5,7 +5,6 @@ health checks and unified service management using pyproject.toml configuration.
 """
 
 import os
-from typing import Any, Optional
 from unittest.mock import MagicMock
 
 import pytest
@@ -15,51 +14,13 @@ from backend.weaviate_client import (
     close_weaviate_client,
     get_weaviate_client,
 )
+from tests.conftest import (
+    get_integration_config,
+    is_service_healthy,
+)
 
 
-def get_integration_config() -> dict[str, Any]:
-    """Get integration configuration from pyproject.toml."""
-    try:
-        import tomllib
-    except ImportError:
-        return {}  # No TOML support available
-
-    try:
-        with open("pyproject.toml", "rb") as f:
-            config = tomllib.load(f)
-        return config.get("tool", {}).get("integration", {})
-    except Exception:
-        return {}
-
-
-def is_http_service_available(url: str, timeout: float = 2.0) -> bool:
-    """Check if a service is available using HTTP health endpoint."""
-    try:
-        import requests
-
-        response = requests.get(url, timeout=timeout)
-        return response.status_code == 200
-    except Exception:
-        return False
-
-
-def is_service_healthy(service: str, config: Optional[dict[str, Any]] = None) -> bool:
-    """Check if a service is healthy using HTTP health endpoint."""
-    if config is None:
-        config = get_integration_config()
-
-    services = config.get("services", {})
-    timeouts = config.get("timeouts", {})
-
-    if service not in services:
-        return False
-
-    service_url = get_service_url(service)
-    health_endpoint = services[service].get("health_endpoint", "")
-    health_url = f"{service_url}{health_endpoint}"
-    http_timeout = timeouts.get("http_timeout", 2.0)
-
-    return is_http_service_available(health_url, http_timeout)
+## Service health helpers are imported from tests.conftest to avoid duplication
 
 
 @pytest.fixture(scope="session")

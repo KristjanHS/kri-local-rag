@@ -18,6 +18,7 @@ import argparse
 import hashlib
 import os
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any, List, Optional, cast
 
@@ -125,7 +126,7 @@ def load_and_split_documents(path: str) -> List[Document]:
     return chunked_docs
 
 
-from backend.weaviate_client import get_weaviate_client
+from backend.weaviate_client import ensure_collection, get_weaviate_client, reset_collection
 
 
 def connect_to_weaviate() -> weaviate.WeaviateClient:
@@ -148,24 +149,15 @@ def _safe_created_at(source_path: Optional[str]) -> str:
 
 def deterministic_uuid(doc: Document) -> str:
     """Generate a deterministic UUID for a document chunk."""
-    # usedforsecurity=False is not available in all python versions, nosec is safer
-    content_hash = hashlib.md5(doc.page_content.encode("utf-8")).hexdigest()  # nosec B324
-    meta_for_uuid = cast(dict[str, Any], cast(Any, doc).metadata)
+    # Combine the source file basename with a SHA-256 of the content
+    # and derive a stable RFC 4122 UUIDv5 from that name.
+    content_hash = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
+    # Avoid direct attribute access that Pyright may mark as Unknown
+    meta_for_uuid = cast(dict[str, Any], getattr(doc, "metadata", {}))
     source: str = cast(str, meta_for_uuid.get("source", "unknown"))
     source_file = os.path.basename(source)
-    return hashlib.md5(f"{source_file}:{content_hash}".encode("utf-8")).hexdigest()  # nosec B324
-
-
-def create_collection_if_not_exists(client: weaviate.WeaviateClient, collection_name: str):
-    """Create a collection if it doesn't exist, configured for manual vectorization."""
-    if not client.collections.exists(collection_name):
-        client.collections.create(
-            name=collection_name,
-            vector_config=weaviate.classes.config.Configure.Vectors.self_provided(),
-        )
-        logger.info(f"→ Collection '{collection_name}' created for manual vectorization.")
-    else:
-        logger.info(f"→ Collection '{collection_name}' already exists.")
+    name = f"{source_file}:{content_hash}"
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, name))
 
 
 def process_and_upload_chunks(
@@ -188,7 +180,8 @@ def process_and_upload_chunks(
         concurrent_requests=WEAVIATE_CONCURRENT_REQUESTS,
     ) as batch:
         for idx, doc in enumerate(docs, start=1):
-            meta: dict[str, Any] = cast(dict[str, Any], cast(Any, doc).metadata)
+            # Avoid direct attribute access that Pyright may mark as Unknown
+            meta: dict[str, Any] = cast(dict[str, Any], getattr(doc, "metadata", {}))
             uuid = deterministic_uuid(doc)
             vector_tensor = cast(Any, model).encode(doc.page_content)
             # Normalize to a plain Python list of floats for the Weaviate client
@@ -267,6 +260,8 @@ def ingest(
     collection_name: str,
     weaviate_client: weaviate.WeaviateClient,
     embedding_model: SentenceTransformer,
+    *,
+    reset: bool = False,
 ):
     """Main ingestion pipeline."""
     start_time = time.time()
@@ -278,7 +273,10 @@ def ingest(
     if not chunked_docs:
         return
 
-    create_collection_if_not_exists(weaviate_client, collection_name)
+    if reset:
+        reset_collection(weaviate_client, collection_name)
+    else:
+        ensure_collection(weaviate_client, collection_name)
     process_and_upload_chunks(weaviate_client, chunked_docs, embedding_model, collection_name)
 
     elapsed = time.time() - start_time
@@ -291,6 +289,12 @@ def ingest(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Ingest documents (.pdf, .md) into Weaviate.")
     parser.add_argument("--data-dir", default="../data", help="Directory with document files.")
+    parser.add_argument(
+        "--reset-collection",
+        action="store_true",
+        default=False,
+        help="Delete and recreate the collection before ingesting (default: false).",
+    )
     args = parser.parse_args()
 
     # Create a single Weaviate client instance
@@ -308,6 +312,7 @@ if __name__ == "__main__":
             collection_name=COLLECTION_NAME,
             weaviate_client=client,
             embedding_model=model,
+            reset=bool(args.reset_collection),
         )
     finally:
         client.close()
