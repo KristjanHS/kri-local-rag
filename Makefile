@@ -1,6 +1,6 @@
 .PHONY: setup-hooks test-up test-down test-logs test-up-force-build test-clean \
         _test-up-with-id _test-down-with-id _test-logs-with-id build-if-needed \
-        test-run-integration
+        test-run-integration integration-local
 
 # Stable project/session handling
 RUN_ID_FILE := .run_id
@@ -108,3 +108,12 @@ test-clean:
 	@echo "Cleaning up test environment and build cache..."
 	@rm -f $(BUILD_HASH_FILE) $(RUN_ID_FILE)
 	@echo "Test build cache cleaned."
+
+# Minimal: run local integration tests using project venv
+integration-local:
+	@if [ ! -x .venv/bin/python ]; then \
+		echo ">> .venv/bin/python not found. Create venv and install dev deps."; \
+		echo ">> e.g., python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt"; \
+		exit 1; \
+	fi
+	@.venv/bin/python -m pytest tests/integration -q
