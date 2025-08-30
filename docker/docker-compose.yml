@@ -44,11 +44,12 @@ services:
 
   # ---------- RAG App Container (supports both web app and CLI) -----------------------------------------
   app:
+    profiles: ["prod"]
     image: kri-local-rag-app
     build:
       context: ..
       dockerfile: docker/app.Dockerfile
-      target: prod
+      target: runtime
 
     ports:
       - "8501:8501"
@@ -60,8 +61,8 @@ services:
       - ../logs:/app/logs # Live log access
       - ../tests:/app/tests # Mount tests for in-container testing
     working_dir: /app
-    # Auto-start Streamlit when container starts
-    command: ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    # Auto-start Streamlit when container starts (headless + no telemetry)
+    command: ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true", "--browser.gatherUsageStats=false"]
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8501/_stcore/health || exit 1"]
       interval: 5s
@@ -77,6 +78,9 @@ services:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
       - WEAVIATE_URL=http://weaviate:8080
+      - STREAMLIT_SERVER_HEADLESS=true
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+      - APP_LOG_DIR=/app/logs
 
   # ---------- Test App Container (profile: test) -----------------------------------------
   app-test:
@@ -84,7 +88,9 @@ services:
     extends: app
     image: kri-local-rag-app:test
     build:
-      target: test
+      target: runtime
+      args:
+        INSTALL_DEV: "1"
     ports: []
     command: ["tail", "-f", "/dev/null"]
     healthcheck:
@@ -107,6 +113,7 @@ services:
       # Point the Python code to the other services inside the compose network
       - OLLAMA_URL=http://ollama:11434
       - WEAVIATE_URL=http://weaviate:8080
+      - APP_LOG_DIR=/app/logs
     command: ["python", "-m", "backend.ingest", "--data-dir", "/app/data"]
 
 volumes:

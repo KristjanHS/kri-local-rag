@@ -47,7 +47,7 @@ build-if-needed:
 	OLD_HASH=$$(cat $(BUILD_HASH_FILE) 2>/dev/null || echo ''); \
 	if [ "$$NEW_HASH" != "$$OLD_HASH" ]; then \
 		echo "Build deps changed; rebuilding images..."; \
-		DOCKER_BUILDKIT=1 $(COMPOSE) -p "$(RUN_ID)" build 2>&1 \
+		DOCKER_BUILDKIT=1 $(COMPOSE) -p "$(RUN_ID)" build app-test 2>&1 \
 		  | tee $(LOG_DIR)/test-build-$(RUN_ID).log; \
 		# Update stable symlink and prune older test-build logs (keep latest 5) \
 		ln -sf "test-build-$(RUN_ID).log" "$(LOG_DIR)/test-build.log"; \
