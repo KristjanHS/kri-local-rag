@@ -116,7 +116,7 @@ integration-local:
 		echo ">> e.g., python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt"; \
 		exit 1; \
 	fi
-	@.venv/bin/python -m pytest tests/integration -q ${PYTEST_ARGS}
+@.venv/bin/python -m pytest tests/integration -q ${PYTEST_ARGS}
 
 # Convenience: push, then run local integration tests, then create/show PR
 push-pr:
