@@ -1,3 +1,15 @@
 {
-    "recommendations": []
+    "recommendations": [
+        "ms-python.python",
+        "ms-python.pylint",
+        "charliermarsh.ruff",
+        "ms-python.black-formatter",
+        "ms-python.flake8",
+        "ms-python.mypy-type-checker",
+        "ms-python.pytest-adapter",
+        "ms-vscode.test-adapter-converter",
+        "hbenl.vscode-test-explorer",
+        "littlefoxteam.vscode-python-test-adapter",
+        "ms-vscode.vscode-json"
+    ]
 }

@@ -45,5 +45,28 @@
     "geminicodeassist.chat.defaultDiffLayout": "Side by side diff",
     "geminicodeassist.chat.defaultCodeBlockDisplay": "Expanded",
     "python-envs.pythonProjects": [],
-    "chatgpt.openOnStartup": true
+    // Test notification settings
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.testing.autoTestDiscoverOnSaveEnabled": true,
+    "python.testing.pytestPath": "${workspaceFolder}/.venv/bin/pytest",
+    // Notification settings
+    "notifications.showInProblemsPanel": true,
+    "notifications.showInStatusBar": true,
+    "notifications.showInTerminal": true,
+    // Test explorer settings
+    "testExplorer.gutterDecoration": true,
+    "testExplorer.addToEditorContextMenu": true,
+    "testExplorer.showOnRun": true,
+    "testExplorer.showOnReload": true,
+    "testExplorer.showOnStart": true,
+    // Auto-run tests on save (optional - can be disabled if too noisy)
+    "python.testing.autoTestDiscoverOnSaveEnabled": false,
+    // Terminal notification settings
+    "terminal.integrated.enableBell": true,
+    "terminal.integrated.bellDuration": 1000
 }
