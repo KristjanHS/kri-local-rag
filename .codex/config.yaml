@@ -33,7 +33,7 @@ sandbox:
 tools:
   shell:
     # Default timeout for shell commands (ms).
-    default_timeout_ms: 120000
+    default_timeout_ms: 600000
     # Output capture limits (Codex CLI truncates around these values).
     max_output_lines: 256
     max_output_bytes: 10240
@@ -132,7 +132,7 @@ privacy:
 
 retries:
   # Global retry policy for transient tool errors (not user code failures).
-  max_attempts: 1
+  max_attempts: 3
   backoff_ms: 1000
 
 limits:
@@ -154,7 +154,7 @@ validation:
 
 ui:
   # Whether to show chain-of-thought/thinking (should remain false in most setups).
-  show_thinking: true
+  show_thinking: false
   # Display the current plan steps in the UI when available.
   show_plan: true
   # Color output preference.
