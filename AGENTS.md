@@ -4,7 +4,6 @@ commands to execute, quality gates to pass, and project conventions. Agents shou
 explicitly overrides them.
 
 ## Repo profile (read me first)  
-- **Project root:** `/home/kristjans/projects/kri-local-rag`  
 - **Primary stack:** Python 3.12 (via `.venv`), Streamlit UI, Weaviate, Ollama, Docker Compose.  
 - **Top modules:**  
   - `backend/` — ingestion (`ingest.py`), retrieval/QA (`qa_loop.py`), Weaviate/Ollama clients, config.  
@@ -16,7 +15,7 @@ explicitly overrides them.
   - `data/`, `example_data/` — sample datasets.
 
 ## Golden rules (non-negotiable)  
-1) **Run commands from repo root.** If you need a shell: `cd /home/kristjans/projects/kri-local-rag`.  
+1) **Run commands from repo root.** If you need a shell 
 2) **Use the project venv:** run Python via `.venv/bin/python` (never the system interpreter).  
 3) **Never commit secrets**; `.secrets.baseline` is enforced. If you touch secrets, stop and ask a human.  
 
