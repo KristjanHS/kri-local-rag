@@ -1,13 +1,17 @@
-"""Global pytest configuration for logging and per-test log capture."""
+#!/usr/bin/env python3
+"""Root-level pytest configuration and fixtures."""
 
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
-from typing import Iterator, Any, Optional
+from typing import Any, Iterator, Optional
 
 import pytest
+
+# Set up a logger for this module
+logger = logging.getLogger(__name__)
+
 
 REPORTS_DIR = Path("reports")
 LOGS_DIR = REPORTS_DIR / "logs"
@@ -20,7 +24,6 @@ def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: D401
     """Ensure report directories exist; preserve service URLs in local runs."""
     # In local runs, keep WEAVIATE_URL/OLLAMA_URL so tests can use running services.
     # Inside Docker, environment is managed by Compose.
-    _ = os.getenv("TEST_DOCKER", "false").lower() == "true"
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -35,16 +38,7 @@ def _ensure_logs_dir() -> Iterator[None]:
     yield
 
 
-## Removed per-test file handler hooks; rely on log_cli/log_file from pyproject.
-
-
-## Removed per-test teardown for file handler.
-
-
-## Removed per-test failure log path emission.
-
 # -------- Shared service health helpers (used by integration + e2e) --------
-from backend.config import get_service_url
 
 
 def get_integration_config() -> dict[str, Any]:
@@ -84,26 +78,15 @@ def is_service_healthy(service: str, config: Optional[dict[str, Any]] = None) ->
     if service not in services:
         return False
 
+    # Lazy import to avoid importing app code during unit test collection
+    from backend.config import get_service_url  # local import by design
+
     service_url = get_service_url(service)
     health_endpoint = services[service].get("health_endpoint", "")
     health_url = f"{service_url}{health_endpoint}"
     http_timeout = timeouts.get("http_timeout", 2.0)
 
     return is_http_service_available(health_url, http_timeout)
-
-
-#!/usr/bin/env python3
-"""Root-level pytest configuration and fixtures."""
-
-import subprocess
-from pathlib import Path
-
-import pytest
-from rich.console import Console
-
-# Set up a logger for this module
-logger = logging.getLogger(__name__)
-console = Console()
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -206,98 +189,6 @@ def weaviate_client():
         logger.warning("Error during post-test cleanup of collection %s: %s", TEST_COLLECTION_NAME, e)
     finally:
         close_weaviate_client()
-
-
-@pytest.fixture(scope="session")
-def test_log_file(tmp_path_factory):
-    """Creates a unique log file for the test session."""
-    log_dir = tmp_path_factory.mktemp("logs")
-    log_file = log_dir / "test_run.log"
-    console.print(f"--- Test output is being logged to: {log_file} ---")
-    return log_file
-
-
-# Fixture to manage the Docker environment for integration tests
-@pytest.fixture(scope="session")
-def docker_services(request, test_log_file):
-    """
-    Manages the Docker environment for the test session.
-    """
-    # If running inside a Docker container, assume services are already managed
-    test_docker = os.getenv("TEST_DOCKER", "false").lower() == "true"
-    if test_docker:
-        console.print("\n--- Running inside Docker, skipping Docker service management. ---")
-        yield
-        return
-
-    project_root = Path(__file__).parent.parent
-    compose_file = project_root / "docker" / "docker-compose.yml"
-
-    # Check for Docker
-    try:
-        subprocess.run(["docker", "info"], check=True, capture_output=True, timeout=5)
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-        pytest.fail("Docker is required for integration tests. Please ensure it is running.")
-
-    console.print("\n--- Setting up Docker services for testing ---")
-
-    with open(test_log_file, "a") as log:
-        try:
-            subprocess.run(
-                ["docker", "compose", "-f", str(compose_file), "up", "-d", "--wait"],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=300,
-            )
-            console.print("✓ Docker services are up and healthy.")
-            log.write("✓ Docker services are up and healthy.\n")
-
-            # --- Ensure Weaviate database is populated for tests ---
-            try:
-                from backend.qa_loop import ensure_weaviate_ready_and_populated
-
-                ensure_weaviate_ready_and_populated()
-                console.print("✓ Weaviate database ready for tests.")
-                log.write("✓ Weaviate database ready for tests.\n")
-            except Exception as e:
-                console.print(f"✗ Failed to verify/populate Weaviate: {e}")
-                log.write(f"✗ Failed to verify/populate Weaviate: {e}\\n")
-
-        except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
-            stderr = e.stderr if hasattr(e, "stderr") else str(e)
-            log.write("\n--- Docker Error Logs ---\n")
-            log.write(str(stderr))
-            pytest.fail(f"Failed to start Docker services. See logs at {test_log_file}")
-        except Exception as e:
-            pytest.fail(f"An unexpected error occurred during Docker setup: {e}")
-
-    # Yield to let the tests run
-    yield
-
-    # Controlled teardown
-    keep_up = request.config.getoption("--keep-docker-up") or os.getenv("KEEP_DOCKER_UP")
-    if keep_up:
-        console.print("\n--- Docker services left running as requested ---")
-        return
-
-    console.print("--- Tearing down Docker services (preserving volumes) ---")
-    try:
-        subprocess.run(["docker", "compose", "-f", str(compose_file), "down"], check=True)
-    except Exception as e:
-        console.print(f"✗ Failed to tear down Docker services: {e}")
-
-
-@pytest.fixture(scope="session")
-def weaviate_compose_up():
-    """Ensure compose Weaviate is up for tests that need the real service.
-
-    Starts only the `weaviate` service using docker compose. Volumes are
-    preserved and global teardown is handled elsewhere (no down -v).
-    """
-    compose_file = str(Path(__file__).resolve().parents[1] / "docker" / "docker-compose.yml")
-    subprocess.run(["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "weaviate"], check=True)
-    yield
 
 
 @pytest.fixture(scope="session")

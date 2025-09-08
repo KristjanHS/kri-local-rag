@@ -4,7 +4,7 @@ Use this checklist to validate recent Dockerfile/Compose changes in small chunks
 
 ## Prep
 - [x] Export BuildKit: `export DOCKER_BUILDKIT=1`
-- [x] Ensure working dir: `cd /home/kristjans/projects/kri-local-rag`
+- [x] Ensure working dir: `cd ~/projects/kri-local-rag`
 
 ## Static checks (fast)
 - [x] Run pre-commit: `pre-commit run --all-files`
