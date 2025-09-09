@@ -9,14 +9,6 @@ on:
       - "**/*.yaml"
       - "Dockerfile"
       - "docker/**"
-  push:
-    paths:
-      - ".github/workflows/**/*.yml"
-      - ".github/workflows/**/*.yaml"
-      - "**/*.yml"
-      - "**/*.yaml"
-      - "Dockerfile"
-      - "docker/**"
   workflow_dispatch: {}
 
 permissions:

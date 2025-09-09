@@ -111,12 +111,12 @@ test-clean:
 
 # Minimal: run local integration tests using project venv
 integration-local:
-	@if [ ! -x .venv/bin/python ]; then \
-		echo ">> .venv/bin/python not found. Create venv and install dev deps."; \
-		echo ">> e.g., python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt"; \
-		exit 1; \
-	fi
-@.venv/bin/python -m pytest tests/integration -q ${PYTEST_ARGS}
+		@if [ ! -x .venv/bin/python ]; then \
+			echo ">> .venv/bin/python not found. Create venv and install dev deps."; \
+			echo ">> e.g., python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt"; \
+			exit 1; \
+		fi
+	@.venv/bin/python -m pytest tests/integration -q ${PYTEST_ARGS}
 
 # Convenience: push, then run local integration tests, then create/show PR
 push-pr:
