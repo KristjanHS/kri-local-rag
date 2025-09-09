@@ -145,7 +145,6 @@ The notification script includes timing:
 ## File Locations
 
 - **Notification script:** `scripts/dev/test-notification.sh`
-- (no automatic post-commit or post-push hooks enabled by default)
 - **VS Code config:** `.vscode/tasks.json`, `.vscode/settings.json`
 - **Logs:** `logs/test-notification.log`
 

@@ -26,7 +26,7 @@ weaviate-client==4.16.6
 
 # Data Processing and File Parsing
 unstructured[pdf]==0.14.8
-PyMuPDF>=1.24.10
+PyMuPDF==1.24.10
 pdfplumber>=0.11.0
 langdetect
 markdown>=3.6

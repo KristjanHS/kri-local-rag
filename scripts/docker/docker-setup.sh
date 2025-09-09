@@ -114,7 +114,6 @@ echo "This may take a few minutes. Detailed output is being saved to '$LOG_FILE'
 run_step "Build app image" "$LOG_FILE" ./scripts/docker/build_app.sh
 echo -e "${GREEN}✓ Build complete.${NC}"
 
-
 # --- Step 2: Start Services ---
 echo ""
 log INFO "Starting Docker services" | tee -a "$LOG_FILE"
@@ -122,7 +121,28 @@ echo -e "${BOLD}--- Step 2: Starting all Docker services... ---${NC}"
 echo "This can take a long time on the first run as models are downloaded."
 echo "The script will wait for all services to report a 'healthy' status."
 echo "Detailed output is being saved to '$LOG_FILE'."
-run_step "Compose up services: ${SERVICES_UP[*]}" "$LOG_FILE" docker compose --file "$DOCKER_COMPOSE_FILE" up --detach --wait "${SERVICES_UP[@]}"
+
+compose_up_with_logs() {
+    if docker compose --file "$DOCKER_COMPOSE_FILE" up --detach --wait "${SERVICES_UP[@]}"; then
+        return 0
+    else
+        rc=$?
+        log ERROR "Compose up failed (exit $rc). Dumping recent app logs and environment…" | tee -a "$LOG_FILE"
+        # Dump last 200 lines of app logs if container exists
+        docker compose --file "$DOCKER_COMPOSE_FILE" ps app 2>&1 | tee -a "$LOG_FILE" || true
+        docker compose --file "$DOCKER_COMPOSE_FILE" logs --no-color --tail=200 app 2>&1 | tee -a "$LOG_FILE" || true
+        # Try a one-off debug shell to inspect PATH inside the image
+        docker compose -f "$DOCKER_COMPOSE_FILE" run --rm --no-deps --entrypoint bash app -lc '
+            echo "=== Debug (post-failure): PATH/which ===";
+            echo "PATH=$PATH";
+            which python || true; python -V || true;
+            which streamlit || true; python -m streamlit --version || true;
+        ' 2>&1 | tee -a "$LOG_FILE" || true
+        return $rc
+    fi
+}
+
+run_step "Compose up services: ${SERVICES_UP[*]}" "$LOG_FILE" compose_up_with_logs
 echo -e "${GREEN}✓ All services are up and healthy.${NC}"
 
 

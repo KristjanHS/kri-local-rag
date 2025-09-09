@@ -32,6 +32,12 @@
 - Ingest: `./scripts/ingest.sh ./data`.
 - CLI Q&A: `./scripts/cli.sh` or `python -m backend.qa_loop --question "..."`.
 
+**Docker Compose Usage**
+- Always target compose by service name (e.g., `app`, `app-test`, `weaviate`, `ollama`). Do not pass profile names as build/up/run targets.
+- Examples:
+  - Build a service: `docker compose -f docker/docker-compose.yml build app-test`
+  - Start services: `docker compose -f docker/docker-compose.yml up -d weaviate ollama app`.
+
 **Terminal and Python Execution**
 - Use the project venv Python: `.venv/bin/python`.
 - Run pytest as a module to avoid import issues: `.venv/bin/python -m pytest ...`.
@@ -80,4 +86,3 @@
 
 **Notes**
 - This document consolidates `.cursor/rules/*` semantics for Codex CLI. See `.cursor/rules/` for the original Cursor‑specific rule files.
-
