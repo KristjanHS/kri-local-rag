@@ -16,7 +16,7 @@ on:
   pull_request:
     branches: [main, dev]
   push:
-    branches: [main, dev]
+    branches: [main]
   workflow_dispatch: {} # Allows manual triggering for slow tests
   schedule:
     - cron: "0 2 * * 0" # Weekly on Sunday at 2 AM for slow tests
