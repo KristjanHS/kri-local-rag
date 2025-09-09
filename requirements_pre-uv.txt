@@ -1,0 +1,54 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+python-dotenv
+
+# Linting and formatting
+ruff==0.12.9
+
+
+# Core Machine Learning Frameworks (CPU-only)
+torch==2.7.1
+# torchvision==0.22.1
+# torchaudio==2.7.1
+
+
+# Sentence Embeddings
+# Keep modern embedding stack
+sentence-transformers==5.0.0
+
+# Core RAG and LangChain Framework
+langchain==0.3.27
+langchain-community==0.3.27
+
+# Vector Database Client
+# Pin to stable version to avoid v4.16.0-4.16.3 bugs
+weaviate-client==4.16.6
+
+# Data Processing and File Parsing
+unstructured[pdf]==0.14.8
+PyMuPDF==1.24.10
+pdfplumber>=0.11.0
+langdetect
+markdown>=3.6
+
+# Image processing
+pillow>=11.1.0
+
+# Web and Network
+httpx
+streamlit>=1.48.0
+
+# Utilities
+
+# Protobuf and gRPC (pinned per UV sandbox resolution)
+protobuf==5.29.5
+grpcio==1.63.0
+grpcio-status==1.63.0
+grpcio-health-checking==1.63.0
+
+# CLI and logging
+rich>=13,<14
+
+# for Windows (but doesn't hurt on Linux)
+# https://github.com/Unstructured-IO/unstructured/issues/2237
+# python-magic-bin==0.4.14
