@@ -153,8 +153,8 @@ def deterministic_uuid(doc: Document) -> str:
     # and derive a stable RFC 4122 UUIDv5 from that name.
     content_hash = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
     # Avoid direct attribute access that Pyright may mark as Unknown
-    meta_for_uuid = cast(dict[str, Any], getattr(doc, "metadata", {}))
-    source: str = cast(str, meta_for_uuid.get("source", "unknown"))
+    meta_for_uuid = getattr(doc, "metadata", {})
+    source: str = "unknown" if (source_val := meta_for_uuid.get("source")) is None else str(source_val)
     source_file = os.path.basename(source)
     name = f"{source_file}:{content_hash}"
     return str(uuid.uuid5(uuid.NAMESPACE_URL, name))

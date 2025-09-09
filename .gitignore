@@ -20,6 +20,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.cache/
 .pytest_cache/
 build/
 _build/
@@ -78,6 +79,7 @@ reports/
 # Coverage artifacts
 .coverage*
 coverage/
+junit.xml
 
 # Analysis & Scan Reports
 *.sarif
