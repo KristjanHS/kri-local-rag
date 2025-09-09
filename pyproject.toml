@@ -126,7 +126,7 @@ ui = [
 # Development tools (linting, type checking, security)
 dev = [
     "ruff==0.12.9",
-    "pyright[nodejs]==1.1.404",
+    "pyright[nodejs]==1.1.405",
     "bandit[toml]==1.8.6",
 ]
 

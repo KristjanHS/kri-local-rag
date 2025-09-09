@@ -20,16 +20,25 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, List, Optional, cast
+from typing import Any, List, Optional, Protocol, cast, runtime_checkable
 
 import torch
 import weaviate
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, UnstructuredMarkdownLoader
+from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
 
 # Direct import since sentence-transformers is a required runtime dependency
 from sentence_transformers import SentenceTransformer
+
+
+# A minimal protocol to support our embedding calls and enable test doubles.
+# Any object with an "encode(str) -> Any" method satisfies this.
+@runtime_checkable
+class SupportsEncode(Protocol):
+    def encode(self, text: Any, *args: Any, **kwargs: Any) -> Any:  # pragma: no cover - structural typing only
+        ...
+
 
 # SentenceTransformer is now loaded via backend.models for consistency
 from backend.config import (
@@ -79,7 +88,7 @@ def load_and_split_documents(path: str) -> List[Document]:
             docs.extend(loader.load())
             file_count = 1
         elif ext == ".md":
-            loader = UnstructuredMarkdownLoader(path)
+            loader = TextLoader(path, encoding="utf-8")
             docs.extend(loader.load())
             file_count = 1
         else:
@@ -91,7 +100,7 @@ def load_and_split_documents(path: str) -> List[Document]:
 
         loader_configs = {
             "**/*.pdf": pdf_loader_cls,
-            "**/*.md": UnstructuredMarkdownLoader,
+            "**/*.md": TextLoader,
         }
         for glob_pattern, loader_cls in loader_configs.items():
             try:
@@ -163,7 +172,7 @@ def deterministic_uuid(doc: Document) -> str:
 def process_and_upload_chunks(
     client: weaviate.WeaviateClient,
     docs: List[Document],
-    model: SentenceTransformer,
+    model: SupportsEncode,
     collection_name: str,
 ):
     """Process each document chunk and upload it to Weaviate."""
@@ -183,16 +192,18 @@ def process_and_upload_chunks(
             # Avoid direct attribute access that Pyright may mark as Unknown
             meta: dict[str, Any] = cast(dict[str, Any], getattr(doc, "metadata", {}))
             uuid = deterministic_uuid(doc)
-            vector_tensor = cast(Any, model).encode(doc.page_content)
+            vector_tensor = model.encode(doc.page_content)
             # Normalize to a plain Python list of floats for the Weaviate client
             vector: List[float] = to_float_list(vector_tensor)
 
             src: Optional[str] = cast(Optional[str], meta.get("source", None))
             src_safe: str = src or "unknown"
+            # Normalize extension to match CLI filter examples (e.g., "pdf", "md")
+            ext = os.path.splitext(src_safe)[1].lstrip(".").lower()
             properties: dict[str, str] = {
                 "content": doc.page_content,
                 "source_file": os.path.basename(src_safe),
-                "source": os.path.splitext(src_safe)[1],
+                "source": ext,
                 # Derive created_at from source file if it exists; fall back to now.
                 "created_at": _safe_created_at(src),
             }
@@ -277,7 +288,9 @@ def ingest(
         reset_collection(weaviate_client, collection_name)
     else:
         ensure_collection(weaviate_client, collection_name)
-    process_and_upload_chunks(weaviate_client, chunked_docs, embedding_model, collection_name)
+    # Narrow to the minimal protocol needed for ingestion; the concrete
+    # SentenceTransformer provides a compatible .encode at runtime.
+    process_and_upload_chunks(weaviate_client, chunked_docs, cast(SupportsEncode, embedding_model), collection_name)
 
     elapsed = time.time() - start_time
     logger.info("── Summary ─────────────────────────────")

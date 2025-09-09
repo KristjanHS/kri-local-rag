@@ -61,7 +61,7 @@ services:
       - ../tests:/app/tests # Mount tests for in-container testing
     working_dir: /app
     # Auto-start Streamlit when container starts (headless + no telemetry)
-    command: ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true", "--browser.gatherUsageStats=false"]
+    command: ["/opt/venv/bin/python", "-m", "streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true", "--browser.gatherUsageStats=false"]
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8501/_stcore/health || exit 1"]
       interval: 5s
