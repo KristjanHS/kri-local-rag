@@ -1,4 +1,5 @@
 ignored:
   - DL4001
+  - DL3008 # We pin via snapshot.debian.org
 trustedRegistries:
   - "*"

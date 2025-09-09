@@ -62,7 +62,7 @@ def mock_embedding_model(mocker) -> MagicMock:
 def managed_cross_encoder(mocker):
     """Fixture to mock the CrossEncoder class, returning a MagicMock instance."""
     mock_encoder_instance = MagicMock()
-    mocker.patch("sentence_transformers.CrossEncoder", return_value=mock_encoder_instance)
+    mocker.patch("backend.qa_loop.load_reranker", return_value=mock_encoder_instance)
     yield mock_encoder_instance
 
 

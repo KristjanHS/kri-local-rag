@@ -19,11 +19,8 @@ def test_cross_encoder_loads(mocker):
     # Set environment variable using mocker (modern approach)
     mocker.patch.dict(os.environ, {"RERANKER_CROSS_ENCODER_OPTIMIZATIONS": "true"})
 
-    # Mock sentence_transformers.CrossEncoder directly (modern approach)
+    # Provide a dummy encoder instance via our app's loader boundary
     mock_encoder_instance = MagicMock()
-    mocker.patch("sentence_transformers.CrossEncoder", return_value=mock_encoder_instance)
-
-    # Mock the load_reranker function to return our dummy encoder (modern approach)
     mocker.patch("backend.qa_loop.load_reranker", return_value=mock_encoder_instance)
 
     # --- First call: should load the model ---
