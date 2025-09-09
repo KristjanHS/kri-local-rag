@@ -1,4 +1,4 @@
-name: Auto Create Pull Request (manual)
+name: Create Pull Request (manual)
 
 on:
   workflow_dispatch: {}
@@ -6,7 +6,7 @@ on:
 jobs:
   create-pr:
     runs-on: ubuntu-latest
-    # Kept for manual runs only; local post-push hook handles auto PR creation
+    # For manual runs only
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

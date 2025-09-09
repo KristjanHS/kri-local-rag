@@ -44,7 +44,6 @@ services:
 
   # ---------- RAG App Container (supports both web app and CLI) -----------------------------------------
   app:
-    profiles: ["prod"]
     image: kri-local-rag-app
     build:
       context: ..
