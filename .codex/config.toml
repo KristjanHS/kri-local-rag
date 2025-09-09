@@ -2,3 +2,5 @@
 command = "npx"
 args = ["-y", "@upstash/context7-mcp"]
 env = { "CONTEXT7_API_KEY" = "YOUR_API_KEY" }
+# Do not set secrets here. The MCP server reads CONTEXT7_API_KEY from the environment.
+# Export CONTEXT7_API_KEY in your shell or load it from a local .env (git-ignored).
