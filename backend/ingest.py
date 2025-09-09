@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """Document Ingestion Script
 
 This script uses LangChain for robust document loading and a manual pipeline
@@ -20,16 +22,25 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, List, Optional, cast
+from typing import Any, List, Optional, Protocol, TypeVar, cast, runtime_checkable
 
 import torch
 import weaviate
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, UnstructuredMarkdownLoader
+from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
 
-# Direct import since sentence-transformers is a required runtime dependency
-from sentence_transformers import SentenceTransformer
+# Avoid importing sentence-transformers at module import time to keep imports light
+# and prevent optional vision dependencies from being pulled in during unit tests.
+
+
+# A minimal protocol to support our embedding calls and enable test doubles.
+# Match SentenceTransformer.encode first parameter shape for compatibility.
+@runtime_checkable
+class SupportsEncode(Protocol):
+    def encode(self, text: str, /, *args: Any, **kwargs: Any) -> Any:  # pragma: no cover
+        ...
+
 
 # SentenceTransformer is now loaded via backend.models for consistency
 from backend.config import (
@@ -79,7 +90,7 @@ def load_and_split_documents(path: str) -> List[Document]:
             docs.extend(loader.load())
             file_count = 1
         elif ext == ".md":
-            loader = UnstructuredMarkdownLoader(path)
+            loader = TextLoader(path, encoding="utf-8")
             docs.extend(loader.load())
             file_count = 1
         else:
@@ -91,7 +102,7 @@ def load_and_split_documents(path: str) -> List[Document]:
 
         loader_configs = {
             "**/*.pdf": pdf_loader_cls,
-            "**/*.md": UnstructuredMarkdownLoader,
+            "**/*.md": TextLoader,
         }
         for glob_pattern, loader_cls in loader_configs.items():
             try:
@@ -153,7 +164,7 @@ def deterministic_uuid(doc: Document) -> str:
     # and derive a stable RFC 4122 UUIDv5 from that name.
     content_hash = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
     # Avoid direct attribute access that Pyright may mark as Unknown
-    meta_for_uuid = getattr(doc, "metadata", {})
+    meta_for_uuid: dict[str, Any] = getattr(doc, "metadata", {})
     source: str = "unknown" if (source_val := meta_for_uuid.get("source")) is None else str(source_val)
     source_file = os.path.basename(source)
     name = f"{source_file}:{content_hash}"
@@ -163,7 +174,7 @@ def deterministic_uuid(doc: Document) -> str:
 def process_and_upload_chunks(
     client: weaviate.WeaviateClient,
     docs: List[Document],
-    model: SentenceTransformer,
+    model: SupportsEncode,
     collection_name: str,
 ):
     """Process each document chunk and upload it to Weaviate."""
@@ -183,16 +194,18 @@ def process_and_upload_chunks(
             # Avoid direct attribute access that Pyright may mark as Unknown
             meta: dict[str, Any] = cast(dict[str, Any], getattr(doc, "metadata", {}))
             uuid = deterministic_uuid(doc)
-            vector_tensor = cast(Any, model).encode(doc.page_content)
+            vector_tensor = model.encode(doc.page_content)
             # Normalize to a plain Python list of floats for the Weaviate client
             vector: List[float] = to_float_list(vector_tensor)
 
             src: Optional[str] = cast(Optional[str], meta.get("source", None))
             src_safe: str = src or "unknown"
+            # Normalize extension to match CLI filter examples (e.g., "pdf", "md")
+            ext = os.path.splitext(src_safe)[1].lstrip(".").lower()
             properties: dict[str, str] = {
                 "content": doc.page_content,
                 "source_file": os.path.basename(src_safe),
-                "source": os.path.splitext(src_safe)[1],
+                "source": ext,
                 # Derive created_at from source file if it exists; fall back to now.
                 "created_at": _safe_created_at(src),
             }
@@ -228,7 +241,10 @@ def process_and_upload_chunks(
     return stats
 
 
-def optimize_embedding_model(embedding_model: SentenceTransformer) -> SentenceTransformer:
+TModel = TypeVar("TModel", bound=SupportsEncode)
+
+
+def optimize_embedding_model(embedding_model: TModel) -> TModel:
     """Compile the embedding model with torch.compile if not already compiled.
 
     Adds a private marker attribute on the compiled instance to avoid duplicate work/logs.
@@ -240,7 +256,7 @@ def optimize_embedding_model(embedding_model: SentenceTransformer) -> SentenceTr
         logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
         torch_compile = getattr(torch, "compile")
         compiled_model = cast(
-            SentenceTransformer,
+            TModel,
             torch_compile(embedding_model, backend="inductor", mode="max-autotune"),
         )
         # Mark the compiled instance so future calls are a no-op.
@@ -259,7 +275,7 @@ def ingest(
     directory: str,
     collection_name: str,
     weaviate_client: weaviate.WeaviateClient,
-    embedding_model: SentenceTransformer,
+    embedding_model: SupportsEncode,
     *,
     reset: bool = False,
 ):
@@ -277,6 +293,8 @@ def ingest(
         reset_collection(weaviate_client, collection_name)
     else:
         ensure_collection(weaviate_client, collection_name)
+    # Narrow to the minimal protocol needed for ingestion; the concrete
+    # SentenceTransformer provides a compatible .encode at runtime.
     process_and_upload_chunks(weaviate_client, chunked_docs, embedding_model, collection_name)
 
     elapsed = time.time() - start_time

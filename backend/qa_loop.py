@@ -157,7 +157,14 @@ def answer(
         collection_name=collection_name,
     )
     if not candidates:
-        return "I found no relevant context to answer that question. The database may be empty. Ingest a PDF first."
+        # Ensure the CLI emits a message to stdout in one-shot mode as well
+        msg = "I found no relevant context to answer that question. The database may be empty. Ingest a PDF first."
+        try:
+            if on_token is None:
+                # Mirror the normal CLI behaviour that prefixes with 'Answer: '
+                console.print(f"Answer: {msg}")
+        finally:
+            return msg
 
     # ---------- 2) Re-rank ------------------------------------------------------
     logger.debug("Re-ranking the top %d candidates...", len(candidates))
