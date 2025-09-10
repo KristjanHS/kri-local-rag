@@ -9,8 +9,10 @@ This module provides a straightforward way to load and cache ML models:
 
 from __future__ import annotations
 
+import os
+
 # For manual vectorization - proper type annotations
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, cast
 
 if TYPE_CHECKING:  # only for type hints; avoids importing at module import time
     from sentence_transformers import SentenceTransformer
@@ -18,12 +20,125 @@ if TYPE_CHECKING:  # only for type hints; avoids importing at module import time
 
 from backend.config import get_logger
 
+# Set up logging for this module early, so the stub can log
+logger = get_logger(__name__)
+
+# Ensure text-only Transformers import path in environments without torchvision/compiled ops
+# This must be set before any potential transformers imports via sentence-transformers.
+os.environ.setdefault("TRANSFORMERS_NO_TORCHVISION", "1")
+
+# In some environments, importing transformers may indirectly import torchvision and
+# fail if compiled ops are unavailable. For our text-only usage, we stub torchvision.
+#
+# IMPORTANT: This stub is intentionally "fail-fast" at runtime. If any code attempts
+# to actually use torchvision functionality (beyond the minimal symbols needed for
+# transformers import-time checks), it will raise a RuntimeError with clear guidance.
+if os.environ.get("TRANSFORMERS_NO_TORCHVISION", "0") == "1":
+    try:
+        import sys
+        import types
+        import importlib.machinery as _machinery
+
+        if "torchvision" not in sys.modules:
+            vision_stub = cast(Any, types.ModuleType("torchvision"))
+            transforms_stub = cast(Any, types.ModuleType("torchvision.transforms"))
+            io_stub = cast(Any, types.ModuleType("torchvision.io"))
+
+            # Provide common module introspection attributes to avoid importlib/inspect pitfalls
+            vision_stub.__file__ = "<stub:torchvision>"
+            vision_stub.__package__ = "torchvision"
+            vision_stub.__path__ = []
+            vision_stub.__doc__ = "Stub module for torchvision (text-only environment)"
+
+            transforms_stub.__file__ = "<stub:torchvision.transforms>"
+            transforms_stub.__package__ = "torchvision"
+            transforms_stub.__path__ = []
+            transforms_stub.__doc__ = "Stub module for torchvision.transforms (text-only environment)"
+
+            io_stub.__file__ = "<stub:torchvision.io>"
+            io_stub.__package__ = "torchvision"
+            io_stub.__path__ = []
+            io_stub.__doc__ = "Stub module for torchvision.io (text-only environment)"
+
+            class _InterpolationMode:
+                NEAREST = 0
+                NEAREST_EXACT = 0
+                BILINEAR = 2
+                BICUBIC = 3
+                BOX = 4
+                HAMMING = 5
+                LANCZOS = 1
+
+            transforms_stub.InterpolationMode = _InterpolationMode
+
+            # Fail-fast helpers
+            def _fail_transforms(name: str = ""):
+                raise RuntimeError(
+                    (
+                        "torchvision.transforms was accessed at runtime but is stubbed. "
+                        "This application runs in text-only mode. If you need vision features, "
+                        "install working torchvision (matching torch version) and unset "
+                        "TRANSFORMERS_NO_TORCHVISION, or isolate vision usage to a separate env. "
+                        f"Tried to access: {name or '<unknown>'}"
+                    )
+                )
+
+            def _fail_io(name: str = ""):
+                raise RuntimeError(
+                    (
+                        "torchvision.io was accessed at runtime but is stubbed. Vision I/O is not supported "
+                        "in this environment. Install proper torchvision if required. "
+                        f"Tried to access: {name or '<unknown>'}"
+                    )
+                )
+
+            # Provide __getattr__ to loudly fail on any unresolved attribute access
+            def _tv_transforms___getattr__(name: str):
+                # Allow only InterpolationMode access; anything else fails
+                if name == "InterpolationMode":
+                    return transforms_stub.InterpolationMode
+                # Permit standard module introspection attributes to be absent gracefully
+                if name in {
+                    "__file__",
+                    "__name__",
+                    "__spec__",
+                    "__package__",
+                    "__loader__",
+                    "__path__",
+                    "__doc__",
+                    "__all__",
+                    "__cached__",
+                    "__version__",
+                }:
+                    return None
+                return _fail_transforms(name)
+
+            def _tv_io___getattr__(name: str):
+                return _fail_io(name)
+
+            transforms_stub.__getattr__ = _tv_transforms___getattr__  # type: ignore[attr-defined]
+            io_stub.__getattr__ = _tv_io___getattr__  # type: ignore[attr-defined]
+
+            # Attach submodules to top-level stub
+            vision_stub.transforms = transforms_stub
+            vision_stub.io = io_stub
+
+            # Provide minimal module specs so importlib checks don't crash
+            vision_stub.__spec__ = _machinery.ModuleSpec("torchvision", loader=None)
+            transforms_stub.__spec__ = _machinery.ModuleSpec("torchvision.transforms", loader=None)
+            io_stub.__spec__ = _machinery.ModuleSpec("torchvision.io", loader=None)
+
+            sys.modules["torchvision"] = vision_stub
+            sys.modules["torchvision.transforms"] = transforms_stub
+            sys.modules["torchvision.io"] = io_stub
+    except Exception as e:
+        # Non-fatal: continue without stubbing if anything goes wrong
+        # Log at debug level to avoid noisy warnings in normal runs
+        logger.debug("Torchvision stub initialization skipped due to error: %s", e, exc_info=True)
+
 # Module-level cache to avoid reloading models
 _embedding_model: Any = None
 _cross_encoder: Any = None
-
-# Set up logging for this module
-logger = get_logger(__name__)
 
 
 # Import model configuration from central config

@@ -1,262 +1,214 @@
 # Declare phony targets
-.PHONY: setup-hooks test-up test-down test-logs test-up-force-build test-clean \
-        _test-up-with-id _test-down-with-id _test-logs-with-id build-if-needed \
-        test-run-integration integration-local push-pr help setup-uv export-reqs \
-        ruff-format ruff-fix yamlfmt pyright pre-commit unit-local pip-audit \
-        semgrep-local actionlint uv-sync-test pre-push
+.PHONY: help setup-hooks test-up test-down test-logs test-up-force-build test-clean \
+        test-run-integration integration push-pr setup-uv export-reqs \
+        ruff-format ruff-fix yamlfmt pyright pre-commit unit pip-audit \
+        semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage coverage-html dev-setup ollama-pull
 
 # Use bash with strict flags for recipes
 SHELL := bash
 .SHELLFLAGS := -euo pipefail -c
+.ONESHELL:
+.DEFAULT_GOAL := help
 
-# Stable project/session handling
-RUN_ID_FILE := .run_id
-LOG_DIR := logs
-BUILD_HASH_FILE := .test-build.hash
+# Avoid repeating long compose invocations
+COMPOSE_APP := docker compose -f docker/docker-compose.yml
 
-# Only files that should trigger an image rebuild (no mounted app/test code here)
-BUILD_DEPS := requirements.txt requirements-dev.txt pyproject.toml \
-              docker/app.Dockerfile docker/docker-compose.yml
-
-# Avoid repeating long compose invocations (use test profile)
-COMPOSE := docker compose -f docker/docker-compose.yml --profile test
+# Tool resolver shortcuts (prefer .venv, fallback to uv/uvx)
+PYTEST := $(if $(wildcard .venv/bin/python),.venv/bin/python -m pytest,uv run -m pytest)
+RUFF := $(if $(wildcard .venv/bin/ruff),.venv/bin/ruff,uv run ruff)
+PYRIGHT_BIN := $(if $(wildcard .venv/bin/pyright),.venv/bin/pyright,uvx pyright)
+PYTEST_BASE := -q
 
 # Configurable pyright config path (default to repo config)
 PYRIGHT_CONFIG ?= ./pyrightconfig.json
 
+# Ensure uv uses a repo-local cache in sandboxed environments
+UV_CACHE_DIR := $(CURDIR)/.uv_cache
+
 # ---------------------------------------------------------------------------
 # Sections
 #   - Setup
+#   - App Runtime
 #   - Docker Test Environment
 #   - Tests (local)
-#   - Lint & Type
 #   - Security / CI Linters
+#   - Lint & Type
 #   - CI Helpers & Git
 # ---------------------------------------------------------------------------
 
-help:
-	@echo "Available targets:"
-	@echo "  -- Setup --"
-	@echo "  setup-hooks        - Configure Git hooks path"
-	@echo "  setup-uv           - Create venv and sync dev/test via uv"
-	@echo "  export-reqs        - Export requirements.txt from uv.lock"
-	@echo ""
-	@echo "  -- Lint & Type Check --"
-	@echo "  ruff-format        - Auto-format code with Ruff"
-	@echo "  ruff-fix           - Run Ruff lint with autofix"
-	@echo "  yamlfmt            - Validate YAML formatting via pre-commit"
-	@echo "  pyright            - Run Pyright type checking"
-	@echo "  pre-commit         - Run all pre-commit hooks on all files"
-	@echo ""
-	@echo "  -- Tests --"
-	@echo "  unit-local         - Run unit tests (local) and write reports"
-	@echo "  integration-local  - Run integration tests (uv preferred)"
-	@echo ""
-	@echo "  -- Security / CI linters --"
-	@echo "  pip-audit          - Export from uv.lock and audit prod/dev+test deps"
-	@echo "  semgrep-local      - Run Semgrep locally via uvx (no metrics)"
-	@echo "  actionlint         - Lint GitHub workflows using actionlint in Docker"
-	@echo ""
-	@echo "  -- CI helpers & Git --"
-	@echo "  uv-sync-test       - uv sync test group (frozen) + pip check"
-	@echo "  pre-push           - Run pre-push checks with all SKIP=0"
+help: ## Show this help (grouped)
+	@awk '
+	  BEGIN {
+	    FS = ":.*##";
+	    last = "";
+	    saw_sep = 0; pending = ""; section = "";
+	  }
+	  # Detect section banners of the form:\n# =========================\n# Name\n# =========================
+	  /^# =+/ { if (saw_sep == 0) { saw_sep = 1 } else if (saw_sep == 1 && pending != "") { section = pending; pending = ""; saw_sep = 0 } ; next }
+	  saw_sep == 1 && match($$0, /^# (.+)$$/, m) { pending = m[1]; next }
+
+	  # Targets with inline help "## description"
+	  /^[a-zA-Z0-9_.-]+:.*##/ {
+	    tgt = $$1; gsub(/^\s+|\s+$$/, "", tgt);
+	    # Recompute desc from original line to preserve colons before ##
+	    idx = index($$0, "##"); desc = substr($$0, idx + 2);
+	    gsub(/^\s+/, "", desc);
+	    sec = (section == "" ? "Other" : section);
+	    if (sec != last) { if (last != "") print ""; print sec ":"; last = sec }
+	    printf "  %-22s %s\n", tgt, desc;
+	  }
+	' $(MAKEFILE_LIST)
 
 # =========================
 # Setup
 # =========================
-setup-hooks:
+setup-hooks: ## Configure Git hooks path
 	@echo "Configuring Git hooks path..."
 	@git config core.hooksPath scripts/git-hooks
 	@echo "Done."
 
-setup-uv:
+setup-uv: ## Create venv and sync dev/test via uv
 	@./run_uv.sh
 
-export-reqs:
-	@echo ">> Exporting requirements.txt from uv.lock (incl dev/test groups)"
-	uv export --no-hashes --group test --locked --no-emit-project --no-emit-package torch --format requirements-txt > requirements.txt
+export-reqs: ## Export requirements.txt from uv.lock (omits torch/GPU extras)
+	@echo ">> Exporting requirements.txt from uv.lock (incl dev/test groups), excluding torch and GPU-specific wheels"
+	mkdir -p $(UV_CACHE_DIR)
+	UV_CACHE_DIR=$(UV_CACHE_DIR) uv export \
+	  --no-hashes \
+	  --group test \
+	  --locked \
+	  --no-emit-project \
+	  --no-emit-package torch \
+	  --format requirements-txt \
+	  > requirements.txt
+	@echo ">> Wrote requirements.txt (torch and GPU extras removed)"
+
+# =========================
+# App Runtime
+# =========================
+# Start of full stack (Weaviate, Ollama, App)
+stack-up: ## Build and start app + deps via script
+	@./scripts/docker/docker-setup.sh
+
+# Ingest documents (default path inside script is ./data). Override path with INGEST_SRC=/path
+ingest: ## Ingest documents (override path with INGEST_SRC=/path)
+	@if [ -n "$(INGEST_SRC)" ]; then \
+		./scripts/ingest.sh "$(INGEST_SRC)"; \
+	else \
+		./scripts/ingest.sh; \
+	fi
+
+stack-down: ## Stop all app services (preserves volumes)
+	@$(COMPOSE_APP) down
+
+# Destructive: stop and remove containers, networks, and volumes
+stack-reset: ## Full reset via docker-reset.sh (destructive)
+	@./scripts/docker/docker-reset.sh
+
+app-logs: ## Fetch/tail app/weaviate/ollama logs (LINES=200, FOLLOW=1)
+	@LINES=$${LINES:-200}; FOLLOW_FLAG=""; if [ "$${FOLLOW:-0}" != "0" ]; then FOLLOW_FLAG="-f"; fi; $(COMPOSE_APP) logs -n "$$LINES" $$FOLLOW_FLAG app weaviate ollama
+
+cli: ## Start CLI Q&A (pass ARGS='--question "..."')
+	@./scripts/cli.sh ${ARGS}
+
+# Convenience: ask a one-off question without passing ARGS
+ask: ## One-off question via CLI (Q='...')
+	@if [ -z "$(Q)" ]; then \
+		echo "Usage: make ask Q='Your question here'"; \
+		exit 1; \
+	fi
+	@$(MAKE) cli ARGS="--question '$(Q)'"
+
+# Pull an Ollama model inside the container
+ollama-pull: ## Pull Ollama model in container (MODEL=...)
+	@if [ -z "$(MODEL)" ]; then \
+		echo "Usage: make ollama-pull MODEL=model/name[:tag]"; \
+		exit 1; \
+	fi
+		@if [ -z "$$(\
+			$(COMPOSE_APP) ps -q ollama 2>/dev/null\
+		)" ]; then \
+			echo "Ollama service is not running. Start the stack first: make stack-up"; \
+			exit 1; \
+		fi
+	@$(COMPOSE_APP) exec -T ollama ollama pull "$(MODEL)"
+
+# Run E2E tests with automatic stack lifecycle
+e2e: ## Run E2E tests (stack-up → test → stack-down)
+	@set -euo pipefail; \
+	$(MAKE) stack-up; \
+	EXIT=0; \
+	$(PYTEST) tests/e2e $(PYTEST_BASE) $${PYTEST_ARGS:-} || EXIT=$$?; \
+	$(MAKE) stack-down; \
+	exit $$EXIT
+
+# Coverage run (host)
+coverage: ## Run coverage across repo (HTML=1 for HTML report)
+	@mkdir -p reports
+	HTML_FLAG=""; if [ "$${HTML:-0}" != "0" ]; then mkdir -p reports/coverage; HTML_FLAG="--cov-report=html:reports/coverage"; fi; \
+	$(PYTEST) -v -m "not environment" --cov=. --cov-report=term $$HTML_FLAG --cov-report=xml:reports/coverage.xml $${PYTEST_ARGS:-}
+
+# Coverage run (host) with HTML output
+coverage-html: ## Run coverage and write HTML to reports/coverage
+	@$(MAKE) coverage HTML=1
+
+# Developer setup wrapper
+dev-setup: ## Bootstrap dev env (venv, deps, tools)
+	bash scripts/dev/setup-dev-env.sh
 
 # =========================
 # Docker Test Environment
 # =========================
-test-up:
-	@if [ -f $(RUN_ID_FILE) ]; then \
-		EXISTING_RUN_ID=$$(cat $(RUN_ID_FILE)); \
-		if $(COMPOSE) -p "$$EXISTING_RUN_ID" ps -q 2>/dev/null | grep -q .; then \
-			echo "Test env RUN_ID=$$EXISTING_RUN_ID already running."; \
-			echo "Use 'make test-down' to stop it, or 'make test-logs' to view logs."; \
-			exit 0; \
-		else \
-			echo "Stale RUN_ID file found, cleaning up..."; \
-			rm -f $(RUN_ID_FILE); \
-		fi; \
-	fi; \
-	RUN_ID=$$(date +%s); \
-	echo $$RUN_ID > $(RUN_ID_FILE); \
-	$(MAKE) _test-up-with-id RUN_ID=$$RUN_ID
+test-up: ## Start docker test env; use FORCE=1 to rebuild
+	bash scripts/dev/test-env.sh up $(if $(FORCE),--force,)
 
-_test-up-with-id:
-	@echo "Starting test environment with RUN_ID=$(RUN_ID)..."
-	@$(MAKE) build-if-needed RUN_ID=$(RUN_ID)
-	@$(COMPOSE) -p "$(RUN_ID)" up -d --wait --wait-timeout 120 weaviate ollama app-test
-	@echo "Test environment started."
+test-up-force-build: ## Alias for test-up with FORCE=1
+	bash scripts/dev/test-env.sh up --force
 
-build-if-needed:
-	@mkdir -p $(LOG_DIR)
-	@NEW_HASH=$$(sha256sum $(BUILD_DEPS) | sha256sum | awk '{print $$1}'); \
-	OLD_HASH=$$(cat $(BUILD_HASH_FILE) 2>/dev/null || echo ''); \
-	if [ "$$NEW_HASH" != "$$OLD_HASH" ]; then \
-		echo "Build deps changed; rebuilding images..."; \
-		DOCKER_BUILDKIT=1 $(COMPOSE) -p "$(RUN_ID)" build app-test 2>&1 \
-		  | tee $(LOG_DIR)/test-build-$(RUN_ID).log; \
-		# Update stable symlink and prune older test-build logs (keep latest 5) \
-		ln -sf "test-build-$(RUN_ID).log" "$(LOG_DIR)/test-build.log"; \
-		ls -1t $(LOG_DIR)/test-build-*.log 2>/dev/null | tail -n +6 | xargs -r rm --; \
-		echo $$NEW_HASH > $(BUILD_HASH_FILE); \
-	else \
-		echo "Build deps unchanged; skipping 'docker compose build'."; \
-	fi
+test-down: ## Stop docker test env if running
+	bash scripts/dev/test-env.sh down
 
-test-up-force-build:
-	@echo "Force rebuilding test environment..."
-	@rm -f $(BUILD_HASH_FILE)
-	@if [ -f $(RUN_ID_FILE) ]; then \
-		EXISTING_RUN_ID=$$(cat $(RUN_ID_FILE)); \
-		$(MAKE) _test-down-with-id RUN_ID=$$EXISTING_RUN_ID; \
-		rm -f $(RUN_ID_FILE); \
-	fi; \
-	RUN_ID=$$(date +%s); \
-	echo $$RUN_ID > $(RUN_ID_FILE); \
-	$(MAKE) _test-up-with-id RUN_ID=$$RUN_ID
-
-test-down:
-	@if [ -f $(RUN_ID_FILE) ]; then \
-		RUN_ID=$$(cat $(RUN_ID_FILE)); \
-		$(MAKE) _test-down-with-id RUN_ID=$$RUN_ID; \
-		rm -f $(RUN_ID_FILE); \
-	else \
-		echo "No active test environment found."; \
-	fi
-
-_test-down-with-id:
-	@echo "Stopping test environment with RUN_ID=$(RUN_ID) ..."
-	@$(COMPOSE) -p "$(RUN_ID)" down -v
-
-test-logs:
-	@if [ -f $(RUN_ID_FILE) ]; then \
-		RUN_ID=$$(cat $(RUN_ID_FILE)); \
-		$(MAKE) _test-logs-with-id RUN_ID=$$RUN_ID; \
-	else \
-		echo "No active test environment found."; \
-	fi
-
-_test-logs-with-id:
-	@echo "Fetching logs for test environment with RUN_ID=$(RUN_ID) ..."
-	@$(COMPOSE) -p "$(RUN_ID)" logs -n 200 app-test weaviate ollama
+test-logs: ## Show docker test env logs
+	bash scripts/dev/test-env.sh logs
 
 # Run integration tests inside the app container using existing .run_id
-test-run-integration:
-	@if [ -f $(RUN_ID_FILE) ]; then \
-		RUN_ID=$$(cat $(RUN_ID_FILE)); \
-		$(COMPOSE) -p "$$RUN_ID" exec -T app-test /opt/venv/bin/python3 -m pytest tests/integration -q --junitxml=reports/junit_compose_integration.xml; \
-	else \
-		echo "No active test environment found. Run 'make test-up' first."; \
-		exit 1; \
-	fi
+test-run-integration: ## Run integration tests inside docker test env
+	bash scripts/dev/test-env.sh run-integration
 
-test-clean:
-	@echo "Cleaning up test environment and build cache..."
-	@rm -f $(BUILD_HASH_FILE) $(RUN_ID_FILE)
-	@echo "Test build cache cleaned."
+test-clean: ## Remove test env run/build metadata
+	bash scripts/dev/test-env.sh clean
 
 # =========================
 # Tests (local)
 # =========================
-# (moved) unit-local defined under Tests section above
+# Run unit tests (local) and write reports
+unit: ## Run unit tests (local) and write reports
+	mkdir -p reports
+	$(PYTEST) tests/unit -n auto --maxfail=1 $(PYTEST_BASE) --junitxml=reports/junit.xml ${PYTEST_ARGS}
 
 # Run local integration tests; prefer uv if available, then .venv fallback
-integration-local:
-	@if command -v uv >/dev/null 2>&1; then \
-		uv run -m pytest tests/integration -q ${PYTEST_ARGS}; \
-	elif [ -x .venv/bin/python ]; then \
+integration: ## Run local integration tests (venv or uv)
+	@if [ -x .venv/bin/python ]; then \
 		.venv/bin/python -m pytest tests/integration -q ${PYTEST_ARGS}; \
+	elif command -v uv >/dev/null 2>&1; then \
+		uv run -m pytest tests/integration -q ${PYTEST_ARGS}; \
 	else \
-		echo "uv not found and .venv/bin/python missing. Install uv (https://astral.sh/uv) and run './run_uv.sh', or create venv then run '.venv/bin/python -m pytest tests/integration -q'"; \
+		echo ".venv/bin/python not found and uv not available. Create the venv (./run_uv.sh or python -m venv .venv) then run '.venv/bin/python -m pytest tests/integration -q'"; \
 		exit 1; \
 	fi
 
-# (moved) push-pr under CI Helpers & Git
-
-# (removed legacy grouping header; replaced by explicit sections)
+ 
 
 # =========================
 # Security / CI Linters
 # =========================
 # audits the already existing env (after export)
-pip-audit: export-reqs
+pip-audit: export-reqs ## Audit dependencies based on requirements.txt
 	@echo ">> Auditing dependencies (based on requirements.txt)"
 	uvx --from pip-audit pip-audit -r requirements.txt
 
-# (moved) CI Helpers & Git at end of file
-
-# New canonical unit test target
-unit-local:
-	mkdir -p reports
-	@if [ -x .venv/bin/python ]; then \
-		.venv/bin/python -m pytest tests/unit -n auto --maxfail=1 -q --junitxml=reports/junit.xml ${PYTEST_ARGS}; \
-	else \
-		uv run -m pytest tests/unit -n auto --maxfail=1 -q --junitxml=reports/junit.xml ${PYTEST_ARGS}; \
-	fi
-
-# =========================
-# Lint & Type
-# =========================
-pyright:
-	@# Determine interpreter path: prefer .venv, then system python
-	@PY_INTERP=""; \
-	if [ -x .venv/bin/python ]; then \
-		PY_INTERP=".venv/bin/python"; \
-	elif command -v python3 >/dev/null 2>&1; then \
-		PY_INTERP=$$(command -v python3); \
-	else \
-		PY_INTERP=$$(command -v python); \
-	fi; \
-	if [ -x .venv/bin/pyright ]; then \
-		.venv/bin/pyright --pythonpath "$$PY_INTERP" --project $(PYRIGHT_CONFIG); \
-	else \
-		uvx pyright --pythonpath "$$PY_INTERP" --project $(PYRIGHT_CONFIG); \
-	fi
-
-yamlfmt:
-	# Ensure dev + test groups are present so later test steps still work
-	uv sync --group dev --group test --frozen
-	uv run pre-commit run yamlfmt -a
-
-# Ruff targets
-ruff-format:
-	@if [ -x .venv/bin/ruff ]; then \
-		.venv/bin/ruff format .; \
-	else \
-		uv run ruff format .; \
-	fi
-
-ruff-fix:
-	@if [ -x .venv/bin/ruff ]; then \
-		.venv/bin/ruff check --fix .; \
-	else \
-		uv run ruff check --fix .; \
-	fi
-
-# Run full pre-commit suite (dev deps required)
-pre-commit:
-	# Keep test deps installed to avoid breaking local test runs after this target
-	uv sync --group dev --group test --frozen
-	uv run pre-commit run --all-files
-
-
-# Security / CI Linters (cont.)
-# Lint GitHub Actions workflows locally using official container
-actionlint:
+ # Lint GitHub Actions workflows locally using official container
+actionlint: ## Lint GitHub workflows using actionlint in Docker
 	@docker run --rm \
 		--user "$(shell id -u):$(shell id -g)" \
 		-v "$(CURDIR)":/repo \
@@ -264,7 +216,7 @@ actionlint:
 		rhysd/actionlint:latest -color && echo "Actionlint: no issues found"
 
 # Run Semgrep locally using uvx, mirroring the local workflow
-semgrep-local:
+semgrep-local: ## Run Semgrep locally via uvx (no metrics)
 	@if command -v uv >/dev/null 2>&1; then \
 		uvx --from semgrep semgrep ci \
 		  --config auto \
@@ -276,7 +228,7 @@ semgrep-local:
 		  COUNT=$$(jq '[.runs[0].results[]] | length' semgrep_local.sarif 2>/dev/null || echo 0); \
 		  echo "Semgrep findings: $${COUNT} (see semgrep_local.sarif)"; \
 		else \
-		  COUNT=$$(grep -o '"ruleId"' -c semgrep_local.sarif 2>/dev/null || echo 0); \
+		  COUNT=$$(grep -o '\"ruleId\"' -c semgrep_local.sarif 2>/dev/null || echo 0); \
 		  echo "Semgrep findings: $${COUNT} (approx; no jq)"; \
 		fi; \
 	else \
@@ -284,17 +236,49 @@ semgrep-local:
 		exit 1; \
 	fi
 
+
+# =========================
+# Lint & Type
+# =========================
+PYRIGHT_LEVEL ?= error
+
+pyright: ## Run Pyright type checking
+	@# Determine interpreter path: prefer .venv, then system python
+	@PY_INTERP=""; \
+	if [ -x .venv/bin/python ]; then PY_INTERP=".venv/bin/python"; \
+	elif command -v python3 >/dev/null 2>&1; then PY_INTERP=$$(command -v python3); \
+	else PY_INTERP=$$(command -v python); fi; \
+	$(PYRIGHT_BIN) --level $(PYRIGHT_LEVEL) --pythonpath "$$PY_INTERP" --project $(PYRIGHT_CONFIG)
+
+yamlfmt: ## Validate YAML formatting via pre-commit
+	# Ensure dev + test groups are present so later test steps still work
+	uv sync --group dev --group test --frozen
+	uv run pre-commit run yamlfmt -a
+
+# Ruff targets
+ruff-format: ## Auto-format code with Ruff
+	$(RUFF) format .
+
+ruff-fix: ## Run Ruff lint with autofix
+	$(RUFF) check --fix .
+
+# Run full pre-commit suite (dev deps required)
+pre-commit: ## Run all pre-commit hooks on all files
+	# Keep test deps installed to avoid breaking local test runs after this target
+	uv sync --group dev --group test --frozen
+	uv run pre-commit run --all-files
+
 # =========================
 # CI Helpers & Git
 # =========================
-uv-sync-test:
+uv-sync-test: ## uv sync test group (frozen) + pip check
 	uv sync --group test --frozen
 	uv pip check
 
 # Run the same checks as the Git pre-push hook, forcing all SKIP flags to 0
-pre-push:
+pre-push: ## Run pre-push checks with all SKIP=0
 	SKIP_LOCAL_SEC_SCANS=0 SKIP_LINT=0 SKIP_PYRIGHT=0 SKIP_TESTS=0 scripts/git-hooks/pre-push
 
 # Convenience: push, then run local integration tests, then create/show PR
-push-pr:
+push-pr: ## Push branch, run local integration tests, and create/show PR
 	@bash scripts/dev/pushpr.sh ${ARGS}

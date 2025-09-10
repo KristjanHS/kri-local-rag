@@ -28,32 +28,38 @@ explicitly overrides them.
 > Agents: prefer these exact commands and **stop on first failure**.
 
 - **Start full stack (recommended path):**  
-  `./scripts/docker/docker-setup.sh`  
+  `make stack-up`  
   _Builds app, starts Weaviate, Ollama, Streamlit._
+
+- **Stop stack:**  
+  `make stack-down`
 
 - **Open Web UI:** visit `http://localhost:8501`.  
   _Dev alternative:_ `streamlit run frontend/rag_app.py`.
 
 - **Ingest documents (from host `./data`):**  
-  `./scripts/ingest.sh ./data`  
+  `make ingest`  
   _Runs ingestion inside the app container._
 
 - **CLI Q&A:**  
-  `./scripts/cli.sh`  
-  or  
-  `.venv/bin/python -m backend.qa_loop --question "..."`
+  `make cli`  
+  _Example (one-off question):_ `make cli ARGS='--question "..."'`
+
+- **View logs (app, weaviate, ollama):**  
+  `make app-logs`  
+  _Options:_ `LINES=500` to change lines, `FOLLOW=1` to tail.
 
 ## Testing & quality gates (must pass before you conclude work)  
 - **Local fast path (as module):**  
-  `.venv/bin/python -m pytest tests/unit -q`  
-  `.venv/bin/python -m pytest tests/integration -q`  
+  `make unit`  
+  `make integration`  
   _Coverage outputs to `reports/coverage`._
 
 - **Full integration harness (dockerized):**  
   `make test-up` → `make test-run-integration` → `make test-down`
 
 - **Pre-commit (mandatory) bash command:**  
-  `pre-commit run --all-files`
+  `make pre-commit`
 
 - **If UI or logs change intentionally:** update any snapshots or expectations the tests rely on.  
   _If failing, fix the code or tests; do **not** disable checks._

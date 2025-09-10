@@ -158,9 +158,9 @@ Repository preparation tasks
   ```
 
 3.2) Validate external services standalone
-- [x] Action: Preferred: run the setup script to start and wait for services:
+- [x] Action: Preferred: start and wait for services:
   ```bash
-  ./scripts/docker/docker-setup.sh
+  make stack-up
   ```
   Manual alternative: start only `weaviate` and `ollama`. Verify readiness (or equivalent checks):
   ```bash
@@ -179,8 +179,7 @@ Repository preparation tasks
   ```bash
   # Show status and recent logs
   docker compose -f docker/docker-compose.yml ps
-  docker compose -f docker/docker-compose.yml logs --tail=200 weaviate | cat
-  docker compose -f docker/docker-compose.yml logs --tail=200 ollama | cat
+  make app-logs LINES=200
   # Optional: live stream logs while waiting (Ctrl+C to stop)
   # docker compose -f docker/docker-compose.yml logs -f ollama
   # If Ollama needs a model, pulls can take a long time. Trigger an explicit pull to see progress in logs:
@@ -240,13 +239,13 @@ PY
   ✓ PDF file present: data/210717IS21-FuseAgilityRoadmap.pdf
 - [x] Action: Run ingestion (choose one). Verify exit code 0:
   *Note: The ingestion process now shows both file count and page count for clarity*
-   - Preferred (host, avoids container package drift):
+   - Preferred: via Make (runs in container):
+     ```bash
+     make ingest INGEST_SRC=example_data
+     ```
+   - Alternative (host, avoids container package drift):
      ```bash
      .venv/bin/python -m backend.ingest --data-dir example_data
-     ```
-   - Example A (helper script; uses a temporary container):
-     ```bash
-     ./scripts/ingest.sh example_data
      ```
    - Example B (compose profile):
      ```bash
@@ -283,9 +282,9 @@ PY
 
 3.6) CLI minimal
 - [ ] Action: Run CLI one-shot in verbose mode (or equivalent). Verify it prints an `Answer:` without stack trace:
-  - Example A (wrapper script):
+  - Example A (Make target):
     ```bash
-    ./scripts/cli.sh --debug --question "hello"
+    make ask Q="hello"
     ```
   - Example B (direct Python):
     ```bash
@@ -420,5 +419,4 @@ Post-MVP (defer)
 - [ ] Resource limits, GPU scheduling policy
 - [ ] Model/version pinning and offline model cache warm-up
 - [ ] Metrics, tracing, alerts
-
 

@@ -1,50 +1,45 @@
 # syntax=docker/dockerfile:1.7
 ##########
-# Two-stage build: builder (Python deps) → runtime (OS deps + app)
+# Two-stage build: builder (Python deps via uv) → runtime (OS deps + app)
 ##########
 
 ############################
 # Build stage: wheels/venv #
 ############################
+
 # Pin this image by digest in CI for full reproducibility.
 # Example: python:3.12-slim-bookworm@sha256:...
-FROM python:3.12-slim-bookworm AS builder
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
 ENV VENV_PATH=/opt/venv \
-  PIP_DISABLE_PIP_VERSION_CHECK=1
-ARG INSTALL_DEV=0
+  UV_PROJECT_ENVIRONMENT=/opt/venv \
+  UV_LINK_MODE=copy
+
+# ENV UV_COMPILE_BYTECODE=1
+# Precompile imported .py files into .pyc as it installs/syncs
+# But if you run with editable installs or generate .py at runtime, drop UV_COMPILE_BYTECODE at Build stage
 
 WORKDIR /app
 
-# Copy only files needed for package installation (not mounted app code)
-COPY requirements.txt ./
-COPY requirements-dev.txt ./
-COPY pyproject.toml ./
-COPY README.md ./
-COPY cli.py .
+# uv phase 1 (to optimize uv cache use): install ONLY deps (lockfile-driven) into /opt/venv
+#    (Copy only files needed for dependency resolution)
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+  uv sync --locked --no-install-project --no-dev
 
-# Create venv and upgrade pip
-RUN python -m venv ${VENV_PATH} \
-  && ${VENV_PATH}/bin/pip install --upgrade pip
+# uv phase 2: copy project and install the project as package
 
-# Pre-install runtime deps for cache friendliness unless doing a dev build
-# - For regular builds (INSTALL_DEV=0): install runtime reqs now for better cache reuse
-# - For dev/test builds (INSTALL_DEV=1): skip here to avoid double-install (dev reqs include runtime)
-RUN --mount=type=cache,target=/root/.cache/pip \
-  if [ "${INSTALL_DEV}" = "1" ]; then \
-  echo "Skipping requirements.txt preinstall for dev build"; \
-  else \
-  ${VENV_PATH}/bin/pip install -r requirements.txt; \
-  fi
-
-# Install our package and optionally dev deps
+# Copy only backend/ that will be packaged here.
+# NB! frontend/ will be referenced as folder in runtime image, so it will be copied in runtime stage below
 COPY backend/ /app/backend/
-COPY frontend/ /app/frontend/
-RUN --mount=type=cache,target=/root/.cache/pip \
-  if [ "${INSTALL_DEV}" = "1" ]; then \
-  ${VENV_PATH}/bin/pip install -r requirements-dev.txt; \
+
+# INSTALL_DEV toggles dev/test groups for CI/dev images, and make project package editable
+ARG INSTALL_DEV=0
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+  if [ "$INSTALL_DEV" = "1" ]; then \
+  uv sync --locked --group dev --group test; \
   else \
-  ${VENV_PATH}/bin/pip install .; \
+  uv sync --locked --no-editable --no-dev; \
   fi
 
 ############################################
@@ -61,19 +56,19 @@ ARG SNAPSHOT=20250906T000000Z  # Bookworm 12.12 point release date
 RUN set -eux; \
   rm -f /etc/apt/sources.list; \
   printf '%s\n' \
-    'Types: deb' \
-    "URIs: https://snapshot.debian.org/archive/debian/${SNAPSHOT}/" \
-    'Suites: bookworm bookworm-updates' \
-    'Components: main contrib non-free non-free-firmware' \
-    'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' \
-    'Check-Valid-Until: no' \
-    '' \
-    'Types: deb' \
-    "URIs: https://snapshot.debian.org/archive/debian-security/${SNAPSHOT}/" \
-    'Suites: bookworm-security' \
-    'Components: main contrib non-free non-free-firmware' \
-    'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' \
-    'Check-Valid-Until: no' \
+  'Types: deb' \
+  "URIs: https://snapshot.debian.org/archive/debian/${SNAPSHOT}/" \
+  'Suites: bookworm bookworm-updates' \
+  'Components: main contrib non-free non-free-firmware' \
+  'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' \
+  'Check-Valid-Until: no' \
+  '' \
+  'Types: deb' \
+  "URIs: https://snapshot.debian.org/archive/debian-security/${SNAPSHOT}/" \
+  'Suites: bookworm-security' \
+  'Components: main contrib non-free non-free-firmware' \
+  'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' \
+  'Check-Valid-Until: no' \
   > /etc/apt/sources.list.d/debian.sources
 
 # Install OS runtime deps (single RUN; clean lists)
@@ -92,43 +87,65 @@ ENV VENV_PATH=/opt/venv
 # hadolint ignore=SC2269
 # Intentionally prepend venv bin to PATH while preserving base PATH
 ENV PATH="${VENV_PATH}/bin:${PATH}"
-ENV PYTHONDONTWRITEBYTECODE=1 \
-  PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1
+# Unbuffered: Forces unbuffered stdout/stderr (same as python -u) so logs show up immediately in Docker.
+
+# ENV PYTHONDONTWRITEBYTECODE=1 \
+# DontwriteBytecode: re-use the bytecode that was compiled by uv during Build phase
+# But if you run with editable installs or generate .py at runtime, drop PYTHONDONTWRITEBYTECODE at Runtime stage
+
 # Runtime tuning: safe defaults for CPU-only deployments
 ENV OMP_NUM_THREADS=6 \
   MKL_NUM_THREADS=6 \
   DNNL_PRIMITIVE_CACHE_CAPACITY=1024
-# Model caching configuration
-ENV HF_HOME=/data/hf
 # Streamlit runtime tuning
 ENV STREAMLIT_SERVER_HEADLESS=true \
   STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
 
-WORKDIR /app
-
 # Bring in the prebuilt venv (same Python ABI as runtime base)
 COPY --from=builder "${VENV_PATH}" "${VENV_PATH}"
 
-# App assets not included in the sdist/wheel
-COPY frontend/ /app/frontend/
-COPY example_data/ /app/example_data/
+WORKDIR /app
+
+# Create a real non-root user with home
+ARG APP_UID=1000
+ARG APP_GID=1000
+RUN groupadd -g ${APP_GID} appuser && \
+  useradd -l -m -u ${APP_UID} -g ${APP_GID} -s /bin/bash appuser
+
+# Huggingface models cache that lives inside the image or named volume
+# TODO: make a named volume for persistance of HF cache
+ENV HF_HOME=/hf_cache \
+  HOME=/home/app
+
+# NB! Never rely on chown in the image for bind mounts. A bind mount hides whatever you COPY/chowned at
+# build-time and writes go back to the host filesystem. Instead, pre-create/own the host directories.
+
+# Create folders and set permission for non-root user - this works for named volumes or image content
+RUN mkdir -p /hf_cache /app \
+  && chown -R appuser:appuser /app /hf_cache
+
+# Ship the folders that Prod needs, in the image (in Dev, these are hidden by bind mount)
+COPY --chown=appuser:appuser frontend/ /app/frontend/
+COPY --chown=appuser:appuser example_data/ /app/example_data/
+
+USER appuser
 
 EXPOSE 8501
-
 # Container-native healthcheck for Streamlit readiness
 HEALTHCHECK --interval=5s --timeout=3s --start-period=30s --retries=30 \
   CMD wget -q --spider http://localhost:8501/_stcore/health || exit 1
 
-# Create non-root user and directories, and set permissions
-RUN useradd -ms /bin/bash appuser \
-  && mkdir -p backend frontend data logs /data/hf \
-  && chown -R appuser:appuser /app /data
-
-USER appuser
-
 # Sanity check: prove streamlit exists & is runnable (fails build if not)
+# Also print the version and a simple format explanation
 RUN test -x "${VENV_PATH}/bin/streamlit" \
-  && "${VENV_PATH}/bin/python" -c "import streamlit, sys; print(streamlit.__version__)"
+  && "${VENV_PATH}/bin/python" -c \
+  "import streamlit; v = streamlit.__version__; print(v)" \
+  && "${VENV_PATH}/bin/python" -c \
+  "print('Format: major.minor.patch (breaking, features, fixes)')"
 
-# Launch Streamlit via the venv Python to avoid PATH ambiguity
-CMD ["streamlit", "run", "frontend/rag_app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true", "--browser.gatherUsageStats=false"]
+ENV STREAMLIT_SERVER_PORT=8501 \
+  STREAMLIT_SERVER_ADDRESS=0.0.0.0
+# Auto-start Streamlit when container starts (headless + no telemetry)
+CMD ["/opt/venv/bin/streamlit", "run", "frontend/rag_app.py", "--server.headless=true", "--browser.gatherUsageStats=false"]
+# NB! ENV variables like ${VENV_PATH} are NOT expanded inside JSON-array CMD or ENTRYPOINT.

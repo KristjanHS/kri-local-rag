@@ -17,6 +17,9 @@ repos:
       - id: pyright
         name: "Pyright - Static type checking"
         description: "Static type checking for Python code"
+        args:
+          - --level
+          - error
 
   - repo: https://github.com/google/yamlfmt
     rev: v0.17.2
