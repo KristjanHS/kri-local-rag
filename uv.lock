@@ -931,47 +931,13 @@ dependencies = [
     { name = "httpx" },
     { name = "langchain" },
     { name = "langchain-community" },
-    { name = "langdetect" },
-    { name = "pdfplumber" },
-    { name = "pillow" },
-    { name = "pymupdf" },
     { name = "python-dotenv" },
     { name = "rich" },
     { name = "sentence-transformers" },
     { name = "streamlit" },
     { name = "torch", version = "2.8.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
     { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
-    { name = "unstructured", extra = ["pdf"] },
     { name = "weaviate-client" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "bandit" },
-    { name = "mkdocs" },
-    { name = "pre-commit" },
-    { name = "pyright", extra = ["nodejs"] },
-    { name = "ruff" },
-]
-docs = [
-    { name = "mkdocs" },
-]
-test = [
-    { name = "playwright" },
-    { name = "protobuf" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "pytest-docker" },
-    { name = "pytest-html" },
-    { name = "pytest-mock" },
-    { name = "pytest-playwright" },
-    { name = "pytest-socket" },
-    { name = "pytest-xdist" },
-    { name = "requests" },
-]
-ui = [
-    { name = "playwright" },
-    { name = "pytest-playwright" },
 ]
 
 [package.dev-dependencies]
@@ -983,8 +949,13 @@ dev = [
     { name = "ruff" },
 ]
 test = [
+    { name = "langdetect" },
+    { name = "numpy" },
+    { name = "pdfplumber" },
+    { name = "pillow" },
     { name = "playwright" },
     { name = "protobuf" },
+    { name = "pymupdf" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-docker" },
@@ -994,45 +965,21 @@ test = [
     { name = "pytest-socket" },
     { name = "pytest-xdist" },
     { name = "requests" },
+    { name = "unstructured", extra = ["pdf"] },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "bandit", extras = ["toml"], marker = "extra == 'dev'", specifier = ">=1.8.6,<2.0.0" },
     { name = "httpx", specifier = ">=0.28.1,<0.29.0" },
     { name = "langchain", specifier = ">=0.3.27,<0.4.0" },
     { name = "langchain-community", specifier = ">=0.3.27,<0.4.0" },
-    { name = "langdetect", specifier = ">=1.0.9,<2.0.0" },
-    { name = "mkdocs", marker = "extra == 'dev'", specifier = ">=1.6.1,<2.0.0" },
-    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.1,<2.0.0" },
-    { name = "pdfplumber", specifier = ">=0.11.7,<0.12.0" },
-    { name = "pillow", specifier = ">=11.3.0,<12.0.0" },
-    { name = "playwright", marker = "extra == 'test'", specifier = ">=1.55.0,<2.0.0" },
-    { name = "playwright", marker = "extra == 'ui'", specifier = ">=1.55.0,<2.0.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.3.0,<5.0.0" },
-    { name = "protobuf", marker = "extra == 'test'", specifier = ">=6.32.0,<7.0.0" },
-    { name = "pymupdf", specifier = "==1.24.10" },
-    { name = "pyright", extras = ["nodejs"], marker = "extra == 'dev'", specifier = ">=1.1.405,<2.0.0" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.4.2,<9.0.0" },
-    { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=6.3.0,<7.0.0" },
-    { name = "pytest-docker", marker = "extra == 'test'", specifier = ">=3.2.3,<4.0.0" },
-    { name = "pytest-html", marker = "extra == 'test'", specifier = ">=4.1.1,<5.0.0" },
-    { name = "pytest-mock", marker = "extra == 'test'", specifier = ">=3.15.0,<4.0.0" },
-    { name = "pytest-playwright", marker = "extra == 'test'", specifier = ">=0.7.1,<0.8.0" },
-    { name = "pytest-playwright", marker = "extra == 'ui'", specifier = ">=0.7.1,<0.8.0" },
-    { name = "pytest-socket", marker = "extra == 'test'", specifier = ">=0.7.0,<0.8.0" },
-    { name = "pytest-xdist", marker = "extra == 'test'", specifier = ">=3.8.0,<4.0.0" },
     { name = "python-dotenv", specifier = ">=1.1.1,<2.0.0" },
-    { name = "requests", marker = "extra == 'test'", specifier = ">=2.32.5,<3.0.0" },
     { name = "rich", specifier = ">=14.1.0,<15.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.12.12,<0.13.0" },
     { name = "sentence-transformers", specifier = ">=5.1.0,<6.0.0" },
     { name = "streamlit", specifier = ">=1.49.1,<2.0.0" },
     { name = "torch", specifier = ">=2.8.0,<3.0.0", index = "https://download.pytorch.org/whl/cpu" },
-    { name = "unstructured", extras = ["pdf"], specifier = ">=0.14.8,<0.15.0" },
     { name = "weaviate-client", specifier = ">=4.16.6,<5.0.0" },
 ]
-provides-extras = ["dev", "test", "docs", "ui"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1043,8 +990,13 @@ dev = [
     { name = "ruff", specifier = ">=0.12.12,<0.13.0" },
 ]
 test = [
+    { name = "langdetect", specifier = ">=1.0.9,<2.0.0" },
+    { name = "numpy", specifier = ">=1.26.0,<3.0.0" },
+    { name = "pdfplumber", specifier = ">=0.11.7,<0.12.0" },
+    { name = "pillow", specifier = ">=11.3.0,<12.0.0" },
     { name = "playwright", specifier = ">=1.55.0,<2.0.0" },
     { name = "protobuf", specifier = ">=6.32.0,<7.0.0" },
+    { name = "pymupdf", specifier = "==1.24.10" },
     { name = "pytest", specifier = ">=8.4.2,<9.0.0" },
     { name = "pytest-cov", specifier = ">=6.3.0,<7.0.0" },
     { name = "pytest-docker", specifier = ">=3.2.3,<4.0.0" },
@@ -1054,6 +1006,7 @@ test = [
     { name = "pytest-socket", specifier = ">=0.7.0,<0.8.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0,<4.0.0" },
     { name = "requests", specifier = ">=2.32.5,<3.0.0" },
+    { name = "unstructured", extras = ["pdf"], specifier = ">=0.14.8,<0.15.0" },
 ]
 
 [[package]]
