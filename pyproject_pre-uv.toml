@@ -5,107 +5,14 @@ description = "A local RAG implementation with Weaviate and Ollama."
 authors = [{ name="Kristjan Sillmann"}]
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-dependencies = [
-    "httpx>=0.28.1,<0.29.0",
-    "langchain>=0.3.27,<0.4.0",
-    "langchain-community>=0.3.27,<0.4.0",
-    "langdetect>=1.0.9,<2.0.0",
-    "pdfplumber>=0.11.7,<0.12.0",
-    "pillow>=11.3.0,<12.0.0",
-    "pymupdf==1.24.10",
-    "python-dotenv>=1.1.1,<2.0.0",
-    "rich>=14.1.0,<15.0.0",
-    "sentence-transformers>=5.1.0,<6.0.0",
-    "streamlit>=1.49.1,<2.0.0",
-    "torch>=2.8.0,<3.0.0",
-    "unstructured[pdf]>=0.14.8,<0.15.0",
-    "weaviate-client>=4.16.6,<5.0.0",
-]
-
-[dependency-groups]
-dev = [
-    "bandit[toml]>=1.8.6,<2.0.0",
-    "mkdocs>=1.6.1,<2.0.0",
-    "pre-commit>=4.3.0,<5.0.0",
-    "pyright[nodejs]>=1.1.405,<2.0.0",
-    "ruff>=0.12.12,<0.13.0",
-]
-
-test = [
-    "playwright>=1.55.0,<2.0.0",
-    "protobuf>=6.32.0,<7.0.0",
-    "pytest>=8.4.2,<9.0.0",
-    "pytest-cov>=6.3.0,<7.0.0",
-    "pytest-docker>=3.2.3,<4.0.0",
-    "pytest-html>=4.1.1,<5.0.0",
-    "pytest-mock>=3.15.0,<4.0.0",
-    "pytest-playwright>=0.7.1,<0.8.0",
-    "pytest-socket>=0.7.0,<0.8.0",
-    "pytest-xdist>=3.8.0,<4.0.0",
-    "requests>=2.32.5,<3.0.0",
-]
-
-# Provide PEP 621 extras for non-uv consumers (e.g., Docker dev builds)
-[project.optional-dependencies]
-dev = [
-    "bandit[toml]>=1.8.6,<2.0.0",
-    "mkdocs>=1.6.1,<2.0.0",
-    "pre-commit>=4.3.0,<5.0.0",
-    "pyright[nodejs]>=1.1.405,<2.0.0",
-    "ruff>=0.12.12,<0.13.0",
-]
-test = [
-    "playwright>=1.55.0,<2.0.0",
-    "protobuf>=6.32.0,<7.0.0",
-    "pytest>=8.4.2,<9.0.0",
-    "pytest-cov>=6.3.0,<7.0.0",
-    "pytest-docker>=3.2.3,<4.0.0",
-    "pytest-html>=4.1.1,<5.0.0",
-    "pytest-mock>=3.15.0,<4.0.0",
-    "pytest-playwright>=0.7.1,<0.8.0",
-    "pytest-socket>=0.7.0,<0.8.0",
-    "pytest-xdist>=3.8.0,<4.0.0",
-    "requests>=2.32.5,<3.0.0",
-]
-docs = [
-    "mkdocs>=1.6.1,<2.0.0",
-]
-ui = [
-    "pytest-playwright>=0.7.1,<0.8.0",
-    "playwright>=1.55.0,<2.0.0",
-]
-
-[tool.deptry.per_rule_ignores]
-DEP002 = ["boto3"]       # AWS libs pulled in indirectly
-
-[tool.uv]
-add-bounds = "major"
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-# Add the PyTorch index, but mark it EXPLICIT so nothing comes from it
-# unless we explicitly say so in [tool.uv.sources].
-explicit = true
-
-# for GPU:
-# name = "pytorch-cu128"
-# url = "https://download.pytorch.org/whl/cu128"
-
-[tool.uv.sources]
-# Only these names are allowed to resolve from that index:
-torch = { index = "pytorch-cpu" }
-# for GPU:
-# torch = { index = "pytorch-cu128"}
 
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-# Limit package discovery to the Python code under `backend/` to avoid
-# setuptools attempting to package non-Python top-level folders like `docker/` or `logs/`.
 [tool.setuptools]
 py-modules = ["cli"]
+packages = ["backend", "frontend"]
 
 [project.scripts]
 kri-local-rag = "cli:main"
@@ -147,6 +54,7 @@ markers = [
     "external: Tests that require external services (Weaviate, Ollama)",
     "requires_weaviate: Tests that require Weaviate service",
     "requires_ollama: Tests that require Ollama service",
+    "integration: Integration tests that require real services or models",
 ]
 testpaths = [
     "tests/unit",
@@ -189,14 +97,51 @@ python-dotenv = ["dotenv"]
 weaviate-client = ["weaviate"]  # if you ever install it optional-only
 langchain-community = ["langchain_community"]
 
+[project.optional-dependencies]
+# Testing dependencies
+test = [
+    "pytest>=8.0,<9.0",
+    "pytest-cov>=4.0,<5.0",
+    "pytest-xdist>=3.0,<4.0",
+    "pytest-mock>=3.0,<4.0",
+    "pytest-docker>=3.0,<4.0",
+    "pytest-html>=4.1,<5.0",
+    "pytest-socket>=0.6.0,<1.0",
+    "requests>=2.31,<3.0",
+    "protobuf>=5.26,<7.0",
+    "rich>=13.0,<14.0",
+]
+
+# Documentation dependencies
+docs = [
+    "mkdocs>=1.5.0,<2.0",
+]
+
+# UI testing dependencies
+ui = [
+    "pytest-playwright==0.4.4",
+    "playwright>=1.45,<2.0",
+]
+
+# Development tools (linting, type checking, security)
+dev = [
+    "ruff==0.12.9",
+    "pyright[nodejs]==1.1.404",
+    "bandit[toml]==1.8.6",
+]
+
+pep621_dev_dependency_groups = ["test", "docs", "ui", "dev"]
+
+[tool.deptry.per_rule_ignores]
+DEP002 = ["boto3"]       # AWS libs pulled in indirectly
 
 [tool.coverage.run]
-# Limit measured source to backend package and suppress noisy warnings when
-# xdist splits tests that don't execute any measured code in a worker.
-source = ["backend"]
 omit = ["tests/ui/*"]
-disable_warnings = ["no-data-collected"]
 data_file = "reports/coverage/.coverage"
+
+[tool.integration]
+# Integration test configuration - single source of truth
+# All integration test settings consolidated here
 
 # Service health check endpoints
 [tool.integration.services]

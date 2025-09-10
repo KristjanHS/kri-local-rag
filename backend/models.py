@@ -10,11 +10,11 @@ This module provides a straightforward way to load and cache ML models:
 from __future__ import annotations
 
 # For manual vectorization - proper type annotations
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-# Direct imports since sentence-transformers is a required runtime dependency
-from sentence_transformers import SentenceTransformer
-from sentence_transformers.cross_encoder import CrossEncoder
+if TYPE_CHECKING:  # only for type hints; avoids importing at module import time
+    from sentence_transformers import SentenceTransformer
+    from sentence_transformers.cross_encoder import CrossEncoder
 
 from backend.config import get_logger
 
@@ -35,7 +35,7 @@ from backend.config import (
 # Configuration is imported directly from config.py
 
 
-def load_embedder() -> SentenceTransformer:
+def load_embedder() -> "SentenceTransformer":
     """Load the embedding model with HuggingFace caching."""
     global _embedding_model
     if _embedding_model is not None:
@@ -46,7 +46,7 @@ def load_embedder() -> SentenceTransformer:
     return _embedding_model
 
 
-def load_reranker() -> CrossEncoder:
+def load_reranker() -> "CrossEncoder":
     """Load the reranker model with HuggingFace caching."""
     global _cross_encoder
     if _cross_encoder is not None:
@@ -98,9 +98,14 @@ def load_model(model_name: str, is_embedding: bool) -> Any:
     try:
         logger.info("Loading %s model: %s", "embedding" if is_embedding else "reranker", model_name)
 
+        # Lazy import to honor TRANSFORMERS_NO_TORCHVISION before transformers loads
         if is_embedding:
+            from sentence_transformers import SentenceTransformer
+
             return SentenceTransformer(model_name)
         else:
+            from sentence_transformers.cross_encoder import CrossEncoder
+
             return CrossEncoder(model_name)
 
     except ImportError as e:
@@ -112,11 +117,11 @@ def load_model(model_name: str, is_embedding: bool) -> Any:
 
 
 # Legacy aliases for backward compatibility
-def get_embedder() -> SentenceTransformer:
+def get_embedder() -> "SentenceTransformer":
     """Legacy alias for load_embedder()."""
     return load_embedder()
 
 
-def get_cross_encoder() -> CrossEncoder:
+def get_cross_encoder() -> "CrossEncoder":
     """Legacy alias for load_reranker()."""
     return load_reranker()

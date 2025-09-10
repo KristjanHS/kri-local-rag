@@ -16,6 +16,9 @@ if [ -f "${VENV_PATH}/bin/activate" ]; then
     source "${VENV_PATH}/bin/activate"
 fi
 
+# Ensure text-only Transformers import path in CPU environments
+export TRANSFORMERS_NO_TORCHVISION=${TRANSFORMERS_NO_TORCHVISION:-1}
+
 # Run the QA loop from the project root to ensure correct module resolution.
 # Pass all script arguments ($@) to the python process.
 exec python -m backend.qa_loop "$@"

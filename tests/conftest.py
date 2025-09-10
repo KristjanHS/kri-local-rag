@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+import os
 from typing import Any, Iterator, Optional
 
 import pytest
@@ -18,6 +19,9 @@ LOGS_DIR = REPORTS_DIR / "logs"
 
 # Test collection name used across fixtures to ensure consistency
 TEST_COLLECTION_NAME = "TestCollection"
+
+# Ensure CPU-friendly transformers imports during tests
+os.environ.setdefault("TRANSFORMERS_NO_TORCHVISION", "1")
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: D401
