@@ -19,14 +19,27 @@ LOG_FILE=$(init_script_logging "$script_name")
 enable_error_trap "$LOG_FILE" "$script_name"
 enable_debug_trace "$LOG_FILE"
 
-log INFO "Starting pre-push checks" | tee -a "$LOG_FILE"
+# Duplicate all subsequent stdout/stderr to both console and log file without using tee
+exec > >(while IFS= read -r line; do echo "$line"; echo "$line" >&3; done) 2>&1
 
-# Detect if 'act' is available; we'll use native tools where possible and only run act-based steps when available
+log INFO "Starting pre-push checks"
+
+# uv cache isolation for hooks (avoid root-owned cache under act)
+export UV_LINK_MODE=copy
+export UV_CACHE_DIR="$(git rev-parse --show-toplevel)/.uv-cache-hooks"
+mkdir -p "$UV_CACHE_DIR"
+
+# Detect if 'act' is available and Docker is usable
 if command -v act >/dev/null 2>&1; then
-  ACT_AVAILABLE=1
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    ACT_AVAILABLE=1
+  else
+    ACT_AVAILABLE=0
+    log WARN "'act' found but Docker is unavailable. Disabling act-based steps (e.g., CodeQL)."
+  fi
 else
   ACT_AVAILABLE=0
-  log WARN "'act' not found. Will run native checks only (ruff/pyright); skipping act-based steps. Install: https://github.com/nektos/act" | tee -a "$LOG_FILE"
+  log WARN "'act' not found. Will run native checks only (ruff/pyright/tests); install: https://github.com/nektos/act"
 fi
 
 # Honor optional guard to skip local security scans (CodeQL/Semgrep)
@@ -40,101 +53,64 @@ SKIP_LINT=${SKIP_LINT:-1}
 SKIP_PYRIGHT=${SKIP_PYRIGHT:-1}
 SKIP_TESTS=${SKIP_TESTS:-0}
 
-if [[ "$SKIP_LOCAL_SEC_SCANS" == "1" ]]; then
-  log INFO "SKIP_LOCAL_SEC_SCANS=1 — security scans will be skipped" | tee -a "$LOG_FILE"
-fi
-if [[ "$SKIP_LINT" == "1" ]]; then
-  log INFO "SKIP_LINT=1 — lint checks will be skipped" | tee -a "$LOG_FILE"
-fi
-if [[ "$SKIP_PYRIGHT" == "1" ]]; then
-  log INFO "SKIP_PYRIGHT=1 — type checks will be skipped" | tee -a "$LOG_FILE"
-fi
-if [[ "$SKIP_TESTS" == "1" ]]; then
-  log INFO "SKIP_TESTS=1 — tests will be skipped" | tee -a "$LOG_FILE"
-fi
-
-# Run ruff (format check + lint) natively from the project venv
+## Ruff via Makefile (format + autofix)
 if [[ "$SKIP_LINT" != "1" ]]; then
-  if [[ -x ".venv/bin/ruff" ]]; then
-    log INFO "Running ruff format --check …" | tee -a "$LOG_FILE"
-    .venv/bin/ruff format --check . 2>&1 | sed 's/^/[ruff] /' | tee -a "$LOG_FILE"
-    log INFO "Running ruff check …" | tee -a "$LOG_FILE"
-    .venv/bin/ruff check . 2>&1 | sed 's/^/[ruff] /' | tee -a "$LOG_FILE"
-  else
-    log WARN "'.venv/bin/ruff' not found. Skipping ruff checks. Ensure dev deps are installed: 'pip install -e .[test,docs]'" | tee -a "$LOG_FILE"
-  fi
+  log INFO "Running ruff format (make ruff-format) …"
+  make ruff-format 2>&1 | sed 's/^/[ruff] /'
+  log INFO "Running ruff autofix (make ruff-fix) …"
+  make ruff-fix 2>&1 | sed 's/^/[ruff] /'
 else
-  log INFO "Skipping ruff due to SKIP_LINT=1" | tee -a "$LOG_FILE"
+  log INFO "Skipping ruff due to SKIP_LINT=1"
 fi
 
-# Run yamlfmt (YAML formatting) natively
+## Yamlfmt via Makefile (uses uv + pre-commit)
 if [[ "$SKIP_LINT" != "1" ]]; then
-  if command -v yamlfmt >/dev/null 2>&1; then
-    log INFO "Running yamlfmt --lint …" | tee -a "$LOG_FILE"
-    yamlfmt --lint "**/*.yml" "**/*.yaml" 2>&1 | sed 's/^/[yamlfmt] /' | tee -a "$LOG_FILE"
-  else
-    log WARN "'yamlfmt' not found. Skipping YAML formatting checks. Install: './scripts/ci/install-system-tools.sh'" | tee -a "$LOG_FILE"
-  fi
+  log INFO "Running yamlfmt (make yamlfmt) …"
+  make yamlfmt 2>&1 | sed 's/^/[yamlfmt] /' || true
 else
-  log INFO "Skipping yamlfmt due to SKIP_LINT=1" | tee -a "$LOG_FILE"
+  log INFO "Skipping yamlfmt due to SKIP_LINT=1"
 fi
 
-# Run pyright (type checking) natively from the project venv
+## Pyright via Makefile target
 if [[ "$SKIP_PYRIGHT" != "1" ]]; then
-  if [[ -x ".venv/bin/pyright" ]]; then
-    log INFO "Running pyright (native) …" | tee -a "$LOG_FILE"
-    .venv/bin/pyright 2>&1 | sed 's/^/[pyright] /' | tee -a "$LOG_FILE"
-  else
-    log WARN "'.venv/bin/pyright' not found. Skipping type checks. Install pyright in the venv (e.g., add to dev deps)." | tee -a "$LOG_FILE"
-  fi
+  log INFO "Running pyright (make pyright) …"
+  make pyright 2>&1 | sed 's/^/[pyright] /'
 else
-  log INFO "Skipping pyright due to SKIP_PYRIGHT=1" | tee -a "$LOG_FILE"
+  log INFO "Skipping pyright due to SKIP_PYRIGHT=1"
 fi
 
-# Run fast tests (keep via act for parity when available)
-if [[ "$SKIP_TESTS" == "1" ]]; then
-  log INFO "Skipping tests due to SKIP_TESTS=1" | tee -a "$LOG_FILE"
-else
-    if [[ "$ACT_AVAILABLE" == "1" ]]; then
-      log INFO "Running fast_tests via act (pull_request) …" | tee -a "$LOG_FILE"
-      act pull_request -j fast_tests --pull=false --rm --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE"
-    else
-      # Native fast path for quick feedback when act isn't available
-      if [[ -x ".venv/bin/python" ]]; then
-        log INFO "Running native unit tests: pytest tests/unit --maxfail=1 -q …" | tee -a "$LOG_FILE"
-        .venv/bin/python -m pytest tests/unit --maxfail=1 -q 2>&1 | tee -a "$LOG_FILE"
-      else
-        log WARN "'.venv/bin/python' not found; cannot run native unit tests." | tee -a "$LOG_FILE"
-      fi
-    fi
-fi
-
-# Run local Semgrep via pipx (isolated) unless skipped
-if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
+## Unit tests: prefer GA job via act; fallback to local Makefile
+if [[ "$SKIP_TESTS" != "1" ]]; then
   if [[ "$ACT_AVAILABLE" == "1" ]]; then
-    log INFO "Running Semgrep via act …" | tee -a "$LOG_FILE"
-    act workflow_dispatch -W .github/workflows/semgrep.yml --pull=false --rm --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
+    log INFO "Running unit tests via act (workflow: python-lint-test.yml, job: unit_tests) …"
+    act -W .github/workflows/python-lint-test.yml -j unit_tests --pull=false --log-prefix-job-id 2>&1 | sed 's/^/[act] /'
   else
-    log INFO "Running Semgrep (local) via pipx …" | tee -a "$LOG_FILE"
-    bash "$SCRIPT_DIR/semgrep_local.sh" 2>&1 | tee -a "$LOG_FILE" || true
+    log WARN "'act' or Docker unavailable. Falling back to local tests (make unit)."
+    make unit 2>&1 | sed 's/^/[unit] /'
   fi
 else
-  log INFO "Skipping Semgrep due to SKIP_LOCAL_SEC_SCANS=1" | tee -a "$LOG_FILE"
+  log INFO "Skipping unit tests due to SKIP_TESTS=1"
+fi
+
+## Semgrep via Makefile (uvx semgrep ci)
+if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
+  log INFO "Running Semgrep (make semgrep-local) …"
+  make semgrep-local 2>&1 | sed 's/^/[semgrep] /' || true
+else
+  log INFO "Skipping Semgrep due to SKIP_LOCAL_SEC_SCANS=1"
 fi
 
 # Optional: run CodeQL locally (informational)
 if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
   if [[ "$ACT_AVAILABLE" == "1" ]]; then
-    log INFO "Running CodeQL via act …" | tee -a "$LOG_FILE"
-    act workflow_dispatch -W .github/workflows/codeql.yml --pull=false --rm --log-prefix-job-id 2>&1 | tee -a "$LOG_FILE" || true
+    log INFO "Running CodeQL via act …"
+    act workflow_dispatch -W .github/workflows/codeql.yml --pull=false --rm --log-prefix-job-id 2>&1 | sed 's/^/[codeql] /' || true
   else
-    log INFO "Skipping CodeQL (act not available)." | tee -a "$LOG_FILE"
+    log INFO "Skipping CodeQL (act not available)."
   fi
 else
-  log INFO "Skipping CodeQL due to SKIP_LOCAL_SEC_SCANS=1" | tee -a "$LOG_FILE"
+  log INFO "Skipping CodeQL due to SKIP_LOCAL_SEC_SCANS=1"
 fi
 
-log INFO "Pre-push checks complete" | tee -a "$LOG_FILE"
+log INFO "Pre-push checks complete"
 exit 0
-
-

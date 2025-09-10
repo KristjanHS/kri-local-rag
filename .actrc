@@ -1,6 +1,6 @@
 # Act configuration file
 
-# NB! they don't include node 20 -> newer Github actions wont work in Act!
+# NB! these images don't include node 20 -> newer Github actions wont work in Act!
 # -P ubuntu-latest=catthehacker/ubuntu:act-latest
 # -P ubuntu-22.04=catthehacker/ubuntu:act-22.04
 
@@ -14,5 +14,23 @@
 # -P ubuntu-latest=catthehacker/ubuntu:full-latest
 # -P ubuntu-latest=ghcr.io/actions-oss/act-full:ubuntu-22.04
 
-# Auto-cleanup containers and volumes after each run to prevent accumulation
+# mount uv cache volume, for reuse over runs
+--container-options "--volume=${HOME}/.cache/uv:/uv-cache"
+--env UV_CACHE_DIR=/uv-cache
+
+# As the workspace lives in the container’s filesystem and the cache is a mounted volume, uv can’t hardlink.
+# To silence the warning:
+--env UV_LINK_MODE=copy
+
+# Auto-cleanup containers and volumes after each run to prevent accumulation. 
+# This will not cleanup the mounted uv cache!
 --rm
+
+# needed for wf jobs to differentiate bw GH and Act runners
+--actor=nektos/act
+
+# make the cache persistent and visible to act across runs
+#--cache-server-path=~/.cache/act/caches
+#--action-cache-path=~/.cache/act/actions
+# Tell Act to reuse downloaded actions
+#--action-offline-mode

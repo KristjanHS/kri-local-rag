@@ -93,39 +93,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          clean: false # avoid deleting untracked files under act --bind
           fetch-depth: 0
+      - name: Setup Python + uv (cached)
+        uses: ./.github/actions/setup-uv
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install pipx and Semgrep (isolated)
-        run: |
-          if ! command -v ~/.local/bin/semgrep &> /dev/null; then
-            echo "semgrep not found, installing..."
-            python -m pip install --user pipx || true
-            python -m pipx ensurepath || true
-            ~/.local/bin/pipx install --force semgrep
-          else
-            echo "semgrep is already installed."
-          fi
-
-      - name: Run Semgrep scan (no metrics)
-        run: |
-          ~/.local/bin/semgrep ci \
-            --config auto \
-            --metrics off \
-            --sarif \
-            --output semgrep_local.sarif
-
-      # Local scan complete - results available in semgrep_local.sarif
-      # For production scans, check GitHub's Security tab
-
-      - name: Quick local summary
-        if: ${{ always() }}
-        run: |
-          if [ -f "semgrep_local.sarif" ]; then
-            echo "Local Semgrep scan complete. Check semgrep_local.sarif for details."
-            echo "For production results, see GitHub's Security tab."
-          fi
+      - name: Run Semgrep via Makefile
+        run: make semgrep-local
