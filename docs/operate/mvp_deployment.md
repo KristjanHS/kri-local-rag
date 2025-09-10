@@ -26,11 +26,7 @@ WEAVIATE_URL=http://localhost:8080
 
 ### Start core services (recommended)
 ```
-./scripts/docker/docker-setup.sh
-```
-Manual alternative (advanced users):
-```
-docker compose -f docker/docker-compose.yml up -d weaviate ollama
+make stack-up
 ```
 Verify readiness:
 ```
@@ -43,22 +39,20 @@ docker compose -f docker/docker-compose.yml exec -T ollama ollama pull "$OLLAMA_
 ```
 
 ### Start the app (Streamlit)
-If you used `docker-setup.sh`, the app is already running at http://localhost:8501
-
-Manual alternative:
+If you used `make stack-up`, the app is already running at http://localhost:8501
+To verify:
 ```
-docker compose -f docker/docker-compose.yml up -d app
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8501
 ```
 
-### Ingest sample data (host preferred)
+### Ingest sample data (preferred)
 ```
-.venv/bin/python -m backend.ingest --data-dir data
+make ingest INGEST_SRC=./data
 ```
 
 ### Quick CLI smoke
 ```
-.venv/bin/python -m cli --question "hello"
+make ask Q='hello'
 ```
 
 ### Common checks
@@ -70,10 +64,9 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8501
 ### Restart and persistence check
 ```
 docker compose -f docker/docker-compose.yml restart weaviate app
-.venv/bin/python -m cli --question "hello after restart"
+make ask Q='hello after restart'
 ```
 
 ### Notes
 - Run Python modules from the project root with `-m` to avoid `PYTHONPATH` issues.
 - Prefer host ingestion if container Python deps drift.
-

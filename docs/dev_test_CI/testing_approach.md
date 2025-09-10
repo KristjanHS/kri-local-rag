@@ -14,13 +14,13 @@ A high-level guide to testing with real local models and external services.
 
 **Local Environment:**
 - Set `TEST_DOCKER=false` or leave unset
-- Run `.venv/bin/python -m pytest tests/integration/ -v`
+- Run `make integration PYTEST_ARGS='-v'`
 
 ### Service-Specific Tests
 
-- **Weaviate only**: `pytest -m "requires_weaviate"`
-- **Ollama only**: `pytest -m "requires_ollama"`
-- **Both services**: `pytest -m "requires_weaviate and requires_ollama"`
+- **Weaviate only**: `make integration PYTEST_ARGS='-m "requires_weaviate"'`
+- **Ollama only**: `make integration PYTEST_ARGS='-m "requires_ollama"'`
+- **Both services**: `make integration PYTEST_ARGS='-m "requires_weaviate and requires_ollama"'`
 
 ## Core Principles
 
@@ -148,3 +148,7 @@ Integration tests combine real local models with mocked external services for ef
 ---
 
 **Note**: This document provides a high-level overview for human readers. For detailed code examples and comprehensive testing guides, see `docs/AI_coder/AI_instructions.md`.
+
+## See Also
+- Make targets: run `make help`
+- Development Guide: `docs/dev_test_CI/DEVELOPMENT.md`

@@ -11,9 +11,9 @@
 - Avoid destructive actions without explicit user request (e.g., volume deletion, force resets).
 
 **Linting, Formatting, Types**
-- Ruff for linting/formatting: `ruff check . --fix`, `ruff format .`.
+- Ruff for linting/formatting: `make ruff-fix`, `make ruff-format`.
 - No `print` in app/tests (Ruff T201). Use `logging`.
-- Pyright for types: `pyright .` (use `# type: ignore[...]` sparingly with justification).
+- Pyright for types: `make pyright` (use `# type: ignore[...]` sparingly with justification).
 
 **Testing**
 - Suites by folder:
@@ -22,15 +22,15 @@
   - E2E: `tests/e2e/` (compose stack).
   - UI: `tests/ui/` (browser tests; typically `--no-cov`).
 - Typical invocations:
-  - Unit: `pytest tests/unit -q` (or `-n auto`).
-  - Integration subsets: `pytest -m "integration and not slow"`.
+  - Unit: `make unit`.
+  - Integration subsets: `make integration PYTEST_ARGS='-m "integration and not slow"'`.
 - Useful env: `RAG_SKIP_STARTUP_CHECKS=1`, `RAG_FAKE_ANSWER="..."`.
 
 **Run/Build Commands**
-- Start stack: `./scripts/docker/docker-setup.sh`.
+- Start stack: `make stack-up`.
 - Web UI: `streamlit run frontend/rag_app.py` (or http://localhost:8501 when stack is up).
-- Ingest: `./scripts/ingest.sh ./data`.
-- CLI Q&A: `./scripts/cli.sh` or `python -m backend.qa_loop --question "..."`.
+- Ingest: `make ingest` (override path with `INGEST_SRC=...`).
+- CLI Q&A: `make cli` or `make ask Q='...'`.
 
 **Docker Compose Usage**
 - Always target compose by service name (e.g., `app`, `app-test`, `weaviate`, `ollama`). Do not pass profile names as build/up/run targets.
@@ -72,7 +72,7 @@
 - Prefer locally installed tools for speed; match CI only when parity is required.
 
 **After Edits**
-- When appropriate, run tests/builds to catch regressions. If failures persist after iterative fixes (≤3 tries), stop and surface logs to decide whether tests or code are incorrect (describe the test’s intent vs actual behavior before changing either).
+- Run `make pre-commit` before pushing; see `docs/dev_test_CI/ci-cd-release-mgmt.md` for CI details.
 
 **Planning with Codex**
 - For multi‑step or ambiguous tasks, use Codex’s plan tool to outline concise steps and keep exactly one step in progress.

@@ -15,7 +15,7 @@ if ! .venv/bin/python -m pip --version >/dev/null 2>&1; then
 fi
 
 # Create or reuse .venv, then sync test group
-uv sync --group test
+uv sync --group test --frozen
 
 # Quick sanity print
 uv run python -V

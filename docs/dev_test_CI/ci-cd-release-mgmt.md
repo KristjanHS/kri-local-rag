@@ -4,6 +4,8 @@
 
 This project uses GitHub Actions for CI/CD and security scanning, with automated release processes for promoting changes from `dev` to `main`.
 
+Canonical local quality gate: run `make pre-commit` before pushing.
+
 ## Available Workflows
 
 ### 1. CodeQL Analysis (`codeql.yml`)
@@ -38,6 +40,8 @@ This project uses GitHub Actions for CI/CD and security scanning, with automated
   - Fast tests → `python-lint-test.yml` job `fast_tests` (needs `lint`)
   - Semgrep → `semgrep.yml` job `semgrep`
   - CodeQL → `codeql.yml` job `analyze`
+
+Tip: To run the full local gate without pushing, use `make pre-commit`.
 
 ## Local Development with Act CLI
 
@@ -85,7 +89,7 @@ This project uses a comprehensive pre-commit framework for code quality, formatt
 
 ### Quick Setup
 ```bash
-./scripts/dev/setup-pre-commit.sh
+make setup-hooks
 ```
 
 ### Included Tools
@@ -108,7 +112,7 @@ git commit -m "Your commit message"
 
 **Manual**: Run all hooks or specific ones:
 ```bash
-pre-commit run --all-files
+make pre-commit
 pre-commit run ruff
 pre-commit run detect-secrets
 ```
@@ -127,7 +131,7 @@ pre-commit run detect-secrets
 pre-commit autoupdate
 
 # Fix common issues
-ruff check . --fix
+make ruff-fix
 
 # For other tools, you may need to install dependencies manually:
 
@@ -177,7 +181,7 @@ go install github.com/google/yamlfmt/cmd/yamlfmt@latest
 - **Merge conflicts**: Resolve manually or use `--prefer-dev-all`
 - **Pre-push CI failures**: Check `logs/pre-push.log`, run cleanup script
 - **Branch protection**: If "PRs only" is enforced, create PR manually
-- **Fast test failures**: Run `ruff check .` and `pytest -q tests/` locally
+- **Fast test failures**: Run `make ruff-fix` and `make unit` locally
 
 ## Testing Workflows
 
@@ -227,3 +231,8 @@ go install github.com/google/yamlfmt/cmd/yamlfmt@latest
 - **Act CLI**: https://github.com/nektos/act
 - **CodeQL**: https://docs.github.com/en/code-security
 - **Semgrep**: https://semgrep.dev/docs/
+
+## See Also
+- Make targets: run `make help`
+- Codex Rules: `docs/AI_coder/CODEX_RULES.md`
+- Testing Approach: `docs/dev_test_CI/testing_approach.md`

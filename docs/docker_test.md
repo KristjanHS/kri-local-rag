@@ -7,18 +7,18 @@ Use this checklist to validate recent Dockerfile/Compose changes in small chunks
 - [x] Ensure working dir: `cd ~/projects/kri-local-rag`
 
 ## Static checks (fast)
-- [x] Run pre-commit: `pre-commit run --all-files`
-- [x] Run unit tests: `.venv/bin/python -m pytest tests/unit -q`
+- [x] Run pre-commit: `make pre-commit`
+- [x] Run unit tests: `make unit`
 - [x] Dry build image (runtime target) to observe context size: `docker build -f docker/app.Dockerfile -t test-app --target runtime . --progress=plain`
 
 ## Bring up full stack
-- [x] Start services: `./scripts/docker/docker-setup.sh`
+- [x] Start services: `make stack-up`
 - [x] Verify status: `docker compose -f docker/docker-compose.yml ps` (expect app/weaviate/ollama healthy)
 
 ## Healthcheck and flags verification
 - [x] Host health probe: `wget -q --spider http://localhost:8501/_stcore/health && echo OK`
 - [x] In-container health probe: `docker compose -f docker/docker-compose.yml exec app sh -lc 'wget -qO- http://localhost:8501/_stcore/health && echo'`
-- [ ] Inspect logs for headless/no-telemetry: `docker compose -f docker/docker-compose.yml logs -n 100 app`
+- [ ] Inspect logs for headless/no-telemetry: `make app-logs LINES=100`
 
 ## Quick app smoke
 - [x] CLI smoke: `docker compose -f docker/docker-compose.yml exec -T app /opt/venv/bin/python -m backend.qa_loop --question "hello"`
@@ -33,6 +33,5 @@ Use this checklist to validate recent Dockerfile/Compose changes in small chunks
 - [ ] Tear down test env: `make test-down`
 
 ## Cleanup
-- [ ] Stop services: `docker compose -f docker/docker-compose.yml down`
+- [ ] Stop services: `make stack-down`
 - [ ] Optional: prune builder cache: `docker builder prune -af`
-
