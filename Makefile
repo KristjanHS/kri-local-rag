@@ -191,12 +191,12 @@ test-clean: ## Remove test env run/build metadata
 	bash scripts/dev/test-env.sh clean
 
 # =========================
-# Tests (local)
+# Tests
 # =========================
-# Run unit tests (local) and write reports
-unit: ## Run unit tests (local) and write reports
+# Run unit tests and write reports
+unit: ## Run unit tests and write reports
 	mkdir -p reports
-	$(PYTEST) tests/unit -n auto --maxfail=1 $(PYTEST_BASE) --junitxml=reports/junit.xml ${PYTEST_ARGS}
+	$(PYTEST) tests/unit -n 1 --maxfail=1 $(PYTEST_BASE) --junitxml=reports/junit.xml ${PYTEST_ARGS}
 
 # Run local integration tests; prefer uv if available, then .venv fallback
 integration: ## Run local integration tests (venv or uv)
