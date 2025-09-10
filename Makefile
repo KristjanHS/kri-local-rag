@@ -90,6 +90,14 @@ export-reqs: ## Export requirements.txt from uv.lock (omits torch/GPU extras)
 stack-up: ## Build and start app + deps via script
 	@./scripts/docker/docker-setup.sh
 
+# Non-interactive: start app stack (weaviate, ollama, app) and wait for health
+app-up: ## Start app stack (compose --wait) non-interactively
+	@$(COMPOSE_APP) up -d --wait weaviate ollama app
+
+# Non-interactive: stop app stack and remove containers (preserve volumes)
+app-down: ## Stop app stack (compose down)
+	@$(COMPOSE_APP) down
+
 # Ingest documents (default path inside script is ./data). Override path with INGEST_SRC=/path
 ingest: ## Ingest documents (override path with INGEST_SRC=/path)
 	@if [ -n "$(INGEST_SRC)" ]; then \
@@ -134,12 +142,16 @@ ollama-pull: ## Pull Ollama model in container (MODEL=...)
 	@$(COMPOSE_APP) exec -T ollama ollama pull "$(MODEL)"
 
 # Run E2E tests with automatic stack lifecycle
-e2e: ## Run E2E tests (stack-up → test → stack-down)
+e2e: ## Run E2E tests (stack-up → test → optional stack-down). Set PRESERVE=0 to stack-down
 	@set -euo pipefail; \
 	$(MAKE) stack-up; \
 	EXIT=0; \
 	$(PYTEST) tests/e2e $(PYTEST_BASE) $${PYTEST_ARGS:-} || EXIT=$$?; \
-	$(MAKE) stack-down; \
+	if [ "$${PRESERVE:-1}" = "0" ]; then \
+		$(MAKE) stack-down; \
+	else \
+		echo "Skipping stack-down: PRESERVE=1 (containers/networks preserved)"; \
+	fi; \
 	exit $$EXIT
 
 # Coverage run (host)

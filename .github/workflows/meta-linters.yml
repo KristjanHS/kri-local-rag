@@ -35,10 +35,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: "Install yamlfmt"
-        run: ./scripts/ci/install-system-tools.sh
-      - name: "Run yamlfmt in lint mode"
-        run: yamlfmt --lint "**/*.yml" "**/*.yaml"
+      - name: Setup Python + uv (cached)
+        uses: ./.github/actions/setup-uv
+      - name: Yamlfmt via Makefile
+        run: make yamlfmt
   hadolint:
     name: Hadolint (Dockerfiles)
     if: ${{ github.actor != 'nektos/act' }}
