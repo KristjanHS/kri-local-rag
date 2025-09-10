@@ -40,6 +40,25 @@ jobs:
           version: "0.12.9"
           args: format --check .
 
+  deptry:
+    name: Deptry dependency health
+    if: ${{ github.actor != 'nektos/act' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Python + uv (cached)
+        uses: ./.github/actions/setup-uv
+      - name: Run deptry (JSON report)
+        run: uvx --from deptry deptry . --json-output deptry_report.json
+      - name: Upload deptry report
+        if: ${{ always() && github.actor != 'nektos/act' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: deptry-report
+          path: deptry_report.json
+
   unit_tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -178,4 +197,3 @@ jobs:
       - name: Tear down local stack
         if: always()
         run: make stack-down
-

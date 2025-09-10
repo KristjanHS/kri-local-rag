@@ -104,3 +104,12 @@ repos:
           )$
         additional_dependencies:
           - detect-secrets[gibberish]
+
+  - repo: local
+    hooks:
+      - id: deptry
+        name: "Deptry - Dependency health"
+        language: system
+        entry: uvx --from deptry deptry .
+        pass_filenames: false
+        types: [python]

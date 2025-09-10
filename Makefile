@@ -2,7 +2,7 @@
 .PHONY: help setup-hooks test-up test-down test-logs test-up-force-build test-clean \
         test-run-integration integration push-pr setup-uv export-reqs \
         ruff-format ruff-fix yamlfmt pyright pre-commit unit pip-audit \
-        semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage coverage-html dev-setup ollama-pull
+        semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage coverage-html dev-setup ollama-pull deptry
 
 # Use bash with strict flags for recipes
 SHELL := bash
@@ -243,6 +243,17 @@ semgrep-local: ## Run Semgrep locally via uvx (no metrics)
 		  COUNT=$$(grep -o '\"ruleId\"' -c semgrep_local.sarif 2>/dev/null || echo 0); \
 		  echo "Semgrep findings: $${COUNT} (approx; no jq)"; \
 		fi; \
+	else \
+		echo "uv not found. Install uv: https://astral.sh/uv"; \
+		exit 1; \
+	fi
+
+
+# Dependency health check using deptry (reads pyproject config)
+deptry: ## Analyze Python dependencies with deptry
+	@if command -v uv >/dev/null 2>&1; then \
+		uvx --from deptry deptry . --json-output deptry_report.json; \
+		echo "Deptry JSON report written to deptry_report.json"; \
 	else \
 		echo "uv not found. Install uv: https://astral.sh/uv"; \
 		exit 1; \
