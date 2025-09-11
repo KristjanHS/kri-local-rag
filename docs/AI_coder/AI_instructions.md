@@ -37,10 +37,7 @@ Client-side vectorization and reranking with centralized model loading:
 
 - Unit: `make unit`
 - Integration (local): `make integration`
-- Integration (docker): `make test-up` → `make test-run-integration` → `make test-down`
 - E2E: `make e2e`
-- Coverage: `make coverage`
-  - HTML report: `make coverage-html` (see `reports/coverage/index.html`)
 
 Details (markers, health checks, TEST_DOCKER): see `docs/dev_test_CI/testing_approach.md`.
 

@@ -8,7 +8,7 @@ runs:
       uses: actions/setup-python@v5
       with:
         python-version: "3.12"
-    # Install uv locally under act: docker image only supports older version of gh action + uv cache is 
+    # Install uv locally under act: docker image only supports older version of gh action + act uses host-mounted uv cache.
     - name: Install uv (act workaround)
       if: ${{ github.actor == 'nektos/act' }}
       uses: astral-sh/setup-uv@v5

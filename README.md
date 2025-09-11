@@ -57,28 +57,14 @@ make stack-reset
 If you prefer to run Python locally and point to Docker services (or your own):
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements-dev.txt
-pip install -e .
-
-# Start Docker services (for Weaviate + Ollama) in another shell if needed
-make stack-up
-
-# Ingest local docs from ./data
-make ingest
-
-# Ask questions via CLI
-make cli
-make ask Q="Summarize project setup"
+# Create venv and sync dependencies with uv
+make setup-uv
 ```
 
 Notes:
 - By default the app expects `WEAVIATE_URL=http://weaviate:8080` and `OLLAMA_URL=http://ollama:11434` in Docker. When running fully locally without Docker networking, set them to `http://localhost:8080` and `http://localhost:11434` respectively.
  - Compose uses service healthchecks; when starting manually, prefer `--wait` to block until ready.
  - To pin the Ollama image, copy `.env.example` to `.env` and adjust `OLLAMA_IMAGE=ollama/ollama:<version>`.
- - For tests, use the Makefile harness: `make test-up` (unique project name), `make test-run-integration`, then `make test-down` (tears down with `-v` for the test stack only).
 
 ---
 
