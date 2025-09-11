@@ -1,6 +1,6 @@
 # Declare phony targets
 .PHONY: help setup-hooks test-up test-down test-logs test-up-force-build test-clean \
-        test-integration integration push-pr setup-uv export-reqs \
+        test-integration test-e2e integration push-pr setup-uv export-reqs \
         ruff-format ruff-fix yamlfmt pyright pre-commit unit pip-audit \
         semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage coverage-html dev-setup ollama-pull deptry
 
@@ -154,10 +154,6 @@ e2e: ## Run E2E tests (stack-up → test → optional stack-down). Set PRESERVE=
 	fi; \
 	exit $$EXIT
 	
-# Run E2E tests and write reports (assumes test environment is already running)
-test-e2e: ## Run E2E tests and write reports
-	mkdir -p reports
-	$(PYTEST) tests/e2e $(PYTEST_BASE) --junitxml=reports/junit_e2e.xml ${PYTEST_ARGS}
 
 # Coverage run (host)
 coverage: ## Run coverage across repo (HTML=1 for HTML report)
