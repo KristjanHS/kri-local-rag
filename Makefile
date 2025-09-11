@@ -143,16 +143,16 @@ ollama-pull: ## Pull Ollama model in container (MODEL=...)
 
 # Run E2E tests with automatic stack lifecycle
 e2e: ## Run E2E tests (stack-up → test → optional stack-down). Set PRESERVE=0 to stack-down
-    @set -euo pipefail; \
-    $(MAKE) stack-up; \
-    EXIT=0; \
-    $(PYTEST) tests/e2e $(PYTEST_BASE) $${PYTEST_ARGS:-} || EXIT=$$?; \
-    if [ "$${PRESERVE:-1}" = "0" ]; then \
-        $(MAKE) stack-down; \
-    else \
-        echo "Skipping stack-down: PRESERVE=1 (containers/networks preserved)"; \
-    fi; \
-    exit $$EXIT
+	@set -euo pipefail; \
+	$(MAKE) stack-up; \
+	EXIT=0; \
+	$(PYTEST) tests/e2e $(PYTEST_BASE) $${PYTEST_ARGS:-} || EXIT=$$?; \
+	if [ "$${PRESERVE:-1}" = "0" ]; then \
+		$(MAKE) stack-down; \
+	else \
+		echo "Skipping stack-down: PRESERVE=1 (containers/networks preserved)"; \
+	fi; \
+	exit $$EXIT
 	
 # Run E2E tests and write reports (assumes test environment is already running)
 test-e2e: ## Run E2E tests and write reports
