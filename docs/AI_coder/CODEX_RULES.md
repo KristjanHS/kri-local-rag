@@ -45,8 +45,8 @@
 - For commands that might page or hide output (e.g., `git log`, `git diff`), force full output in non‑interactive logs, e.g., `bash -o pipefail -c 'git --no-pager log | cat'`.
 
 **Imports and Dependencies**
-- If `ModuleNotFoundError`: ensure editable install: `pip install -e .`.
-- Prefer optional deps in `pyproject.toml` `[project.optional-dependencies]`; keep `requirements-dev.txt` as thin wrapper to extras.
+- If `ModuleNotFoundError`: install dependencies with: `make uv-sync-test`.
+ - Prefer uv for dependency management. Use `[dependency-groups]` in `pyproject.toml` (e.g., `dev`, `test`) and install via `make uv-sync-test`. Do not add separate dev requirements files.
 
 **Docker Volumes Safety**
 - Never remove production volumes. Do not use `-v` on non‑test stacks.

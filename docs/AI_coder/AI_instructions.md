@@ -43,10 +43,11 @@ Details (markers, health checks, TEST_DOCKER): see `docs/dev_test_CI/testing_app
 
 ## Development Environment
 
-**Dependencies**:
-- `requirements.txt`: production deps
-- `requirements-dev.txt`: dev/testing deps (includes production)
-- Install: `.venv/bin/python -m pip install -r requirements-dev.txt && .venv/bin/python -m pip install -e .`
+**Dependencies (uv)**:
+- Dependency groups live in `pyproject.toml` under `[dependency-groups]` (e.g., `dev`, `test`).
+- Quick install: `make uv-sync-test` (syncs test deps; uv manages env).
+- Full dev/test install: `uv venv --seed && make uv-sync-test`.
+- Use `.venv/bin/python -m <module>` for execution; editable install handled by uv.
 
 **Quick Commands**:
 - Setup dev env: `make dev-setup`

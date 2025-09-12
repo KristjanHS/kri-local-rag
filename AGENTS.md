@@ -56,7 +56,7 @@ explicitly overrides them.
   _Coverage outputs to `reports/coverage`._
 
 - **Full integration harness (dockerized):**  
-  `make test-up` → `make test-run-integration` → `make test-down`
+  `make test-up` → `make test-integration` → `make test-down`
 
 - **Pre-commit (mandatory) bash command:**  
   `make pre-commit`

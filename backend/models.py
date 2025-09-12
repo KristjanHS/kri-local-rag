@@ -224,7 +224,7 @@ def load_model(model_name: str, is_embedding: bool) -> Any:
             return CrossEncoder(model_name)
 
     except ImportError as e:
-        error_msg = "sentence-transformers not available. Install with: pip install sentence-transformers"
+        error_msg = "sentence-transformers not available. Install with: make uv-sync-test"
         raise RuntimeError(error_msg) from e
     except Exception as e:
         error_msg = f"Could not load model '{model_name}': {e}"

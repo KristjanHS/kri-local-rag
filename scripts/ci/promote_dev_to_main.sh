@@ -273,8 +273,14 @@ if [[ -n "${div_source:-}" ]]; then
   log_step "Source ${FROM_BRANCH}: behind origin by ${behind_src}, ahead by ${ahead_src}."
 fi
 
-log_step "Installing dev dependencies (if needed)…"
-"$PY" -m pip install -r requirements-dev.txt --disable-pip-version-check --no-input 2>&1 | tee -a "$LOG_FILE"
+log_step "Syncing test dependencies via make (frozen)…"
+if command -v uv >/dev/null 2>&1; then
+  uv venv --seed 2>&1 | tee -a "$LOG_FILE"
+  make uv-sync-test 2>&1 | tee -a "$LOG_FILE"
+else
+  _red "uv not found. Install uv: https://astral.sh/uv" | tee -a "$LOG_FILE"
+  exit 1
+fi
 
 fast_checks
 
@@ -401,4 +407,3 @@ fi
 
 switch_to_branch "$FROM_BRANCH"
 _green "✅ Promotion complete. ${TO_BRANCH} is up to date with ${FROM_BRANCH}."
-

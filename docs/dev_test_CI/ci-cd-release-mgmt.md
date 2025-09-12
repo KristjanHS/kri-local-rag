@@ -125,7 +125,7 @@ pre-commit run detect-secrets
 ### Troubleshooting
 ```bash
 # Install pre-commit
-.venv/bin/python -m pip install pre-commit
+make uv-sync-test
 
 # Update hooks
 pre-commit autoupdate
@@ -139,7 +139,7 @@ make ruff-fix
 go install github.com/google/yamlfmt/cmd/yamlfmt@latest
 
 # detect-secrets with plugins
-.venv/bin/python -m pip install "detect-secrets[gibberish,entropy,wordlist]"
+make uv-sync-test
 
 # Initialize detect-secrets baseline (if .secrets.baseline doesn't exist)
 .venv/bin/python -m detect_secrets scan --baseline .secrets.baseline

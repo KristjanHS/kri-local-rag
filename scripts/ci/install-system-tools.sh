@@ -98,8 +98,8 @@ fi
 
 
 
-# pyright and bandit are installed via pip from requirements-dev.txt into the project's .venv.
-# This ensures they're version-pinned and isolated. No system-wide install needed.
+# pyright and bandit are installed into the project's .venv by project Make targets.
+# Ensure `make uv-sync-test` has been run. No system-wide install needed.
 
 # Show versions for a quick sanity check.
 echo "Installed versions:"
@@ -112,7 +112,7 @@ echo -n "pyright: " && (
   if [ -f ".venv/bin/pyright" ]; then
     .venv/bin/pyright --version 2>/dev/null
   else
-    echo "not installed (run pip install -r requirements-dev.txt)"
+    echo "not installed (run: make uv-sync-test)"
   fi
 )
 
@@ -120,6 +120,6 @@ echo -n "bandit: " && (
   if [ -f ".venv/bin/bandit" ]; then
     .venv/bin/bandit --version 2>/dev/null
   else
-    echo "not installed (run pip install -r requirements-dev.txt)"
+    echo "not installed (run: make uv-sync-test)"
   fi
 )

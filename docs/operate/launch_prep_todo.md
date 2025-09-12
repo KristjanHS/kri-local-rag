@@ -93,10 +93,11 @@ Repository preparation tasks
   Expect 3+ lines printed with expected keys present. ✓ All 3 keys present: OLLAMA_MODEL, OLLAMA_URL, WEAVIATE_URL.
 - [x] Action: Prepare a Python environment and install dev deps (venv, conda, or system). Example:
   ```bash
-  python -m venv .venv; .venv/bin/pip install -r requirements-dev.txt
+  # Preferred: uv
+  uv venv --seed && make uv-sync-test
   .venv/bin/python --version && .venv/bin/ruff --version | cat
   ```
-  Verify your Python is available and a linter (`ruff`) is installed (version prints). ✓ Python 3.12.11 and ruff 0.12.9 available in .venv.
+  Verify your Python is available and a linter (`ruff`) is installed (version prints). ✓ Python 3.12.11 and ruff available in .venv.
 
 2) Network exposure (security)
 - [x] Action: Ensure Weaviate (8080) and Ollama (11434) are not publicly exposed (bind to loopback or compose-internal). Publish only Streamlit (8501). Example compose snippet:
@@ -419,4 +420,3 @@ Post-MVP (defer)
 - [ ] Resource limits, GPU scheduling policy
 - [ ] Model/version pinning and offline model cache warm-up
 - [ ] Metrics, tracing, alerts
-

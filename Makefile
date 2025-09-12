@@ -1,6 +1,6 @@
 # Declare phony targets
 .PHONY: help setup-hooks test-up test-down test-logs test-up-force-build test-clean \
-        test-integration test-e2e integration push-pr setup-uv export-reqs \
+        test-integration test-e2e integration push-pr export-reqs \
         ruff-format ruff-fix yamlfmt pyright pre-commit unit pip-audit \
         semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage coverage-html dev-setup ollama-pull deptry
 
@@ -62,13 +62,14 @@ help: ## Show this help (grouped)
 # =========================
 # Setup
 # =========================
+uv-sync-test: ## uv sync test group (frozen) + pip check
+	uv sync --locked --group test
+	uv pip check
+
 setup-hooks: ## Configure Git hooks path
 	@echo "Configuring Git hooks path..."
 	@git config core.hooksPath scripts/git-hooks
 	@echo "Done."
-
-setup-uv: ## Create venv and sync dev/test via uv
-	@./run_uv.sh
 
 export-reqs: ## Export requirements.txt from uv.lock (omits torch/GPU extras)
 	@echo ">> Exporting requirements.txt from uv.lock (incl dev/test groups), excluding torch and GPU-specific wheels"
@@ -209,7 +210,7 @@ integration: ## Run local integration tests (venv or uv)
 	elif command -v uv >/dev/null 2>&1; then \
 		uv run -m pytest tests/integration -q ${PYTEST_ARGS}; \
 	else \
-		echo ".venv/bin/python not found and uv not available. Create the venv (./run_uv.sh or python -m venv .venv) then run '.venv/bin/python -m pytest tests/integration -q'"; \
+		echo ".venv/bin/python not found and uv not available. Create the env (make uv-sync-test or python -m venv .venv) then run '.venv/bin/python -m pytest tests/integration -q'"; \
 		exit 1; \
 	fi
 
@@ -298,10 +299,6 @@ pre-commit: ## Run all pre-commit hooks on all files
 # =========================
 # CI Helpers & Git
 # =========================
-uv-sync-test: ## uv sync test group (frozen) + pip check
-	uv sync --group test --frozen
-	uv pip check
-
 # Run the same checks as the Git pre-push hook, forcing all SKIP flags to 0
 pre-push: ## Run pre-push checks with all SKIP=0
 	SKIP_LOCAL_SEC_SCANS=0 SKIP_LINT=0 SKIP_PYRIGHT=0 SKIP_TESTS=0 scripts/git-hooks/pre-push

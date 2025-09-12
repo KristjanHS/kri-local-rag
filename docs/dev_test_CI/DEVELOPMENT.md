@@ -109,13 +109,10 @@ DOCKER_BUILDKIT=1 docker build \
   -f docker/app.Dockerfile -t kri-local-rag:local .
 ```
 
-- Local venv install (choose one channel):
+- Local venv install (uv):
 ```bash
-export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu      # default
-# export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu121   # CUDA 12.1
-# export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/rocm6.1 # ROCm 6.1
-
-.venv/bin/python -m pip install -r requirements-dev.txt
+# CPU wheels are configured in pyproject via [tool.uv.index]/[tool.uv.sources]
+uv venv --seed && make uv-sync-test
 ```
 
 - Quick smoke test of image:
@@ -124,7 +121,7 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 ```
 
 ## Notes
-- Avoid setting `PYTHONPATH`. Use editable installs (`pip install -e .`) and module execution with `-m`.
+- Avoid setting `PYTHONPATH`. Install dependencies via `make uv-sync-test` and use module execution with `-m`.
  - `kri_local_rag.egg-info/` provides package metadata that enables editable installs, dependency resolution, and discovery of modules/entry points by tooling.
 
 
