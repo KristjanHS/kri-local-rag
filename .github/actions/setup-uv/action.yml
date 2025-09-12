@@ -15,6 +15,13 @@ runs:
       with:
         cache-local-path: "/uv-cache"
         prune-cache: false
+    # Install uv locally under act: docker image only supports older version of gh action + uv cache is 
+    - name: Install uv (act workaround)
+      if: ${{ github.actor == 'nektos/act' }}
+      uses: astral-sh/setup-uv@v5
+      with:
+        cache-local-path: "/uv-cache"
+        prune-cache: false
     # Normal uv install path on real GitHub runners
     - name: Install uv
       if: ${{ github.actor != 'nektos/act' }}
@@ -25,3 +32,20 @@ runs:
           uv.lock
           pyproject.toml
         cache-local-path: "${{ github.workspace }}/.uv-cache"
+    - name: Debug uv cache env
+      if: ${{ github.actor == 'nektos/act' }}
+      shell: bash
+      run: |
+        echo "UV_CACHE_DIR=${UV_CACHE_DIR:-<unset>}"
+        echo "UV_LINK_MODE=${UV_LINK_MODE:-<unset>}"
+        echo "github.workspace=${GITHUB_WORKSPACE:-<unset>}"
+        if [ -d "/uv-cache" ]; then
+          echo "/uv-cache perms:" && ls -ld /uv-cache || true
+          stat -c 'mode=%a uid=%u gid=%g' /uv-cache || true
+        fi
+        if [ -n "${UV_CACHE_DIR:-}" ] && [ -d "${UV_CACHE_DIR}" ]; then
+          echo "UV_CACHE_DIR perms:" && ls -ld "${UV_CACHE_DIR}" || true
+          stat -c 'mode=%a uid=%u gid=%g' "${UV_CACHE_DIR}" || true
+        fi
+        echo "whoami=$(whoami)"
+        id || true
