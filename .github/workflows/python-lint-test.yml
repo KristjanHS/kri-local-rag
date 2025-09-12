@@ -73,22 +73,6 @@ jobs:
         run: |
           echo "UV_CACHE_DIR=/uv-cache" >> "$GITHUB_ENV"
           echo "UV_LINK_MODE=copy" >> "$GITHUB_ENV"
-      - name: Debug UV cache (act)
-        if: ${{ github.actor == 'nektos/act' }}
-        run: |
-          echo "After env config:"
-          echo "UV_CACHE_DIR=${UV_CACHE_DIR:-<unset>}"
-          echo "UV_LINK_MODE=${UV_LINK_MODE:-<unset>}"
-          if [ -d "/uv-cache" ]; then
-            echo "/uv-cache perms:" && ls -ld /uv-cache || true
-            stat -c 'mode=%a uid=%u gid=%g' /uv-cache || true
-            echo "Top of /uv-cache:" && ls -la /uv-cache | head -n 50 || true
-            du -sh /uv-cache || true
-          fi
-          if [ -n "${UV_CACHE_DIR:-}" ] && [ -d "${UV_CACHE_DIR}" ]; then
-            echo "Top of $UV_CACHE_DIR:" && ls -la "$UV_CACHE_DIR" | head -n 50 || true
-            du -sh "$UV_CACHE_DIR" || true
-          fi
       #- name: Seed pip in .venv
       #  run: uv venv --seed
       - name: Sync test env + check
