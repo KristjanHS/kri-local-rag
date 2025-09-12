@@ -19,8 +19,8 @@ log INFO "⏳ Running pre-commit framework with advanced checks..."
 
 # Check if pre-commit is installed
 if ! command -v pre-commit >/dev/null 2>&1; then
-    log ERROR "❌ pre-commit framework not found. Install with: pip install pre-commit"
-    log INFO "💡 Alternatively, run: .venv/bin/python -m pip install pre-commit"
+    log ERROR "❌ pre-commit framework not found. Install with: make uv-sync-test"
+    log INFO "💡 Alternatively, run: make uv-sync-test"
     exit 1
 fi
 

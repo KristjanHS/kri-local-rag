@@ -116,7 +116,7 @@ Your project uses both:
 
 1. **Install the library:**
    ```bash
-   pip install -U sentence-transformers
+   make uv-sync-test
    ```
 
 2. **Load and use a model:**

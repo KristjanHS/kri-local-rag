@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """Document Ingestion Script
 
 This script uses LangChain for robust document loading and a manual pipeline
@@ -20,7 +22,7 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, List, Optional, Protocol, cast, runtime_checkable
+from typing import Any, List, Optional, Protocol, TypeVar, cast, runtime_checkable
 
 import torch
 import weaviate
@@ -28,15 +30,15 @@ from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
 
-# Direct import since sentence-transformers is a required runtime dependency
-from sentence_transformers import SentenceTransformer
+# Avoid importing sentence-transformers at module import time to keep imports light
+# and prevent optional vision dependencies from being pulled in during unit tests.
 
 
 # A minimal protocol to support our embedding calls and enable test doubles.
-# Any object with an "encode(str) -> Any" method satisfies this.
+# Match SentenceTransformer.encode first parameter shape for compatibility.
 @runtime_checkable
 class SupportsEncode(Protocol):
-    def encode(self, text: Any, *args: Any, **kwargs: Any) -> Any:  # pragma: no cover - structural typing only
+    def encode(self, text: str, /, *args: Any, **kwargs: Any) -> Any:  # pragma: no cover
         ...
 
 
@@ -162,7 +164,7 @@ def deterministic_uuid(doc: Document) -> str:
     # and derive a stable RFC 4122 UUIDv5 from that name.
     content_hash = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
     # Avoid direct attribute access that Pyright may mark as Unknown
-    meta_for_uuid = getattr(doc, "metadata", {})
+    meta_for_uuid: dict[str, Any] = getattr(doc, "metadata", {})
     source: str = "unknown" if (source_val := meta_for_uuid.get("source")) is None else str(source_val)
     source_file = os.path.basename(source)
     name = f"{source_file}:{content_hash}"
@@ -239,7 +241,10 @@ def process_and_upload_chunks(
     return stats
 
 
-def optimize_embedding_model(embedding_model: SentenceTransformer) -> SentenceTransformer:
+TModel = TypeVar("TModel", bound=SupportsEncode)
+
+
+def optimize_embedding_model(embedding_model: TModel) -> TModel:
     """Compile the embedding model with torch.compile if not already compiled.
 
     Adds a private marker attribute on the compiled instance to avoid duplicate work/logs.
@@ -251,7 +256,7 @@ def optimize_embedding_model(embedding_model: SentenceTransformer) -> SentenceTr
         logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
         torch_compile = getattr(torch, "compile")
         compiled_model = cast(
-            SentenceTransformer,
+            TModel,
             torch_compile(embedding_model, backend="inductor", mode="max-autotune"),
         )
         # Mark the compiled instance so future calls are a no-op.
@@ -270,7 +275,7 @@ def ingest(
     directory: str,
     collection_name: str,
     weaviate_client: weaviate.WeaviateClient,
-    embedding_model: SentenceTransformer,
+    embedding_model: SupportsEncode,
     *,
     reset: bool = False,
 ):
@@ -290,7 +295,7 @@ def ingest(
         ensure_collection(weaviate_client, collection_name)
     # Narrow to the minimal protocol needed for ingestion; the concrete
     # SentenceTransformer provides a compatible .encode at runtime.
-    process_and_upload_chunks(weaviate_client, chunked_docs, cast(SupportsEncode, embedding_model), collection_name)
+    process_and_upload_chunks(weaviate_client, chunked_docs, embedding_model, collection_name)
 
     elapsed = time.time() - start_time
     logger.info("── Summary ─────────────────────────────")
