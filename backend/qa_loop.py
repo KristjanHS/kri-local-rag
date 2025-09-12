@@ -38,8 +38,8 @@ def _setup_cli_logging(log_level: str | None, verbose_count: int, quiet_count: i
     elif quiet_count >= 1:
         level = "WARNING"
     else:
-        # Default to WARNING to keep CLI output clean unless verbosity requested
-        level = os.getenv("LOG_LEVEL", "WARNING").upper()
+        # Default to INFO (overridable via LOG_LEVEL) when no flags are provided
+        level = os.getenv("LOG_LEVEL", "INFO").upper()
 
     # Use the centralized logging configuration
     set_log_level(level)

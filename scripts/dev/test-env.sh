@@ -236,6 +236,7 @@ main() {
     clean) cmd_clean ;;
     -h|--help|help|"") usage ;;
     *) echo "Unknown command: $cmd"; usage; exit 1 ;;
-  esac}
+  esac
+}
 
 main "$@"

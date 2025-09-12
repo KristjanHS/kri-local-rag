@@ -15,13 +15,6 @@ runs:
       with:
         cache-local-path: "/uv-cache"
         prune-cache: false
-    # Install uv locally under act: docker image only supports older version of gh action + uv cache is 
-    - name: Install uv (act workaround)
-      if: ${{ github.actor == 'nektos/act' }}
-      uses: astral-sh/setup-uv@v5
-      with:
-        cache-local-path: "/uv-cache"
-        prune-cache: false
     # Normal uv install path on real GitHub runners
     - name: Install uv
       if: ${{ github.actor != 'nektos/act' }}

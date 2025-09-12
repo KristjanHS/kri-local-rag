@@ -41,6 +41,13 @@ Client-side vectorization and reranking with centralized model loading:
 
 Details (markers, health checks, TEST_DOCKER): see `docs/dev_test_CI/testing_approach.md`.
 
+Markers
+- `slow`: Long-running tests (>30s)
+- `docker`: Requires Docker daemon
+- `requires_weaviate`: Needs Weaviate service
+- `requires_ollama`: Needs Ollama service
+Note: the generic `external` marker was removed in favor of the specific service markers above.
+
 ## Development Environment
 
 **Dependencies (uv)**:

@@ -2,7 +2,7 @@ import pytest
 
 pytest_plugins = ["tests.e2e.fixtures_ingestion"]
 
-pytestmark = [pytest.mark.slow, pytest.mark.external, pytest.mark.docker]
+pytestmark = [pytest.mark.slow, pytest.mark.docker]
 
 
 def test_e2e_answer_with_real_services_in_container(docker_services_ready, run_cli_in_container):  # noqa: ANN001
