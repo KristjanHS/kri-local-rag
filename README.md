@@ -57,8 +57,8 @@ make stack-reset
 If you prefer to run Python locally and point to Docker services (or your own):
 
 ```bash
-# Create venv and sync dependencies with uv
-make setup-uv
+# Sync test dependencies with uv (creates/uses .venv)
+make uv-sync-test
 ```
 
 Notes:

@@ -56,9 +56,9 @@ SKIP_TESTS=${SKIP_TESTS:-0}
 ## Ruff via Makefile (format + autofix)
 if [[ "$SKIP_LINT" != "1" ]]; then
   log INFO "Running ruff format (make ruff-format) …"
-  make ruff-format 2>&1 | sed 's/^/[ruff] /'
+  make ruff-format 2>&1 | sed 's/^/[ruff-format] /'
   log INFO "Running ruff autofix (make ruff-fix) …"
-  make ruff-fix 2>&1 | sed 's/^/[ruff] /'
+  make ruff-fix 2>&1 | sed 's/^/[ruff-fix] /'
 else
   log INFO "Skipping ruff due to SKIP_LINT=1"
 fi
@@ -83,7 +83,7 @@ fi
 if [[ "$SKIP_TESTS" != "1" ]]; then
   if [[ "$ACT_AVAILABLE" == "1" ]]; then
     log INFO "Running unit tests via act (workflow: python-lint-test.yml, job: unit_tests) …"
-    act -W .github/workflows/python-lint-test.yml -j unit_tests --pull=false --log-prefix-job-id
+    act -W .github/workflows/python-lint-test.yml -j unit_tests --pull=false --log-prefix-job-id 2>&1 | sed 's/^/[unit] /'
   else
     log WARN "'act' or Docker unavailable. Falling back to local tests (make unit)."
     make unit 2>&1 | sed 's/^/[unit] /'
@@ -104,7 +104,7 @@ fi
 if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
   if [[ "$ACT_AVAILABLE" == "1" ]]; then
     log INFO "Running CodeQL via act …"
-    act workflow_dispatch -W .github/workflows/codeql.yml --pull=false --rm --log-prefix-job-id || true
+    act workflow_dispatch -W .github/workflows/codeql.yml --pull=false --rm --log-prefix-job-id 2>&1 | sed 's/^/[codeql] /' || true
   else
     log INFO "Skipping CodeQL (act not available)."
   fi
