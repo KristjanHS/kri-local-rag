@@ -158,7 +158,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
   - **Verification**: ✅ **COMPLETED** - act-only Compose job implemented and simplified:
     - **✅ Unit tests on PRs**: `fast_tests` runs on `pull_request` and `push`
     - **✅ Compose integration job (act-only)**: `compose_integration_tests` gated by `github.actor == 'nektos/act'`
-    - **✅ Uses Makefile harness**: `make test-up`, `make test-run-integration`, `make test-down`, `make test-logs`
+    - **✅ Uses Makefile harness**: `make test-up`, `make test-integration`, `make test-down`, `make test-logs`
     - **✅ Reuses `.run_id` when present**: Allows reusing a running environment; otherwise `make test-up` creates one
     - **✅ Proper readiness and teardown**: `up --wait` and `down -v`, tailed logs on failure
     - **✅ In-container Python**: Tests run via `/opt/venv/bin/python3` inside the app container
@@ -1169,7 +1169,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
   - Verify: Pre-push log shows Semgrep/CodeQL steps executed without schema errors and exits 0.
 
 - [x] Install pyright in `.venv` so type checks run in pre-push
-  - Action: `.venv/bin/pip install pyright` (optionally pin to CI version) and commit if adding to `requirements-dev.txt`.
+  - Action: Install via uv groups (e.g., ensure `pyright` is in `[dependency-groups].dev`), then run `make uv-sync-test`.
   - Verify: `.venv/bin/pyright --version` succeeds and pre-push no longer warns about missing pyright.
 
 **Status**: All steps completed. Local security scans are re-enabled in pre-push, and pyright is installed in the local venv for type checking.

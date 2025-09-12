@@ -49,7 +49,7 @@ def get_weaviate_client() -> weaviate.WeaviateClient:
             http_secure=parsed_url.scheme == "https",
             grpc_secure=parsed_url.scheme == "https",
         )
-        logger.info("Weaviate connection established")
+        logger.debug("Weaviate connection established")
         return _client
     except Exception as e:
         logger.error(f"Failed to connect to Weaviate: {e}")
@@ -62,7 +62,7 @@ def close_weaviate_client():
     if _client is not None:
         try:
             _client.close()
-            logger.info("Weaviate connection closed")
+            logger.debug("Weaviate connection closed")
         except Exception as e:
             logger.warning(f"Error closing Weaviate connection: {e}")
         finally:

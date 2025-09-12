@@ -9,18 +9,28 @@ A high-level guide to testing with real local models and external services.
 **Docker Environment (Recommended):**
 - Set `TEST_DOCKER=true`
 - Run `make test-up` to start services
-- Run `make test-run-integration` to execute tests
+- Run `make test-integration` to execute tests
 - Run `make test-down` to stop services
 
 **Local Environment:**
 - Set `TEST_DOCKER=false` or leave unset
-- Run `.venv/bin/python -m pytest tests/integration/ -v`
+- Run `make integration PYTEST_ARGS='-v'`
 
 ### Service-Specific Tests
 
-- **Weaviate only**: `pytest -m "requires_weaviate"`
-- **Ollama only**: `pytest -m "requires_ollama"`
-- **Both services**: `pytest -m "requires_weaviate and requires_ollama"`
+- **Weaviate only**: `make integration PYTEST_ARGS='-m "requires_weaviate"'`
+- **Ollama only**: `make integration PYTEST_ARGS='-m "requires_ollama"'`
+- **Both services**: `make integration PYTEST_ARGS='-m "requires_weaviate and requires_ollama"'`
+
+### Markers
+
+- `slow`: Long-running tests (>30s)
+- `docker`: Tests that require Docker daemon
+- `requires_weaviate`: Tests that need Weaviate service available
+- `requires_ollama`: Tests that need Ollama service available
+
+Note: The generic `external` marker was removed in favor of the specific
+`requires_weaviate` and `requires_ollama` markers.
 
 ## Core Principles
 
@@ -107,7 +117,7 @@ Integration tests combine real local models with mocked external services for ef
 - Inside the Docker image, models are baked at `EMBED_MODEL_PATH` and `RERANK_MODEL_PATH`.
 - We include a simple integration smoke test that verifies these local paths load and run offline.
 - Locally (outside Docker), this test skips to keep developer workflow fast.
-- To run in Docker tests: `TEST_DOCKER=true make test-up && make test-run-integration && make test-down`.
+- To run in Docker tests: `TEST_DOCKER=true make test-up && make test-integration && make test-down`.
 
 ## Testing Strategy Guidelines
 
@@ -148,3 +158,7 @@ Integration tests combine real local models with mocked external services for ef
 ---
 
 **Note**: This document provides a high-level overview for human readers. For detailed code examples and comprehensive testing guides, see `docs/AI_coder/AI_instructions.md`.
+
+## See Also
+- Make targets: run `make help`
+- Development Guide: `docs/dev_test_CI/DEVELOPMENT.md`
