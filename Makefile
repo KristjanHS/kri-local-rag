@@ -76,8 +76,7 @@ setup-hooks: ## Configure Git hooks path
 
 export-reqs: ## Export requirements.txt from uv.lock (omits torch/GPU extras)
 	@echo ">> Exporting requirements.txt from uv.lock (incl dev/test groups), excluding torch and GPU-specific wheels"
-	mkdir -p $(UV_CACHE_DIR)
-	UV_CACHE_DIR=$(UV_CACHE_DIR) uv export \
+	uv export \
 	  --no-hashes \
 	  --group test \
 	  --locked \
@@ -150,7 +149,7 @@ ollama-pull: ## Pull Ollama model in container (MODEL=...)
 	@$(COMPOSE_APP) exec -T ollama ollama pull "$(MODEL)"
 
 # Run E2E tests with automatic stack lifecycle
-e2e: ## Run E2E tests (stack-up → test → optional stack-down). Set PRESERVE=0 to stack-down
+e2e: ## Run E2E tests on local env, assumes already running docker services. Set PRESERVE=0 to stack-down
 	@set -euo pipefail; \
 	EXIT=0; \
 	$(PYTEST) tests/e2e $(PYTEST_BASE) $${PYTEST_ARGS:-} || EXIT=$$?; \
@@ -161,8 +160,6 @@ coverage: ## Run coverage across repo (HTML=1 for HTML report)
 	@mkdir -p reports
 	HTML_FLAG=""; if [ "$${HTML:-0}" != "0" ]; then mkdir -p reports/coverage; HTML_FLAG="--cov-report=html:reports/coverage"; fi; \
 	$(PYTEST) -v -m "not environment" --cov=. --cov-report=term $$HTML_FLAG --cov-report=xml:reports/coverage.xml $${PYTEST_ARGS:-}
-
-
 
 # Developer setup wrapper
 dev-setup: ## Bootstrap dev env (venv, deps, tools)
