@@ -14,6 +14,13 @@
 # -P ubuntu-latest=catthehacker/ubuntu:full-latest
 # -P ubuntu-latest=ghcr.io/actions-oss/act-full:ubuntu-22.04
 
+# Auto-cleanup containers and volumes after each run to prevent accumulation. 
+# This will not cleanup the mounted uv cache!
+--rm
+
+# needed for wf jobs to differentiate bw GH and Act runners
+--actor=nektos/act
+
 # mount uv cache volume, for reuse over runs
 --container-options "--volume=${HOME}/.cache/uv:/uv-cache"
 --env UV_CACHE_DIR=/uv-cache
@@ -22,12 +29,7 @@
 # To silence the warning:
 --env UV_LINK_MODE=copy
 
-# Auto-cleanup containers and volumes after each run to prevent accumulation. 
-# This will not cleanup the mounted uv cache!
---rm
 
-# needed for wf jobs to differentiate bw GH and Act runners
---actor=nektos/act
 
 # make the cache persistent and visible to act across runs
 #--cache-server-path=~/.cache/act/caches

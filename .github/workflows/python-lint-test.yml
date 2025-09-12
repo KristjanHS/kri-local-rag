@@ -68,6 +68,11 @@ jobs:
           persist-credentials: false # ⬅️ do not store token in git config
       - name: Setup Python + uv (cached)
         uses: ./.github/actions/setup-uv
+      - name: Configure env for act (UV cache)
+        if: ${{ github.actor == 'nektos/act' }}
+        run: |
+          echo "UV_CACHE_DIR=/uv-cache" >> "$GITHUB_ENV"
+          echo "UV_LINK_MODE=copy" >> "$GITHUB_ENV"
       #- name: Seed pip in .venv
       #  run: uv venv --seed
       - name: Sync test env + check

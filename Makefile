@@ -22,8 +22,8 @@ PYTEST_BASE := -q
 # Configurable pyright config path (default to repo config)
 PYRIGHT_CONFIG ?= ./pyrightconfig.json
 
-# Ensure uv uses a repo-local cache in sandboxed environments
-UV_CACHE_DIR := $(CURDIR)/.uv_cache
+# NB! do not set UV_CACHE_DIR here - it would override the mounted uv cache dir of act runner -> uv can't reuse cache on next Act run
+# UV_CACHE_DIR := ... NO!
 
 # ---------------------------------------------------------------------------
 # Sections
@@ -62,6 +62,9 @@ help: ## Show this help (grouped)
 # =========================
 # Setup
 # =========================
+
+# uv sync re-locks before syncing unless you pass --locked or --frozen.
+# If pyproject.toml changed and uv.lock wasn’t regenerated, --frozen will still proceed, while --locked will stop.
 uv-sync-test: ## uv sync test group (frozen) + pip check
 	uv sync --locked --group test
 	uv pip check

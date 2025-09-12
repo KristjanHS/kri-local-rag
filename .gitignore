@@ -1,6 +1,3 @@
-# UV sandbox artifacts
-tools/uv_sandbox/.venv/
-tools/uv_sandbox/.python-version
 # Compiled outputs
 bin/
 *.out
@@ -29,6 +26,8 @@ dist/
 *.egg-info/
 .ruff_cache
 .test-build*
+.uv-cache/
+.uv-cache-hooks/
 
 # Jupyter
 .ipynb_checkpoints/

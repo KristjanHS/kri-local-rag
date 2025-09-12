@@ -83,7 +83,7 @@ fi
 if [[ "$SKIP_TESTS" != "1" ]]; then
   if [[ "$ACT_AVAILABLE" == "1" ]]; then
     log INFO "Running unit tests via act (workflow: python-lint-test.yml, job: unit_tests) …"
-    act -W .github/workflows/python-lint-test.yml -j unit_tests --pull=false --log-prefix-job-id 2>&1 | sed 's/^/[unit] /'
+    act -W .github/workflows/python-lint-test.yml -j unit_tests --pull=false --log-prefix-job-id 2>&1
   else
     log WARN "'act' or Docker unavailable. Falling back to local tests (make unit)."
     make unit 2>&1 | sed 's/^/[unit] /'
@@ -104,7 +104,7 @@ fi
 if [[ "$SKIP_LOCAL_SEC_SCANS" != "1" ]]; then
   if [[ "$ACT_AVAILABLE" == "1" ]]; then
     log INFO "Running CodeQL via act …"
-    act workflow_dispatch -W .github/workflows/codeql.yml --pull=false --rm --log-prefix-job-id 2>&1 | sed 's/^/[codeql] /' || true
+    act workflow_dispatch -W .github/workflows/codeql.yml --pull=false --rm --log-prefix-job-id 2>&1 || true
   else
     log INFO "Skipping CodeQL (act not available)."
   fi
