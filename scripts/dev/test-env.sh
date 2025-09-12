@@ -2,13 +2,6 @@
 set -euo pipefail
 
 # Orchestrates the docker-compose based test environment.
-# Usage:
-#   scripts/dev/test-env.sh up [--force]
-#   scripts/dev/test-env.sh down
-#   scripts/dev/test-env.sh logs [--lines N]
-#   scripts/dev/test-env.sh run-integration
-#   scripts/dev/test-env.sh build-if-needed [--run-id ID]
-#   scripts/dev/test-env.sh clean
 
 RUN_ID_FILE=${RUN_ID_FILE:-.run_id}
 LOG_DIR=${LOG_DIR:-logs}
@@ -16,7 +9,7 @@ BUILD_HASH_FILE=${BUILD_HASH_FILE:-.test-build.hash}
 COMPOSE_FILE=${COMPOSE_FILE:-docker/docker-compose.yml}
 PROFILE=${PROFILE:-test}
 COMPOSE=(docker compose -f "$COMPOSE_FILE" --profile "$PROFILE")
-BUILD_DEPS=(requirements.txt requirements-dev.txt pyproject.toml docker/app.Dockerfile docker/docker-compose.yml)
+BUILD_DEPS=(pyproject.toml uv.lock docker/app.Dockerfile docker/docker-compose.yml)
 # Centralized service list used by up/logs
 SERVICES=(weaviate ollama app-test)
 
@@ -24,6 +17,20 @@ SERVICES=(weaviate ollama app-test)
 log() { echo "$*"; }
 warn() { echo "$*" >&2; }
 err() { echo "$*" >&2; }
+
+usage() {
+  cat <<EOF
+Usage: $0 <command> [options]
+Commands:
+  up [--force|-f]        Start docker test env (rebuild if --force)
+  down                   Stop docker test env and remove volumes
+  logs [--lines|-n N]    Show logs from app-test/weaviate/ollama
+  run-integration        Run integration tests inside app-test container
+  run-e2e                Run E2E tests tests inside app-test container
+  build-if-needed        Rebuild image if deps changed [--run-id ID]
+  clean                  Remove run/build metadata files
+EOF
+}
 
 ensure_repo_root() {
   if [[ ! -f "$COMPOSE_FILE" ]]; then
@@ -171,7 +178,21 @@ cmd_run_integration() {
   if [[ -f "$RUN_ID_FILE" ]]; then
     local run_id
     run_id=$(<"$RUN_ID_FILE")
-    dc "$run_id" exec -T app-test /opt/venv/bin/python3 -m pytest tests/integration -q --junitxml=reports/junit_compose_integration.xml
+    # Set TEST_DOCKER=true to indicate we're running in Docker test environment
+    dc "$run_id" exec -T -e TEST_DOCKER=true app-test /opt/venv/bin/python3 -m pytest tests/integration -q --junitxml=reports/junit_compose_integration.xml
+  else
+    err "No active test environment found. Run 'make test-up' first."
+    exit 1
+  fi
+}
+
+cmd_run_e2e() {
+  if [[ -f "$RUN_ID_FILE" ]]; then
+    local run_id
+    run_id=$(<"$RUN_ID_FILE")
+    mkdir -p reports
+    # Set TEST_DOCKER=true to indicate we're running in Docker test environment
+    dc "$run_id" exec -T -e TEST_DOCKER=true app-test /opt/venv/bin/python3 -m pytest tests/e2e -q --junitxml=reports/junit_compose_e2e.xml
   else
     err "No active test environment found. Run 'make test-up' first."
     exit 1
@@ -197,19 +218,6 @@ cmd_clean() {
   echo "Test build cache cleaned."
 }
 
-usage() {
-  cat <<EOF
-Usage: $0 <command> [options]
-Commands:
-  up [--force|-f]        Start docker test env (rebuild if --force)
-  down                   Stop docker test env and remove volumes
-  logs [--lines|-n N]    Show logs from app-test/weaviate/ollama
-  run-integration        Run integration tests inside app-test container
-  build-if-needed        Rebuild image if deps changed [--run-id ID]
-  clean                  Remove run/build metadata files
-EOF
-}
-
 main() {
   local cmd=${1:-}
   shift || true
@@ -223,11 +231,11 @@ main() {
     down) cmd_down ;;
     logs) cmd_logs "$@" ;;
     run-integration) cmd_run_integration ;;
+    run-e2e) cmd_run_e2e ;;
     build-if-needed) cmd_build_if_needed "$@" ;;
     clean) cmd_clean ;;
     -h|--help|help|"") usage ;;
     *) echo "Unknown command: $cmd"; usage; exit 1 ;;
-  esac
-}
+  esac}
 
 main "$@"

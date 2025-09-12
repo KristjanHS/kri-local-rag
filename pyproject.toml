@@ -72,7 +72,7 @@ torch = { index = "pytorch-cpu" }
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-# Limit package discovery to the Python code under `backend/` to avoid
+# Limit package discovery to the Python code under `cli.py` and `backend/` to avoid
 # setuptools attempting to package non-Python top-level folders like `docker/` or `logs/`.
 [tool.setuptools]
 py-modules = ["cli"]

@@ -29,7 +29,7 @@ Use this checklist to validate recent Dockerfile/Compose changes in small chunks
 
 ## Test profile (compose)
 - [ ] Start test env: `make test-up` (app-test builds with INSTALL_DEV=1, idles)
-- [ ] Run integration tests: `make test-run-integration`
+- [ ] Run integration tests: `make test-integration`
 - [ ] Tear down test env: `make test-down`
 
 ## Cleanup

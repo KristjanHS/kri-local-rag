@@ -1,6 +1,6 @@
 # Declare phony targets
 .PHONY: help setup-hooks test-up test-down test-logs test-up-force-build test-clean \
-        test-run-integration integration push-pr setup-uv export-reqs \
+        test-integration test-e2e integration push-pr setup-uv export-reqs \
         ruff-format ruff-fix yamlfmt pyright pre-commit unit pip-audit \
         semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage coverage-html dev-setup ollama-pull deptry
 
@@ -153,6 +153,7 @@ e2e: ## Run E2E tests (stack-up → test → optional stack-down). Set PRESERVE=
 		echo "Skipping stack-down: PRESERVE=1 (containers/networks preserved)"; \
 	fi; \
 	exit $$EXIT
+	
 
 # Coverage run (host)
 coverage: ## Run coverage across repo (HTML=1 for HTML report)
@@ -184,8 +185,11 @@ test-logs: ## Show docker test env logs
 	bash scripts/dev/test-env.sh logs
 
 # Run integration tests inside the app container using existing .run_id
-test-run-integration: ## Run integration tests inside docker test env
+test-integration: ## Run integration tests inside docker test env
 	bash scripts/dev/test-env.sh run-integration
+
+test-e2e: ## Run E2E tests on host against docker test env using existing .run_id
+	bash scripts/dev/test-env.sh run-e2e
 
 test-clean: ## Remove test env run/build metadata
 	bash scripts/dev/test-env.sh clean
@@ -240,7 +244,7 @@ semgrep-local: ## Run Semgrep locally via uvx (no metrics)
 		  COUNT=$$(jq '[.runs[0].results[]] | length' semgrep_local.sarif 2>/dev/null || echo 0); \
 		  echo "Semgrep findings: $${COUNT} (see semgrep_local.sarif)"; \
 		else \
-		  COUNT=$$(grep -o '\"ruleId\"' -c semgrep_local.sarif 2>/dev/null || echo 0); \
+		  COUNT=$$(grep -o '"ruleId"' -c semgrep_local.sarif 2>/dev/null || echo 0); \
 		  echo "Semgrep findings: $${COUNT} (approx; no jq)"; \
 		fi; \
 	else \

@@ -29,9 +29,10 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
 
 # uv phase 2: copy project and install the project as package
 
-# Copy only backend/ that will be packaged here.
+# Copy only backend/ and cli.py that will be packaged here.
 # NB! frontend/ will be referenced as folder in runtime image, so it will be copied in runtime stage below
 COPY backend/ /app/backend/
+COPY cli.py /app/
 
 # INSTALL_DEV toggles dev/test groups for CI/dev images, and make project package editable
 ARG INSTALL_DEV=0
@@ -106,28 +107,26 @@ ENV STREAMLIT_SERVER_HEADLESS=true \
 COPY --from=builder "${VENV_PATH}" "${VENV_PATH}"
 
 WORKDIR /app
-
-# Create a real non-root user with home
+ENV HOME=/home/appuser
+# Create a real non-root user with home, into the conventional /home/<username>
 ARG APP_UID=1000
 ARG APP_GID=1000
-RUN groupadd -g ${APP_GID} appuser && \
+RUN groupadd -g ${APP_GID} app && \
   useradd -l -m -u ${APP_UID} -g ${APP_GID} -s /bin/bash appuser
 
 # Huggingface models cache that lives inside the image or named volume
 # TODO: make a named volume for persistance of HF cache
-ENV HF_HOME=/hf_cache \
-  HOME=/home/app
+ENV HF_HOME=/hf_cache
 
 # NB! Never rely on chown in the image for bind mounts. A bind mount hides whatever you COPY/chowned at
 # build-time and writes go back to the host filesystem. Instead, pre-create/own the host directories.
 
 # Create folders and set permission for non-root user - this works for named volumes or image content
-RUN mkdir -p /hf_cache /app \
-  && chown -R appuser:appuser /app /hf_cache
+RUN mkdir --chown=app:appuser -p /hf_cache /app /home/appuser
 
 # Ship the folders that Prod needs, in the image (in Dev, these are hidden by bind mount)
-COPY --chown=appuser:appuser frontend/ /app/frontend/
-COPY --chown=appuser:appuser example_data/ /app/example_data/
+COPY --chown=app:appuser frontend/ /app/frontend/
+COPY --chown=app:appuser example_data/ /app/example_data/
 
 USER appuser
 

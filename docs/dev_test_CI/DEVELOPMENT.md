@@ -42,7 +42,7 @@ make unit
 # Docker environment (recommended)
 export TEST_DOCKER=true
 make test-up
-make test-run-integration
+make test-integration
 make test-down
 
 # Local environment

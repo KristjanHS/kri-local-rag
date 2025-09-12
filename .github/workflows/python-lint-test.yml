@@ -71,9 +71,7 @@ jobs:
       #- name: Seed pip in .venv
       #  run: uv venv --seed
       - name: Sync test env + check
-        run: |
-          uv sync --group test --frozen
-          uv pip check
+        run: make uv-sync-test
       - name: Run unit tests (Makefile)
         run: make unit
       # Keep the cache small in CI (safe to no-op locally).
@@ -96,7 +94,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false # ⬅️ do not store token in git config
-          clean: false # avoid deleting untracked files under act --bind
       - name: Setup Python + uv (cached)
         uses: ./.github/actions/setup-uv
       - name: Sync test env (Makefile)
@@ -120,8 +117,7 @@ jobs:
       - name: Prepare reports directories
         run: mkdir -p reports
       - name: Run integration tests
-        run: >-
-          uv run -m pytest tests/integration -q --junitxml=reports/junit_integration.xml
+        run: make test-run-integration
       - name: Tear down services
         if: always()
         run: make test-down
