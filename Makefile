@@ -2,7 +2,7 @@
 .PHONY: help setup-hooks test-up test-down test-logs test-up-force-build test-clean \
         test-integration test-e2e integration push-pr export-reqs \
         ruff-format ruff-fix yamlfmt pyright pre-commit unit pip-audit \
-        semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage coverage-html dev-setup ollama-pull deptry
+        semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage dev-setup ollama-pull deptry
 
 # Use bash with strict flags for recipes
 SHELL := bash
@@ -120,6 +120,10 @@ app-logs: ## Fetch/tail app/weaviate/ollama logs (LINES=200, FOLLOW=1)
 cli: ## Start CLI Q&A (pass ARGS='--question "..."')
 	@./scripts/cli.sh ${ARGS}
 
+# Run CLI inside the app container (bind-mount code; editable in Dev)
+cli-docker: ## Run CLI inside the app container (ARGS='--question "..."')
+	@$(COMPOSE_APP) exec -T app /opt/venv/bin/python -m backend.qa_loop ${ARGS}
+
 # Convenience: ask a one-off question without passing ARGS
 ask: ## One-off question via CLI (Q='...')
 	@if [ -z "$(Q)" ]; then \
@@ -145,16 +149,9 @@ ollama-pull: ## Pull Ollama model in container (MODEL=...)
 # Run E2E tests with automatic stack lifecycle
 e2e: ## Run E2E tests (stack-up → test → optional stack-down). Set PRESERVE=0 to stack-down
 	@set -euo pipefail; \
-	$(MAKE) stack-up; \
 	EXIT=0; \
 	$(PYTEST) tests/e2e $(PYTEST_BASE) $${PYTEST_ARGS:-} || EXIT=$$?; \
-	if [ "$${PRESERVE:-1}" = "0" ]; then \
-		$(MAKE) stack-down; \
-	else \
-		echo "Skipping stack-down: PRESERVE=1 (containers/networks preserved)"; \
-	fi; \
 	exit $$EXIT
-	
 
 # Coverage run (host)
 coverage: ## Run coverage across repo (HTML=1 for HTML report)
@@ -162,9 +159,7 @@ coverage: ## Run coverage across repo (HTML=1 for HTML report)
 	HTML_FLAG=""; if [ "$${HTML:-0}" != "0" ]; then mkdir -p reports/coverage; HTML_FLAG="--cov-report=html:reports/coverage"; fi; \
 	$(PYTEST) -v -m "not environment" --cov=. --cov-report=term $$HTML_FLAG --cov-report=xml:reports/coverage.xml $${PYTEST_ARGS:-}
 
-# Coverage run (host) with HTML output
-coverage-html: ## Run coverage and write HTML to reports/coverage
-	@$(MAKE) coverage HTML=1
+
 
 # Developer setup wrapper
 dev-setup: ## Bootstrap dev env (venv, deps, tools)

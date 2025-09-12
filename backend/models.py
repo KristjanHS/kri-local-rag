@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 
 # For manual vectorization - proper type annotations
-from typing import Any, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:  # only for type hints; avoids importing at module import time
     from sentence_transformers import SentenceTransformer
@@ -35,9 +35,9 @@ os.environ.setdefault("TRANSFORMERS_NO_TORCHVISION", "1")
 # transformers import-time checks), it will raise a RuntimeError with clear guidance.
 if os.environ.get("TRANSFORMERS_NO_TORCHVISION", "0") == "1":
     try:
+        import importlib.machinery as _machinery
         import sys
         import types
-        import importlib.machinery as _machinery
 
         if "torchvision" not in sys.modules:
             vision_stub = cast(Any, types.ModuleType("torchvision"))
@@ -157,7 +157,7 @@ def load_embedder() -> "SentenceTransformer":
         return _embedding_model
 
     _embedding_model = load_model(EMBEDDING_MODEL, is_embedding=True)
-    logger.info("Embedding model loaded and cached successfully")
+    logger.debug("Embedding model loaded and cached successfully")
     return _embedding_model
 
 
@@ -168,7 +168,7 @@ def load_reranker() -> "CrossEncoder":
         return _cross_encoder
 
     _cross_encoder = load_model(RERANKER_MODEL, is_embedding=False)
-    logger.info("Reranker model loaded and cached successfully")
+    logger.debug("Reranker model loaded and cached successfully")
     return _cross_encoder
 
 
@@ -177,7 +177,7 @@ def preload_models() -> None:
     logger.info("Preloading models...")
     load_embedder()
     load_reranker()
-    logger.info("All models preloaded successfully")
+    logger.debug("All models preloaded successfully")
 
 
 def clear_model_cache() -> None:

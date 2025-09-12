@@ -6,9 +6,9 @@ from __future__ import annotations
 
 import os
 import sys
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Callable
 import threading
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from rich.rule import Rule
 
@@ -38,7 +38,8 @@ def _setup_cli_logging(log_level: str | None, verbose_count: int, quiet_count: i
     elif quiet_count >= 1:
         level = "WARNING"
     else:
-        level = os.getenv("LOG_LEVEL", "INFO").upper()
+        # Default to WARNING to keep CLI output clean unless verbosity requested
+        level = os.getenv("LOG_LEVEL", "WARNING").upper()
 
     # Use the centralized logging configuration
     set_log_level(level)
@@ -256,7 +257,7 @@ def ensure_weaviate_ready_and_populated():
         client = get_weaviate_client()
         logger.debug("1. Attempting to connect to Weaviate at %s...", weaviate_url)
         client.is_ready()  # Raises if not ready
-        logger.info("   ✓ Connection successful.")
+        logger.debug("   ✓ Connection successful.")
 
         # Check if collection exists
         logger.debug("2. Checking if collection '%s' exists...", collection_name)
@@ -322,8 +323,7 @@ def ensure_weaviate_ready_and_populated():
 
         # If the collection already exists, we do nothing. This avoids checking if it's empty
         # and re-populating, which could be slow on large user databases.
-        logger.debug("   ✓ Collection '%s' exists.", collection_name)
-        console.log("Weaviate is ready.")
+        logger.info("   ✓ Collection '%s' exists.", collection_name)
     except WeaviateConnectionError:
         raise WeaviateConnectionError(
             "Failed to connect to Weaviate. "
@@ -409,13 +409,20 @@ if __name__ == "__main__":
     cross_encoder = _get_cross_encoder()
 
     if args.question:
-        qa_loop(
-            args.question,
-            embedding_model=embedding_model,
-            cross_encoder=cross_encoder,
-            k=args.k,
-            metadata_filter=meta_filter,
-        )
+        try:
+            qa_loop(
+                args.question,
+                embedding_model=embedding_model,
+                cross_encoder=cross_encoder,
+                k=args.k,
+                metadata_filter=meta_filter,
+            )
+        finally:
+            # Ensure Weaviate client connections are closed in one-shot mode
+            try:
+                close_weaviate_client()
+            except Exception as e:
+                logger.debug("Failed to close Weaviate client gracefully: %s", e)
         sys.exit(0)
 
     # Interactive loop - show readiness spinners and then the prompt
