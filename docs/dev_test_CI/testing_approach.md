@@ -22,6 +22,16 @@ A high-level guide to testing with real local models and external services.
 - **Ollama only**: `make integration PYTEST_ARGS='-m "requires_ollama"'`
 - **Both services**: `make integration PYTEST_ARGS='-m "requires_weaviate and requires_ollama"'`
 
+### Markers
+
+- `slow`: Long-running tests (>30s)
+- `docker`: Tests that require Docker daemon
+- `requires_weaviate`: Tests that need Weaviate service available
+- `requires_ollama`: Tests that need Ollama service available
+
+Note: The generic `external` marker was removed in favor of the specific
+`requires_weaviate` and `requires_ollama` markers.
+
 ## Core Principles
 
 1. **Test Isolation**: Each test runs independently without state leakage

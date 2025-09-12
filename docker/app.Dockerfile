@@ -122,7 +122,8 @@ ENV HF_HOME=/hf_cache
 # build-time and writes go back to the host filesystem. Instead, pre-create/own the host directories.
 
 # Create folders and set permission for non-root user - this works for named volumes or image content
-RUN mkdir --chown=appuser:appgroup -p /hf_cache /app /home/appuser
+RUN mkdir -p /hf_cache /app /home/appuser \
+  && chown -R appuser:appgroup /hf_cache /app /home/appuser
 
 # Ship the folders that Prod needs, in the image (in Dev, these are hidden by bind mount)
 COPY --chown=appuser:appgroup frontend/ /app/frontend/

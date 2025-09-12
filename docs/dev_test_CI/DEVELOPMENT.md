@@ -52,6 +52,13 @@ make integration
 
 For testing patterns, see `docs/dev_test_CI/testing_approach.md`.
 
+### Markers
+- `slow`: Long-running tests (>30s)
+- `docker`: Requires Docker daemon
+- `requires_weaviate`: Needs Weaviate service
+- `requires_ollama`: Needs Ollama service
+Note: the generic `external` marker has been removed; use the specific service markers instead.
+
 - E2E (full stack via Docker Compose):
 ```bash
 make e2e

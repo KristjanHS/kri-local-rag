@@ -115,7 +115,6 @@ addopts = [
 markers = [
     "slow: Tests that take longer to run (>30s)",
     "docker: Tests requiring a running Docker daemon",
-    "external: Tests that require external services (Weaviate, Ollama)",
     "requires_weaviate: Tests that require Weaviate service",
     "requires_ollama: Tests that require Ollama service",
 ]
