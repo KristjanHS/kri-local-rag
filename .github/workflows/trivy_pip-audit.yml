@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - "requirements.txt"
-      - "requirements-dev.txt"
+      - "uv.lock"
       - "pyproject.toml"
       - "Dockerfile"
       - "docker/**"
@@ -26,22 +26,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Audit requirements.txt
-        uses: pypa/gh-action-pip-audit@v1.1.0
-        env:
-          PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
-        with:
-          inputs: requirements.txt
-      - name: Audit requirements-dev.txt
-        if: hashFiles('requirements-dev.txt') != ''
-        uses: pypa/gh-action-pip-audit@v1.1.0
-        env:
-          PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
-        with:
-          inputs: requirements-dev.txt
+      - name: Setup Python + uv (cached)
+        uses: ./.github/actions/setup-uv
+      #- name: Seed pip in .venv
+      #  run: uv venv --seed
+      - name: pip-audit via Makefile
+        run: make pip-audit
 
   trivy-fs:
     name: Trivy FS (vuln+config+secrets)

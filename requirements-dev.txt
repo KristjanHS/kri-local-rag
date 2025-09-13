@@ -1,5 +1,0 @@
--r requirements.txt
--e .[test,docs,ui,dev]
-# Dev installs rely on extras defined in pyproject
-# Explicitly avoid OTel in app/dev env until protobuf≥5 support is confirmed
-# opentelemetry-proto<5 is incompatible with protobuf>=5; do not add OTel deps here

@@ -33,7 +33,7 @@ fi
 # 2) Local integration tests (only after successful push)
 if [[ ! -x ".venv/bin/python" ]]; then
   echo "[pushpr] ERROR: .venv/bin/python not found. Create venv and install dev deps."
-  echo "         e.g., python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt"
+  echo "         e.g., uv venv --seed && make uv-sync-test"
   exit 1
 fi
 
@@ -75,4 +75,3 @@ else
 fi
 
 echo "[pushpr] Done."
-

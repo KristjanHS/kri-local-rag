@@ -5,6 +5,7 @@ import ast
 import logging
 import os
 import subprocess
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -88,7 +89,7 @@ class TestStartupValidationUnit:
         logger.info("Testing config.py import in subprocess...")
         try:
             result = subprocess.run(
-                ["python", "-m", "backend.config"],
+                [sys.executable, "-m", "backend.config"],
                 capture_output=True,
                 text=True,
                 timeout=10,  # 10-second timeout
