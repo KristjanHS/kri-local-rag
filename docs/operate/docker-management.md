@@ -34,7 +34,7 @@
 
 ## Service Operations (advanced)
 
-Refer to the root README for common operations. Prefer using `scripts/docker/docker-setup.sh` to build and start all services with health checks. Below are additional/advanced commands not covered there:
+Refer to the root README for common operations. Prefer using `make stack-up` to build and start all services with health checks, `make stack-down` to stop without removing volumes, and `make stack-reset` for a destructive teardown that removes volumes. Below are additional/advanced commands not covered there:
 
 ```bash
 # Rebuild all images with no cache (slower, clean rebuild)
@@ -102,10 +102,8 @@ curl -I http://localhost:8501
 
 ### Service Issues
 ```bash
-# Check logs for individual services
-docker compose logs weaviate | tail -n 200
-docker compose logs ollama | tail -n 200
-docker compose logs app | tail -n 200
+# App/Weaviate/Ollama logs (200 lines; add FOLLOW=1 to tail)
+make app-logs LINES=200
 
 # Check status
 docker ps -a
@@ -170,7 +168,10 @@ This process removes all containers and images associated with the project but p
 First, stop the running services. It is critical to use the correct `down` command to ensure your data volumes are not deleted.
 
 ```bash
-# This command stops containers but PRESERVES all persistent data volumes.
+# Recommended: stop stack and PRESERVE data volumes
+make stack-down
+
+# Equivalent compose command (also preserves volumes)
 docker compose down
 ```
 
@@ -201,3 +202,13 @@ After running the cleanup, your persistent data remains safe. The following volu
 
 - [Development Guide](DEVELOPMENT.md)
 - [Document Processing Guide](document-processing.md)
+
+## Destructive Reset (Delete Volumes)
+
+To wipe all app data managed by Compose, use:
+
+```bash
+make stack-reset
+```
+
+Warning: This removes named volumes (e.g., Weaviate DB, Ollama models). Backup first if needed.

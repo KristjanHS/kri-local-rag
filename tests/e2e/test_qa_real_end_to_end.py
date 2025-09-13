@@ -16,10 +16,9 @@ from backend.ollama_client import pull_if_missing
 from backend.qa_loop import answer
 from tests.conftest import TEST_COLLECTION_NAME
 
-pytestmark = [pytest.mark.slow, pytest.mark.external, pytest.mark.requires_weaviate, pytest.mark.requires_ollama]
+pytestmark = [pytest.mark.slow, pytest.mark.requires_weaviate, pytest.mark.requires_ollama]
 
 
-@pytest.mark.external
 def test_e2e_answer_with_real_services(
     docker_services_ready, cross_encoder_cache_dir, weaviate_client, sample_documents_path
 ):  # noqa: ANN001

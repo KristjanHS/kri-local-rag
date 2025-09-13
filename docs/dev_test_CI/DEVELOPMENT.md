@@ -10,7 +10,7 @@ Concise setup for human developers. For detailed, AI-automation-focused guidance
 This project uses a unified script to set up a complete development environment, including a Python virtualenv, all dependencies, and required system tools.
 
 ```bash
-bash scripts/dev/setup-dev-env.sh
+make dev-setup
 ```
 
 After setup, activate the virtual environment to use the installed tools:
@@ -34,7 +34,7 @@ For basic usage and quick-start commands, see the root README. This document foc
 
 - Unit (fast, sockets blocked):
 ```bash
-.venv/bin/python -m pytest tests/unit -n auto -q
+make unit
 ```
 
 - Integration (real services with simplified patterns):
@@ -42,21 +42,26 @@ For basic usage and quick-start commands, see the root README. This document foc
 # Docker environment (recommended)
 export TEST_DOCKER=true
 make test-up
-.venv/bin/python -m pytest tests/integration -q
+make test-integration
 make test-down
 
 # Local environment
 export TEST_DOCKER=false
-.venv/bin/python -m pytest tests/integration -q
+make integration
 ```
 
 For testing patterns, see `docs/dev_test_CI/testing_approach.md`.
 
+### Markers
+- `slow`: Long-running tests (>30s)
+- `docker`: Requires Docker daemon
+- `requires_weaviate`: Needs Weaviate service
+- `requires_ollama`: Needs Ollama service
+Note: the generic `external` marker has been removed; use the specific service markers instead.
+
 - E2E (full stack via Docker Compose):
 ```bash
-docker compose -f docker/docker-compose.yml up -d --build
-.venv/bin/python -m pytest tests/e2e -q
-docker compose -f docker/docker-compose.yml down -v
+make e2e
 ```
 
 - UI (Playwright/Streamlit; coverage disabled):
@@ -66,7 +71,7 @@ docker compose -f docker/docker-compose.yml down -v
 
 - Pre-push fast path (runs unit bundle by default; respects SKIP_TESTS=1):
 ```bash
-scripts/git-hooks/pre-push
+make pre-push
 ```
 
 ## Model System
@@ -93,9 +98,9 @@ reranker = load_reranker()
 - **Offline mode**: Set `TRANSFORMERS_OFFLINE=1` for production deployments
 
 ## Docker (optional)
-Preferred startup: use the automated setup script which builds the image, starts services, and waits for health checks.
+Preferred startup: use the Make target which builds the image, starts services, and waits for health checks.
 ```bash
-./scripts/docker/docker-setup.sh
+make stack-up
 ```
 See the root README for starting/stopping the stack and simple day-to-day commands. For deeper service operations and troubleshooting, see `docs/operate/docker-management.md`.
 
@@ -111,13 +116,10 @@ DOCKER_BUILDKIT=1 docker build \
   -f docker/app.Dockerfile -t kri-local-rag:local .
 ```
 
-- Local venv install (choose one channel):
+- Local venv install (uv):
 ```bash
-export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu      # default
-# export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu121   # CUDA 12.1
-# export PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/rocm6.1 # ROCm 6.1
-
-.venv/bin/python -m pip install -r requirements-dev.txt
+# CPU wheels are configured in pyproject via [tool.uv.index]/[tool.uv.sources]
+uv venv --seed && make uv-sync-test
 ```
 
 - Quick smoke test of image:
@@ -126,7 +128,7 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 ```
 
 ## Notes
-- Avoid setting `PYTHONPATH`. Use editable installs (`pip install -e .`) and module execution with `-m`.
+- Avoid setting `PYTHONPATH`. Install dependencies via `make uv-sync-test` and use module execution with `-m`.
  - `kri_local_rag.egg-info/` provides package metadata that enables editable installs, dependency resolution, and discovery of modules/entry points by tooling.
 
 
@@ -144,3 +146,8 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 - `scripts/cli.sh`: convenience wrapper to run the CLI inside Docker.
 
 **Note**: Scripts that need integration test utilities should import them from `tests/integration/conftest.py` rather than duplicating the logic. See `docs/dev_test_CI/testing_approach.md` for details.
+
+## See Also
+- Make targets: run `make help`
+- AI Agent Instructions: `docs/AI_coder/AI_instructions.md`
+- Docker Management: `docs/operate/docker-management.md`

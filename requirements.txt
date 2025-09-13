@@ -215,9 +215,7 @@ langchain-core==0.3.75
 langchain-text-splitters==0.3.11
     # via langchain
 langdetect==1.0.9
-    # via
-    #   kri-local-rag
-    #   unstructured
+    # via unstructured
 langsmith==0.4.27
     # via
     #   langchain
@@ -337,14 +335,11 @@ pdfminer-six==20250506
     #   pdfplumber
     #   unstructured
 pdfplumber==0.11.7
-    # via
-    #   kri-local-rag
-    #   layoutparser
+    # via layoutparser
 pikepdf==9.10.2
     # via unstructured
 pillow==11.3.0
     # via
-    #   kri-local-rag
     #   layoutparser
     #   matplotlib
     #   pdf2image
@@ -423,7 +418,6 @@ pygments==2.19.2
     #   pytest
     #   rich
 pymupdf==1.24.10
-    # via kri-local-rag
 pymupdfb==1.24.10
     # via pymupdf
 pyparsing==3.2.3
@@ -643,7 +637,6 @@ typing-inspection==0.4.1
 tzdata==2025.2
     # via pandas
 unstructured==0.14.8
-    # via kri-local-rag
 unstructured-client==0.42.3
     # via unstructured
 unstructured-inference==0.7.36
