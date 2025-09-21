@@ -46,7 +46,7 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
 ############################################
 # Runtime stage: Debian + apt + your app  #
 ############################################
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.14.0rc3-slim-bookworm AS runtime
 
 # --- Debian snapshot date (set to base image date in CI) ---
 # Accepts YYYYMMDD or YYYYMMDDTHHMMSSZ. Example default is a placeholder.
