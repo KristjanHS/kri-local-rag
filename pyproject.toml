@@ -15,6 +15,7 @@ dependencies = [
     "streamlit>=1.49.1,<2.0.0",
     "torch>=2.8.0,<3.0.0",
     "weaviate-client>=4.16.6,<5.0.0",
+    "pymupdf==1.24.10",
 ]
 
 [dependency-groups]
@@ -41,7 +42,6 @@ test = [
     # Optional runtime deps kept in test group while verifying prod minimal set
     "pdfplumber>=0.11.7,<0.12.0",
     "pillow>=11.3.0,<12.0.0",
-    "pymupdf==1.24.10",
     "unstructured[pdf]>=0.14.10,<0.15.0",
     "langdetect>=1.0.9,<2.0.0",
     "numpy>=1.26.0,<3.0.0",
