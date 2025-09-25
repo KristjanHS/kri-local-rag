@@ -1,10 +1,19 @@
 # kri-local-rag
 
-Local RAG system using Weaviate, Ollama, and a CPU-optimized Python backend.
+This RAG (Retrieval-Augmented Generation) LLM Q&A solution was created FROM SCRATCH, using agentic coding only.
+It uses 3 local models on Ollama + local Weaviate db, so usable fully offline.
+
+The Coding Agents that I used during this project (config and rules files for these are included):
+- Cursor IDE
+- Codex (CLI + extension)
+- Github Copilot
+- Gemini CLI
+- Gemini Code assist (extension)
+- Continue (with open coding models)
 
 ---
 
-## What you can do
+## What you can do with this solution:
 
 - Ingest your local PDFs/Markdown into a vector DB
 - Ask questions about your documents via a CLI or a simple web UI
