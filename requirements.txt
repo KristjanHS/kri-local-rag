@@ -22,7 +22,7 @@ attrs==25.3.0
     #   jsonschema
     #   pytest-docker
     #   referencing
-authlib==1.6.3
+authlib==1.6.4
     # via weaviate-client
 backoff==2.2.1
     # via unstructured
