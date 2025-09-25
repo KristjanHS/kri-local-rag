@@ -200,14 +200,16 @@ unit: ## Run unit tests and write reports
 
 # Run local integration tests; prefer uv if available, then .venv fallback
 integration: ## Run local integration tests (venv or uv)
-	@if [ -x .venv/bin/python ]; then \
-		.venv/bin/python -m pytest tests/integration -q ${PYTEST_ARGS}; \
-	elif command -v uv >/dev/null 2>&1; then \
-		uv run -m pytest tests/integration -q ${PYTEST_ARGS}; \
-	else \
+	@MPLCONFIGDIR=$${MPLCONFIGDIR:-$(CURDIR)/.cache/matplotlib}; \
+	 mkdir -p "$$MPLCONFIGDIR"; \
+	 if [ -x .venv/bin/python ]; then \
+		MPLCONFIGDIR="$$MPLCONFIGDIR" .venv/bin/python -m pytest tests/integration -q ${PYTEST_ARGS}; \
+	 elif command -v uv >/dev/null 2>&1; then \
+		MPLCONFIGDIR="$$MPLCONFIGDIR" uv run -m pytest tests/integration -q ${PYTEST_ARGS}; \
+	 else \
 		echo ".venv/bin/python not found and uv not available. Create the env (make uv-sync-test or python -m venv .venv) then run '.venv/bin/python -m pytest tests/integration -q'"; \
 		exit 1; \
-	fi
+	 fi
 
  
 
