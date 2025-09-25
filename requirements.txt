@@ -666,3 +666,6 @@ yarl==1.20.1
     # via aiohttp
 zstandard==0.24.0
     # via langsmith
+torch>=2.8.0 # not directly required, pinned by Snyk to avoid a vulnerability
+wheel>=0.38.0 # not directly required, pinned by Snyk to avoid a vulnerability
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
