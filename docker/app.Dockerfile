@@ -50,7 +50,7 @@ FROM python:3.12-slim-bookworm AS runtime
 
 # --- Debian snapshot date (set to base image date in CI) ---
 # Accepts YYYYMMDD or YYYYMMDDTHHMMSSZ. Example default is a placeholder.
-ARG SNAPSHOT=20250906T000000Z  # Bookworm 12.12 point release date
+ARG SNAPSHOT=20250906T120000Z  # Bookworm 12.12 point release date + a few hours, to avoid mirror lag
 
 # Replace sources with a single Deb822 file pointing to snapshot.debian.org.
 # Ensure SNAPSHOT is expanded by the shell (avoid quoted heredoc preventing expansion).
