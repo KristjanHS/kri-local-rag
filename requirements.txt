@@ -330,7 +330,7 @@ pathspec==0.12.1
     # via mkdocs
 pdf2image==1.17.0
     # via unstructured
-pdfminer-six==20250506
+pdfminer-six==20251107
     # via
     #   pdfplumber
     #   unstructured
