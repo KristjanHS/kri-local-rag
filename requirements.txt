@@ -506,7 +506,7 @@ regex==2025.9.1
     # via
     #   nltk
     #   transformers
-requests==2.32.5
+requests==2.33.0
     # via
     #   google-api-core
     #   huggingface-hub
