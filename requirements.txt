@@ -423,7 +423,7 @@ pymupdfb==1.24.10
     # via pymupdf
 pyparsing==3.2.4
     # via matplotlib
-pypdf==6.0.0
+pypdf==6.10.2
     # via
     #   unstructured
     #   unstructured-client
