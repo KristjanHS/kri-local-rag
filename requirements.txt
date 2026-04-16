@@ -207,7 +207,7 @@ langchain==0.3.27
     #   langchain-community
 langchain-community==0.3.29
     # via kri-local-rag
-langchain-core==0.3.76
+langchain-core==1.2.22
     # via
     #   langchain
     #   langchain-community
