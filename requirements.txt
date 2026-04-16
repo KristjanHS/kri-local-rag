@@ -387,7 +387,7 @@ psutil==7.0.0
     #   unstructured
 pyarrow==21.0.0
     # via streamlit
-pyasn1==0.6.1
+pyasn1==0.6.3
     # via
     #   pyasn1-modules
     #   rsa
