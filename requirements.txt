@@ -566,7 +566,7 @@ sqlalchemy==2.0.43
     #   langchain-community
 stevedore==5.5.0
     # via bandit
-streamlit==1.49.1
+streamlit==1.54.0
     # via kri-local-rag
 sympy==1.14.0
     # via
