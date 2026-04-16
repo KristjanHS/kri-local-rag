@@ -644,7 +644,7 @@ unstructured-inference==1.0.5
     # via unstructured
 unstructured-pytesseract==0.3.15
     # via unstructured
-urllib3==2.5.0
+urllib3==2.6.3
     # via requests
 validators==0.35.0
     # via weaviate-client
