@@ -593,7 +593,7 @@ torchvision==0.23.0
     # via
     #   effdet
     #   timm
-tornado==6.5.2
+tornado==6.5.5
     # via streamlit
 tqdm==4.67.1
     # via
