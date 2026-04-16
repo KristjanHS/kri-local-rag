@@ -434,7 +434,7 @@ pypdfium2==4.30.0
 pyreadline3==3.5.4 ; sys_platform == 'win32'
     # via humanfriendly
 pyright==1.1.405
-pytest==8.4.2
+pytest==9.0.3
     # via
     #   pytest-base-url
     #   pytest-cov
