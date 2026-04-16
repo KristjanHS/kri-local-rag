@@ -469,7 +469,7 @@ python-iso639==2025.2.18
     # via unstructured
 python-magic==0.4.27
     # via unstructured
-python-multipart==0.0.20
+python-multipart==0.0.26
     # via unstructured-inference
 python-oxmsg==0.0.2
     # via unstructured
