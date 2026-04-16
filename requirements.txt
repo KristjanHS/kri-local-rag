@@ -103,7 +103,7 @@ filetype==1.2.0
     # via unstructured
 flatbuffers==25.2.10
     # via onnxruntime
-fonttools==4.59.2
+fonttools==4.60.2
     # via matplotlib
 frozenlist==1.7.0
     # via
