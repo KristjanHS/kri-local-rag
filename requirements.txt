@@ -636,7 +636,7 @@ typing-inspection==0.4.1
     #   pydantic-settings
 tzdata==2025.2
     # via pandas
-unstructured==0.18.15
+unstructured==0.18.18
     # via kri-local-rag
 unstructured-client==0.42.3
     # via unstructured
