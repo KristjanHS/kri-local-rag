@@ -340,7 +340,7 @@ pi-heif==1.1.0
     # via unstructured
 pikepdf==9.11.0
     # via unstructured
-pillow==11.3.0
+pillow==12.2.0
     # via
     #   matplotlib
     #   pdf2image
