@@ -413,7 +413,7 @@ pydeck==0.9.1
     # via streamlit
 pyee==13.0.0
     # via playwright
-pygments==2.19.2
+pygments==2.20.0
     # via
     #   pytest
     #   rich
