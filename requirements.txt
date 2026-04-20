@@ -6,7 +6,7 @@ aiofiles==24.1.0
     # via unstructured-client
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.12.15
+aiohttp==3.13.3
     # via langchain-community
 aiosignal==1.4.0
     # via aiohttp
@@ -24,7 +24,7 @@ attrs==25.3.0
     #   jsonschema
     #   pytest-docker
     #   referencing
-authlib==1.6.4
+authlib==1.6.6
     # via weaviate-client
 backoff==2.2.1
     # via unstructured
@@ -93,7 +93,7 @@ emoji==2.14.1
     # via unstructured
 execnet==2.1.1
     # via pytest-xdist
-filelock==3.19.1
+filelock==3.20.3
     # via
     #   huggingface-hub
     #   torch
@@ -103,7 +103,7 @@ filetype==1.2.0
     # via unstructured
 flatbuffers==25.2.10
     # via onnxruntime
-fonttools==4.59.2
+fonttools==4.60.2
     # via matplotlib
 frozenlist==1.7.0
     # via
@@ -207,7 +207,7 @@ langchain==0.3.27
     #   langchain-community
 langchain-community==0.3.29
     # via kri-local-rag
-langchain-core==0.3.76
+langchain-core==0.3.81
     # via
     #   langchain
     #   langchain-community
@@ -233,7 +233,7 @@ markupsafe==3.0.2
     # via
     #   jinja2
     #   mkdocs
-marshmallow==3.26.1
+marshmallow==3.26.2
     # via dataclasses-json
 matplotlib==3.10.6
     # via unstructured-inference
@@ -387,7 +387,7 @@ psutil==7.0.0
     #   unstructured
 pyarrow==21.0.0
     # via streamlit
-pyasn1==0.6.1
+pyasn1==0.6.2
     # via
     #   pyasn1-modules
     #   rsa
@@ -423,7 +423,7 @@ pymupdfb==1.24.10
     # via pymupdf
 pyparsing==3.2.4
     # via matplotlib
-pypdf==6.0.0
+pypdf==6.6.0
     # via
     #   unstructured
     #   unstructured-client
@@ -644,11 +644,11 @@ unstructured-inference==1.0.5
     # via unstructured
 unstructured-pytesseract==0.3.15
     # via unstructured
-urllib3==2.5.0
+urllib3==2.6.3
     # via requests
 validators==0.35.0
     # via weaviate-client
-virtualenv==20.34.0
+virtualenv==20.36.1
     # via pre-commit
 watchdog==6.0.0
     # via
