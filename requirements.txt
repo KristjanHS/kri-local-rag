@@ -602,7 +602,7 @@ tqdm==4.67.1
     #   sentence-transformers
     #   transformers
     #   unstructured
-transformers==4.56.1
+transformers==5.0.0
     # via
     #   sentence-transformers
     #   unstructured-inference
