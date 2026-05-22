@@ -221,7 +221,7 @@ langsmith==0.4.27
     #   langchain
     #   langchain-community
     #   langchain-core
-lxml==6.0.1
+lxml==6.1.0
     # via
     #   pikepdf
     #   unstructured
