@@ -385,7 +385,7 @@ psutil==7.0.0
     # via
     #   accelerate
     #   unstructured
-pyarrow==21.0.0
+pyarrow==23.0.1
     # via streamlit
 pyasn1==0.6.1
     # via
