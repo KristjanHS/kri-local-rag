@@ -1,9 +1,8 @@
-name: Security scans (pip-audit + Trivy)
+name: Security scans (uv audit + Trivy)
 
 on:
   pull_request:
     paths:
-      - "requirements.txt"
       - "uv.lock"
       - "pyproject.toml"
       - "Dockerfile"
@@ -20,18 +19,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pip-audit:
-    name: pip-audit (deps)
+  audit:
+    name: uv audit (deps)
     if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Setup Python + uv (cached)
         uses: ./.github/actions/setup-uv
-      #- name: Seed pip in .venv
-      #  run: uv venv --seed
-      - name: pip-audit via Makefile
-        run: make pip-audit
+      - name: uv audit via Makefile
+        run: make audit
 
   trivy-fs:
     name: Trivy FS (vuln+config+secrets)
@@ -39,8 +36,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Python + uv (cached)
+        uses: ./.github/actions/setup-uv
+      - name: Materialize requirements.txt for the scan
+        # requirements.txt is no longer committed (derived from uv.lock); generate it so
+        # the pinned Trivy version, which predates native uv.lock support, can scan deps.
+        run: make export-reqs
       - name: Run Trivy repo scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
         with:
           scan-type: fs
           scan-ref: .

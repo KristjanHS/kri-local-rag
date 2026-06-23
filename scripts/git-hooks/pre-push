@@ -50,7 +50,9 @@ SKIP_LOCAL_SEC_SCANS=${SKIP_LOCAL_SEC_SCANS:-1}
 # Optional local skip toggles (developer ergonomics)
 # Default to skipping lint for faster pushes (opt-in for thorough checks)
 SKIP_LINT=${SKIP_LINT:-1}
-SKIP_PYRIGHT=${SKIP_PYRIGHT:-1}
+# Pyright moved here from pre-commit (whole-project type-check is the push-boundary
+# gate, not a per-commit cost). Default ON; set SKIP_PYRIGHT=1 to opt out.
+SKIP_PYRIGHT=${SKIP_PYRIGHT:-0}
 SKIP_TESTS=${SKIP_TESTS:-0}
 
 ## Ruff via Makefile (format + autofix)

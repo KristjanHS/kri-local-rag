@@ -6,7 +6,83 @@ from pathlib import Path
 
 import pytest
 
+from backend.config import get_service_url
 from backend.weaviate_client import close_weaviate_client, get_weaviate_client
+from tests.conftest import get_integration_config, is_service_healthy
+
+
+def _detect_environment() -> str:
+    """Infer the run environment from the resolved Weaviate URL.
+
+    E2E tests must work in both the Docker test environment (service URLs point at
+    compose service hostnames) and locally (localhost). Unlike the integration
+    fixture this does not consult TEST_DOCKER — that variable was eliminated; the
+    service URLs set by docker-compose are the single source of truth.
+    """
+    weaviate_url = get_service_url("weaviate")
+    if "localhost" in weaviate_url or "127.0.0.1" in weaviate_url:
+        return "local"
+    return "Docker"
+
+
+@pytest.fixture(scope="session")
+def e2e():
+    """Unified e2e fixture mirroring the integration fixture's service management.
+
+    Provides HTTP health checks and URL resolution shared with integration tests
+    (via ``tests.conftest``), with environment auto-detected from service URLs so
+    the same test code runs in both Docker and local environments.
+    """
+    config = get_integration_config()
+
+    if not config:
+        pytest.skip("Integration configuration not found in pyproject.toml")
+
+    environment = _detect_environment()
+    commands = config.get("commands", {})
+
+    def check_service_health(service_name: str) -> bool:
+        return is_service_healthy(service_name, config)
+
+    def require_services(*services: str):
+        missing = [service for service in services if not check_service_health(service)]
+        if not missing:
+            return
+
+        if environment == "Docker":
+            action_msg = f"Try: {commands.get('docker_start', 'make test-up')}"
+        else:
+            # Local mode: emit a start hint for EVERY missing service, not just the
+            # first matched (avoids hiding the ollama hint when both are down).
+            local_hints = {
+                "weaviate": commands.get("local_weaviate_start", "start Weaviate"),
+                "ollama": commands.get("local_ollama_start", "ollama serve"),
+            }
+            hints = [local_hints[service] for service in missing if service in local_hints]
+            action_msg = "Try: " + "; ".join(hints) if hints else "Start the required services"
+
+        health_urls: list[str] = []
+        for service in missing:
+            service_url = get_service_url(service)
+            health_endpoint = config.get("services", {}).get(service, {}).get("health_endpoint", "")
+            if service_url and health_endpoint:
+                health_urls.append(f"{service_url}{health_endpoint}")
+        health_check_msg = " Health check URLs: " + "; ".join(health_urls) if health_urls else ""
+
+        pytest.skip(
+            f"Required services not available: {', '.join(missing)} "
+            f"(in {environment} environment). {action_msg}.{health_check_msg}"
+        )
+
+    # NOTE: unlike the integration fixture this dict intentionally omits "test_docker"
+    # — TEST_DOCKER was eliminated for e2e; use "environment" ("Docker"/"local") instead.
+    return {
+        "config": config,
+        "environment": environment,
+        "check_service_health": check_service_health,
+        "require_services": require_services,
+        "get_service_url": lambda service: get_service_url(service),
+    }
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:

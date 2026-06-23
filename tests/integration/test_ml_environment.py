@@ -1,4 +1,8 @@
 import logging
+import shutil
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 import torch
@@ -9,9 +13,79 @@ from backend.config import DEFAULT_EMBEDDING_MODEL
 
 EXPECTED_MODEL_NAME = DEFAULT_EMBEDDING_MODEL
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _uv_export(*extra_args: str) -> str:
+    """Return `uv export` output for the committed lock, no network (--frozen).
+
+    Output is scoped to the host platform: it emits each extra-fork but only the
+    current OS's wheels (nvidia-* carry `sys_platform == 'linux'`, the cpu-fork
+    torch line is `+cpu` only on non-darwin). The GPU-default assertions below
+    are therefore Linux-shaped — the caller guards with `skipif(darwin)`.
+    """
+    uv = shutil.which("uv")
+    if uv is None:
+        pytest.skip("uv not on PATH — cannot inspect the resolved lock")
+    result = subprocess.run(
+        [uv, "export", "--frozen", "--no-hashes", "--no-emit-project", *extra_args],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        pytest.fail(f"`uv export {' '.join(extra_args)}` failed:\n{result.stderr}")
+    return result.stdout
+
+
+def _torch_lines(exported: str) -> list[str]:
+    return [line for line in exported.splitlines() if line.startswith("torch==")]
+
+
+@pytest.mark.skipif(
+    sys.platform == "darwin",
+    reason="GPU-default invariant is Linux-shaped: macOS PyPI torch is CPU-only (no CUDA wheels), "
+    "and uv export is host-scoped so the nvidia-/+cpu assertions don't apply.",
+)
+def test_torch_variant_resolution_forks_correctly():
+    """Lock-level tripwire for the GPU-default + cpu-extra torch scheme.
+
+    The design hinges on a subtle uv behavior: torch sits in base deps and
+    resolves from PyPI (CUDA wheels on Linux) by default, while the ``cpu`` extra
+    re-pins it to the pytorch-cpu index. The otherwise-redundant ``gpu`` extra
+    exists only to satisfy uv's >=2-members-per-conflict-set rule (see pyproject
+    ``[tool.uv].conflicts``) — that conflict is what scopes the cpu index to
+    ``--extra cpu`` instead of bleeding into the base resolution.
+
+    If a future uv changes either rule, the no-extra install would silently
+    collapse to CPU torch (0 nvidia pkgs) with no error. This test reads the
+    committed lock (``--frozen``, no network) and fails loudly if that happens.
+    """
+    default = _uv_export()
+    cpu = _uv_export("--extra", "cpu")
+
+    # Default fork → CUDA wheels present, torch un-suffixed (resolved from PyPI).
+    assert any(line.startswith("nvidia-") for line in default.splitlines()), (
+        "GPU-default regressed: the no-extra resolution pulls no nvidia-* packages "
+        "(torch collapsed to a CPU wheel). Check [tool.uv].conflicts in pyproject.toml."
+    )
+    assert _torch_lines(default), "no torch in the default resolution"
+    assert all("+cpu" not in line for line in _torch_lines(default)), (
+        f"no-extra resolution pinned a +cpu torch wheel (should be PyPI/CUDA): {_torch_lines(default)}"
+    )
+
+    # cpu fork → no CUDA wheels, torch carries the +cpu local version on non-darwin.
+    assert not any(line.startswith("nvidia-") for line in cpu.splitlines()), (
+        "--extra cpu pulled nvidia-* packages — the cpu index pin leaked CUDA wheels."
+    )
+    assert any("+cpu" in line for line in _torch_lines(cpu)), (
+        f"--extra cpu did not pin a +cpu torch wheel: {_torch_lines(cpu)}"
+    )
 
 
 @pytest.fixture(scope="session")
@@ -30,19 +104,23 @@ def cached_sentence_transformer_model():
         pytest.fail(f"Failed to load model '{EXPECTED_MODEL_NAME}': {e}")
 
 
-def test_pytorch_is_cpu_only():
+def test_torchvision_nms_abi_matches_torch():
     """
-    Verifies that the installed PyTorch wheel does not have CUDA support compiled in.
+    torch and torchvision must come from the same wheel source or torchvision's
+    C++ ops fail to register (``operator torchvision::nms does not exist``). This
+    is the ABI invariant the single-source scheme protects: the default PyPI
+    wheels, or both from the cpu index together. Run on CPU so it holds for both
+    the default (GPU) and ``--extra cpu`` installs.
     """
-    # torch.version is a module in some builds; prefer hasattr checks
-    cuda_ver = getattr(getattr(torch, "version", object()), "cuda", None)
-    assert cuda_ver is None, (
-        "Test failed: PyTorch was built with CUDA support (torch.version.cuda is not None), "
-        "but a CPU-only build is expected. Please reinstall PyTorch from the CPU wheel."
-    )
-    assert not torch.backends.mps.is_available(), (
-        "Test failed: PyTorch has access to an MPS device, but it should be CPU-only."
-    )
+    import torchvision
+
+    boxes = torch.as_tensor([[0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 1.0, 1.0]])
+    scores = torch.as_tensor([0.9, 0.8])
+    # A raw call is intentional: an ABI mismatch raises
+    # `operator torchvision::nms does not exist`, which fails the test with a
+    # clear traceback (torch {ver} / torchvision {ver}).
+    keep = torchvision.ops.nms(boxes, scores, iou_threshold=0.5)
+    assert keep.numel() >= 1
 
 
 def test_pytorch_cpu_optimizations_are_available():

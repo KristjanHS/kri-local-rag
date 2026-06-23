@@ -21,8 +21,12 @@
 # needed for wf jobs to differentiate bw GH and Act runners
 --actor=nektos/act
 
-# mount uv cache volume, for reuse over runs
---container-options "--volume=${HOME}/.cache/uv:/uv-cache"
+# Mount a DEDICATED uv cache volume for act, for reuse over runs.
+# NB! Must NOT be the host's primary ~/.cache/uv: act containers run as root, so
+# they write root-owned files into whatever is mounted here. Mounting the local-dev
+# cache poisons it and breaks subsequent host `uv sync`/`uv export` (Permission
+# denied). A separate ~/.cache/uv-act dir keeps act's root-owned cache isolated.
+--container-options "--volume=${HOME}/.cache/uv-act:/uv-cache"
 --env UV_CACHE_DIR=/uv-cache
 
 # As the workspace lives in the container’s filesystem and the cache is a mounted volume, uv can’t hardlink.
