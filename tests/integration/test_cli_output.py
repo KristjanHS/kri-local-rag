@@ -18,8 +18,10 @@ def reset_logging_state():
     original_level = logging.root.level
     original_log_level_env = os.environ.get("LOG_LEVEL")
 
-    # Reset to clean state
-    logging.shutdown()
+    # Reset to clean state. Detach handlers without logging.shutdown(): shutdown()
+    # closes every handler process-wide, including pytest's log_file handler, which
+    # is opened in mode "w" and never reopens once closed — silently dropping the
+    # rest of the session from reports/test_session.log.
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
     if "LOG_LEVEL" in os.environ:
@@ -32,8 +34,7 @@ def reset_logging_state():
 
     yield
 
-    # Restore original state
-    logging.shutdown()
+    # Restore original state (detach current handlers without closing them; see above).
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
 

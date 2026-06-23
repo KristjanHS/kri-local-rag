@@ -16,25 +16,20 @@ Both approaches should work seamlessly using the same test code and service URL 
 - [x] Updated `test-env.sh` to run E2E tests inside `app-test` container
 - [x] Modified `cmd_run_e2e()` to use `docker compose exec` instead of `uv run`
 - [x] Eliminated TEST_DOCKER environment variable usage
-
-### 🔄 In Progress
-- [ ] **Update E2E conftest.py to follow integration test design pattern**
-  - Create `e2e` fixture similar to integration test's `integration` fixture
-  - Use same service health check and URL resolution logic
-  - Remove any remaining TEST_DOCKER references
-  - Support both Docker and local environments seamlessly
+- [x] **Created unified `e2e` fixture mirroring the integration pattern** (`92bd246`)
+  - Session-scoped `e2e` fixture in `tests/e2e/conftest.py` exposing
+    `config`/`check_service_health`/`require_services`/`get_service_url`
+  - Reuses `get_integration_config()` + `is_service_healthy()` from `tests.conftest`
+  - Environment auto-detected from the resolved service URL (no TEST_DOCKER —
+    already absent from e2e); `require_services` skip-messages pull start commands
+    from `[tool.integration.commands]`
+  - `pytest_collection_modifyitems` already matched the integration marker-skip
+    pattern (no TEST_DOCKER logic to remove)
 
 ### 📋 Pending
-- [ ] **Create unified E2E fixture following integration test pattern**
-  - Implement `e2e` fixture with service health checks and URL resolution
-  - Use same `get_integration_config()` and `is_service_healthy()` functions
-  - Provide `require_services()` function for E2E tests
-  - Support both Docker and local environments automatically
-
-- [ ] **Update pytest_collection_modifyitems to match integration test approach**
-  - Remove TEST_DOCKER-based logic
-  - Use same service health check pattern as integration tests
-  - Provide generic error messages (no TEST_DOCKER dependency)
+- [ ] **Migrate existing e2e tests to consume the `e2e` fixture / `require_services`**
+  - The fixture is in place but no test opts into it yet (they still gate via
+    `requires_weaviate`/`requires_ollama` markers + `*_compose_up` fixtures)
 
 - [ ] **Simplify compose fixtures to match integration test simplicity**
   - Remove complex Docker detection logic

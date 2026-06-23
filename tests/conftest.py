@@ -7,11 +7,18 @@ import logging
 from pathlib import Path
 import os
 from typing import Any, Iterator, Optional
+import warnings
 
 import pytest
 
 # Set up a logger for this module
 logger = logging.getLogger(__name__)
+
+# Dedicated logger for pytest-captured warnings so they are greppable and land in
+# the dated session log (see pytest_warning_recorded). Deliberately NOT under the
+# "pytest" namespace, which pytest controls — a top-level name is immune to any
+# level/handler reconfiguration of pytest's own loggers.
+_warnings_logger = logging.getLogger("test_warnings")
 
 
 REPORTS_DIR = Path("reports")
@@ -111,8 +118,77 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 def pytest_configure(config: pytest.Config) -> None:  # noqa: D401
-    """Minimal global configuration (no suite flags or collection hooks)."""
-    return
+    """Give each run its own timestamped log file, retaining history.
+
+    The ini ``log_file`` (reports/test_session.log) opens in mode "w" and is
+    overwritten every run. Here we redirect it to ``reports/test_session-<ts>.log``
+    so past runs are kept, and leave a ``test_session.log`` symlink pointing at the
+    latest. This hook runs before ``_pytest.logging``'s trylast ``pytest_configure``,
+    so the LoggingPlugin picks up the rewritten ``config.option.log_file``.
+    """
+    # Respect an explicit --log-file on the CLI; only rewrite the ini default.
+    if config.getoption("log_file"):
+        return
+    ini_log_file = config.getini("log_file")
+    if not ini_log_file:
+        return
+
+    from datetime import datetime
+
+    base = Path(ini_log_file)
+    base.parent.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    dated = base.with_name(f"{base.stem}-{ts}{base.suffix}")
+    config.option.log_file = str(dated)
+
+    # Stable "latest" pointer at the original ini path.
+    try:
+        if base.is_symlink() or base.exists():
+            base.unlink()
+        base.symlink_to(dated.name)
+    except OSError:
+        pass  # symlink unsupported on this FS; the dated file is still written
+
+    # Prune old runs, keeping the most recent ones (names sort chronologically).
+    keep = 15
+    stale = sorted(base.parent.glob(f"{base.stem}-*{base.suffix}"), reverse=True)[keep:]
+    for path in stale:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
+def pytest_warning_recorded(
+    warning_message: warnings.WarningMessage,
+    when: str,
+    nodeid: str,
+    location: Optional[tuple[str, int, str]],
+) -> None:
+    """Persist pytest-captured warnings into the dated session log.
+
+    Pytest renders its terminal "warnings summary" from its own recorder, a channel
+    separate from ``logging`` — so those warnings vanish with the terminal scrollback.
+    The app already routes *runtest*-phase warnings to ``logging`` via
+    ``backend.config`` calling ``logging.captureWarnings(True)``, but that only
+    activates once backend is imported (an autouse fixture, i.e. after collection).
+    Warnings raised during config/collection therefore never reach ``log_file``.
+
+    Re-emit every warning pytest records as a logging record on the
+    root-propagating ``pytest.warnings`` logger so it is captured in
+    ``reports/test_session-<ts>.log`` regardless of phase.
+    """
+    category = getattr(warning_message.category, "__name__", str(warning_message.category))
+    origin = f"{warning_message.filename}:{warning_message.lineno}"
+    where = f" [{nodeid}]" if nodeid else ""
+    _warnings_logger.warning(
+        "%s: %s (%s, phase=%s)%s",
+        category,
+        warning_message.message,
+        origin,
+        when,
+        where,
+    )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
