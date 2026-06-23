@@ -1,4 +1,6 @@
-from unittest.mock import MagicMock, patch
+import shutil
+from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from langchain_core.documents import Document
@@ -44,24 +46,22 @@ def mock_docs():
     return [doc1, doc2]
 
 
-@patch("backend.ingest.DirectoryLoader")
-@patch("backend.ingest.os.path.exists", return_value=True)
-def test_load_and_split_documents(mock_exists, mock_loader):
-    """Test that documents are loaded and split correctly."""
-    # Arrange
-    mock_instance = mock_loader.return_value
-    mock_instance.load.return_value = [
-        Document(page_content="PDF content repeated. " * 50),
-        Document(page_content="Markdown content repeated. " * 50),
-    ]
+def test_load_and_split_documents(tmp_path):
+    """Real temp .md + .pdf files are loaded (no loader mock) and split into chunks."""
+    # Arrange: a markdown file long enough to force splitting, plus the PDF fixture.
+    fixture_pdf = Path(__file__).resolve().parents[1] / "test_data" / "test.pdf"
+    shutil.copyfile(fixture_pdf, tmp_path / "doc.pdf")
+    (tmp_path / "notes.md").write_text("Markdown content repeated. " * 200, encoding="utf-8")
 
     # Act
-    chunked_docs = load_and_split_documents("fake_dir")
+    chunked_docs = load_and_split_documents(str(tmp_path))
 
-    # Assert
-    assert len(chunked_docs) > 2  # Check that splitting occurred
-    assert "PDF content" in chunked_docs[0].page_content
-    assert "Markdown content" in chunked_docs[-1].page_content
+    # Assert: splitting occurred and both sources contributed.
+    assert len(chunked_docs) > 2
+    combined = " ".join(d.page_content for d in chunked_docs)
+    assert "Markdown content" in combined
+    sources = {Path(str(d.metadata.get("source", ""))).name for d in chunked_docs}
+    assert {"doc.pdf", "notes.md"} <= sources
 
 
 def test_deterministic_uuid(mock_docs):

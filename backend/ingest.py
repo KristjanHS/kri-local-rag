@@ -3,14 +3,15 @@ from __future__ import annotations
 
 """Document Ingestion Script
 
-This script uses LangChain for robust document loading and a manual pipeline
-for vectorization and storage to offer detailed control.
+This script loads documents with lightweight, permissively-licensed parsers
+(pypdf for PDFs, stdlib for text) and a manual pipeline for vectorization and
+storage to offer detailed control.
 
 Usage:
     python backend/ingest.py --data-dir ./data
 
 Key Features:
--   **Multi-Format Support**: Ingests PDF and Markdown files via LangChain loaders.
+-   **Multi-Format Support**: Ingests PDF (pypdf) and Markdown (stdlib) files.
 -   **Manual Control**: Provides explicit control over sentence transformation and Weaviate upsert logic.
 -   **Idempotent**: Re-running the script updates existing documents without creating duplicates.
 -   **CPU Optimized**: Leverages a CPU-optimized sentence-transformer model.
@@ -22,13 +23,14 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, List, Optional, Protocol, TypeVar, cast, runtime_checkable
 
 import torch
 import weaviate
-from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pypdf import PdfReader
 
 # Avoid importing sentence-transformers at module import time to keep imports light
 # and prevent optional vision dependencies from being pulled in during unit tests.
@@ -67,27 +69,26 @@ def _is_valid_pdf(path: str) -> bool:
         return False
 
 
+def _load_pdf(path: str) -> List[Document]:
+    """Load a PDF into one Document per page using pypdf (pure-Python, BSD-licensed)."""
+    reader = PdfReader(path)
+    return [
+        Document(page_content=page.extract_text() or "", metadata={"source": path, "page": i})
+        for i, page in enumerate(reader.pages)
+    ]
+
+
+def _load_text(path: str) -> List[Document]:
+    """Load a UTF-8 text/markdown file into a single Document via the stdlib."""
+    return [Document(page_content=Path(path).read_text(encoding="utf-8"), metadata={"source": path})]
+
+
 def load_and_split_documents(path: str) -> List[Document]:
     """Load documents from a directory or a single file, then split into chunks."""
     # Fast path: if the path does not exist, skip gracefully
     if not os.path.exists(path):
         logger.warning(f"Path not found: '{path}'. Skipping ingestion.")
         return []
-    # Choose the most robust/accurate PDF loader available in this environment
-    pdf_loader_cls = PyPDFLoader
-    try:
-        from langchain_community.document_loaders import PyMuPDFLoader  # type: ignore
-
-        pdf_loader_cls = PyMuPDFLoader  # fastest, robust on malformed PDFs
-        logger.info("Using PyMuPDFLoader for PDFs (best available).")
-    except Exception:
-        try:
-            from langchain_community.document_loaders import UnstructuredPDFLoader  # type: ignore
-
-            pdf_loader_cls = UnstructuredPDFLoader  # layout-aware; robust
-            logger.info("Using UnstructuredPDFLoader for PDFs.")
-        except Exception:
-            logger.info("Using PyPDFLoader for PDFs (fallback).")
 
     # 1) Single file path support
     docs: List[Document] = []
@@ -98,43 +99,34 @@ def load_and_split_documents(path: str) -> List[Document]:
             if not _is_valid_pdf(path):
                 logger.warning(f"Skipping '{path}': not a valid PDF (bad magic bytes).")
                 return []
-            loader = pdf_loader_cls(path)
-            docs.extend(loader.load())
+            docs.extend(_load_pdf(path))
             file_count = 1
         elif ext == ".md":
-            loader = TextLoader(path, encoding="utf-8")
-            docs.extend(loader.load())
+            docs.extend(_load_text(path))
             file_count = 1
         else:
             logger.warning(f"Unsupported file extension '{ext}' for path '{path}'.")
             return []
     else:
-        # 2) Directory path with glob patterns
+        # 2) Directory path with glob patterns. Per-file try/except so one bad
+        #    file logs and is skipped rather than aborting the whole batch.
         import glob
 
         loader_configs = {
-            "**/*.pdf": pdf_loader_cls,
-            "**/*.md": TextLoader,
+            "**/*.pdf": _load_pdf,
+            "**/*.md": _load_text,
         }
-        for glob_pattern, loader_cls in loader_configs.items():
-            try:
-                # Count files first
-                pattern_path = os.path.join(path, glob_pattern)
-                matching_files = glob.glob(pattern_path, recursive=True)
-                file_count += len(matching_files)
-
-                loader = DirectoryLoader(
-                    path,
-                    glob=glob_pattern,
-                    loader_cls=cast(Any, loader_cls),
-                    show_progress=True,
-                    use_multithreading=True,
-                )
-                loaded_docs = loader.load()
-                docs.extend(loaded_docs)
-            except Exception as e:
-                logger.error(f"Error loading documents with pattern '{glob_pattern}': {e}")
-                logger.exception("Full traceback for loading error:")
+        for glob_pattern, loader_fn in loader_configs.items():
+            for file_path in glob.glob(os.path.join(path, glob_pattern), recursive=True):
+                try:
+                    if file_path.lower().endswith(".pdf") and not _is_valid_pdf(file_path):
+                        logger.warning(f"Skipping '{file_path}': not a valid PDF (bad magic bytes).")
+                        continue
+                    docs.extend(loader_fn(file_path))
+                    file_count += 1
+                except Exception as e:
+                    logger.error(f"Error loading '{file_path}' with pattern '{glob_pattern}': {e}")
+                    logger.exception("Full traceback for loading error:")
 
     if not docs:
         logger.warning(f"No documents found in '{path}'.")
