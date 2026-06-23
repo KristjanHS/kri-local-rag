@@ -111,8 +111,45 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 def pytest_configure(config: pytest.Config) -> None:  # noqa: D401
-    """Minimal global configuration (no suite flags or collection hooks)."""
-    return
+    """Give each run its own timestamped log file, retaining history.
+
+    The ini ``log_file`` (reports/test_session.log) opens in mode "w" and is
+    overwritten every run. Here we redirect it to ``reports/test_session-<ts>.log``
+    so past runs are kept, and leave a ``test_session.log`` symlink pointing at the
+    latest. This hook runs before ``_pytest.logging``'s trylast ``pytest_configure``,
+    so the LoggingPlugin picks up the rewritten ``config.option.log_file``.
+    """
+    # Respect an explicit --log-file on the CLI; only rewrite the ini default.
+    if config.getoption("log_file"):
+        return
+    ini_log_file = config.getini("log_file")
+    if not ini_log_file:
+        return
+
+    from datetime import datetime
+
+    base = Path(ini_log_file)
+    base.parent.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    dated = base.with_name(f"{base.stem}-{ts}{base.suffix}")
+    config.option.log_file = str(dated)
+
+    # Stable "latest" pointer at the original ini path.
+    try:
+        if base.is_symlink() or base.exists():
+            base.unlink()
+        base.symlink_to(dated.name)
+    except OSError:
+        pass  # symlink unsupported on this FS; the dated file is still written
+
+    # Prune old runs, keeping the most recent ones (names sort chronologically).
+    keep = 15
+    stale = sorted(base.parent.glob(f"{base.stem}-*{base.suffix}"), reverse=True)[keep:]
+    for path in stale:
+        try:
+            path.unlink()
+        except OSError:
+            pass
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
