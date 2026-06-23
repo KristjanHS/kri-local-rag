@@ -7,9 +7,8 @@ Purpose
 - Complements the admin runbook in `docs/operate/mvp_deployment.md` (this file is for preparing the repo before handover).
 
 See also:
-- AI agent cheatsheet and E2E commands: `docs/AI_coder/AI_instructions.md` (sections: "Golden commands" and "AI Agent Hints: Docker startup and E2E tests").
-- Test suites and markers: `docs/AI_coder/AI_instructions.md` (section: "Testing").
-- Human dev quickstart: `docs/dev_test_CI/DEVELOPMENT.md`.
+- Commands and golden targets: root `README.md` and `make help` (also summarized in `CLAUDE.md`).
+- Dev setup, test suites, CI/release: `docs/dev_test_CI/README.md`.
 
 
 Context

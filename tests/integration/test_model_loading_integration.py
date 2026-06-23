@@ -70,8 +70,10 @@ def test_load_embedder_real_model_with_timeout(reset_global_cache):
         elapsed_time = time.time() - start_time
 
         # Verify reasonable load time
-        assert elapsed_time < MODEL_LOAD_TIMEOUT, ".2f"
-        logger.info(".2f")
+        assert elapsed_time < MODEL_LOAD_TIMEOUT, (
+            f"Embedding model load took {elapsed_time:.2f}s, exceeds {MODEL_LOAD_TIMEOUT}s"
+        )
+        logger.info("Embedding model loaded in %.2fs", elapsed_time)
 
         # Verify model is loaded and functional
         assert model is not None, "Embedding model should be loaded"
@@ -201,8 +203,10 @@ def test_load_reranker_real_model_with_timeout(reset_global_cache):
         elapsed_time = time.time() - start_time
 
         # Verify reasonable load time
-        assert elapsed_time < MODEL_LOAD_TIMEOUT, ".2f"
-        logger.info(".2f")
+        assert elapsed_time < MODEL_LOAD_TIMEOUT, (
+            f"Reranker model load took {elapsed_time:.2f}s, exceeds {MODEL_LOAD_TIMEOUT}s"
+        )
+        logger.info("Reranker model loaded in %.2fs", elapsed_time)
 
         # Verify model is loaded and functional
         assert model is not None, "Reranker model should be loaded"
@@ -279,12 +283,17 @@ def test_model_caching_behavior(reset_global_cache):
 
     # Second load should be significantly faster (caching benefit)
     speedup_ratio = first_load_time / max(second_load_time, 0.001)  # Avoid division by zero
-    logger.info(".2f")
+    logger.info(
+        "Cache speedup: first=%.2fs second=%.2fs ratio=%.2fx",
+        first_load_time,
+        second_load_time,
+        speedup_ratio,
+    )
     # Use speedup_ratio to avoid unused variable warning - caching should provide benefit
     assert speedup_ratio > 1.0, "Second load should be faster than first load"
 
     # The speedup should be substantial, but we'll be lenient since first load includes download
-    assert second_load_time < 1.0, ".3f"
+    assert second_load_time < 1.0, f"Cached load took {second_load_time:.3f}s, expected < 1.0s"
 
     logger.info("✓ Model caching validated successfully")
 
@@ -304,9 +313,9 @@ def test_preload_models_functionality(reset_global_cache):
     preload_models()
     preload_time = time.time() - start_time
 
-    logger.info(".2f")
+    logger.info("Preloaded both models in %.2fs", preload_time)
     # Verify preload completed within reasonable time
-    assert preload_time < MODEL_LOAD_TIMEOUT * 2, ".2f"
+    assert preload_time < MODEL_LOAD_TIMEOUT * 2, f"Preload took {preload_time:.2f}s, exceeds {MODEL_LOAD_TIMEOUT * 2}s"
 
     # Verify both models are now loaded
     assert backend.models._embedding_model is not None, "Embedding model should be loaded after preload"
@@ -332,25 +341,26 @@ def test_model_loading_error_handling(reset_global_cache):
         with pytest.raises(Exception) as exc_info:
             load_embedder()
 
-            # Should raise some kind of error
-            assert exc_info.value is not None, "Should raise an error for invalid model configuration"
-            assert isinstance(exc_info.value, (RuntimeError, OSError, Exception)), (
-                f"Expected model loading exception, got {type(exc_info.value)}"
-            )
+    # Assertions must run AFTER the with-block: code inside pytest.raises after the
+    # raising call is unreachable (the exception unwinds out of the block).
+    assert exc_info.value is not None, "Should raise an error for invalid model configuration"
+    assert isinstance(exc_info.value, (RuntimeError, OSError, Exception)), (
+        f"Expected model loading exception, got {type(exc_info.value)}"
+    )
 
-            # Verify it's related to missing model or network connectivity (offline mode)
-            error_msg = str(exc_info.value).lower()
-            expected_keywords = [
-                "not found",
-                "no such file",
-                "cannot find",
-                "model",
-                "couldn't connect",
-                "offline mode",
-            ]
-            assert any(keyword in error_msg for keyword in expected_keywords), (
-                f"Expected missing model or network error, got: {error_msg}"
-            )
+    # Verify it's related to missing model or network connectivity (offline mode)
+    error_msg = str(exc_info.value).lower()
+    expected_keywords = [
+        "not found",
+        "no such file",
+        "cannot find",
+        "model",
+        "couldn't connect",
+        "offline mode",
+    ]
+    assert any(keyword in error_msg for keyword in expected_keywords), (
+        f"Expected missing model or network error, got: {error_msg}"
+    )
 
     logger.info("✓ Error handling validated successfully")
 
@@ -515,9 +525,9 @@ def test_model_cache_integration_performance(real_model_loader):
 
     # Second load should be very fast due to caching
     if second_load_time > 0:
-        logger.info(".3f")
+        logger.info("Cached load of both models took %.3fs", second_load_time)
         # Cached loads should be very fast (< 1 second for both models)
-        assert second_load_time < 1.0, ".3f"
+        assert second_load_time < 1.0, f"Cached load took {second_load_time:.3f}s, expected < 1.0s"
 
     # Verify models are still functional
     if embedder1 is not None:

@@ -24,6 +24,11 @@ if ! command -v pre-commit >/dev/null 2>&1; then
     exit 1
 fi
 
+# Capture the files staged for THIS commit before running hooks, so we can
+# re-stage only those if a hook reformats them — never sweep in unrelated
+# working-tree changes (git add -u would stage the whole repo).
+mapfile -t STAGED_FILES < <(git diff --cached --name-only --diff-filter=ACMR)
+
 # Run pre-commit on all files
 # This will run: ruff (fix + format), yamlfmt, detect-secrets, and custom secrets scan
 pre-commit run --all-files 2>&1 | tee -a "$LOG_FILE"
@@ -36,9 +41,14 @@ if [ $EXIT_CODE -ne 0 ]; then
     exit 1
 fi
 
-# Stage any files that were modified by the pre-commit hooks
-log INFO "✓ Staging any files modified by pre-commit hooks..."
-git add -u
+# Re-stage only the files that were already part of this commit, in case a
+# hook reformatted them. Skips files the hooks deleted (no longer on disk).
+log INFO "✓ Re-staging commit files modified by pre-commit hooks..."
+for f in "${STAGED_FILES[@]}"; do
+    if [ -e "$f" ]; then
+        git add -- "$f"
+    fi
+done
 
 log INFO "✅ Pre-commit checks passed successfully."
 log INFO "🎉 All checks completed: Ruff formatting, YAML formatting, and secrets scanning"

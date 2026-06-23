@@ -2,7 +2,8 @@
 .PHONY: help setup-hooks test-up test-down test-logs test-up-force-build test-clean \
         test-integration test-e2e integration push-pr export-reqs \
         ruff-format ruff-fix yamlfmt pyright pre-commit unit pip-audit \
-        semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage dev-setup ollama-pull deptry
+        semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage dev-setup ollama-pull deptry \
+        sync use-gpu use-cpu show-variant
 
 # Use bash with strict flags for recipes
 SHELL := bash
@@ -65,9 +66,30 @@ help: ## Show this help (grouped)
 
 # uv sync re-locks before syncing unless you pass --locked or --frozen.
 # If pyproject.toml changed and uv.lock wasn’t regenerated, --frozen will still proceed, while --locked will stop.
+# Resolve the per-machine uv extras variant (cpu | gpu) in-recipe so a bad
+# KRI_VARIANT / .kri-variant.local aborts the recipe with the selector's error
+# (under .ONESHELL + set -e) instead of producing an empty --extra. KRI_VARIANT
+# env > .kri-variant.local file > gpu default. CI/act export KRI_VARIANT=cpu.
 uv-sync-test: ## uv sync test group (frozen) + pip check
-	uv sync --locked --group test
+	V=$$(./scripts/select_variant.sh)
+	uv sync --locked --extra "$$V" --group test
 	uv pip check
+
+# Variant-aware sync: run_uv.sh reads the selected variant (gpu by default) and
+# passes the matching --extra to `uv sync`.
+sync: ## Sync the venv for the selected variant (./run_uv.sh)
+	@./run_uv.sh
+
+use-gpu: ## Select the GPU (cu128) extra for this checkout and sync
+	@echo gpu > .kri-variant.local
+	@./run_uv.sh
+
+use-cpu: ## Select the CPU extra for this checkout and sync
+	@echo cpu > .kri-variant.local
+	@./run_uv.sh
+
+show-variant: ## Print the resolved variant (gpu by default; rejects typos)
+	@./scripts/select_variant.sh
 
 setup-hooks: ## Configure Git hooks path
 	@echo "Configuring Git hooks path..."
@@ -82,9 +104,10 @@ export-reqs: ## Export requirements.txt from uv.lock (omits torch/GPU extras)
 	  --locked \
 	  --no-emit-project \
 	  --no-emit-package torch \
+	  --no-emit-package torchvision \
 	  --format requirements-txt \
 	  > requirements.txt
-	@echo ">> Wrote requirements.txt (torch and GPU extras removed)"
+	@echo ">> Wrote requirements.txt (torch/torchvision and GPU extras removed)"
 
 # =========================
 # App Runtime
@@ -149,7 +172,7 @@ ollama-pull: ## Pull Ollama model in container (MODEL=...)
 	@$(COMPOSE_APP) exec -T ollama ollama pull "$(MODEL)"
 
 # Run E2E tests with automatic stack lifecycle
-e2e: ## Run E2E tests on local env, assumes already running docker services. Set PRESERVE=0 to stack-down
+e2e: ## Run E2E tests on host; needs kri-local-rag-app:latest (auto-built by `make stack-up`), else tests skip. For fully-automated build+run, use `make test-up && make test-e2e`. Set PRESERVE=0 to stack-down
 	@set -euo pipefail; \
 	EXIT=0; \
 	$(PYTEST) tests/e2e $(PYTEST_BASE) $${PYTEST_ARGS:-} || EXIT=$$?; \
@@ -203,9 +226,9 @@ integration: ## Run local integration tests (venv or uv)
 	@MPLCONFIGDIR=$${MPLCONFIGDIR:-$(CURDIR)/.cache/matplotlib}; \
 	 mkdir -p "$$MPLCONFIGDIR"; \
 	 if [ -x .venv/bin/python ]; then \
-		MPLCONFIGDIR="$$MPLCONFIGDIR" .venv/bin/python -m pytest tests/integration -q ${PYTEST_ARGS}; \
+		MPLCONFIGDIR="$$MPLCONFIGDIR" .venv/bin/python -m pytest tests/integration -q --junitxml=reports/junit_integration.xml ${PYTEST_ARGS}; \
 	 elif command -v uv >/dev/null 2>&1; then \
-		MPLCONFIGDIR="$$MPLCONFIGDIR" uv run -m pytest tests/integration -q ${PYTEST_ARGS}; \
+		MPLCONFIGDIR="$$MPLCONFIGDIR" uv run -m pytest tests/integration -q --junitxml=reports/junit_integration.xml ${PYTEST_ARGS}; \
 	 else \
 		echo ".venv/bin/python not found and uv not available. Create the env (make uv-sync-test or python -m venv .venv) then run '.venv/bin/python -m pytest tests/integration -q'"; \
 		exit 1; \
@@ -277,7 +300,8 @@ pyright: ## Run Pyright type checking
 
 yamlfmt: ## Validate YAML formatting via pre-commit
 	# Ensure dev + test groups are present so later test steps still work
-	uv sync --group dev --group test --frozen
+	V=$$(./scripts/select_variant.sh)
+	uv sync --extra "$$V" --group dev --group test --frozen
 	uv run pre-commit run yamlfmt -a
 
 # Ruff targets
@@ -290,7 +314,8 @@ ruff-fix: ## Run Ruff lint with autofix
 # Run full pre-commit suite (dev deps required)
 pre-commit: ## Run all pre-commit hooks on all files
 	# Keep test deps installed to avoid breaking local test runs after this target
-	uv sync --group dev --group test --frozen
+	V=$$(./scripts/select_variant.sh)
+	uv sync --extra "$$V" --group dev --group test --frozen
 	uv run pre-commit run --all-files
 
 # =========================

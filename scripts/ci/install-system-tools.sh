@@ -12,6 +12,20 @@ fi
 $SUDO_CMD apt-get update && $SUDO_CMD env DEBIAN_FRONTEND=noninteractive apt-get install -y \
   curl jq ca-certificates tar xz-utils python3 python3-pip file
 
+# B8: verify a downloaded file against an expected SHA256 before installing.
+# Pins below default to known-good versions; checksums are fetched from each
+# release's published checksum manifest and compared. Override *_VERSION to bump.
+verify_sha256() {
+  # $1 = file path, $2 = expected lowercase hex sha256
+  local file="$1" expected="$2" actual
+  actual="$(sha256sum "$file" | awk '{print $1}')"
+  if [[ "$actual" != "$expected" ]]; then
+    echo "SHA256 mismatch for ${file}" >&2
+    echo "  expected: ${expected}" >&2
+    echo "  actual:   ${actual}" >&2
+    exit 1
+  fi
+}
 
 # --- hadolint (static binary, arch-aware) ---
 arch="$(uname -m)"
@@ -21,82 +35,100 @@ case "$arch" in
   *) echo "Unsupported arch: $arch" && exit 1 ;;
 esac
 
-# Optional pin (e.g., HADOLINT_VERSION=2.12.0). Empty => latest.
-: "${HADOLINT_VERSION:=}"
+# Pinned for supply-chain integrity (B8). Override via HADOLINT_VERSION.
+: "${HADOLINT_VERSION:=2.14.0}"
 
-# Build the download URL WITHOUT using the GitHub API to avoid 403s.
-if [[ -z "${HADOLINT_VERSION}" ]]; then
-  HL_URL="https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-${HL_ARCH}"
-else
-  HL_URL="https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-${HL_ARCH}"
+# Versioned download URL (avoids the GitHub API to dodge 403s). Lowercase asset
+# names match the published checksum sidecar.
+HL_URL="https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-${HL_ARCH}"
+
+# Download fresh into a temp file, verify SHA256, then install.
+HL_TMP="$(mktemp)"
+trap 'rm -f "$HL_TMP"' EXIT
+curl -fLso "$HL_TMP" "${HL_URL}"
+# The .sha256 sidecar is "<hash> *<filename>"; take field 1 as the expected hash.
+HL_EXPECTED="$(curl -fsSL "${HL_URL}.sha256" | awk '{print $1}')"
+if [[ -z "${HL_EXPECTED}" ]]; then
+  echo "Empty checksum from ${HL_URL}.sha256" >&2
+  exit 1
 fi
-
-# Replace any old/corrupt binary, download fresh, make executable, and validate
+verify_sha256 "$HL_TMP" "$HL_EXPECTED"
 $SUDO_CMD rm -f /usr/local/bin/hadolint
-$SUDO_CMD curl -fLso /usr/local/bin/hadolint "${HL_URL}"
-$SUDO_CMD chmod +x /usr/local/bin/hadolint
+$SUDO_CMD install -m 0755 "$HL_TMP" /usr/local/bin/hadolint
+rm -f "$HL_TMP"
+trap - EXIT
 if ! file /usr/local/bin/hadolint | grep -q 'ELF'; then
-  echo "Downloaded hadolint is not a valid ELF. URL: ${HL_URL}" >&2
+  echo "Installed hadolint is not a valid ELF. URL: ${HL_URL}" >&2
   exit 1
 fi
 
-# actionlint (system-wide install into /usr/local/bin)
-# Uses official download script with positional args: <version> <install-dir>.
-: "${ACTIONLINT_VERSION:=latest}"
+# --- actionlint (static binary from tarball, arch-aware) ---
+# Pinned + checksum-verified (B8). Replaces the previously unpinned
+# download-actionlint.bash fetched from the repo's main branch.
+case "$arch" in
+  x86_64)  AL_ARCH="amd64" ;;
+  aarch64|arm64) AL_ARCH="arm64" ;;
+  *) echo "Unsupported arch: $arch" && exit 1 ;;
+esac
 
-# Download and install actionlint system-wide (Codespaces-compatible: avoid process substitution).
-TMP_SCRIPT="$(mktemp)"
-trap 'rm -f "$TMP_SCRIPT"' EXIT
-curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash -o "$TMP_SCRIPT"
-$SUDO_CMD bash "$TMP_SCRIPT" "${ACTIONLINT_VERSION}" "/usr/local/bin"
+: "${ACTIONLINT_VERSION:=1.7.12}"
 
-# yamlfmt (static binary from tarball, arch-aware)
-# Uses the same architecture detection as hadolint
+AL_TARBALL="actionlint_${ACTIONLINT_VERSION}_linux_${AL_ARCH}.tar.gz"
+AL_BASE="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
+AL_URL="${AL_BASE}/${AL_TARBALL}"
+AL_CHECKSUMS_URL="${AL_BASE}/actionlint_${ACTIONLINT_VERSION}_checksums.txt"
+
+AL_TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$AL_TMP_DIR"' EXIT
+echo "Downloading actionlint from ${AL_URL}"
+curl -fLso "${AL_TMP_DIR}/${AL_TARBALL}" "${AL_URL}"
+# checksums.txt lines are "<hash>  <filename>"; match our tarball's row.
+AL_EXPECTED="$(curl -fsSL "${AL_CHECKSUMS_URL}" | awk -v f="${AL_TARBALL}" '$2==f {print $1}')"
+if [[ -z "${AL_EXPECTED}" ]]; then
+  echo "No checksum entry for ${AL_TARBALL} in ${AL_CHECKSUMS_URL}" >&2
+  exit 1
+fi
+verify_sha256 "${AL_TMP_DIR}/${AL_TARBALL}" "${AL_EXPECTED}"
+tar -xzf "${AL_TMP_DIR}/${AL_TARBALL}" -C "${AL_TMP_DIR}" actionlint
+$SUDO_CMD install -m 0755 "${AL_TMP_DIR}/actionlint" /usr/local/bin/actionlint
+rm -rf "$AL_TMP_DIR"
+trap - EXIT
+
+# --- yamlfmt (static binary from tarball, arch-aware) ---
 case "$arch" in
   x86_64)  YF_ARCH="x86_64" ;;
   aarch64|arm64) YF_ARCH="arm64" ;;
   *) echo "Unsupported arch: $arch" && exit 1 ;;
 esac
 
-# Optional pin (e.g., YAMLFMT_VERSION=0.12.0). Empty => latest.
-: "${YAMLFMT_VERSION:=}"
-
-if [[ -z "${YAMLFMT_VERSION}" ]]; then
-    echo "Detecting latest yamlfmt version..."
-    # Get latest release tag from redirect, then strip 'v'
-    LATEST_TAG=$(curl -Ls -o /dev/null -w '%{url_effective}' "https://github.com/google/yamlfmt/releases/latest" | rev | cut -d'/' -f1 | rev)
-    if [[ ! "$LATEST_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "Could not determine latest yamlfmt version from tag: ${LATEST_TAG}" >&2
-        exit 1
-    fi
-    YAMLFMT_VERSION="${LATEST_TAG#v}"
-    echo "Latest yamlfmt version is ${YAMLFMT_VERSION}"
-fi
+# Pinned + checksum-verified (B8). Override via YAMLFMT_VERSION.
+: "${YAMLFMT_VERSION:=0.21.0}"
 
 YF_TARBALL="yamlfmt_${YAMLFMT_VERSION}_Linux_${YF_ARCH}.tar.gz"
-YF_URL="https://github.com/google/yamlfmt/releases/download/v${YAMLFMT_VERSION}/${YF_TARBALL}"
+YF_BASE="https://github.com/google/yamlfmt/releases/download/v${YAMLFMT_VERSION}"
+YF_URL="${YF_BASE}/${YF_TARBALL}"
+YF_CHECKSUMS_URL="${YF_BASE}/checksums.txt"
 
-# Download, extract, and install
-TMP_DIR=$(mktemp -d)
-# Setup trap to remove temp dir on EXIT.
-trap 'rm -rf "$TMP_DIR"' EXIT
-
+YF_TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$YF_TMP_DIR"' EXIT
 echo "Downloading yamlfmt from ${YF_URL}"
-curl -fLso "${TMP_DIR}/${YF_TARBALL}" "${YF_URL}"
-
+curl -fLso "${YF_TMP_DIR}/${YF_TARBALL}" "${YF_URL}"
+# checksums.txt lines are "<hash>  <filename>"; match our tarball's row.
+YF_EXPECTED="$(curl -fsSL "${YF_CHECKSUMS_URL}" | awk -v f="${YF_TARBALL}" '$2==f {print $1}')"
+if [[ -z "${YF_EXPECTED}" ]]; then
+  echo "No checksum entry for ${YF_TARBALL} in ${YF_CHECKSUMS_URL}" >&2
+  exit 1
+fi
+verify_sha256 "${YF_TMP_DIR}/${YF_TARBALL}" "${YF_EXPECTED}"
 echo "Extracting yamlfmt binary"
-tar -xzf "${TMP_DIR}/${YF_TARBALL}" -C "${TMP_DIR}" yamlfmt
-
-echo "Installing yamlfmt to /usr/local/bin"
-$SUDO_CMD mv "${TMP_DIR}/yamlfmt" /usr/local/bin/yamlfmt
-$SUDO_CMD chmod +x /usr/local/bin/yamlfmt
-
+tar -xzf "${YF_TMP_DIR}/${YF_TARBALL}" -C "${YF_TMP_DIR}" yamlfmt
+$SUDO_CMD install -m 0755 "${YF_TMP_DIR}/yamlfmt" /usr/local/bin/yamlfmt
+rm -rf "$YF_TMP_DIR"
+trap - EXIT
 if ! file /usr/local/bin/yamlfmt | grep -q 'ELF'; then
   echo "Installed yamlfmt is not a valid ELF. URL: ${YF_URL}" >&2
   exit 1
 fi
-
-
 
 # pyright and bandit are installed into the project's .venv by project Make targets.
 # Ensure `make uv-sync-test` has been run. No system-wide install needed.
