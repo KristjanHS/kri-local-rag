@@ -98,23 +98,24 @@ Offline-first loading, all settings in `backend/config.py`:
 
 Start the stack with `make stack-up` (builds, starts, waits for health). Service operations and reset: `docs/operate/docker-management.md`.
 
-**Torch variant (CPU/GPU).** torch + torchvision live in mutually-exclusive
-`cpu` / `gpu` uv extras (index-pinned to pytorch-cpu / pytorch-cu128; see
-`pyproject.toml` and `docs/plans/archive/2026-06-23-gpu-cpu-torch-extras.md`). The active
-variant is resolved by `scripts/select_variant.sh` with precedence
-`KRI_VARIANT` env > `.kri-variant.local` (gitignored, per-machine) > **gpu**
-(the local-dev default).
+**Torch variant (GPU default / CPU extra).** torch + torchvision are base deps
+that resolve from PyPI by default → GPU-capable CUDA wheels on Linux. A single
+`cpu` extra re-pins both to the pytorch-cpu index for slim CPU-only installs (see
+`pyproject.toml` `[tool.uv]` and
+`docs/plans/2026-06-23-cpu-gpu-variant-simplification-design.md`). The
+otherwise-redundant `gpu` extra exists only to satisfy uv's ≥2-members-per-conflict
+rule — it is source-less, so it resolves from PyPI just like the no-extra default.
 
 ```bash
-make use-gpu          # local/bare-metal dev (cu128) — writes .kri-variant.local + syncs
-make use-cpu          # CPU-only box — writes .kri-variant.local + syncs
-make show-variant     # print the resolved variant
-make sync             # sync the current variant (./run_uv.sh)
-KRI_VARIANT=cpu make uv-sync-test   # one-off CPU sync (what CI does)
+make sync                            # local/bare-metal dev → PyPI/CUDA torch (default)
+make sync SYNC_EXTRA="--extra cpu"   # CPU-only box → slim +cpu wheels
+./run_uv.sh --extra cpu              # equivalent direct invocation
 ```
 
-Always select a variant — a bare `uv sync` with no `--extra` falls back to the
-default PyPI torch wheel (CUDA-bundled on Linux, not index-pinned).
+CI passes `SYNC_EXTRA="--extra cpu"` (CPU-only runners). A bare `uv sync` with no
+extra is now the *intended* GPU path, not a footgun. To switch an existing checkout
+between variants, recreate the venv clean (`rm -rf .venv` then re-sync) — swapping
+CUDA wheel families in place can corrupt the shared PEP-420 `nvidia/` namespace dir.
 
 The **Docker app image stays CPU** (slim runtime; only Ollama uses the GPU). Its
 `uv sync` lines hardcode `--extra cpu`, so no build arg is needed:

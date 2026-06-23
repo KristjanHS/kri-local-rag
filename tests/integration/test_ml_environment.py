@@ -1,6 +1,7 @@
 import logging
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -23,8 +24,10 @@ logger = logging.getLogger(__name__)
 def _uv_export(*extra_args: str) -> str:
     """Return `uv export` output for the committed lock, no network (--frozen).
 
-    Universal export: it emits every platform fork with environment markers, so
-    the assertions below hold regardless of the host OS.
+    Output is scoped to the host platform: it emits each extra-fork but only the
+    current OS's wheels (nvidia-* carry `sys_platform == 'linux'`, the cpu-fork
+    torch line is `+cpu` only on non-darwin). The GPU-default assertions below
+    are therefore Linux-shaped — the caller guards with `skipif(darwin)`.
     """
     uv = shutil.which("uv")
     if uv is None:
@@ -44,6 +47,11 @@ def _torch_lines(exported: str) -> list[str]:
     return [line for line in exported.splitlines() if line.startswith("torch==")]
 
 
+@pytest.mark.skipif(
+    sys.platform == "darwin",
+    reason="GPU-default invariant is Linux-shaped: macOS PyPI torch is CPU-only (no CUDA wheels), "
+    "and uv export is host-scoped so the nvidia-/+cpu assertions don't apply.",
+)
 def test_torch_variant_resolution_forks_correctly():
     """Lock-level tripwire for the GPU-default + cpu-extra torch scheme.
 
