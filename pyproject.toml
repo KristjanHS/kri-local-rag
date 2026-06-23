@@ -11,7 +11,9 @@ dependencies = [
     "langchain-text-splitters>=1.1.2,<2.0.0",
     "python-dotenv>=1.2.2,<2.0.0",
     "rich>=14.1.0,<15.0.0",
-    "sentence-transformers>=5.1.0,<6.0.0",
+    # >=5.6.0: earlier 5.1.0 capped transformers<5.0.0, blocking the transformers 5.x
+    # security bump; 5.2.0+ widened to transformers<6.0.0. See constraint-dependencies.
+    "sentence-transformers>=5.6.0,<6.0.0",
     "streamlit>=1.49.1,<2.0.0",
     # torch + torchvision resolve from PyPI by default → GPU-capable, ABI-matched
     # wheels for local dev. The `cpu` extra re-pins both to the pytorch-cpu index
@@ -109,9 +111,12 @@ constraint-dependencies = [
     "pyasn1>=0.6.3",            # CVE-2026-23490, CVE-2026-30922
     "pygments>=2.20.0",         # CVE-2026-4539 (rich transitive)
     "virtualenv>=20.36.1",      # CVE-2026-22702 (pre-commit transitive, dev group)
-    # transformers 4.56.1 (sentence-transformers transitive): PYSEC-2025-214..218 have
-    # no fixed release; CVE-2026-1839 only fixed in 5.0.0rc3 (pre-release, and 5.x breaks
-    # sentence-transformers>=5.1.0). No safe pin available — left flagged intentionally.
+    # transformers (sentence-transformers transitive; we don't import it directly):
+    # the 4.56.1 advisories (incl. CVE-2026-1839 / GHSA-69w3-r845-3855) are fixed in the
+    # 5.x line, now shipped stable (no pre-release needed). 5.x requires sentence-transformers
+    # >=5.2.0 (5.1.0 capped <5.0.0) — direct floor bumped to >=5.6.0 above. Floor here forces
+    # the transitive resolution onto 5.x so a future re-lock can't silently regress to 4.x.
+    "transformers>=5.12.1,<6.0.0",
     # Third wave (uv audit / OSV, 2026-06): non-major fixes only.
     "fonttools>=4.60.2",       # GHSA-768j-98cg-p3fv (arbitrary file write / XML injection)
     "marshmallow>=3.26.2",     # GHSA-428g-f7cq-pgp5 (Schema.load DoS; stays on 3.x)
