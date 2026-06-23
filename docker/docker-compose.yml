@@ -2,7 +2,9 @@ name: kri-local-rag
 services:
   # ---------- Local Weaviate database ------------------------------------------------
   weaviate:
-    image: cr.weaviate.io/semitechnologies/weaviate:1.32.0
+    # Digest-pinned for supply-chain integrity (B7). Renovate's docker:pinDigests
+    # keeps the tag@sha256 pair current.
+    image: cr.weaviate.io/semitechnologies/weaviate:1.32.0@sha256:9452e68c58c287c8c29a525ff1468c209cd5e106cc927d67b7d34d61533151b3
     ports:
       - "127.0.0.1:8080:8080"
       - "127.0.0.1:50051:50051"
@@ -10,6 +12,11 @@ services:
       - weaviate_db:/var/lib/weaviate
     environment:
       QUERY_DEFAULTS_LIMIT: 25
+      # B4: Anonymous access is intentional under this stack's trust model — Weaviate
+      # is bound to 127.0.0.1 (see `ports:` above) for strict single-user localhost use.
+      # Any local process can read/delete the index, which is acceptable for a local-only
+      # deployment. If this port is ever bound to 0.0.0.0 or the stack becomes multi-user,
+      # enable API-key auth by wiring in `docker/weaviate_auth.notused`.
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
       DEFAULT_VECTORIZER_MODULE: 'none' # We are providing vectors manually
       # ENABLE_MODULES: 'text2vec-huggingface,reranker-huggingface' # Still needed for reranker
@@ -27,7 +34,9 @@ services:
 
   # ---------- Local LLM server for generating RAG answers ---------------------------------------------------
   ollama:
-    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
+    # Digest-pinned default for supply-chain integrity (B7); override via OLLAMA_IMAGE.
+    # Renovate's docker:pinDigests keeps the tag@sha256 pair current.
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest@sha256:bfc9c6d53cc6989aa5131a6fde6b162b2802d4d337657f3253b5f69579bddeee}
     deploy:
       resources:
         reservations:
