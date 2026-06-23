@@ -834,7 +834,7 @@ provides-extras = ["cpu", "gpu"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "bandit", extras = ["toml"], specifier = ">=1.8.6,<2.0.0" },
+    { name = "bandit", extras = ["toml"], specifier = ">=1.9.4,<2.0.0" },
     { name = "mkdocs", specifier = ">=1.6.1,<2.0.0" },
     { name = "pre-commit", specifier = ">=4.3.0,<5.0.0" },
     { name = "pyright", extras = ["nodejs"], specifier = ">=1.1.410,<2.0.0" },
