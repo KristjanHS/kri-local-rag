@@ -100,7 +100,7 @@ Start the stack with `make stack-up` (builds, starts, waits for health). Service
 
 **Torch variant (CPU/GPU).** torch + torchvision live in mutually-exclusive
 `cpu` / `gpu` uv extras (index-pinned to pytorch-cpu / pytorch-cu128; see
-`pyproject.toml` and `docs/plans/2026-06-23-gpu-cpu-torch-extras.md`). The active
+`pyproject.toml` and `docs/plans/archive/2026-06-23-gpu-cpu-torch-extras.md`). The active
 variant is resolved by `scripts/select_variant.sh` with precedence
 `KRI_VARIANT` env > `.kri-variant.local` (gitignored, per-machine) > **gpu**
 (the local-dev default).

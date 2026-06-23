@@ -4,8 +4,10 @@ on:
   workflow_dispatch: {}
 
 # B5: least-privilege GITHUB_TOKEN (was inheriting the broad default).
+# peter-evans/create-pull-request pushes the branch ref, so it needs
+# contents: write (its documented minimum), not contents: read.
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:

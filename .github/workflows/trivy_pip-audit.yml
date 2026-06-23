@@ -20,7 +20,7 @@ concurrency:
 
 env:
   # CI runners are CPU-only — select the cpu torch extra so no CUDA wheels are
-  # pulled. See docs/plans/2026-06-23-gpu-cpu-torch-extras.md.
+  # pulled. See docs/plans/archive/2026-06-23-gpu-cpu-torch-extras.md.
   KRI_VARIANT: cpu
 
 jobs:

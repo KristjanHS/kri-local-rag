@@ -16,15 +16,15 @@ last_verified: 2026-05-18
 ## Plan archival
 - Plans representing a single shipped session (≤ 1 day end-to-end, all commits reference the plan path or feature name): `git rm`, don't `git mv`. Git log is the audit trail; the archived md is a second copy. Archive only plans whose design rationale isn't fully captured in commit messages.
 
-Shipped plans left in `docs/plans/` auto-load into future sessions and masquerade as active work. When a plan-survey step finds a plan fully shipped, `git mv` it into an `archived/` sibling the same session — don't just note shipped status and move on.
+Shipped plans left in `docs/plans/` auto-load into future sessions and masquerade as active work. When a plan-survey step finds a plan fully shipped, `git mv` it into an `archive/` sibling the same session — don't just note shipped status and move on.
 
 Before `git mv`: grep the plan path across the codebase, docs, and `CLAUDE.md` and update references to the archived location. If a sibling plan references the archived one with conditional/status language (`"Doc A pending"`, `"if X ships first"`, `"either can ship first"`), the condition has resolved — resolve sibling status notes and post-archive diff-list section headers to state the realized order concretely, not as a hypothetical.
 
-Before `git mv`ing a design doc to `archived/`, grep §Design content against the living reference docs. Any load-bearing fact not present is merge-debt — migrate first. Walk each §section — vocabulary grep hits upstream §s but misses downstream rendering rationale. Do NOT archive plans marked "approved but not implemented" — those are still active even if dormant.
+Before `git mv`ing a design doc to `archive/`, grep §Design content against the living reference docs. Any load-bearing fact not present is merge-debt — migrate first. Walk each §section — vocabulary grep hits upstream §s but misses downstream rendering rationale. Do NOT archive plans marked "approved but not implemented" — those are still active even if dormant.
 
 If the plan has working-tree amendments (e.g. a §0 resolution note added in the archiving session), `git add <plan>` the amendment BEFORE `git mv` — `git mv` stages the rename against HEAD content, silently dropping uncommitted working-tree edits. The archive commit then ships without the amendment and the audit-trail content is lost.
 
-When a multi-stage split IS warranted: one file per stage under `docs/plans/`, each sized to fit a 200k-token session context. Write `<date>-<feature>-stage-A.md`, `-stage-B.md`, … plus a short `<date>-<feature>-overview.md` index if useful; cross-reference between files. Single-stage plans stay in one file (Design + Plan + Corrections sections in place). Archive rule (`git mv` to `archived/` after ship) applies per-stage file. No `-v2-` / `-enhancements-` version siblings — amend in place with a changelog entry inside the same stage file.
+When a multi-stage split IS warranted: one file per stage under `docs/plans/`, each sized to fit a 200k-token session context. Write `<date>-<feature>-stage-A.md`, `-stage-B.md`, … plus a short `<date>-<feature>-overview.md` index if useful; cross-reference between files. Single-stage plans stay in one file (Design + Plan + Corrections sections in place). Archive rule (`git mv` to `archive/` after ship) applies per-stage file. No `-v2-` / `-enhancements-` version siblings — amend in place with a changelog entry inside the same stage file.
 
 ## Doc hygiene
 Session-generated audits, analyses, and reports go in an `archived/` or `analysis/` subfolder (and should be `.claudeignore`'d) — not in the reference-doc root. The `docs/` root is for trigger-indexed reference docs listed in `CLAUDE.md`. Don't drop one-off session outputs into the reference tier.

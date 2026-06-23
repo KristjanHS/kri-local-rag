@@ -48,6 +48,10 @@ trap 'rm -f "$HL_TMP"' EXIT
 curl -fLso "$HL_TMP" "${HL_URL}"
 # The .sha256 sidecar is "<hash> *<filename>"; take field 1 as the expected hash.
 HL_EXPECTED="$(curl -fsSL "${HL_URL}.sha256" | awk '{print $1}')"
+if [[ -z "${HL_EXPECTED}" ]]; then
+  echo "Empty checksum from ${HL_URL}.sha256" >&2
+  exit 1
+fi
 verify_sha256 "$HL_TMP" "$HL_EXPECTED"
 $SUDO_CMD rm -f /usr/local/bin/hadolint
 $SUDO_CMD install -m 0755 "$HL_TMP" /usr/local/bin/hadolint
