@@ -42,11 +42,14 @@ def _dump_container_diagnostics(compose_file: str, result: subprocess.CompletedP
                 check=False,
                 timeout=30,
             )
+            # Concatenate both streams: `docker compose logs` writes the log
+            # stream to stdout but surfaces its own errors on stderr.
+            combined = f"{logs.stdout}\n{logs.stderr}".strip()
             logger.error(
                 "--- %s logs (last %d lines) ---\n%s",
                 service,
                 _DIAGNOSTIC_LOG_TAIL,
-                logs.stdout or logs.stderr,
+                combined,
             )
         except (subprocess.SubprocessError, OSError) as e:
             logger.error("Failed to collect %s logs: %s", service, e)
