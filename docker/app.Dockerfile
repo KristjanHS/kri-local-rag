@@ -25,7 +25,7 @@ WORKDIR /app
 #    (Copy only files needed for dependency resolution)
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
-  uv sync --locked --no-install-project --no-dev
+  uv sync --locked --extra cpu --no-install-project --no-dev
 
 # uv phase 2: copy project and install the project as package
 
@@ -38,9 +38,9 @@ COPY cli.py /app/
 ARG INSTALL_DEV=0
 RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
   if [ "$INSTALL_DEV" = "1" ]; then \
-  uv sync --locked --group dev --group test; \
+  uv sync --locked --extra cpu --group dev --group test; \
   else \
-  uv sync --locked --no-editable --no-dev; \
+  uv sync --locked --extra cpu --no-editable --no-dev; \
   fi
 
 ############################################

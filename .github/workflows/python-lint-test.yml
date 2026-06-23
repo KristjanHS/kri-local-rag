@@ -20,6 +20,11 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # GitHub + act runners are CPU-only — select the cpu torch extra so no CUDA
+  # wheels are pulled. See docs/plans/2026-06-23-gpu-cpu-torch-extras.md.
+  KRI_VARIANT: cpu
+
 jobs:
   lint:
     name: Lint

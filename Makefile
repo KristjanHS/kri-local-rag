@@ -2,7 +2,12 @@
 .PHONY: help setup-hooks test-up test-down test-logs test-up-force-build test-clean \
         test-integration test-e2e integration push-pr export-reqs \
         ruff-format ruff-fix yamlfmt pyright pre-commit unit pip-audit \
-        semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage dev-setup ollama-pull deptry
+        semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage dev-setup ollama-pull deptry \
+        sync use-gpu use-cpu show-variant
+
+# Resolve the per-machine uv extras variant (cpu | gpu). KRI_VARIANT env >
+# .kri-variant.local file > gpu default. CI/act export KRI_VARIANT=cpu.
+VARIANT := $(shell ./scripts/select_variant.sh)
 
 # Use bash with strict flags for recipes
 SHELL := bash
@@ -66,8 +71,30 @@ help: ## Show this help (grouped)
 # uv sync re-locks before syncing unless you pass --locked or --frozen.
 # If pyproject.toml changed and uv.lock wasn’t regenerated, --frozen will still proceed, while --locked will stop.
 uv-sync-test: ## uv sync test group (frozen) + pip check
-	uv sync --locked --group test
+	uv sync --locked --extra $(VARIANT) --group test
 	uv pip check
+
+# Variant-aware sync: run_uv.sh reads the selected variant (gpu by default) and
+# passes the matching --extra to `uv sync`.
+sync: ## Sync the venv for the selected variant (./run_uv.sh)
+	@./run_uv.sh
+
+use-gpu: ## Select the GPU (cu128) extra for this checkout and sync
+	@echo gpu > .kri-variant.local
+	@./run_uv.sh
+
+use-cpu: ## Select the CPU extra for this checkout and sync
+	@echo cpu > .kri-variant.local
+	@./run_uv.sh
+
+show-variant: ## Print the currently selected variant (gpu by default)
+	@if [ -n "$${KRI_VARIANT:-}" ]; then \
+		echo "$$KRI_VARIANT (from KRI_VARIANT env)"; \
+	elif [ -f .kri-variant.local ]; then \
+		cat .kri-variant.local; \
+	else \
+		echo "(default: gpu — no .kri-variant.local present)"; \
+	fi
 
 setup-hooks: ## Configure Git hooks path
 	@echo "Configuring Git hooks path..."
@@ -82,9 +109,10 @@ export-reqs: ## Export requirements.txt from uv.lock (omits torch/GPU extras)
 	  --locked \
 	  --no-emit-project \
 	  --no-emit-package torch \
+	  --no-emit-package torchvision \
 	  --format requirements-txt \
 	  > requirements.txt
-	@echo ">> Wrote requirements.txt (torch and GPU extras removed)"
+	@echo ">> Wrote requirements.txt (torch/torchvision and GPU extras removed)"
 
 # =========================
 # App Runtime
@@ -277,7 +305,7 @@ pyright: ## Run Pyright type checking
 
 yamlfmt: ## Validate YAML formatting via pre-commit
 	# Ensure dev + test groups are present so later test steps still work
-	uv sync --group dev --group test --frozen
+	uv sync --extra $(VARIANT) --group dev --group test --frozen
 	uv run pre-commit run yamlfmt -a
 
 # Ruff targets
@@ -290,7 +318,7 @@ ruff-fix: ## Run Ruff lint with autofix
 # Run full pre-commit suite (dev deps required)
 pre-commit: ## Run all pre-commit hooks on all files
 	# Keep test deps installed to avoid breaking local test runs after this target
-	uv sync --group dev --group test --frozen
+	uv sync --extra $(VARIANT) --group dev --group test --frozen
 	uv run pre-commit run --all-files
 
 # =========================

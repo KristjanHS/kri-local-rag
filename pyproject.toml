@@ -13,11 +13,29 @@ dependencies = [
     "rich>=14.1.0,<15.0.0",
     "sentence-transformers>=5.1.0,<6.0.0",
     "streamlit>=1.49.1,<2.0.0",
-    "torch>=2.8.0,<3.0.0",
+    # torch + torchvision moved to [project.optional-dependencies] (cpu / gpu extras).
+    # See docs/plans/2026-06-23-gpu-cpu-torch-extras.md.
     "weaviate-client>=4.16.6,<5.0.0",
     "unstructured[pdf]>=0.18.18,<0.19.0",
     "numpy>=2.3.3,<3.0.0",
     "pymupdf>=1.24.10,<2.0.0",
+]
+
+[project.optional-dependencies]
+# Mutually exclusive (see [tool.uv].conflicts). Wrappers (run_uv.sh, Makefile
+# targets) always pass `--extra cpu` or `--extra gpu` based on the gitignored
+# `.kri-variant.local` file (or the KRI_VARIANT env override). GPU is the default
+# for local/bare-metal dev; CPU is the fallback for CI, act, and the Docker app
+# image. Bare `uv sync` with no extra installs neither torch — undefined; always
+# select a variant. torchvision is index-pinned alongside torch to avoid the
+# `operator torchvision::nms does not exist` ABI mismatch.
+cpu = [
+    "torch>=2.8.0,<3.0.0",
+    "torchvision>=0.23.0,<1.0.0",
+]
+gpu = [
+    "torch>=2.8.0,<3.0.0",
+    "torchvision>=0.23.0,<1.0.0",
 ]
 
 [dependency-groups]
@@ -51,6 +69,13 @@ test = [
 [tool.uv]
 add-bounds = "major"
 
+# cpu and gpu extras are mutually exclusive — uv resolves both into a single
+# `uv.lock` with conflicting markers, so a sync with one extra never installs
+# the other's torch/torchvision wheels.
+conflicts = [
+    [ { extra = "cpu" }, { extra = "gpu" } ],
+]
+
 # Minimum-safe-version constraints for transitive deps with open CVE advisories
 # (Dependabot, 2026-06). Constraints pin a floor without making the package a
 # direct dependency; see docs/plans/security-remediation.md Part A.
@@ -74,19 +99,27 @@ constraint-dependencies = [
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
-# Add the PyTorch index, but mark it EXPLICIT so nothing comes from it
-# unless we explicitly say so in [tool.uv.sources].
+# `explicit = true` means nothing resolves from this index unless bound via
+# [tool.uv.sources] below.
 explicit = true
 
-# for GPU:
-# name = "pytorch-cu128"
-# url = "https://download.pytorch.org/whl/cu128"
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
 
 [tool.uv.sources]
-# Only these names are allowed to resolve from that index:
-torch = { index = "pytorch-cpu" }
-# for GPU:
-# torch = { index = "pytorch-cu128"}
+# Bind torch + torchvision to the CPU index under the `cpu` extra and the cu128
+# index under the `gpu` extra. Both must come from the same index per extra to
+# keep their ABI in sync.
+torch = [
+    { index = "pytorch-cpu",    extra = "cpu" },
+    { index = "pytorch-cu128",  extra = "gpu" },
+]
+torchvision = [
+    { index = "pytorch-cpu",    extra = "cpu" },
+    { index = "pytorch-cu128",  extra = "gpu" },
+]
 
 [build-system]
 requires = ["setuptools"]
@@ -184,6 +217,7 @@ DEP002 = [
     "boto3",                                       # AWS libs pulled in indirectly
     "langdetect",                                  # planned/optional language detection
     "pdfplumber", "pillow", "pymupdf", "unstructured",  # PDF backends for loaders
+    "torchvision",                                 # index-pinned ABI peer of torch (not imported directly)
 ]
 
 
