@@ -6,6 +6,14 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
+# Keep local uv on the latest release so it matches CI (astral-sh/setup-uv@v6
+# pins no version, i.e. always latest). Non-fatal: self-update needs network and
+# only works for the standalone installer (not pip/pipx/brew installs). Set
+# KRI_SKIP_UV_UPDATE=1 to skip (offline, or package-manager-managed uv).
+if [ -z "${KRI_SKIP_UV_UPDATE:-}" ]; then
+  uv self update || echo "[kri-local-rag] uv self update skipped (offline or non-standalone install)" >&2
+fi
+
 # Resolve the per-machine uv extras variant (cpu | gpu) via
 # scripts/select_variant.sh (KRI_VARIANT env > .kri-variant.local > gpu default).
 # The selector validates the value and rejects typos.

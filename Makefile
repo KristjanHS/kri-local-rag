@@ -1,7 +1,7 @@
 # Declare phony targets
 .PHONY: help setup-hooks test-up test-down test-logs test-up-force-build test-clean \
         test-integration test-e2e integration push-pr export-reqs \
-        ruff-format ruff-fix yamlfmt pyright pre-commit unit pip-audit \
+        ruff-format ruff-fix yamlfmt pyright pre-commit unit audit \
         semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage dev-setup ollama-pull deptry \
         sync use-gpu use-cpu show-variant
 
@@ -240,9 +240,9 @@ integration: ## Run local integration tests (venv or uv)
 # Security / CI Linters
 # =========================
 # audits the already existing env (after export)
-pip-audit: export-reqs ## Audit dependencies based on requirements.txt
-	@echo ">> Auditing dependencies (based on requirements.txt)"
-	uvx --from pip-audit pip-audit -r requirements.txt
+audit: ## Audit dependencies for known vulnerabilities (uv audit, reads uv.lock via OSV)
+	@echo ">> Auditing dependencies (uv audit, OSV database, reads uv.lock)"
+	uv audit
 
  # Lint GitHub Actions workflows locally using official container
 actionlint: ## Lint GitHub workflows using actionlint in Docker
