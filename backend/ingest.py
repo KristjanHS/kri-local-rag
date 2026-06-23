@@ -95,15 +95,19 @@ def load_and_split_documents(path: str) -> List[Document]:
     file_count = 0
     if os.path.isfile(path):
         ext = os.path.splitext(path)[1].lower()
-        if ext == ".pdf":
-            if not _is_valid_pdf(path):
-                logger.warning(f"Skipping '{path}': not a valid PDF (bad magic bytes).")
+        if ext == ".pdf" and not _is_valid_pdf(path):
+            logger.warning(f"Skipping '{path}': not a valid PDF (bad magic bytes).")
+            return []
+        if ext in (".pdf", ".md"):
+            # Same error isolation as the directory walk: a corrupt PDF or
+            # non-UTF-8 file logs and yields nothing rather than aborting.
+            try:
+                docs.extend(_load_pdf(path) if ext == ".pdf" else _load_text(path))
+                file_count = 1
+            except Exception as e:
+                logger.error(f"Error loading '{path}': {e}")
+                logger.exception("Full traceback for loading error:")
                 return []
-            docs.extend(_load_pdf(path))
-            file_count = 1
-        elif ext == ".md":
-            docs.extend(_load_text(path))
-            file_count = 1
         else:
             logger.warning(f"Unsupported file extension '{ext}' for path '{path}'.")
             return []
@@ -127,6 +131,10 @@ def load_and_split_documents(path: str) -> List[Document]:
                 except Exception as e:
                     logger.error(f"Error loading '{file_path}' with pattern '{glob_pattern}': {e}")
                     logger.exception("Full traceback for loading error:")
+
+    # Drop pages with no extractable text (e.g. image-only/scanned PDF pages):
+    # empty content would yield colliding deterministic UUIDs and junk vectors.
+    docs = [d for d in docs if d.page_content.strip()]
 
     if not docs:
         logger.warning(f"No documents found in '{path}'.")
