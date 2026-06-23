@@ -43,7 +43,7 @@ jobs:
         # the pinned Trivy version, which predates native uv.lock support, can scan deps.
         run: make export-reqs
       - name: Run Trivy repo scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
         with:
           scan-type: fs
           scan-ref: .
