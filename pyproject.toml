@@ -7,8 +7,9 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "httpx>=0.28.1,<0.29.0",
-    "langchain>=0.3.30,<0.4.0",
-    "langchain-community>=0.3.30,<0.4.0",
+    "langchain-community>=0.4,<0.5.0",
+    "langchain-core>=1.2.22,<2.0.0",
+    "langchain-text-splitters>=1.1.2,<2.0.0",
     "python-dotenv>=1.2.2,<2.0.0",
     "rich>=14.1.0,<15.0.0",
     "sentence-transformers>=5.1.0,<6.0.0",
@@ -85,7 +86,7 @@ conflicts = [
 constraint-dependencies = [
     "authlib>=1.6.9",          # GHSA-wvwj-cvrp-7pv5 (JWS/JWK header injection)
     "nltk>=3.9.3",             # GHSA-7p94-766c-hgjp (Zip-Slip)
-    "langchain-core>=0.3.81",  # GHSA-c67j-w6g6-q2cm (serialization injection)
+    # langchain-core: now a direct dep (>=1.2.22) — clears GHSA-c67j-w6g6-q2cm too.
     "urllib3>=2.7.0",          # GHSA-qccp-gfcp-xxvc
     "cryptography>=48.0.1",    # GHSA-537c-gmf6-5ccf
     "tornado>=6.5.6",          # 3 High advisories (Streamlit transitive)
@@ -112,9 +113,11 @@ constraint-dependencies = [
     "marshmallow>=3.26.2",     # GHSA-428g-f7cq-pgp5 (Schema.load DoS; stays on 3.x)
     "protobuf>=6.33.5",        # GHSA-7gcm-g887-7qv7 (JSON recursion bypass; Streamlit transitive)
     "requests>=2.33.0",        # GHSA-gc5v-m9x4-r6x2 (insecure temp-file reuse in extract_zipped_paths)
+    # LangChain 1.x migration DONE 2026-06-23 (-community>=0.4 / -core>=1.2.22 /
+    # -text-splitters>=1.1.2 as direct deps; the `langchain` umbrella is no longer a
+    # direct dep — we import only from community/core/text_splitters). Cleared the 5
+    # LangChain advisories. See docs/plans/archive/2026-06-23-langchain-1x-migration.md.
     # uv-audit/OSV findings with NO safe fix here (left flagged intentionally):
-    #  - langchain / langchain-core / langchain-text-splitters: only fixed in 1.x (major
-    #    LangChain migration, breaks backend API usage) — needs a dedicated migration, not a floor.
     #  - nltk 3.9.4 (GHSA-p4gq-832x-fm9v) and torch (GHSA-rrmf-rvhw-rf47): no fixed release upstream.
 ]
 

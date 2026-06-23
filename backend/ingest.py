@@ -26,9 +26,9 @@ from typing import Any, List, Optional, Protocol, TypeVar, cast, runtime_checkab
 
 import torch
 import weaviate
-from langchain.docstore.document import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # Avoid importing sentence-transformers at module import time to keep imports light
 # and prevent optional vision dependencies from being pulled in during unit tests.

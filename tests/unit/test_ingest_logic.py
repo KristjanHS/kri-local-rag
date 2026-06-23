@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from langchain.docstore.document import Document
+from langchain_core.documents import Document
 
 from backend.ingest import (
     _is_valid_pdf,
