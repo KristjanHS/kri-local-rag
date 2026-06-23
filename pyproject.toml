@@ -165,7 +165,7 @@ exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
 # NOT auto-adopt 3.14-only syntax (e.g. PEP 758 parenthesis-free `except A, B:`),
 # which would be a SyntaxError under a rollback to the 3.13 floor and breaks the
 # atomic single-revert guarantee of the 3.14 bump. Adopting 3.14 syntax is a
-# separate task — see docs/plans/2026-06-23-python-3.14-upgrade.md "Out of scope".
+# separate task — see docs/plans/archive/2026-06-23-python-3.14-upgrade.md "Out of scope".
 target-version = "py313"
 
 [tool.ruff.lint]
