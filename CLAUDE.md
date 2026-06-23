@@ -39,7 +39,7 @@ Local RAG system: document ingestion → vector index → retrieval → answer. 
 - Lint/format/types: `ruff check . --fix`, `ruff format .`, `make pyright`.
 - Tests: `make unit`, `make integration`; dockerized: `make test-up` → `make test-integration` → `make test-down`.
 - Pre-commit: `make pre-commit`. Deps: edit `pyproject.toml`, then `make export-reqs`. Audit: `make audit` (`uv audit`, OSV, reads `uv.lock`; needs uv ≥0.10.12).
-- Torch variant: `make use-gpu` (default, cu128) / `make use-cpu`, or `KRI_VARIANT=cpu` (CI). `make show-variant`.
+- Torch: `make sync` installs the PyPI/GPU wheel by default; pass `--extra cpu` (CI/Docker use `SYNC_EXTRA="--extra cpu"`) for slim CPU-only wheels.
 
 ## Rules Index (path-gated — auto-loaded when touching matching files)
 

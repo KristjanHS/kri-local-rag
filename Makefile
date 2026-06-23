@@ -3,7 +3,7 @@
         test-integration test-e2e integration push-pr export-reqs \
         ruff-format ruff-fix yamlfmt pyright pre-commit unit audit \
         semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage dev-setup ollama-pull deptry \
-        sync use-gpu use-cpu show-variant
+        sync
 
 # Use bash with strict flags for recipes
 SHELL := bash
@@ -22,6 +22,11 @@ PYTEST_BASE := -q
 
 # Configurable pyright config path (default to repo config)
 PYRIGHT_CONFIG ?= ./pyrightconfig.json
+
+# Optional uv extra for sync targets. Empty by default → the PyPI torch wheel
+# (GPU-capable on Linux) for local dev. CI passes SYNC_EXTRA="--extra cpu" to
+# pull slim CPU-only wheels.
+SYNC_EXTRA ?=
 
 # NB! do not set UV_CACHE_DIR here - it would override the mounted uv cache dir of act runner -> uv can't reuse cache on next Act run
 # UV_CACHE_DIR := ... NO!
@@ -66,38 +71,24 @@ help: ## Show this help (grouped)
 
 # uv sync re-locks before syncing unless you pass --locked or --frozen.
 # If pyproject.toml changed and uv.lock wasn’t regenerated, --frozen will still proceed, while --locked will stop.
-# Resolve the per-machine uv extras variant (cpu | gpu) in-recipe so a bad
-# KRI_VARIANT / .kri-variant.local aborts the recipe with the selector's error
-# (under .ONESHELL + set -e) instead of producing an empty --extra. KRI_VARIANT
-# env > .kri-variant.local file > gpu default. CI/act export KRI_VARIANT=cpu.
+# Default sync (no extra) installs the PyPI torch wheel (GPU on Linux). CI passes
+# SYNC_EXTRA="--extra cpu" for slim CPU-only wheels.
 uv-sync-test: ## uv sync test group (frozen) + pip check
-	V=$$(./scripts/select_variant.sh)
-	uv sync --locked --extra "$$V" --group test
+	uv sync --locked $(SYNC_EXTRA) --group test
 	uv pip check
 
-# Variant-aware sync: run_uv.sh reads the selected variant (gpu by default) and
-# passes the matching --extra to `uv sync`.
-sync: ## Sync the venv for the selected variant (./run_uv.sh)
-	@./run_uv.sh
-
-use-gpu: ## Select the GPU (cu128) extra for this checkout and sync
-	@echo gpu > .kri-variant.local
-	@./run_uv.sh
-
-use-cpu: ## Select the CPU extra for this checkout and sync
-	@echo cpu > .kri-variant.local
-	@./run_uv.sh
-
-show-variant: ## Print the resolved variant (gpu by default; rejects typos)
-	@./scripts/select_variant.sh
+# Local sync via run_uv.sh: default (PyPI/GPU) torch. For CPU wheels run
+# `./run_uv.sh --extra cpu` or `make sync SYNC_EXTRA="--extra cpu"`.
+sync: ## Sync the venv (default GPU torch; SYNC_EXTRA="--extra cpu" for CPU)
+	@./run_uv.sh $(SYNC_EXTRA)
 
 setup-hooks: ## Configure Git hooks path
 	@echo "Configuring Git hooks path..."
 	@git config core.hooksPath scripts/git-hooks
 	@echo "Done."
 
-export-reqs: ## Export requirements.txt from uv.lock (omits torch/GPU extras)
-	@echo ">> Exporting requirements.txt from uv.lock (incl dev/test groups), excluding torch and GPU-specific wheels"
+export-reqs: ## Export requirements.txt from uv.lock (omits torch/torchvision)
+	@echo ">> Exporting requirements.txt from uv.lock (incl dev/test groups), excluding torch/torchvision wheels"
 	uv export \
 	  --no-hashes \
 	  --group test \
@@ -107,7 +98,7 @@ export-reqs: ## Export requirements.txt from uv.lock (omits torch/GPU extras)
 	  --no-emit-package torchvision \
 	  --format requirements-txt \
 	  > requirements.txt
-	@echo ">> Wrote requirements.txt (torch/torchvision and GPU extras removed)"
+	@echo ">> Wrote requirements.txt (torch/torchvision removed)"
 
 # =========================
 # App Runtime
@@ -300,9 +291,8 @@ pyright: ## Run Pyright type checking
 
 yamlfmt: ## Validate YAML formatting via pre-commit
 	# Ensure dev + test groups are present so later test steps still work
-	V=$$(./scripts/select_variant.sh)
-	uv sync --extra "$$V" --group dev --group test --frozen
-	# --no-sync: a bare `uv run` re-syncs WITHOUT --extra, reverting the variant torch.
+	uv sync $(SYNC_EXTRA) --group dev --group test --frozen
+	# --no-sync: a bare `uv run` re-syncs WITHOUT --extra, reverting to default torch.
 	uv run --no-sync pre-commit run yamlfmt -a
 
 # Ruff targets
@@ -315,9 +305,8 @@ ruff-fix: ## Run Ruff lint with autofix
 # Run full pre-commit suite (dev deps required)
 pre-commit: ## Run all pre-commit hooks on all files
 	# Keep test deps installed to avoid breaking local test runs after this target
-	V=$$(./scripts/select_variant.sh)
-	uv sync --extra "$$V" --group dev --group test --frozen
-	# --no-sync: a bare `uv run` re-syncs WITHOUT --extra, reverting the variant torch.
+	uv sync $(SYNC_EXTRA) --group dev --group test --frozen
+	# --no-sync: a bare `uv run` re-syncs WITHOUT --extra, reverting to default torch.
 	uv run --no-sync pre-commit run --all-files
 
 # =========================

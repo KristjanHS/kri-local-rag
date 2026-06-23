@@ -20,11 +20,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  # GitHub + act runners are CPU-only — select the cpu torch extra so no CUDA
-  # wheels are pulled. See docs/plans/archive/2026-06-23-gpu-cpu-torch-extras.md.
-  KRI_VARIANT: cpu
-
 jobs:
   lint:
     name: Lint
@@ -81,7 +76,7 @@ jobs:
       #- name: Seed pip in .venv
       #  run: uv venv --seed
       - name: Sync test env + check
-        run: make uv-sync-test
+        run: make uv-sync-test SYNC_EXTRA="--extra cpu" # CPU-only CI runners — slim +cpu wheels
       - name: Run unit tests (Makefile)
         run: make unit
       # Keep the cache small in CI (safe to no-op locally).
@@ -107,7 +102,7 @@ jobs:
       - name: Setup Python + uv (cached)
         uses: ./.github/actions/setup-uv
       - name: Sync test env (Makefile)
-        run: make uv-sync-test
+        run: make uv-sync-test SYNC_EXTRA="--extra cpu" # CPU-only CI runners — slim +cpu wheels
       - name: Pyright (Makefile)
         run: make pyright
 
@@ -162,7 +157,7 @@ jobs:
       - name: Setup Python + uv (cached)
         uses: ./.github/actions/setup-uv
       - name: Sync test env (uv)
-        run: make uv-sync-test
+        run: make uv-sync-test SYNC_EXTRA="--extra cpu" # CPU-only CI runners — slim +cpu wheels
       - name: Install Playwright browsers
         run: |
           uv run playwright install --with-deps

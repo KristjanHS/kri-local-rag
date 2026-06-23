@@ -97,8 +97,6 @@ secrets.*
 # requirements.txt is a derived artifact (uv export from uv.lock); not committed.
 # Regenerate with `make export-reqs`. Source of truth: pyproject.toml + uv.lock.
 requirements.txt
-# Per-machine uv extras variant selector (cpu | gpu) — see run_uv.sh
-.kri-variant.local
 
 # Track the devcontainer config in this repo, overriding the user's global
 # ~/.gitignore_global rule ('.devcontainer/'). These files carry no secrets;

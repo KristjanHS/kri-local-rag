@@ -14,29 +14,31 @@ dependencies = [
     "rich>=14.1.0,<15.0.0",
     "sentence-transformers>=5.1.0,<6.0.0",
     "streamlit>=1.49.1,<2.0.0",
-    # torch + torchvision moved to [project.optional-dependencies] (cpu / gpu extras).
-    # See docs/plans/2026-06-23-gpu-cpu-torch-extras.md.
+    # torch + torchvision resolve from PyPI by default → GPU-capable, ABI-matched
+    # wheels for local dev. The `cpu` extra re-pins both to the pytorch-cpu index
+    # for slim CI/Docker installs. See docs/plans/2026-06-23-cpu-gpu-variant-simplification-design.md.
+    "torch>=2.8.0,<3.0.0",
+    "torchvision>=0.23.0,<1.0.0",
     "weaviate-client>=4.22.0,<5.0.0",
     "unstructured[pdf]>=0.18.18,<0.19.0",
     "numpy>=2.3.3,<3.0.0",
     "pymupdf>=1.24.10,<2.0.0",
 ]
 
+# Default (no extra) installs the PyPI torch wheel (CUDA on Linux) for local dev;
+# pass `--extra cpu` (CI, Docker app image) for slim `+cpu` wheels from the
+# pytorch-cpu index via [tool.uv.sources]. Both torch and torchvision come from
+# the same source so their ABI stays matched (avoids `operator torchvision::nms
+# does not exist`). The `gpu` extra below exists ONLY because uv requires every
+# conflict set to have >=2 members — see the [tool.uv].conflicts note.
 [project.optional-dependencies]
-# Mutually exclusive (see [tool.uv].conflicts). Wrappers (run_uv.sh, Makefile
-# targets) always pass `--extra cpu` or `--extra gpu` based on the gitignored
-# `.kri-variant.local` file (or the KRI_VARIANT env override). GPU is the default
-# for local/bare-metal dev; CPU is the fallback for CI, act, and the Docker app
-# image. WARNING: a bare `uv sync` with no extra does NOT skip torch — because
-# sentence-transformers depends on torch unconditionally, uv falls back to the
-# default PyPI torch wheel (CUDA-bundled on Linux, no index-pin / ABI guarantee).
-# Always select a variant (run_uv.sh / make use-gpu|use-cpu / KRI_VARIANT).
-# torchvision is index-pinned alongside torch to avoid the
-# `operator torchvision::nms does not exist` ABI mismatch.
 cpu = [
     "torch>=2.8.0,<3.0.0",
     "torchvision>=0.23.0,<1.0.0",
 ]
+# `gpu` carries no source binding → resolves from PyPI (CUDA wheels on Linux).
+# It exists only to give the cpu extra a conflict partner (uv requires >=2
+# members per conflict set); it is the default for local dev.
 gpu = [
     "torch>=2.8.0,<3.0.0",
     "torchvision>=0.23.0,<1.0.0",
@@ -73,9 +75,14 @@ test = [
 [tool.uv]
 add-bounds = "major"
 
-# cpu and gpu extras are mutually exclusive — uv resolves both into a single
-# `uv.lock` with conflicting markers, so a sync with one extra never installs
-# the other's torch/torchvision wheels.
+# Conflict pair isolating the `cpu` extra. Without it, uv applies the pytorch-cpu
+# source binding (below) to the *base* resolution too, collapsing the default
+# (no-extra) install to CPU wheels and losing GPU-by-default. The conflict scopes
+# that index to `--extra cpu`; the no-extra / `--extra gpu` forks resolve torch
+# from PyPI (CUDA on Linux). uv requires >=2 members per conflict set, so the
+# otherwise-redundant `gpu` extra is the mandatory partner. See
+# https://docs.astral.sh/uv/guides/integration/pytorch/ and
+# docs/plans/2026-06-23-cpu-gpu-variant-simplification-design.md.
 conflicts = [
     [ { extra = "cpu" }, { extra = "gpu" } ],
 ]
@@ -128,23 +135,11 @@ url = "https://download.pytorch.org/whl/cpu"
 # [tool.uv.sources] below.
 explicit = true
 
-[[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true
-
 [tool.uv.sources]
-# Bind torch + torchvision to the CPU index under the `cpu` extra and the cu128
-# index under the `gpu` extra. Both must come from the same index per extra to
-# keep their ABI in sync.
-torch = [
-    { index = "pytorch-cpu",    extra = "cpu" },
-    { index = "pytorch-cu128",  extra = "gpu" },
-]
-torchvision = [
-    { index = "pytorch-cpu",    extra = "cpu" },
-    { index = "pytorch-cu128",  extra = "gpu" },
-]
+# Under the `cpu` extra, bind both torch and torchvision to the CPU index (same
+# source keeps their ABI matched). Without the extra they resolve from PyPI.
+torch       = [{ index = "pytorch-cpu", extra = "cpu" }]
+torchvision = [{ index = "pytorch-cpu", extra = "cpu" }]
 
 [build-system]
 requires = ["setuptools"]
@@ -258,7 +253,7 @@ DEP002 = [
     "boto3",                                       # AWS libs pulled in indirectly
     "langdetect",                                  # planned/optional language detection
     "pdfplumber", "pillow", "pymupdf", "unstructured",  # PDF backends for loaders
-    "torchvision",                                 # index-pinned ABI peer of torch (not imported directly)
+    "torchvision",                                 # ABI peer of torch (not imported directly by first-party code)
 ]
 
 

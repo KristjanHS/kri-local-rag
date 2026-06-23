@@ -1,6 +1,4 @@
 import logging
-import os
-from pathlib import Path
 
 import pytest
 import torch
@@ -10,20 +8,6 @@ import torch
 from backend.config import DEFAULT_EMBEDDING_MODEL
 
 EXPECTED_MODEL_NAME = DEFAULT_EMBEDDING_MODEL
-
-
-def _selected_variant() -> str:
-    """Resolve the active torch wheel variant the way scripts/select_variant.sh does.
-
-    Precedence: ``KRI_VARIANT`` env > ``<repo>/.kri-variant.local`` > ``gpu`` default.
-    """
-    env = os.environ.get("KRI_VARIANT", "").strip()
-    if env:
-        return env
-    variant_file = Path(__file__).resolve().parents[2] / ".kri-variant.local"
-    if variant_file.is_file():
-        return variant_file.read_text().strip()
-    return "gpu"
 
 
 # Configure logging
@@ -47,32 +31,23 @@ def cached_sentence_transformer_model():
         pytest.fail(f"Failed to load model '{EXPECTED_MODEL_NAME}': {e}")
 
 
-def test_pytorch_wheel_matches_selected_variant():
+def test_torchvision_nms_abi_matches_torch():
     """
-    Verifies the installed PyTorch wheel matches the selected build variant.
-
-    The CPU wheel has no CUDA support compiled in; the GPU (cu128) wheel does.
-    The repo defaults to the GPU variant (CI/act set ``KRI_VARIANT=cpu``), so a
-    hardcoded CPU-only assertion would fail for anyone running locally. Asserting
-    against the selected variant catches an accidental wheel mismatch either way.
+    torch and torchvision must come from the same wheel source or torchvision's
+    C++ ops fail to register (``operator torchvision::nms does not exist``). This
+    is the ABI invariant the single-source scheme protects: the default PyPI
+    wheels, or both from the cpu index together. Run on CPU so it holds for both
+    the default (GPU) and ``--extra cpu`` installs.
     """
-    variant = _selected_variant()
-    # torch.version is a module in some builds; prefer hasattr checks
-    cuda_ver = getattr(getattr(torch, "version", object()), "cuda", None)
+    import torchvision
 
-    if variant == "cpu":
-        assert cuda_ver is None, (
-            "CPU variant selected but PyTorch was built with CUDA support "
-            f"(torch.version.cuda={cuda_ver!r}). Reinstall from the CPU wheel (make use-cpu)."
-        )
-        assert not torch.backends.mps.is_available(), (
-            "CPU variant selected but PyTorch reports an available MPS device."
-        )
-    else:
-        assert cuda_ver is not None, (
-            "GPU variant selected but PyTorch has no CUDA support "
-            "(torch.version.cuda is None). Reinstall from the GPU wheel (make use-gpu)."
-        )
+    boxes = torch.as_tensor([[0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 1.0, 1.0]])
+    scores = torch.as_tensor([0.9, 0.8])
+    # A raw call is intentional: an ABI mismatch raises
+    # `operator torchvision::nms does not exist`, which fails the test with a
+    # clear traceback (torch {ver} / torchvision {ver}).
+    keep = torchvision.ops.nms(boxes, scores, iou_threshold=0.5)
+    assert keep.numel() >= 1
 
 
 def test_pytorch_cpu_optimizations_are_available():
