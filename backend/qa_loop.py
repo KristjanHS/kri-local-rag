@@ -127,8 +127,6 @@ def answer(
     stop_event: Optional[threading.Event] = None,
     context_tokens: int = 8192,
     collection_name: Optional[str] = None,
-    get_top_k_func: Callable[..., List[str]] = get_top_k,
-    generate_response_func: Callable[..., tuple[str, Optional[list[int]]]] = generate_response,
 ) -> str:
     """Return an answer from the LLM using RAG with optional debug output and streaming callbacks.
     Can be interrupted with stop_event.
@@ -150,7 +148,7 @@ def answer(
     # ---------- 1) Retrieve -----------------------------------------------------
     # Ask vector DB for more than we eventually keep to improve re-ranking quality
     initial_k = k * 20
-    candidates = get_top_k_func(
+    candidates = get_top_k(
         question,
         k=initial_k,
         metadata_filter=metadata_filter,
@@ -219,7 +217,7 @@ def answer(
         console.print("Answer: ", end="")
 
     logger.debug("About to call generate_response with model=%s context_tokens=%d", OLLAMA_MODEL, context_tokens)
-    answer_text, updated_context = generate_response_func(
+    answer_text, updated_context = generate_response(
         prompt_text,
         OLLAMA_MODEL,
         _ollama_context,
