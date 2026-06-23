@@ -7,11 +7,18 @@ import logging
 from pathlib import Path
 import os
 from typing import Any, Iterator, Optional
+import warnings
 
 import pytest
 
 # Set up a logger for this module
 logger = logging.getLogger(__name__)
+
+# Dedicated logger for pytest-captured warnings so they are greppable and land in
+# the dated session log (see pytest_warning_recorded). Deliberately NOT under the
+# "pytest" namespace, which pytest controls — a top-level name is immune to any
+# level/handler reconfiguration of pytest's own loggers.
+_warnings_logger = logging.getLogger("test_warnings")
 
 
 REPORTS_DIR = Path("reports")
@@ -150,6 +157,38 @@ def pytest_configure(config: pytest.Config) -> None:  # noqa: D401
             path.unlink()
         except OSError:
             pass
+
+
+def pytest_warning_recorded(
+    warning_message: warnings.WarningMessage,
+    when: str,
+    nodeid: str,
+    location: Optional[tuple[str, int, str]],
+) -> None:
+    """Persist pytest-captured warnings into the dated session log.
+
+    Pytest renders its terminal "warnings summary" from its own recorder, a channel
+    separate from ``logging`` — so those warnings vanish with the terminal scrollback.
+    The app already routes *runtest*-phase warnings to ``logging`` via
+    ``backend.config`` calling ``logging.captureWarnings(True)``, but that only
+    activates once backend is imported (an autouse fixture, i.e. after collection).
+    Warnings raised during config/collection therefore never reach ``log_file``.
+
+    Re-emit every warning pytest records as a logging record on the
+    root-propagating ``pytest.warnings`` logger so it is captured in
+    ``reports/test_session-<ts>.log`` regardless of phase.
+    """
+    category = getattr(warning_message.category, "__name__", str(warning_message.category))
+    origin = f"{warning_message.filename}:{warning_message.lineno}"
+    where = f" [{nodeid}]" if nodeid else ""
+    _warnings_logger.warning(
+        "%s: %s (%s, phase=%s)%s",
+        category,
+        warning_message.message,
+        origin,
+        when,
+        where,
+    )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
