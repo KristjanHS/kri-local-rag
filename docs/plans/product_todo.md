@@ -29,7 +29,7 @@ Each item has Action + Verify; make one change per step. On a Verify failure, st
 >
 > | Phase | Item(s) | Why here |
 > |-------|---------|----------|
-> | **A** | P5 **(+ P3 Step 7 folded in)** | Fix the Weaviate collection/schema root cause. Pull P3 Step 7 (diagnostics & isolation) forward as the instrumentation that makes P5 debugging actionable. |
+> | **A** | ~~P5 + P3 Step 7~~ ✅ **DONE 2026-06-23** | P5 (Weaviate collection/schema root cause) found already-resolved on live triage — QA retrieval E2E passes. P3 Step 7 diagnostics shipped (`_dump_container_diagnostics`); isolation half deferred to `e2e_container.md`. |
 > | **B** | P3 Steps 6, 8 | With P5 green, verify build-reuse (Step 6) and wire the containerized CLI subset into scripts/docs/CI (Step 8). Also satisfies P2's Integration-Suite / Docker-Env / Docs sub-items. |
 > | **C** | P2 (remaining gaps) | Full app-validation sweep as *confirmation*, skipping what A+B already covered. Model-loading layers (Integration Suite, Real Model Ops) are independent of P5 and can run anytime. |
 > | **D** | P7 | Low-value / partly moot — **defer** unless Phase C surfaces a concrete compile-time pain point. |
