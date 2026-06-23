@@ -1,0 +1,47 @@
+# Build artifacts
+*.egg-info/
+__pycache__/
+.venv/
+.venv-ci/
+.ruff_cache/
+.pytest_cache/
+.uv_cache/
+.uv-cache-hooks/
+.pre-commit-cache/
+.mypy_cache/
+
+# Sibling AI-tool configs (tracked, but Claude reads CLAUDE.md + .claude/rules/)
+.codex/
+.cursor/
+.gemini/
+gemini
+gemini.md
+AGENTS.md
+docs/AI_coder/CODEX_RULES.md
+
+# Runtime artifacts
+logs/
+reports/
+tmp*/
+*.db
+*.sqlite*
+wget-log*
+
+# Models / large caches / sample data
+model_cache/
+.cache/
+data/
+example_data/
+test_data/
+
+# Archived docs / one-off session outputs
+docs/_archived/
+docs/plans/archived/
+docs/analysis/
+
+# Notebooks
+*.ipynb
+
+# Windows scripts (WSL interop disabled)
+*.bat
+*.cmd
