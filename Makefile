@@ -287,7 +287,7 @@ pyright: ## Run Pyright type checking
 	if [ -x .venv/bin/python ]; then PY_INTERP=".venv/bin/python"; \
 	elif command -v python3 >/dev/null 2>&1; then PY_INTERP=$$(command -v python3); \
 	else PY_INTERP=$$(command -v python); fi; \
-	$(PYRIGHT_BIN) --level $(PYRIGHT_LEVEL) --pythonpath "$$PY_INTERP" --project $(PYRIGHT_CONFIG)
+	PYRIGHT_PYTHON_FORCE_VERSION=latest $(PYRIGHT_BIN) --level $(PYRIGHT_LEVEL) --pythonpath "$$PY_INTERP" --project $(PYRIGHT_CONFIG)
 
 yamlfmt: ## Validate YAML formatting via pre-commit
 	# Ensure dev + test groups are present so later test steps still work
