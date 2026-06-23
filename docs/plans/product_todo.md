@@ -49,7 +49,20 @@ This file tracks **outstanding / undone** tasks for the project. Completed work
 
 ## Prioritized Backlog
 
-#### P2 — Complete Application Validation After Model Changes (IN PROGRESS)
+> **Execution order (set 2026-06-23).** Work the items in *phase* order (A→D), not
+> P-number order. P-numbers are retained as stable IDs. Dependency spine: **P5 is the
+> root-cause keystone** — fixing the Weaviate collection/schema mismatch unblocks the P3
+> blockers and removes most P2 E2E failures. P5/P3/P2 overlap heavily; treat them as one
+> effort, not three.
+>
+> | Phase | Item(s) | Why here |
+> |-------|---------|----------|
+> | **A** | P5 **(+ P3 Step 7 folded in)** | Fix the Weaviate collection/schema root cause. Pull P3 Step 7 (diagnostics & isolation) forward as the instrumentation that makes P5 debugging actionable. |
+> | **B** | P3 Steps 6, 8 | With P5 green, verify build-reuse (Step 6) and wire the containerized CLI subset into scripts/docs/CI (Step 8). Also satisfies P2's Integration-Suite / Docker-Env / Docs sub-items. |
+> | **C** | P2 (remaining gaps) | Full app-validation sweep as *confirmation*, skipping what A+B already covered. Model-loading layers (Integration Suite, Real Model Ops) are independent of P5 and can run anytime. |
+> | **D** | P7 | Low-value / partly moot — **defer** unless Phase C surfaces a concrete compile-time pain point. |
+
+#### P2 — Complete Application Validation After Model Changes (PHASE C — confirmation sweep, IN PROGRESS)
 
 **Goal**: Validate that the entire RAG application works correctly after the comprehensive
 model handling refactoring, ensuring no regressions were introduced.
@@ -122,7 +135,7 @@ network dependency for downloads · Docker build time · test flakiness from rea
 
 ---
 
-#### P3 — Containerized CLI E2E copies (Steps 6–8 remaining)
+#### P3 — Containerized CLI E2E copies (PHASE B — Steps 6 & 8; Step 7 pulled into Phase A)
 
 **Already done** (see archive): Steps 1–5 — the CLI-twin infrastructure using the existing
 `app` container (`run_cli_in_container` helper, removed separate `cli` service, one passing
@@ -137,7 +150,7 @@ twin `test_qa_real_end_to_end_container_e2e.py`).
   - Verify: second run is faster due to image reuse. *(Partially verified — build works,
     but tests fail on the Weaviate blockers below.)*
 
-- [ ] **Step 7 — Diagnostics and isolation**
+- [ ] **Step 7 — Diagnostics and isolation** *(PULLED INTO PHASE A — build first, then use it to debug P5)*
   - Action: on failure, print exit code, last 200 lines of app logs, and tails of
     `weaviate`/`ollama` logs; use ephemeral dirs/volumes.
   - Verify: failures are actionable; runs are deterministic and isolated.
@@ -162,11 +175,17 @@ twin `test_qa_real_end_to_end_container_e2e.py`).
 
 ---
 
-#### P5 — E2E retrieval failure: QA test returns no context (Weaviate)
+#### P5 — E2E retrieval failure: QA test returns no context (Weaviate) — **PHASE A — DO FIRST (keystone)**
 
 > **Note**: same root cause as the P3 blockers above (collection/schema mismatch). Resolve
 > together. Likely mismatch between the collection name used by retrieval vs. ingestion, or
 > ingestion not executed.
+>
+> **Phase A folds in P3 Step 7.** Build the P3 Step 7 diagnostics/isolation harness (exit
+> code + app/`weaviate`/`ollama` log tails on failure, ephemeral volumes) *before* cracking
+> P5 — it turns the "no context returned" failure into an actionable trace. The load-bearing
+> fix in this phase is **Task 5: standardize on one E2E collection name** across tests,
+> fixtures, and config; the other tasks are diagnosis around it.
 
 - [ ] **Task 1 — Reproduce quickly**
   - Action: run only the failing test (e.g. `pytest tests/e2e/test_qa_real_end_to_end.py`).
@@ -204,7 +223,7 @@ twin `test_qa_real_end_to_end_container_e2e.py`).
 
 ---
 
-#### P7 — Torch.compile Optimization (Tasks 2–4 remaining, low priority)
+#### P7 — Torch.compile Optimization (PHASE D — DEFERRED; Tasks 2–4 remaining, low priority)
 
 **Already done** (see archive): `.env` fix, reduced verbosity, in-process re-compile guard,
 and **Task 1 is moot** — the torch.compile logic was refactored into `backend/ingest.py`
