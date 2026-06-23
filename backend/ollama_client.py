@@ -28,23 +28,6 @@ def _get_ollama_base_url() -> str:
     return url
 
 
-def _detect_ollama_model() -> Optional[str]:
-    """Return the first available model reported by the Ollama server or None."""
-    try:
-        # /api/tags lists all pulled models
-        base_url = _get_ollama_base_url()
-        resp = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=2)
-        resp.raise_for_status()
-        models = resp.json().get("models", [])
-        if models:
-            # The endpoint returns a list of objects; each has a `name` field.
-            return models[0].get("name")
-    except Exception as e:
-        # Any issue (network, JSON, etc.) – silently ignore and let caller fall back.
-        logger.debug("Failed to detect Ollama model, falling back. Error: %s", e)
-    return None
-
-
 def _check_model_exists(model_name: str, models: list[dict[str, str]]) -> bool:
     """Check if a model exists in the list of available models."""
     for model in models:
@@ -111,39 +94,6 @@ def _download_model_with_progress(model_name: str, base_url: str, timeout_second
         return False
 
 
-def _verify_model_download(model_name: str, base_url: str) -> bool:
-    """Verify that a model was successfully downloaded."""
-    import time
-
-    time.sleep(2)  # Wait for model to be registered
-
-    # Re-check if model is now available
-    verify_resp = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=2)
-    verify_resp.raise_for_status()
-    verify_models = verify_resp.json().get("models", [])
-
-    model_verified = _check_model_exists(model_name, verify_models)
-
-    if model_verified:
-        logger.info("Model '%s' downloaded and verified successfully!", model_name)
-    else:
-        logger.warning("Model '%s' download completed but verification failed.", model_name)
-
-    return model_verified
-
-
-def ensure_model_available(model_name: str) -> bool:
-    """Simplified model ensure: attempt a quick, single pull request.
-
-    This avoids pre-checks and verbose progress. Intended for dev flows.
-    """
-    try:
-        return pull_if_missing(model_name)
-    except Exception as e:
-        logger.error("Unexpected error ensuring model availability: %s", e)
-        return False
-
-
 def pull_if_missing(model_name: str, timeout_seconds: int = 300) -> bool:
     """Ensure a model is available; pull only if it's missing.
 
@@ -167,57 +117,6 @@ def pull_if_missing(model_name: str, timeout_seconds: int = 300) -> bool:
 
     # Pull (idempotent on server side)
     return _download_model_with_progress(model_name, base_url, timeout_seconds=timeout_seconds)
-
-
-def test_ollama_connection() -> bool:
-    """Test Ollama connection and model with a simple dry-run."""
-    try:
-        base_url = _get_ollama_base_url()
-        model_name = OLLAMA_MODEL
-
-        logger.info("Testing Ollama connection...")
-
-        # Test 1: Check if Ollama is reachable
-        try:
-            resp = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=5)
-            resp.raise_for_status()
-            logger.info("✓ Ollama server is reachable")
-        except Exception as e:
-            logger.error("✗ Ollama server not reachable: %s", e)
-            return False
-
-        # Test 2: Ensure model is available
-        if not ensure_model_available(model_name):
-            return False
-
-        # Test 3: Quick inference test
-        logger.info("Running quick inference test...")
-        test_payload = {
-            "model": model_name,
-            "prompt": "Hello",
-            "stream": True,
-            "options": {"num_predict": 5},  # Limit to 5 tokens for speed
-        }
-
-        test_resp = httpx.stream(
-            "POST",
-            f"{base_url.rstrip('/')}/api/generate",
-            json=test_payload,
-            timeout=10,
-        )
-        with test_resp as resp:
-            resp.raise_for_status()
-            # Just read a few lines to confirm it's working
-            for i, _ in enumerate(resp.iter_lines()):
-                if i >= 3:  # Only read first 3 lines
-                    break
-
-        logger.info("✓ Ollama inference test successful")
-        return True
-
-    except Exception as e:
-        logger.error("✗ Ollama test failed: %s", e)
-        return False
 
 
 def generate_response(
@@ -377,7 +276,3 @@ def generate_response(
         if on_debug:
             on_debug(f"Exception in generate_response: {e}")
         return f"[Error generating response: {e}]", context
-
-
-# Keep selected helpers referenced to satisfy strict static checks and tests
-_KEEP_FOR_TESTS = (_detect_ollama_model, _verify_model_download)

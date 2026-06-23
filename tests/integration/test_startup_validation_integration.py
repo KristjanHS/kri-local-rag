@@ -34,7 +34,7 @@ class TestInitializationLogging:
 
     def test_ollama_model_check_logging(self, mock_httpx_get):
         """Test Ollama model availability check logging."""
-        from backend.ollama_client import ensure_model_available
+        from backend.ollama_client import pull_if_missing
 
         # Mock successful model check
         mock_response = MagicMock()
@@ -42,7 +42,7 @@ class TestInitializationLogging:
         mock_response.raise_for_status.return_value = None
         mock_httpx_get.return_value = mock_response
 
-        result = ensure_model_available("test-model")
+        result = pull_if_missing("test-model")
         assert result is True
 
 
@@ -98,7 +98,7 @@ class TestContainerReadiness:
 
         # Should be able to import all core modules
         assert hasattr(config, "OLLAMA_MODEL")
-        assert hasattr(ollama_client, "ensure_model_available")
+        assert hasattr(ollama_client, "pull_if_missing")
         assert hasattr(retriever, "get_top_k")
 
     def test_weaviate_url_configuration(self):
