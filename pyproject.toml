@@ -4,13 +4,13 @@ version = "0.1.0"
 description = "A local RAG implementation with Weaviate and Ollama."
 authors = [{ name="Kristjan Sillmann"}]
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.14,<3.15"
 dependencies = [
     "httpx>=0.28.1,<0.29.0",
     "langchain-core>=1.2.22,<2.0.0",
     "langchain-text-splitters>=1.1.2,<2.0.0",
     "python-dotenv>=1.2.2,<2.0.0",
-    "rich>=14.1.0,<15.0.0",
+    "rich>=14.1.0,<16.0.0",
     # >=5.6.0: earlier 5.1.0 capped transformers<5.0.0, blocking the transformers 5.x
     # security bump; 5.2.0+ widened to transformers<6.0.0. See constraint-dependencies.
     "sentence-transformers>=5.6.0,<6.0.0",
@@ -52,19 +52,19 @@ dev = [
     "mkdocs>=1.6.1,<2.0.0",
     "pre-commit>=4.3.0,<5.0.0",
     "pyright[nodejs]>=1.1.405,<2.0.0",
-    "ruff>=0.12.12,<0.13.0",
+    "ruff>=0.12.12,<0.16.0",
 ]
 
 test = [
     "playwright>=1.55.0,<2.0.0",
     "protobuf>=6.32.0,<7.0.0",
     "pytest>=9.0.3,<10.0.0",  # CVE-2025-71176 (fixed in 9.0.3)
-    "pytest-cov>=6.3.0,<7.0.0",
+    "pytest-cov>=6.3.0,<8.0.0",
     "pytest-docker>=3.2.3,<4.0.0",
     "pytest-html>=4.1.1,<5.0.0",
     "pytest-mock>=3.15.0,<4.0.0",
-    "pytest-playwright>=0.7.1,<0.8.0",
-    "pytest-socket>=0.7.0,<0.8.0",
+    "pytest-playwright>=0.7.1,<0.9.0",
+    "pytest-socket>=0.7.0,<0.9.0",
     "pytest-xdist>=3.8.0,<4.0.0",
     "requests>=2.32.5,<3.0.0",
     # Optional runtime deps not yet used in app
@@ -161,6 +161,12 @@ kri-local-rag = "cli:main"
 [tool.ruff]
 line-length = 120
 exclude = [".git", "__pycache__", ".venv", "venv", "build", "dist"]
+# Pin the lint/format target one minor below requires-python (3.14) so ruff does
+# NOT auto-adopt 3.14-only syntax (e.g. PEP 758 parenthesis-free `except A, B:`),
+# which would be a SyntaxError under a rollback to the 3.13 floor and breaks the
+# atomic single-revert guarantee of the 3.14 bump. Adopting 3.14 syntax is a
+# separate task — see docs/plans/2026-06-23-python-3.14-upgrade.md "Out of scope".
+target-version = "py313"
 
 [tool.ruff.lint]
 # E203: whitespace-before-punctuation

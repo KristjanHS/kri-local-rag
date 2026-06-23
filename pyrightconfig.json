@@ -14,7 +14,7 @@
     "strict": [
         "backend/**"
     ],
-    "pythonVersion": "3.13",
+    "pythonVersion": "3.14",
     "pythonPlatform": "Linux",
     "reportMissingModuleSource": "warning",
     "reportMissingTypeStubs": "none",
