@@ -143,6 +143,16 @@ if "init_done" not in st.session_state:
     buf = io.StringIO()
     capture_handler = logging.StreamHandler(buf)
     capture_handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    # The root logger is shared across all Streamlit session threads. Restrict capture to
+    # this thread so a concurrently-initializing session's logs (queries, retrieved context)
+    # don't leak into this session's "Backend init logs".
+    init_thread_id = threading.get_ident()
+
+    class _ThreadLogFilter(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:
+            return record.thread == init_thread_id
+
+    capture_handler.addFilter(_ThreadLogFilter())
     root_logger = logging.getLogger()
     root_logger.addHandler(capture_handler)
     try:
