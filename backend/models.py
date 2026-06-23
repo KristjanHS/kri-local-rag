@@ -23,9 +23,15 @@ from backend.config import get_logger
 # Set up logging for this module early, so the stub can log
 logger = get_logger(__name__)
 
-# Ensure text-only Transformers import path in environments without torchvision/compiled ops
-# This must be set before any potential transformers imports via sentence-transformers.
-os.environ.setdefault("TRANSFORMERS_NO_TORCHVISION", "1")
+# Ensure text-only Transformers import path in environments without torchvision/compiled ops.
+# Only force this when torchvision is genuinely unavailable — otherwise the stub below would
+# clobber a working torchvision (transformers 5.x imports torchvision.io.ImageReadMode during
+# PreTrainedModel import, which the fail-fast stub rejects, breaking CrossEncoder loading).
+import importlib.util as _importlib_util
+
+_torchvision_available = _importlib_util.find_spec("torchvision") is not None
+if not _torchvision_available:
+    os.environ.setdefault("TRANSFORMERS_NO_TORCHVISION", "1")
 
 # In some environments, importing transformers may indirectly import torchvision and
 # fail if compiled ops are unavailable. For our text-only usage, we stub torchvision.
@@ -33,7 +39,7 @@ os.environ.setdefault("TRANSFORMERS_NO_TORCHVISION", "1")
 # IMPORTANT: This stub is intentionally "fail-fast" at runtime. If any code attempts
 # to actually use torchvision functionality (beyond the minimal symbols needed for
 # transformers import-time checks), it will raise a RuntimeError with clear guidance.
-if os.environ.get("TRANSFORMERS_NO_TORCHVISION", "0") == "1":
+if not _torchvision_available and os.environ.get("TRANSFORMERS_NO_TORCHVISION", "0") == "1":
     try:
         import importlib.machinery as _machinery
         import sys
@@ -70,6 +76,17 @@ if os.environ.get("TRANSFORMERS_NO_TORCHVISION", "0") == "1":
                 LANCZOS = 1
 
             transforms_stub.InterpolationMode = _InterpolationMode
+
+            # transformers 5.x accesses torchvision.io.ImageReadMode at import time even on the
+            # text-only path; provide a benign value so PreTrainedModel imports successfully.
+            class _ImageReadMode:
+                UNCHANGED = 0
+                GRAY = 1
+                GRAY_ALPHA = 2
+                RGB = 3
+                RGB_ALPHA = 4
+
+            io_stub.ImageReadMode = _ImageReadMode
 
             # Fail-fast helpers
             def _fail_transforms(name: str = ""):
@@ -114,6 +131,8 @@ if os.environ.get("TRANSFORMERS_NO_TORCHVISION", "0") == "1":
                 return _fail_transforms(name)
 
             def _tv_io___getattr__(name: str):
+                if name == "ImageReadMode":
+                    return io_stub.ImageReadMode
                 return _fail_io(name)
 
             transforms_stub.__getattr__ = _tv_transforms___getattr__  # type: ignore[attr-defined]
