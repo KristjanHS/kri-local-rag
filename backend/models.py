@@ -133,6 +133,20 @@ if not _torchvision_available and os.environ.get("TRANSFORMERS_NO_TORCHVISION", 
             def _tv_io___getattr__(name: str):
                 if name == "ImageReadMode":
                     return io_stub.ImageReadMode
+                # Permit standard module introspection attributes to be absent gracefully
+                if name in {
+                    "__file__",
+                    "__name__",
+                    "__spec__",
+                    "__package__",
+                    "__loader__",
+                    "__path__",
+                    "__doc__",
+                    "__all__",
+                    "__cached__",
+                    "__version__",
+                }:
+                    return None
                 return _fail_io(name)
 
             transforms_stub.__getattr__ = _tv_transforms___getattr__  # type: ignore[attr-defined]
