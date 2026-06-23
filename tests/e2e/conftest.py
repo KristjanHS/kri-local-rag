@@ -51,12 +51,15 @@ def e2e():
 
         if environment == "Docker":
             action_msg = f"Try: {commands.get('docker_start', 'make test-up')}"
-        elif "weaviate" in missing:
-            action_msg = f"Try: {commands.get('local_weaviate_start', 'start Weaviate')}"
-        elif "ollama" in missing:
-            action_msg = f"Try: {commands.get('local_ollama_start', 'ollama serve')}"
         else:
-            action_msg = "Start the required services"
+            # Local mode: emit a start hint for EVERY missing service, not just the
+            # first matched (avoids hiding the ollama hint when both are down).
+            local_hints = {
+                "weaviate": commands.get("local_weaviate_start", "start Weaviate"),
+                "ollama": commands.get("local_ollama_start", "ollama serve"),
+            }
+            hints = [local_hints[service] for service in missing if service in local_hints]
+            action_msg = "Try: " + "; ".join(hints) if hints else "Start the required services"
 
         health_urls: list[str] = []
         for service in missing:
@@ -71,6 +74,8 @@ def e2e():
             f"(in {environment} environment). {action_msg}.{health_check_msg}"
         )
 
+    # NOTE: unlike the integration fixture this dict intentionally omits "test_docker"
+    # — TEST_DOCKER was eliminated for e2e; use "environment" ("Docker"/"local") instead.
     return {
         "config": config,
         "environment": environment,
