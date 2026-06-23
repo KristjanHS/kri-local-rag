@@ -1,7 +1,7 @@
 # run locally: ~/projects/kri-local-rag$ streamlit run frontend/rag_app.py
-import contextlib
 import html
 import io
+import logging
 import os
 import threading
 
@@ -12,9 +12,10 @@ from backend.config import OLLAMA_CONTEXT_TOKENS, get_logger
 # Set up logging for this module
 logger = get_logger(__name__)
 
-# Upload safety limits (defense-in-depth for the ingestion entry point)
-MAX_UPLOAD_FILES = 20
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB per file
+# Upload safety limits (defense-in-depth for the ingestion entry point).
+# Overridable via env: MAX_UPLOAD_FILES (count), MAX_UPLOAD_MB (per-file size).
+MAX_UPLOAD_FILES = int(os.getenv("MAX_UPLOAD_FILES", "150"))
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "50")) * 1024 * 1024
 PDF_MAGIC = b"%PDF-"
 
 
@@ -48,7 +49,7 @@ st.sidebar.markdown(
 **GPU Monitoring:**
 To monitor your GPU VRAM usage while running large context windows, open a terminal and run:
 ```
-./monitor_gpu.sh
+./scripts/dev/monitor_gpu.sh
 ```
 This shows GPU memory, utilization, and container resource usage.
 
@@ -137,26 +138,43 @@ if stop_clicked:
 
 # ---------------- One-time backend initialization ------------------
 if "init_done" not in st.session_state:
+    # Capture log records (not stdout): app logging goes to stderr handlers, so a
+    # temporary in-memory handler on the root logger is what surfaces init output here.
     buf = io.StringIO()
-    with contextlib.redirect_stdout(buf):
-        try:
-            skip_checks = os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes")
-            fake_answer_present = bool(os.getenv("RAG_FAKE_ANSWER"))
-            logger.info(
-                "App startup env: RAG_SKIP_STARTUP_CHECKS=%s, RAG_FAKE_ANSWER=%s",
-                str(skip_checks),
-                str(fake_answer_present),
-            )
-            if skip_checks:
-                logger.info("Startup checks skipped via RAG_SKIP_STARTUP_CHECKS")
-            else:
-                # Lazy import to avoid heavy deps during module import
-                from backend.qa_loop import ensure_weaviate_ready_and_populated
+    capture_handler = logging.StreamHandler(buf)
+    capture_handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    # The root logger is shared across all Streamlit session threads. Restrict capture to
+    # this thread so a concurrently-initializing session's logs (queries, retrieved context)
+    # don't leak into this session's "Backend init logs".
+    init_thread_id = threading.get_ident()
 
-                ensure_weaviate_ready_and_populated()
-        except Exception as e:
-            logger.error("Backend initialization failed: %s", e)
-    st.session_state["init_logs"] = buf.getvalue()
+    class _ThreadLogFilter(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:
+            return record.thread == init_thread_id
+
+    capture_handler.addFilter(_ThreadLogFilter())
+    root_logger = logging.getLogger()
+    root_logger.addHandler(capture_handler)
+    try:
+        skip_checks = os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes")
+        fake_answer_present = bool(os.getenv("RAG_FAKE_ANSWER"))
+        logger.info(
+            "App startup env: RAG_SKIP_STARTUP_CHECKS=%s, RAG_FAKE_ANSWER=%s",
+            str(skip_checks),
+            str(fake_answer_present),
+        )
+        if skip_checks:
+            logger.info("Startup checks skipped via RAG_SKIP_STARTUP_CHECKS")
+        else:
+            # Lazy import to avoid heavy deps during module import
+            from backend.qa_loop import ensure_weaviate_ready_and_populated
+
+            ensure_weaviate_ready_and_populated()
+    except Exception as e:
+        logger.error("Backend initialization failed: %s", e)
+    finally:
+        root_logger.removeHandler(capture_handler)
+    st.session_state["init_logs"] = buf.getvalue() or "No init logs."
     st.session_state["init_done"] = True
 
 # Show init logs in sidebar
@@ -215,6 +233,8 @@ if submitted and question.strip():
             )
     # After streaming, keep showing the debug info
     debug_placeholder.text("\n".join(st.session_state["debug_lines"]))
-else:
-    # Show a persistent debug info area even when not running
-    st.sidebar.expander("Debug info", expanded=False).text("\n".join(st.session_state.get("debug_lines", [])))
+
+# Always surface the latest debug lines in the sidebar (reflects the most recent run).
+st.sidebar.expander("Debug info", expanded=False).text(
+    "\n".join(st.session_state.get("debug_lines", [])) or "No debug info."
+)

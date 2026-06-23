@@ -1,5 +1,5 @@
 # Use the official Microsoft dev container image as a base.
-FROM mcr.microsoft.com/devcontainers/python:1-3.13-bookworm
+FROM mcr.microsoft.com/devcontainers/python:3-3.14-bookworm
 
 # Switch to root to install system-level dependencies.
 USER root
