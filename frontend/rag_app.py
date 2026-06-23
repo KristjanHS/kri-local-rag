@@ -59,9 +59,8 @@ class _DebugPanelHandler(logging.Handler):
             self._placeholder.text("\n".join(lines))
         except Exception:
             # Placeholder may be unavailable after a rerun; the sidebar expander still
-            # renders the accumulated buffer at the end of the run. Use the module logger
-            # (not the backend.ollama_client logger this handler is attached to) to avoid
-            # re-entering emit().
+            # renders the accumulated buffer at the end of the run. handleError writes to
+            # stderr (never via a logger), so it can't re-enter emit().
             self.handleError(record)
 
 
