@@ -103,7 +103,6 @@ make app-logs LINES=200          # add FOLLOW=1 to tail
 ## Documentation
 
 - [Development Guide](docs/dev_test_CI/DEVELOPMENT.md) – More setup, testing, helper scripts, and power-user tips.
-- [AI-coder guide](docs/AI_coder/AI_instructions.md) – automation-friendly commands.
 - [Docker Management](docs/operate/docker-management.md) – deeper service ops and troubleshooting.
 
 ## License

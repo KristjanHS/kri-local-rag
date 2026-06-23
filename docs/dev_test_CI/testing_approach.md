@@ -155,10 +155,6 @@ Integration tests combine real local models with mocked external services for ef
 - Test Weaviate connectivity: `curl -i $WEAVIATE_URL/v1/.well-known/ready`
 - Test Ollama connectivity: `curl -i $OLLAMA_URL/api/version`
 
----
-
-**Note**: This document provides a high-level overview for human readers. For detailed code examples and comprehensive testing guides, see `docs/AI_coder/AI_instructions.md`.
-
 ## See Also
 - Make targets: run `make help`
 - Development Guide: `docs/dev_test_CI/DEVELOPMENT.md`

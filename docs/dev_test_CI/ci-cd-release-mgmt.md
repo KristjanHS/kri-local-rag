@@ -61,8 +61,7 @@ The `.actrc` file uses optimized Docker images and automatically removes contain
 act -l
 
 # Run CI locally
-# Note: ci_act.sh script not found in current structure
-# Consider using: act workflow_dispatch -W .github/workflows/python-lint-test.yml
+act workflow_dispatch -W .github/workflows/python-lint-test.yml
 
 # Run specific workflows
 act workflow_dispatch -W .github/workflows/codeql.yml
@@ -201,9 +200,7 @@ make uv-sync-test
 ## Project Scripts
 
 ### CI Scripts
-- `scripts/ci_act.sh`: Run full CI locally (not found in current structure)
 - `scripts/docker/cleanup_docker_and_ci_cache.sh`: Cleanup Docker and act cache
-- `scripts/ci_local_fast.sh`: Fast local CI testing (not found in current structure)
 
 ### Release Scripts
 - `scripts/ci/promote_dev_to_main.sh`: Safe dev → main promotion
@@ -225,14 +222,6 @@ make uv-sync-test
 - Set up automated alerts
 - Maintain security baseline
 
-## Getting Help
-
-- **GitHub Actions**: https://docs.github.com/en/actions
-- **Act CLI**: https://github.com/nektos/act
-- **CodeQL**: https://docs.github.com/en/code-security
-- **Semgrep**: https://semgrep.dev/docs/
-
 ## See Also
 - Make targets: run `make help`
-- Codex Rules: `docs/AI_coder/CODEX_RULES.md`
 - Testing Approach: `docs/dev_test_CI/testing_approach.md`

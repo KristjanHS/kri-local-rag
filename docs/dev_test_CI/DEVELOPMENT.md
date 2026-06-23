@@ -1,6 +1,6 @@
 # Development Quickstart
 
-Concise setup for human developers. For detailed, AI-automation-focused guidance, see `docs/AI_coder/AI_instructions.md`.
+Concise setup for human developers.
 
 ## Prerequisites
 - Python 3.12+ recommended (matches project requirement)
@@ -52,12 +52,7 @@ make integration
 
 For testing patterns, see `docs/dev_test_CI/testing_approach.md`.
 
-### Markers
-- `slow`: Long-running tests (>30s)
-- `docker`: Requires Docker daemon
-- `requires_weaviate`: Needs Weaviate service
-- `requires_ollama`: Needs Ollama service
-Note: the generic `external` marker has been removed; use the specific service markers instead.
+Test markers (`slow`, `docker`, `requires_weaviate`, `requires_ollama`) are defined in `docs/dev_test_CI/testing_approach.md`.
 
 - E2E (full stack via Docker Compose):
 ```bash
@@ -73,6 +68,14 @@ make e2e
 ```bash
 make pre-push
 ```
+
+### Test notifications
+Run tests with color/bell/log notifications:
+- Push → test → PR: `make push-pr`
+- With notifications: `./scripts/dev/test-notification.sh [integration|unit|e2e|all]`
+- Extra pytest args: `PYTEST_ARGS="-x --tb=short" ./scripts/dev/test-notification.sh integration`
+- VS Code: Ctrl+Shift+P → "Tasks: Run Task" → "Run Tests with Notifications"
+- Requires `.venv/bin/python`; logs to `logs/test-notification.log`.
 
 ## Model System
 
@@ -133,7 +136,6 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 
 
 ## More docs
-- Detailed guidance used mostly by AI coder: `docs/AI_coder/AI_instructions.md`
 - Docker management and troubleshooting: `docs/operate/docker-management.md`
 - **Testing strategy**: `docs/dev_test_CI/testing_approach.md` - Complete guide to testing patterns, integration tests, and model management
 
@@ -149,5 +151,4 @@ docker run --rm kri-local-rag:local python -c "import torch,google.protobuf as g
 
 ## See Also
 - Make targets: run `make help`
-- AI Agent Instructions: `docs/AI_coder/AI_instructions.md`
 - Docker Management: `docs/operate/docker-management.md`
