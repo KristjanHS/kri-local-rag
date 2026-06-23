@@ -226,9 +226,9 @@ integration: ## Run local integration tests (venv or uv)
 	@MPLCONFIGDIR=$${MPLCONFIGDIR:-$(CURDIR)/.cache/matplotlib}; \
 	 mkdir -p "$$MPLCONFIGDIR"; \
 	 if [ -x .venv/bin/python ]; then \
-		MPLCONFIGDIR="$$MPLCONFIGDIR" .venv/bin/python -m pytest tests/integration -q ${PYTEST_ARGS}; \
+		MPLCONFIGDIR="$$MPLCONFIGDIR" .venv/bin/python -m pytest tests/integration -q --junitxml=reports/junit_integration.xml ${PYTEST_ARGS}; \
 	 elif command -v uv >/dev/null 2>&1; then \
-		MPLCONFIGDIR="$$MPLCONFIGDIR" uv run -m pytest tests/integration -q ${PYTEST_ARGS}; \
+		MPLCONFIGDIR="$$MPLCONFIGDIR" uv run -m pytest tests/integration -q --junitxml=reports/junit_integration.xml ${PYTEST_ARGS}; \
 	 else \
 		echo ".venv/bin/python not found and uv not available. Create the env (make uv-sync-test or python -m venv .venv) then run '.venv/bin/python -m pytest tests/integration -q'"; \
 		exit 1; \
