@@ -87,11 +87,11 @@ Connection refused usually means a URL mismatch (localhost vs container name) or
 
 ## Model system
 
-Offline-first loading, all settings in `backend/config.py`:
+Model settings live in `backend/config.py`:
 
-- Env overrides: `EMBED_REPO`, `RERANK_REPO`, `EMBED_COMMIT`, `RERANK_COMMIT`.
+- Env overrides: `EMBEDDING_MODEL`, `RERANK_MODEL`, `OLLAMA_MODEL`.
 - Defaults: `all-MiniLM-L6-v2` (embed), `ms-marco-MiniLM-L-6-v2` (rerank).
-- Dev downloads models at pinned commits; prod bakes them into the image and sets `TRANSFORMERS_OFFLINE=1`.
+- HuggingFace caches under `HF_HOME`; prod bakes the models into the image so loading needs no network.
 - API: `load_embedder()` / `load_reranker()` from `backend.models` (cached).
 
 ## Docker & wheels
