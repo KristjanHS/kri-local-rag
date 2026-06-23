@@ -29,9 +29,15 @@ fi
 # working-tree changes (git add -u would stage the whole repo).
 mapfile -t STAGED_FILES < <(git diff --cached --name-only --diff-filter=ACMR)
 
-# Run pre-commit on all files
-# This will run: ruff (fix + format), yamlfmt, detect-secrets, and custom secrets scan
-pre-commit run --all-files 2>&1 | tee -a "$LOG_FILE"
+# Run hooks only on the files staged for THIS commit (not --all-files), so cost
+# scales with the diff, not the repo size — keeps commits sub-2s. Whole-project
+# gates (pyright) run in pre-push instead. If nothing is staged there is nothing
+# to check, so exit cleanly.
+if [ ${#STAGED_FILES[@]} -eq 0 ]; then
+    log INFO "No staged files; skipping pre-commit hooks."
+    exit 0
+fi
+pre-commit run --files "${STAGED_FILES[@]}" 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 
 if [ $EXIT_CODE -ne 0 ]; then

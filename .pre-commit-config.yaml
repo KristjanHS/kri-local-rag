@@ -11,15 +11,9 @@ repos:
         name: "Ruff - Format code"
         description: "Reformat all files according to the rules in pyproject.toml"
 
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.405
-    hooks:
-      - id: pyright
-        name: "Pyright - Static type checking"
-        description: "Static type checking for Python code"
-        args:
-          - --level
-          - error
+  # NOTE: Pyright runs in the pre-push hook (scripts/git-hooks/pre-push), not here.
+  # Type checking is a whole-project gate (~5s) and dominated pre-commit time; it
+  # is non-mutating and CI gates it too, so it belongs at the push boundary.
 
   - repo: https://github.com/google/yamlfmt
     rev: v0.17.2
