@@ -149,7 +149,7 @@ ollama-pull: ## Pull Ollama model in container (MODEL=...)
 	@$(COMPOSE_APP) exec -T ollama ollama pull "$(MODEL)"
 
 # Run E2E tests with automatic stack lifecycle
-e2e: ## Run E2E tests on local env, assumes already running docker services. Set PRESERVE=0 to stack-down
+e2e: ## Run E2E tests on host; needs kri-local-rag-app:latest (auto-built by `make stack-up`), else tests skip. For fully-automated build+run, use `make test-up && make test-e2e`. Set PRESERVE=0 to stack-down
 	@set -euo pipefail; \
 	EXIT=0; \
 	$(PYTEST) tests/e2e $(PYTEST_BASE) $${PYTEST_ARGS:-} || EXIT=$$?; \
