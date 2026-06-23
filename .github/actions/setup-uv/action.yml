@@ -1,13 +1,13 @@
 name: "Setup Python + uv (cached)"
-description: "Sets up Python 3.12 and uv with sensible caching for GitHub CI and act"
+description: "Sets up Python 3.13 and uv with sensible caching for GitHub CI and act"
 
 runs:
   using: "composite"
   steps:
-    - name: Setup Python 3.12 (composite)
+    - name: Setup Python 3.13 (composite)
       uses: actions/setup-python@v5
       with:
-        python-version: "3.12"
+        python-version: "3.13"
     # Install uv locally under act: docker image only supports older version of gh action + act uses host-mounted uv cache.
     - name: Install uv (act workaround)
       if: ${{ github.actor == 'nektos/act' }}

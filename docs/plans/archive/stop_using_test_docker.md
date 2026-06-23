@@ -60,8 +60,7 @@ Tests can simply use the service URLs directly without any environment detection
   - Ensure tests work without explicit TEST_DOCKER setting
 
 - [ ] **Update documentation to reflect new environment-based approach**
-  - Update `docs/dev_test_CI/testing_approach.md`
-  - Update `docs/dev_test_CI/DEVELOPMENT.md`
+  - Update `docs/dev_test_CI/README.md`
   - Update `docs/AI_coder/AI_instructions.md`
   - Remove TEST_DOCKER references from all docs
 
@@ -126,8 +125,7 @@ ollama_url = get_service_url("ollama")      # Works in both environments
 - `Makefile` - Update test targets if needed
 
 ### Documentation
-- `docs/dev_test_CI/testing_approach.md`
-- `docs/dev_test_CI/DEVELOPMENT.md`
+- `docs/dev_test_CI/README.md`
 - `docs/AI_coder/AI_instructions.md`
 - `docs/e2e_container.md` - Update to reflect new approach
 

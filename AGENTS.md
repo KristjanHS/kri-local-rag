@@ -65,7 +65,7 @@ explicitly overrides them.
   _If failing, fix the code or tests; do **not** disable checks._
 
 ## Code style & conventions  
-- Obey `docs/CODEX_RULES.md` for lint, type checks, import order, logging, and Docker safety posture.  
+- Obey the rules in `.cursor/rules/` (and the mirrored `.claude/rules/`) for lint, type checks, import order, logging, and Docker safety posture.  
 - Keep lines ≤120 chars. Prefer small, composable functions and explicit error handling.  
 - Add or update tests when changing behavior.
 

@@ -15,14 +15,14 @@
     "prConcurrentLimit": 10,
     "minimumReleaseAge": "3 days",
     "enabledManagers": [
-        "pip_requirements",
+        "pep621",
         "github-actions",
         "dockerfile"
     ],
-    "pip_requirements": {
-        "fileMatch": [
-            "(^|/)requirements(-dev)?\\.txt$"
-        ],
+    "lockFileMaintenance": {
+        "enabled": true
+    },
+    "pep621": {
         "rangeStrategy": "replace"
     },
     "ignoreDeps": [
@@ -31,7 +31,7 @@
     "packageRules": [
         {
             "matchManagers": [
-                "pip_requirements"
+                "pep621"
             ],
             "labels": [
                 "deps",
@@ -42,7 +42,7 @@
         },
         {
             "matchManagers": [
-                "pip_requirements"
+                "pep621"
             ],
             "matchUpdateTypes": [
                 "major"
@@ -57,7 +57,7 @@
         },
         {
             "matchManagers": [
-                "pip_requirements"
+                "pep621"
             ],
             "matchUpdateTypes": [
                 "patch"
@@ -73,7 +73,7 @@
         },
         {
             "matchManagers": [
-                "pip_requirements"
+                "pep621"
             ],
             "groupName": "pytest ecosystem",
             "labels": [
@@ -88,7 +88,7 @@
         },
         {
             "matchManagers": [
-                "pip_requirements"
+                "pep621"
             ],
             "groupName": "ruff ecosystem",
             "labels": [
@@ -103,7 +103,7 @@
         },
         {
             "matchManagers": [
-                "pip_requirements"
+                "pep621"
             ],
             "groupName": "mypy ecosystem",
             "labels": [
@@ -118,7 +118,7 @@
         },
         {
             "matchManagers": [
-                "pip_requirements"
+                "pep621"
             ],
             "groupName": "sphinx ecosystem",
             "labels": [
