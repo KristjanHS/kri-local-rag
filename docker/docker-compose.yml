@@ -14,6 +14,10 @@ services:
       DEFAULT_VECTORIZER_MODULE: 'none' # We are providing vectors manually
       # ENABLE_MODULES: 'text2vec-huggingface,reranker-huggingface' # Still needed for reranker
       CLUSTER_HOSTNAME: 'node1'
+      # Pin the gossip advertise address to the container's primary interface.
+      # Without this, Weaviate's memberlist auto-detection fails ("No private IP
+      # address found") in some Docker/WSL2 networks and the container exits 1.
+      CLUSTER_ADVERTISE_INTERFACE: 'eth0'
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1"]
       interval: 5s
