@@ -8,25 +8,37 @@ unit tier despite covering an e2e helper.
 import logging
 import subprocess
 
-from tests.e2e.conftest import _DIAGNOSTIC_SERVICES, _dump_container_diagnostics
+from tests.e2e.conftest import ComposeContext, _dump_container_diagnostics
+
+# A representative active-test-stack context (project + profile + app-test service).
+_TEST_CTX = ComposeContext(
+    project="123-run-id",
+    base=["docker", "compose", "-f", "docker/docker-compose.yml", "--profile", "test"],
+    app_service="app-test",
+    diagnostic_services=("app-test", "weaviate", "ollama"),
+)
 
 
 def test_dump_collects_logs_for_every_diagnostic_service(monkeypatch, caplog):
     """A failed CLI run dumps `docker compose logs` for each diagnostic service
     plus the CLI exit code and captured stdout/stderr."""
     requested_services: list[str] = []
+    seen_project: list[str | None] = []
 
     def fake_run(cmd, **kwargs):  # noqa: ANN001, ANN003
         requested_services.append(cmd[-1])  # `docker compose ... logs --tail N <service>`
+        seen_project.append(kwargs.get("env", {}).get("COMPOSE_PROJECT_NAME"))
         return subprocess.CompletedProcess(cmd, 0, stdout="container log line", stderr="")
 
     monkeypatch.setattr("tests.e2e.conftest.subprocess.run", fake_run)
 
     failed = subprocess.CompletedProcess(["docker"], 1, stdout="boom-out", stderr="boom-err")
     with caplog.at_level(logging.ERROR, logger="tests.e2e.conftest"):
-        _dump_container_diagnostics("docker/docker-compose.yml", failed)
+        _dump_container_diagnostics(_TEST_CTX, failed)
 
-    assert requested_services == list(_DIAGNOSTIC_SERVICES)
+    assert requested_services == list(_TEST_CTX.diagnostic_services)
+    # Diagnostics must target the same compose project the CLI ran against.
+    assert seen_project == [_TEST_CTX.project] * len(_TEST_CTX.diagnostic_services)
     text = caplog.text
     assert "exited 1" in text
     assert "boom-out" in text and "boom-err" in text
@@ -43,4 +55,4 @@ def test_dump_never_raises_when_docker_unavailable(monkeypatch):
 
     failed = subprocess.CompletedProcess(["docker"], 1, stdout="", stderr="")
     # Should swallow the OSError rather than propagate it.
-    _dump_container_diagnostics("docker/docker-compose.yml", failed)
+    _dump_container_diagnostics(_TEST_CTX, failed)

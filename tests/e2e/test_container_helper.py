@@ -10,5 +10,8 @@ def test_run_cli_in_container_help(run_cli_in_container):  # noqa: ANN001
     """
     result = run_cli_in_container(["--help"])
     assert result.returncode == 0
-    assert "usage: qa_loop.py" in result.stdout
+    # Invoked as `python -m backend.qa_loop`, so argparse reports that as the prog
+    # name (not `qa_loop.py`). Assert the stable parts of the help banner.
+    assert "usage:" in result.stdout
+    assert "backend.qa_loop" in result.stdout
     assert "Interactive RAG console" in result.stdout
