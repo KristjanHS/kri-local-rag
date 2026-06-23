@@ -62,6 +62,10 @@ services:
       context: ..
       dockerfile: docker/app.Dockerfile
       target: runtime
+      args:
+        # Install backend editable so the ../backend bind mount below is live:
+        # edits are picked up on app restart, no image rebuild required.
+        INSTALL_EDITABLE: "1"
 
     ports:
       - "8501:8501"
