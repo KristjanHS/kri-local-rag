@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """E2E test configuration and fixtures."""
 
+import logging
 import subprocess
 from pathlib import Path
 
@@ -9,6 +10,46 @@ import pytest
 from backend.config import get_service_url
 from backend.weaviate_client import close_weaviate_client, get_weaviate_client
 from tests.conftest import get_integration_config, is_service_healthy
+
+logger = logging.getLogger(__name__)
+
+# When a containerized CLI call fails, dump these services' recent logs so the
+# failure is actionable without a manual `docker compose logs` round-trip
+# (P3 Step 7 — diagnostics & isolation). This e2e-tier conftest already shells
+# out to `docker compose` for the live stack; the dump is on that same path.
+# <!-- external-process-test-gate-override: e2e-tier conftest already drives docker compose -->
+_DIAGNOSTIC_SERVICES = ("app", "weaviate", "ollama")
+_DIAGNOSTIC_LOG_TAIL = 200
+
+
+def _dump_container_diagnostics(compose_file: str, result: subprocess.CompletedProcess[str]) -> None:
+    """Log exit code + recent service logs after a failed containerized CLI run.
+
+    Best-effort: it must never raise (it runs on the failure path and must not
+    mask the original assertion error).
+    """
+    logger.error("Containerized CLI exited %s; dumping diagnostics.", result.returncode)
+    if result.stdout:
+        logger.error("CLI stdout (tail):\n%s", result.stdout[-4000:])
+    if result.stderr:
+        logger.error("CLI stderr (tail):\n%s", result.stderr[-4000:])
+    for service in _DIAGNOSTIC_SERVICES:
+        try:
+            logs = subprocess.run(
+                ["docker", "compose", "-f", compose_file, "logs", "--tail", str(_DIAGNOSTIC_LOG_TAIL), service],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=30,
+            )
+            logger.error(
+                "--- %s logs (last %d lines) ---\n%s",
+                service,
+                _DIAGNOSTIC_LOG_TAIL,
+                logs.stdout or logs.stderr,
+            )
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.error("Failed to collect %s logs: %s", service, e)
 
 
 def _detect_environment() -> str:
@@ -266,6 +307,8 @@ def run_cli_in_container(app_compose_up):
         full_command = base_command + env_vars + ["app", "python", "-m", "backend.qa_loop"] + args
 
         result = subprocess.run(full_command, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            _dump_container_diagnostics(compose_file, result)
         return result
 
     return _run_cli
