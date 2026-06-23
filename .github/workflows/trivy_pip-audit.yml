@@ -3,7 +3,6 @@ name: Security scans (pip-audit + Trivy)
 on:
   pull_request:
     paths:
-      - "requirements.txt"
       - "uv.lock"
       - "pyproject.toml"
       - "Dockerfile"
@@ -39,6 +38,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Python + uv (cached)
+        uses: ./.github/actions/setup-uv
+      - name: Materialize requirements.txt for the scan
+        # requirements.txt is no longer committed (derived from uv.lock); generate it so
+        # the pinned Trivy version, which predates native uv.lock support, can scan deps.
+        run: make export-reqs
       - name: Run Trivy repo scan
         uses: aquasecurity/trivy-action@0.28.0
         with:
