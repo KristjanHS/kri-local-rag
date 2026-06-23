@@ -57,9 +57,11 @@ def _compose_env(project: str | None) -> dict[str, str]:
 def _resolve_compose_context() -> ComposeContext:
     """Target a running `make test-up` stack when present; else the default project.
 
-    Cached for the session — the active stack does not change mid-run. Never raises:
-    any docker/`.run_id` error falls back to the default-project context so the
-    fixtures' own health checks decide skip-vs-run.
+    Cache lifetime is the process (the `lru_cache`), which for pytest equals the
+    session — the active stack is treated as fixed for the run, so a mid-run stack
+    change is intentionally invisible. Never raises: any docker/`.run_id` error
+    falls back to the default-project context so the fixtures' own health checks
+    decide skip-vs-run.
     """
     default = ComposeContext(
         project=None,
@@ -300,8 +302,9 @@ def _ensure_compose_service_up(service_name: str) -> None:
             ctx.base + ["up", "-d", "--wait", service_name],
             env=_compose_env(ctx.project),
             check=True,
+            timeout=120,  # match `--wait-timeout 120` in scripts/dev/test-env.sh
         )
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
         pytest.skip(f"Failed to start {service_name} container: {e}")
 
 
@@ -368,22 +371,25 @@ def app_compose_up(weaviate_compose_up, ollama_compose_up):  # type: ignore[no-r
 
     _docker_available_or_skip()
 
-    # Default-project path needs a prebuilt image.
-    image_name = "kri-local-rag-app:latest"
-    try:
-        subprocess.run(["docker", "image", "inspect", image_name], check=True, capture_output=True)
-    except subprocess.CalledProcessError:
-        pytest.skip(
-            f"Docker image {image_name} not found. Please build it first, e.g., with './scripts/docker/build_app.sh'"
-        )
+    # <!-- external-process-test-gate-override: e2e app fixture drives docker compose by design -->
+    # The image-existence guard only applies to the default project, which builds
+    # `kri-local-rag-app:latest`. The run-id test stack uses a different tag
+    # (`kri-local-rag-app:test`) built by `make test-up`, so don't gate it on :latest.
+    if ctx.project is None:
+        image_name = "kri-local-rag-app:latest"
+        try:
+            subprocess.run(["docker", "image", "inspect", image_name], check=True, capture_output=True)
+        except subprocess.CalledProcessError:
+            pytest.skip(f"Docker image {image_name} not found. Build it first: ./scripts/docker/build_app.sh")
 
     try:
         subprocess.run(
             ctx.base + ["up", "-d", "--wait", ctx.app_service],
             env=_compose_env(ctx.project),
             check=True,
+            timeout=120,
         )
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
         pytest.skip(f"Failed to start app container: {e}")
 
     yield
