@@ -73,7 +73,7 @@ services:
       - ../backend:/app/backend # Live backend code (for editable runtime package in Dev)
       - ../frontend:/app/frontend # Live frontend code            (for hot reload in Dev)
       - ../tests:/app/tests:ro # Live tests for in-container testing
-      - ../data:/app/data:ro # Live data access
+      - ../data:/app/data # Live data access (read-write: GUI ingest writes uploaded PDFs here)
       - ../example_data:/app/example_data:ro # Ensure example_data matches project layout
     working_dir: /app
 
