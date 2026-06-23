@@ -52,15 +52,15 @@ class TestStartupValidationUnit:
             assert "COLLECTION_NAME" in config_content
         logger.info("✓ config.py structure validated")
 
-        # Test retriever.py has proper import fallback
+        # Test retriever.py delegates model loading to the offline-first loader
+        # (graceful missing-dependency handling lives in load_embedder, not here).
         logger.info("Analyzing retriever.py...")
         retriever_path = os.path.join(backend_dir, "retriever.py")
         with open(retriever_path, "r") as f:
             retriever_content = f.read()
-            assert "try:" in retriever_content
-            assert "ImportError:" in retriever_content
+            assert "load_embedder" in retriever_content
             assert "sentence_transformers" in retriever_content
-        logger.info("✓ retriever.py import fallback structure validated")
+        logger.info("✓ retriever.py model-loading structure validated")
 
         logger.info("=== IMPORT STRUCTURE TEST COMPLETED ===")
 
@@ -160,19 +160,6 @@ class TestStartupValidationUnit:
             logger.info("✓ torch not available (unexpected)")
 
         logger.info("=== HEAVY IMPORTS TEST COMPLETED ===")
-
-    def test_sentence_transformers_graceful_fallback(self):
-        """Test that sentence_transformers fallback works gracefully."""
-        logger.info("\n=== TESTING SENTENCE_TRANSFORMERS FALLBACK ===")
-
-        # Test the fallback mechanism in retriever.py
-        with patch("backend.retriever.SentenceTransformer", None):
-            # This should not crash
-            from backend import retriever
-
-            assert hasattr(retriever, "get_top_k")
-
-        logger.info("=== SENTENCE_TRANSFORMERS FALLBACK TEST COMPLETED ===")
 
     def test_retriever_import_fallback_without_heavy_import(self):
         """Test that retriever can be imported even without heavy dependencies."""
