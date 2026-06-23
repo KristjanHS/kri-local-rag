@@ -1,6 +1,32 @@
 # Plan: LangChain 1.x migration (+ tracked upstream-blocked advisories)
 
-Status: **proposed, not started** (2026-06-23). Owner: TBD.
+Status: **DONE** (2026-06-23, commit `290c6e2` on `dev`). Owner: Claude/Kristjan.
+
+## Outcome / plan-reality deltas (resolved during impl)
+
+The plan's assumed fix versions were partly wrong; resolved empirically via PyPI + `uv lock`:
+
+- **`langchain` has no 1.4.6** — latest is 1.3.11. The advisory (GHSA-gr75, "fixed in 1.3.9/1.4.6")
+  is satisfied by 1.3.9. Moot anyway — see next point.
+- **`langchain` umbrella dropped as a direct dep entirely.** After re-pointing imports, nothing
+  imports the bare `langchain` package; it was pulling the unused `langgraph` agent stack. Removing
+  it (deptry DEP002) prunes 6 packages and **moots GHSA-gr75** (package no longer installed).
+- **`langchain-community` has NO 1.x** — the 1.x-compatible release is the **0.4.x** line
+  (resolved `0.4.2`). It pulls `langchain-classic` + `langchain-core` (where loaders now live).
+- **Two test files** also imported the old `langchain.docstore.document` path
+  (`test_ingest_logic.py`, `test_supports_encode_protocol_unit.py`) — re-pointed to
+  `langchain_core.documents`. (Plan listed only `backend/ingest.py`.)
+- **Two lazy loader imports** in `ingest.py` (`PyMuPDFLoader`/`UnstructuredPDFLoader`, lines 79/85)
+  beyond the 3 top-level ones — all stay in `langchain_community.document_loaders`.
+- `langchain-core` + `langchain-text-splitters` added as **direct deps** (imported directly);
+  redundant `langchain-core` constraint-dependencies floor dropped.
+- **`uv audit`: 13 → 8 vulns**, all 5 LangChain advisories cleared; remaining 8 are the
+  upstream-blocked set (transformers/nltk/torch). 65 unit tests green.
+- **Follow-up:** `langchain-community` 0.4.x emits a sunset DeprecationWarning (not escalated —
+  fires outside `backend/`). Standalone loader packages are the eventual successor; revisit when
+  community is fully sunset.
+- **Not run:** live `make ingest` + QA round-trip (needs Docker stack); covered by import
+  smoke-test + unit suite.
 
 ## Why
 
