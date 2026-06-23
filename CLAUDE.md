@@ -2,7 +2,7 @@
 
 ## What This Is
 
-Local RAG system: document ingestion → vector index → retrieval → answer. Python 3.12, Streamlit UI, Weaviate (vector DB), Ollama (local embeddings + LLM), packaged with Docker Compose.
+Local RAG system: document ingestion → vector index → retrieval → answer. Python 3.13, Streamlit UI, Weaviate (vector DB), Ollama (local embeddings + LLM), packaged with Docker Compose.
 
 - `backend/` — ingestion (`ingest.py`), retrieval/QA (`qa_loop.py`), Weaviate/Ollama clients, config.
 - `frontend/` — Streamlit app (`rag_app.py`).

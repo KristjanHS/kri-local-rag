@@ -22,7 +22,7 @@ dependencies = [
     "weaviate-client>=4.22.0,<5.0.0",
     "unstructured[pdf]>=0.18.18,<0.19.0",
     "numpy>=2.3.3,<3.0.0",
-    "pymupdf>=1.24.10,<2.0.0",
+    "pymupdf>=1.25.0,<2.0.0",  # 1.25+ ships cp310-abi3 wheels (cover py3.13); 1.24.x has no cp313 wheel -> source build fails
 ]
 
 # Default (no extra) installs the PyPI torch wheel (CUDA on Linux) for local dev;
