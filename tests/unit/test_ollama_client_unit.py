@@ -57,7 +57,7 @@ def test_generate_response_handles_empty_and_exception(monkeypatch, caplog):
 
     monkeypatch.setattr(httpx, "stream", fake_stream)
 
-    text, _ = oc.generate_response("hi", on_token=None, on_debug=None, stop_event=None, context_tokens=64)
+    text, _ = oc.generate_response("hi", on_token=None, stop_event=None, context_tokens=64)
     assert "hello" in text
 
     # Now simulate exception path
@@ -69,7 +69,7 @@ def test_generate_response_handles_empty_and_exception(monkeypatch, caplog):
     caplog.set_level(_logging.ERROR, logger=oc.__name__)
 
     monkeypatch.setattr(httpx, "stream", fake_stream_err)
-    text, _ = oc.generate_response("hi", on_token=None, on_debug=None, stop_event=None, context_tokens=64)
+    text, _ = oc.generate_response("hi", on_token=None, stop_event=None, context_tokens=64)
     assert "Error generating response" in text
     msgs = [rec.getMessage() for rec in caplog.records]
     assert any("Exception in generate_response" in m for m in msgs)

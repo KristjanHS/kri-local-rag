@@ -33,6 +33,38 @@ def _render_answer(placeholder, tokens):
     )
 
 
+class _DebugPanelHandler(logging.Handler):
+    """Feed backend ``logger.debug`` records into the Streamlit debug panel.
+
+    Replaces the old hand-maintained ``on_debug`` callback channel: backend code now emits
+    diagnostics solely via logging, and the UI captures them by attaching this handler around
+    the ``answer()`` call. Restricted to the originating ScriptRunner thread so concurrent
+    sessions don't cross-feed each other's debug lines (mirrors ``_ThreadLogFilter`` below).
+    """
+
+    def __init__(self, thread_id: int, placeholder) -> None:
+        super().__init__(level=logging.DEBUG)
+        self._thread_id = thread_id
+        self._placeholder = placeholder
+        self.setFormatter(logging.Formatter("%(message)s"))
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.thread != self._thread_id:
+            return
+        lines = st.session_state.get("debug_lines")
+        if lines is None:
+            return
+        lines.append(self.format(record))
+        try:
+            self._placeholder.text("\n".join(lines))
+        except Exception:
+            # Placeholder may be unavailable after a rerun; the sidebar expander still
+            # renders the accumulated buffer at the end of the run. Use the module logger
+            # (not the backend.ollama_client logger this handler is attached to) to avoid
+            # re-entering emit().
+            self.handleError(record)
+
+
 st.set_page_config(page_title="RAG Q&A", layout="centered")
 st.title("RAG Q&A (Streamlit Frontend)")
 
@@ -196,10 +228,6 @@ if submitted and question.strip():
         # Render with a stable locator for Playwright; content is HTML-escaped (XSS-safe)
         _render_answer(answer_placeholder, answer_tokens)
 
-    def on_debug(msg):
-        st.session_state["debug_lines"].append(msg)
-        debug_placeholder.text("\n".join(st.session_state["debug_lines"]))
-
     # If tests requested a fake answer, render it immediately to satisfy E2E
     fake_answer = os.getenv("RAG_FAKE_ANSWER")
     if fake_answer:
@@ -222,15 +250,25 @@ if submitted and question.strip():
                 st.error("CrossEncoder model could not be loaded. Ensure the model is available or try again later.")
                 raise
 
-            answer(
-                question,
-                k=k,
-                on_token=on_token,
-                on_debug=on_debug,
-                stop_event=st.session_state.stop_event,
-                context_tokens=context_tokens,
-                cross_encoder=cross_encoder,
-            )
+            # Route backend diagnostics into the debug panel via logging (replaces on_debug).
+            # Temporarily lower the module logger to DEBUG so its records reach the handler.
+            ollama_logger = logging.getLogger("backend.ollama_client")
+            prev_level = ollama_logger.level
+            ollama_logger.setLevel(logging.DEBUG)
+            debug_handler = _DebugPanelHandler(threading.get_ident(), debug_placeholder)
+            ollama_logger.addHandler(debug_handler)
+            try:
+                answer(
+                    question,
+                    k=k,
+                    on_token=on_token,
+                    stop_event=st.session_state.stop_event,
+                    context_tokens=context_tokens,
+                    cross_encoder=cross_encoder,
+                )
+            finally:
+                ollama_logger.removeHandler(debug_handler)
+                ollama_logger.setLevel(prev_level)
     # After streaming, keep showing the debug info
     debug_placeholder.text("\n".join(st.session_state["debug_lines"]))
 
