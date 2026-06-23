@@ -1,6 +1,6 @@
 """Integration tests for the QA pipeline and retriever."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from backend.qa_loop import answer
 
@@ -29,12 +29,14 @@ def test_qa_pipeline_produces_answer():
     from backend.qa_loop import _get_cross_encoder
 
     cross_encoder = _get_cross_encoder()
-    result = answer(
-        question,
-        cross_encoder=cross_encoder,
-        get_top_k_func=mock_get_top_k,
-        generate_response_func=mock_generate_response,
-    )
+    with (
+        patch("backend.qa_loop.get_top_k", mock_get_top_k),
+        patch("backend.qa_loop.generate_response", mock_generate_response),
+    ):
+        result = answer(
+            question,
+            cross_encoder=cross_encoder,
+        )
 
     # ─── Assertions ──────────────────────────────────────────────────────────
     assert "Paris" in result
@@ -63,7 +65,8 @@ def test_qa_pipeline_no_context():
     from backend.qa_loop import _get_cross_encoder
 
     cross_encoder = _get_cross_encoder()
-    result = answer(question, cross_encoder=cross_encoder, get_top_k_func=mock_get_top_k)
+    with patch("backend.qa_loop.get_top_k", mock_get_top_k):
+        result = answer(question, cross_encoder=cross_encoder)
 
     assert "I found no relevant context" in result
     mock_get_top_k.assert_called_once()
