@@ -242,7 +242,6 @@ def answer(
 import argparse
 
 from weaviate.classes.query import Filter
-from weaviate.exceptions import WeaviateConnectionError
 
 from backend import config as app_config
 from backend.config import get_service_url
@@ -325,13 +324,6 @@ def ensure_weaviate_ready_and_populated():
         # If the collection already exists, we do nothing. This avoids checking if it's empty
         # and re-populating, which could be slow on large user databases.
         logger.info("   ✓ Collection '%s' exists.", collection_name)
-    except WeaviateConnectionError:
-        raise WeaviateConnectionError(
-            "Failed to connect to Weaviate. "
-            "Please ensure Weaviate is running and accessible before starting the backend."
-        ) from None
-    except Exception as e:
-        raise Exception(f"An unexpected error occurred during Weaviate check: {e}") from e
     finally:
         try:
             close_weaviate_client()
