@@ -1,0 +1,33 @@
+name: Enable auto-merge
+
+# Arms GitHub's auto-merge on every non-draft PR targeting main, so the PR
+# merges itself once the required status checks (see the "Require CI tests on
+# main" ruleset) pass. Repo-level "Allow auto-merge" must stay enabled.
+#
+# Uses pull_request_target (not pull_request) so the base-branch version of this
+# workflow always runs — covering PRs from branches that predate it — and we
+# never check out the PR's code, so the write-scoped token is not exposed to it.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: enable-automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  enable:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable auto-merge (merge commit)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --merge "$PR_URL"
