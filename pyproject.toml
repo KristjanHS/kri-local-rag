@@ -16,7 +16,7 @@ dependencies = [
     "streamlit>=1.49.1,<2.0.0",
     # torch + torchvision resolve from PyPI by default → GPU-capable, ABI-matched
     # wheels for local dev. The `cpu` extra re-pins both to the pytorch-cpu index
-    # for slim CI/Docker installs. See docs/plans/2026-06-23-cpu-gpu-variant-simplification-design.md.
+    # for slim CI/Docker installs. See docs/plans/archive/2026-06-23-cpu-gpu-variant-simplification-design.md.
     "torch>=2.8.0,<3.0.0",
     "torchvision>=0.23.0,<1.0.0",
     "weaviate-client>=4.22.0,<5.0.0",
@@ -82,7 +82,7 @@ add-bounds = "major"
 # from PyPI (CUDA on Linux). uv requires >=2 members per conflict set, so the
 # otherwise-redundant `gpu` extra is the mandatory partner. See
 # https://docs.astral.sh/uv/guides/integration/pytorch/ and
-# docs/plans/2026-06-23-cpu-gpu-variant-simplification-design.md.
+# docs/plans/archive/2026-06-23-cpu-gpu-variant-simplification-design.md.
 conflicts = [
     [ { extra = "cpu" }, { extra = "gpu" } ],
 ]

@@ -102,7 +102,7 @@ Start the stack with `make stack-up` (builds, starts, waits for health). Service
 that resolve from PyPI by default → GPU-capable CUDA wheels on Linux. A single
 `cpu` extra re-pins both to the pytorch-cpu index for slim CPU-only installs (see
 `pyproject.toml` `[tool.uv]` and
-`docs/plans/2026-06-23-cpu-gpu-variant-simplification-design.md`). The
+`docs/plans/archive/2026-06-23-cpu-gpu-variant-simplification-design.md`). The
 otherwise-redundant `gpu` extra exists only to satisfy uv's ≥2-members-per-conflict
 rule — it is source-less, so it resolves from PyPI just like the no-extra default.
 
