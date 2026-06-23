@@ -31,7 +31,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run actionlint
-        uses: docker://rhysd/actionlint:latest
+        # B6: digest-pinned (was mutable :latest). Renovate's docker:pinDigests maintains it.
+        uses: docker://rhysd/actionlint:latest@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
         with:
           args: -color
   yamlfmt:
@@ -51,7 +52,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run hadolint
-        uses: hadolint/hadolint-action@v3.1.0
+        # B6: SHA-pinned (was mutable @v3.1.0 tag). Renovate's pinGitHubActionDigests maintains it.
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
         with:
           dockerfile: docker/app.Dockerfile
           format: github

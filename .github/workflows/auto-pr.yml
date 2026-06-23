@@ -3,6 +3,11 @@ name: Auto Create Pull Request (manual)
 on:
   workflow_dispatch: {}
 
+# B5: least-privilege GITHUB_TOKEN (was inheriting the broad default).
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   create-pr:
     runs-on: ubuntu-latest
@@ -14,7 +19,8 @@ jobs:
           fetch-depth: 0
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
+        # B6: SHA-pinned (was mutable @v6 tag). Renovate's pinGitHubActionDigests maintains it.
+        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: "feat: Auto-generated PR for ${{ github.ref_name }}"
