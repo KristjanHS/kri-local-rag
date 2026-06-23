@@ -164,8 +164,11 @@ def answer(
             if on_token is None:
                 # Mirror the normal CLI behaviour that prefixes with 'Answer: '
                 console.print(f"Answer: {msg}")
-        finally:
-            return msg
+        except Exception:
+            # Best-effort console output; always return the message regardless.
+            # (Avoids `return` inside `finally`, deprecated in Python 3.14.)
+            logger.debug("Failed to print empty-context answer to console", exc_info=True)
+        return msg
 
     # ---------- 2) Re-rank ------------------------------------------------------
     logger.debug("Re-ranking the top %d candidates...", len(candidates))
