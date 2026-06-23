@@ -95,6 +95,8 @@ jobs:
     name: Pyright
     if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-latest
+    env:
+      PYRIGHT_PYTHON_FORCE_VERSION: latest # always fetch the newest pyright (no stale-version nag)
     steps:
       - uses: actions/checkout@v4
         with:
