@@ -8,8 +8,8 @@
 ############################
 
 # Pin this image by digest in CI for full reproducibility.
-# Example: python:3.13-slim-bookworm@sha256:...
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
+# Example: python:3.14-slim-bookworm@sha256:...
+FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS builder
 
 ENV VENV_PATH=/opt/venv \
   UV_PROJECT_ENVIRONMENT=/opt/venv \
@@ -34,11 +34,17 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
 COPY backend/ /app/backend/
 COPY cli.py /app/
 
-# INSTALL_DEV toggles dev/test groups for CI/dev images, and make project package editable
+# INSTALL_DEV toggles dev/test groups for CI/dev images, and makes the project package editable.
+# INSTALL_EDITABLE installs the project editable WITHOUT dev/test groups, so a dev `app`
+# container can hot-mount ../backend:/app/backend and pick up edits without a rebuild.
+# Default (both 0) keeps the shippable runtime image self-contained (--no-editable).
 ARG INSTALL_DEV=0
+ARG INSTALL_EDITABLE=0
 RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
   if [ "$INSTALL_DEV" = "1" ]; then \
   uv sync --locked --extra cpu --group dev --group test; \
+  elif [ "$INSTALL_EDITABLE" = "1" ]; then \
+  uv sync --locked --extra cpu --no-dev; \
   else \
   uv sync --locked --extra cpu --no-editable --no-dev; \
   fi
@@ -46,7 +52,7 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
 ############################################
 # Runtime stage: Debian + apt + your app  #
 ############################################
-FROM python:3.13-slim-bookworm AS runtime
+FROM python:3.14-slim-bookworm AS runtime
 
 # --- Debian snapshot date (set to base image date in CI) ---
 # Accepts YYYYMMDD or YYYYMMDDTHHMMSSZ. Example default is a placeholder.
