@@ -12,9 +12,10 @@ from backend.config import OLLAMA_CONTEXT_TOKENS, get_logger
 # Set up logging for this module
 logger = get_logger(__name__)
 
-# Upload safety limits (defense-in-depth for the ingestion entry point)
-MAX_UPLOAD_FILES = 20
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB per file
+# Upload safety limits (defense-in-depth for the ingestion entry point).
+# Overridable via env: MAX_UPLOAD_FILES (count), MAX_UPLOAD_MB (per-file size).
+MAX_UPLOAD_FILES = int(os.getenv("MAX_UPLOAD_FILES", "20"))
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "50")) * 1024 * 1024
 PDF_MAGIC = b"%PDF-"
 
 
