@@ -93,3 +93,13 @@ secrets.*
 
 # Ignore the temporary run ID file used by the Makefile
 .run_id
+
+# requirements.txt is a derived artifact (uv export from uv.lock); not committed.
+# Regenerate with `make export-reqs`. Source of truth: pyproject.toml + uv.lock.
+requirements.txt
+
+# Track the devcontainer config in this repo, overriding the user's global
+# ~/.gitignore_global rule ('.devcontainer/'). These files carry no secrets;
+# keeping them in git lets the devcontainer build reproducibly in CI/clones.
+!.devcontainer/
+!.devcontainer/**

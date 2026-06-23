@@ -1,8 +1,9 @@
 # Declare phony targets
 .PHONY: help setup-hooks test-up test-down test-logs test-up-force-build test-clean \
         test-integration test-e2e integration push-pr export-reqs \
-        ruff-format ruff-fix yamlfmt pyright pre-commit unit pip-audit \
-        semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage dev-setup ollama-pull deptry
+        ruff-format ruff-fix yamlfmt pyright pre-commit unit audit \
+        semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage dev-setup ollama-pull deptry \
+        sync
 
 # Use bash with strict flags for recipes
 SHELL := bash
@@ -21,6 +22,11 @@ PYTEST_BASE := -q
 
 # Configurable pyright config path (default to repo config)
 PYRIGHT_CONFIG ?= ./pyrightconfig.json
+
+# Optional uv extra for sync targets. Empty by default → the PyPI torch wheel
+# (GPU-capable on Linux) for local dev. CI passes SYNC_EXTRA="--extra cpu" to
+# pull slim CPU-only wheels.
+SYNC_EXTRA ?=
 
 # NB! do not set UV_CACHE_DIR here - it would override the mounted uv cache dir of act runner -> uv can't reuse cache on next Act run
 # UV_CACHE_DIR := ... NO!
@@ -65,26 +71,34 @@ help: ## Show this help (grouped)
 
 # uv sync re-locks before syncing unless you pass --locked or --frozen.
 # If pyproject.toml changed and uv.lock wasn’t regenerated, --frozen will still proceed, while --locked will stop.
+# Default sync (no extra) installs the PyPI torch wheel (GPU on Linux). CI passes
+# SYNC_EXTRA="--extra cpu" for slim CPU-only wheels.
 uv-sync-test: ## uv sync test group (frozen) + pip check
-	uv sync --locked --group test
+	uv sync --locked $(SYNC_EXTRA) --group test
 	uv pip check
+
+# Local sync via run_uv.sh: default (PyPI/GPU) torch. For CPU wheels run
+# `./run_uv.sh --extra cpu` or `make sync SYNC_EXTRA="--extra cpu"`.
+sync: ## Sync the venv (default GPU torch; SYNC_EXTRA="--extra cpu" for CPU)
+	@./run_uv.sh $(SYNC_EXTRA)
 
 setup-hooks: ## Configure Git hooks path
 	@echo "Configuring Git hooks path..."
 	@git config core.hooksPath scripts/git-hooks
 	@echo "Done."
 
-export-reqs: ## Export requirements.txt from uv.lock (omits torch/GPU extras)
-	@echo ">> Exporting requirements.txt from uv.lock (incl dev/test groups), excluding torch and GPU-specific wheels"
+export-reqs: ## Export requirements.txt from uv.lock (omits torch/torchvision)
+	@echo ">> Exporting requirements.txt from uv.lock (incl dev/test groups), excluding torch/torchvision wheels"
 	uv export \
 	  --no-hashes \
 	  --group test \
 	  --locked \
 	  --no-emit-project \
 	  --no-emit-package torch \
+	  --no-emit-package torchvision \
 	  --format requirements-txt \
 	  > requirements.txt
-	@echo ">> Wrote requirements.txt (torch and GPU extras removed)"
+	@echo ">> Wrote requirements.txt (torch/torchvision removed)"
 
 # =========================
 # App Runtime
@@ -149,7 +163,7 @@ ollama-pull: ## Pull Ollama model in container (MODEL=...)
 	@$(COMPOSE_APP) exec -T ollama ollama pull "$(MODEL)"
 
 # Run E2E tests with automatic stack lifecycle
-e2e: ## Run E2E tests on local env, assumes already running docker services. Set PRESERVE=0 to stack-down
+e2e: ## Run E2E tests on host; needs kri-local-rag-app:latest (auto-built by `make stack-up`), else tests skip. For fully-automated build+run, use `make test-up && make test-e2e`. Set PRESERVE=0 to stack-down
 	@set -euo pipefail; \
 	EXIT=0; \
 	$(PYTEST) tests/e2e $(PYTEST_BASE) $${PYTEST_ARGS:-} || EXIT=$$?; \
@@ -203,9 +217,9 @@ integration: ## Run local integration tests (venv or uv)
 	@MPLCONFIGDIR=$${MPLCONFIGDIR:-$(CURDIR)/.cache/matplotlib}; \
 	 mkdir -p "$$MPLCONFIGDIR"; \
 	 if [ -x .venv/bin/python ]; then \
-		MPLCONFIGDIR="$$MPLCONFIGDIR" .venv/bin/python -m pytest tests/integration -q ${PYTEST_ARGS}; \
+		MPLCONFIGDIR="$$MPLCONFIGDIR" .venv/bin/python -m pytest tests/integration -q --junitxml=reports/junit_integration.xml ${PYTEST_ARGS}; \
 	 elif command -v uv >/dev/null 2>&1; then \
-		MPLCONFIGDIR="$$MPLCONFIGDIR" uv run -m pytest tests/integration -q ${PYTEST_ARGS}; \
+		MPLCONFIGDIR="$$MPLCONFIGDIR" uv run -m pytest tests/integration -q --junitxml=reports/junit_integration.xml ${PYTEST_ARGS}; \
 	 else \
 		echo ".venv/bin/python not found and uv not available. Create the env (make uv-sync-test or python -m venv .venv) then run '.venv/bin/python -m pytest tests/integration -q'"; \
 		exit 1; \
@@ -217,9 +231,9 @@ integration: ## Run local integration tests (venv or uv)
 # Security / CI Linters
 # =========================
 # audits the already existing env (after export)
-pip-audit: export-reqs ## Audit dependencies based on requirements.txt
-	@echo ">> Auditing dependencies (based on requirements.txt)"
-	uvx --from pip-audit pip-audit -r requirements.txt
+audit: ## Audit dependencies for known vulnerabilities (uv audit, reads uv.lock via OSV)
+	@echo ">> Auditing dependencies (uv audit, OSV database, reads uv.lock)"
+	uv audit
 
  # Lint GitHub Actions workflows locally using official container
 actionlint: ## Lint GitHub workflows using actionlint in Docker
@@ -277,8 +291,9 @@ pyright: ## Run Pyright type checking
 
 yamlfmt: ## Validate YAML formatting via pre-commit
 	# Ensure dev + test groups are present so later test steps still work
-	uv sync --group dev --group test --frozen
-	uv run pre-commit run yamlfmt -a
+	uv sync $(SYNC_EXTRA) --group dev --group test --frozen
+	# --no-sync: a bare `uv run` re-syncs WITHOUT --extra, reverting to default torch.
+	uv run --no-sync pre-commit run yamlfmt -a
 
 # Ruff targets
 ruff-format: ## Auto-format code with Ruff
@@ -290,8 +305,9 @@ ruff-fix: ## Run Ruff lint with autofix
 # Run full pre-commit suite (dev deps required)
 pre-commit: ## Run all pre-commit hooks on all files
 	# Keep test deps installed to avoid breaking local test runs after this target
-	uv sync --group dev --group test --frozen
-	uv run pre-commit run --all-files
+	uv sync $(SYNC_EXTRA) --group dev --group test --frozen
+	# --no-sync: a bare `uv run` re-syncs WITHOUT --extra, reverting to default torch.
+	uv run --no-sync pre-commit run --all-files
 
 # =========================
 # CI Helpers & Git

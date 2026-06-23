@@ -26,9 +26,9 @@ from typing import Any, List, Optional, Protocol, TypeVar, cast, runtime_checkab
 
 import torch
 import weaviate
-from langchain.docstore.document import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # Avoid importing sentence-transformers at module import time to keep imports light
 # and prevent optional vision dependencies from being pulled in during unit tests.
@@ -56,6 +56,15 @@ from backend.vector_utils import to_float_list
 
 # --- Logging Setup ---
 logger = get_logger(__name__)
+
+
+def _is_valid_pdf(path: str) -> bool:
+    """Defense-in-depth: confirm a .pdf file actually starts with the PDF magic bytes."""
+    try:
+        with open(path, "rb") as fh:
+            return fh.read(5) == b"%PDF-"
+    except OSError:
+        return False
 
 
 def load_and_split_documents(path: str) -> List[Document]:
@@ -86,6 +95,9 @@ def load_and_split_documents(path: str) -> List[Document]:
     if os.path.isfile(path):
         ext = os.path.splitext(path)[1].lower()
         if ext == ".pdf":
+            if not _is_valid_pdf(path):
+                logger.warning(f"Skipping '{path}': not a valid PDF (bad magic bytes).")
+                return []
             loader = pdf_loader_cls(path)
             docs.extend(loader.load())
             file_count = 1

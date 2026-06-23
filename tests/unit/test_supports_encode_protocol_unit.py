@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, List
 from unittest.mock import MagicMock
 
-from langchain.docstore.document import Document
+from langchain_core.documents import Document
 
 from backend.ingest import SupportsEncode, process_and_upload_chunks
 

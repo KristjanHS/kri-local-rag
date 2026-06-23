@@ -7,11 +7,12 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-# Ensure venv exists and is seeded with pip for any tools that still expect it
-uv venv --seed
-
-echo "--- Syncing test dependencies via make uv-sync-test ---"
-make uv-sync-test
+# Seed the venv and sync dependencies. Default torch is the PyPI/GPU wheel; pass
+# `--extra cpu` (or run `./run_uv.sh --extra cpu`) on CPU-only boxes. run_uv.sh
+# handles venv creation + sync.
+echo "--- Syncing dependencies via run_uv.sh ---"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+"$REPO_ROOT/run_uv.sh"
 
 echo "--- Verifying Python and ruff availability ---"
 .venv/bin/python --version
