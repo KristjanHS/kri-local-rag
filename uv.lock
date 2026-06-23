@@ -1177,7 +1177,7 @@ test = [
     { name = "pillow", specifier = ">=12.2.0,<13.0.0" },
     { name = "playwright", specifier = ">=1.55.0,<2.0.0" },
     { name = "protobuf", specifier = ">=6.32.0,<7.0.0" },
-    { name = "pytest", specifier = ">=8.4.2,<9.0.0" },
+    { name = "pytest", specifier = ">=9.0.3,<9.1.0" },
     { name = "pytest-cov", specifier = ">=6.3.0,<7.0.0" },
     { name = "pytest-docker", specifier = ">=3.2.3,<4.0.0" },
     { name = "pytest-html", specifier = ">=4.1.1,<5.0.0" },
@@ -2548,7 +2548,7 @@ nodejs = [
 
 [[package]]
 name = "pytest"
-version = "8.4.2"
+version = "9.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-13-kri-local-rag-cpu' and extra == 'extra-13-kri-local-rag-gpu')" },
@@ -2557,9 +2557,9 @@ dependencies = [
     { name = "pluggy" },
     { name = "pygments" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a3/5c/00a0e072241553e1a7496d638deababa67c5058571567b92a7eaa258397c/pytest-8.4.2.tar.gz", hash = "sha256:86c0d0b93306b961d58d62a4db4879f27fe25513d4b969df351abdddb3c30e01", size = 1519618, upload-time = "2025-09-04T14:34:22.711Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7d/0d/549bd94f1a0a402dc8cf64563a117c0f3765662e2e668477624baeec44d5/pytest-9.0.3.tar.gz", hash = "sha256:b86ada508af81d19edeb213c681b1d48246c1a91d304c6c81a427674c17eb91c", size = 1572165, upload-time = "2026-04-07T17:16:18.027Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a8/a4/20da314d277121d6534b3a980b29035dcd51e6744bd79075a6ce8fa4eb8d/pytest-8.4.2-py3-none-any.whl", hash = "sha256:872f880de3fc3a5bdc88a11b39c9710c3497a547cfa9320bc3c5e62fbf272e79", size = 365750, upload-time = "2025-09-04T14:34:20.226Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/24/a372aaf5c9b7208e7112038812994107bc65a84cd00e0354a88c2c77a617/pytest-9.0.3-py3-none-any.whl", hash = "sha256:2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9", size = 375249, upload-time = "2026-04-07T17:16:16.13Z" },
 ]
 
 [[package]]
@@ -2591,15 +2591,15 @@ wheels = [
 
 [[package]]
 name = "pytest-docker"
-version = "3.2.3"
+version = "3.2.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
     { name = "pytest" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/79/75/285187953062ebe38108e77a7919c75e157943fa3513371c88e27d3df7b2/pytest_docker-3.2.3.tar.gz", hash = "sha256:26a1c711d99ef01e86e7c9c007f69641552c1554df4fccb065b35581cca24206", size = 13452, upload-time = "2025-07-04T07:46:17.647Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/66/05/b7e47dc3e01b505838372e296bd780180b3b699a9a134bb8d6be85f3d567/pytest_docker-3.2.5.tar.gz", hash = "sha256:c9662567522911280b394af4da2edd57facaf644494601fac962ff1e396d7ab6", size = 13717, upload-time = "2025-11-12T13:42:19.641Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c5/c7/e057e0d1de611ce1bbb26cccf07ddf56eb30a6f6a03aa512a09dac356e03/pytest_docker-3.2.3-py3-none-any.whl", hash = "sha256:f973c35e6f2b674c8fc87e8b3354b02c15866a21994c0841a338c240a05de1eb", size = 8585, upload-time = "2025-07-04T07:46:16.439Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/e4/3a76a393f808edb0ee08ecc25e5c00bce0522a45b8fcf8693ec9441739c8/pytest_docker-3.2.5-py3-none-any.whl", hash = "sha256:79f3d209f928f45d4385cb825944861bc8a8cccd309804d9c9cd63bcef03edba", size = 8724, upload-time = "2025-11-12T13:42:18.631Z" },
 ]
 
 [[package]]
@@ -2642,7 +2642,7 @@ wheels = [
 
 [[package]]
 name = "pytest-playwright"
-version = "0.7.1"
+version = "0.7.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "playwright" },
@@ -2650,9 +2650,9 @@ dependencies = [
     { name = "pytest-base-url" },
     { name = "python-slugify" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a0/1e/9771990bad2b59d37728c4b6f28c234b3badbb2494bd72d54a6e2a988e23/pytest_playwright-0.7.1.tar.gz", hash = "sha256:94b551b2677ecdc16284fcd6a4f0045eafda47a60e74410f3fe4d8260e12cabf", size = 16769, upload-time = "2025-09-08T08:10:53.765Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/6b/913e36aa421b35689ec95ed953ff7e8df3f2ee1c7b8ab2a3f1fd39d95faf/pytest_playwright-0.7.2.tar.gz", hash = "sha256:247b61123b28c7e8febb993a187a07e54f14a9aa04edc166f7a976d88f04c770", size = 16928, upload-time = "2025-11-24T03:43:22.53Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dd/59/373da90ce6a1a46ca6a449bf16cea11a3c6e269814eb60e7668526350b95/pytest_playwright-0.7.1-py3-none-any.whl", hash = "sha256:fcc46510fb75f8eba6df3bc8e84e4e902483d92be98075f20b9d160651a36d90", size = 16754, upload-time = "2025-09-08T08:10:55.92Z" },
+    { url = "https://files.pythonhosted.org/packages/76/61/4d333d8354ea2bea2c2f01bad0a4aa3c1262de20e1241f78e73360e9b620/pytest_playwright-0.7.2-py3-none-any.whl", hash = "sha256:8084e015b2b3ecff483c2160f1c8219b38b66c0d4578b23c0f700d1b0240ea38", size = 16881, upload-time = "2025-11-24T03:43:24.423Z" },
 ]
 
 [[package]]
