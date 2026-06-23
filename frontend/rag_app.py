@@ -19,6 +19,21 @@ MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "50")) * 1024 * 1024
 PDF_MAGIC = b"%PDF-"
 
 
+# --- Test-only hooks -------------------------------------------------------
+# These env vars let CLI/UI e2e tests bypass the real backend. They are read
+# only through the helpers below so the test surface stays explicit and in one
+# place (Tier 2.6 of complexity-cleanup). The backend's own RAG_FAKE_ANSWER
+# bypass lives independently in backend.qa_loop.answer().
+def _fake_answer() -> str | None:
+    """Return the canned answer for fake-mode, or None when the hook is unset/empty."""
+    return os.getenv("RAG_FAKE_ANSWER") or None
+
+
+def _skip_startup_checks() -> bool:
+    """True when startup Weaviate/ingest checks should be bypassed for tests."""
+    return os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes")
+
+
 def _render_answer(placeholder, tokens):
     """Render streamed answer tokens inside a stable Playwright locator.
 
@@ -187,12 +202,11 @@ if "init_done" not in st.session_state:
     root_logger = logging.getLogger()
     root_logger.addHandler(capture_handler)
     try:
-        skip_checks = os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes")
-        fake_answer_present = bool(os.getenv("RAG_FAKE_ANSWER"))
+        skip_checks = _skip_startup_checks()
         logger.info(
             "App startup env: RAG_SKIP_STARTUP_CHECKS=%s, RAG_FAKE_ANSWER=%s",
             str(skip_checks),
-            str(fake_answer_present),
+            str(_fake_answer() is not None),
         )
         if skip_checks:
             logger.info("Startup checks skipped via RAG_SKIP_STARTUP_CHECKS")
@@ -228,7 +242,7 @@ if submitted and question.strip():
         _render_answer(answer_placeholder, answer_tokens)
 
     # If tests requested a fake answer, render it immediately to satisfy E2E
-    fake_answer = os.getenv("RAG_FAKE_ANSWER")
+    fake_answer = _fake_answer()
     if fake_answer:
         for ch in fake_answer:
             on_token(ch)
