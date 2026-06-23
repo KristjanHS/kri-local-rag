@@ -8,8 +8,8 @@
 ############################
 
 # Pin this image by digest in CI for full reproducibility.
-# Example: python:3.12-slim-bookworm@sha256:...
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
+# Example: python:3.13-slim-bookworm@sha256:...
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
 
 ENV VENV_PATH=/opt/venv \
   UV_PROJECT_ENVIRONMENT=/opt/venv \
@@ -46,7 +46,7 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
 ############################################
 # Runtime stage: Debian + apt + your app  #
 ############################################
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.13-slim-bookworm AS runtime
 
 # --- Debian snapshot date (set to base image date in CI) ---
 # Accepts YYYYMMDD or YYYYMMDDTHHMMSSZ. Example default is a placeholder.
