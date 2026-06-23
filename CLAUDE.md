@@ -18,6 +18,7 @@ Local RAG system: document ingestion → vector index → retrieval → answer. 
 | Quick start, run commands, Makefile targets | `README.md`, `Makefile` |
 | Dev setup, test suites, CI/release flow, env vars | `docs/dev_test_CI/README.md` |
 | Docker stack management, volumes, reset | `docs/operate/docker-management.md` |
+| Auto-merge, branch rulesets, required CI checks | `docs/operate/auto-merge.md` |
 
 ## Critical Rules
 
