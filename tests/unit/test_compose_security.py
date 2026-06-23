@@ -15,7 +15,7 @@ def test_compose_service_ports_binding_security() -> None:
     compose_path = project_root / "docker" / "docker-compose.yml"
     assert compose_path.exists(), "docker/docker-compose.yml should exist"
 
-    with open(compute_str(compose_path), "r", encoding="utf-8") as f:  # type: ignore[name-defined]
+    with open(compose_path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
     services = data.get("services", {}) if isinstance(data, dict) else {}
 
@@ -29,8 +29,3 @@ def test_compose_service_ports_binding_security() -> None:
 
     # Streamlit app should be published (no strict binding required here)
     assert any(":8501" in str(p) for p in app_ports), "App should publish port 8501"
-
-
-# Helper to avoid mypy/pyright complaining when Path-like passed to yaml in typed mode
-def compute_str(p: Path) -> str:
-    return str(p)
