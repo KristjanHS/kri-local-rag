@@ -1,5 +1,6 @@
 # run locally: ~/projects/kri-local-rag$ streamlit run frontend/rag_app.py
 import contextlib
+import html
 import io
 import os
 import threading
@@ -10,6 +11,25 @@ from backend.config import OLLAMA_CONTEXT_TOKENS, get_logger
 
 # Set up logging for this module
 logger = get_logger(__name__)
+
+# Upload safety limits (defense-in-depth for the ingestion entry point)
+MAX_UPLOAD_FILES = 20
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB per file
+PDF_MAGIC = b"%PDF-"
+
+
+def _render_answer(placeholder, tokens):
+    """Render streamed answer tokens inside a stable Playwright locator.
+
+    The wrapper is static, trusted HTML; the model/document-derived content is
+    HTML-escaped to prevent script injection (XSS) from ingested documents.
+    """
+    content = html.escape("".join(tokens))
+    placeholder.markdown(
+        f"<div data-testid='answer'><h3>Answer</h3><div class='answer-content'>{content}</div></div>",
+        unsafe_allow_html=True,
+    )
+
 
 st.set_page_config(page_title="RAG Q&A", layout="centered")
 st.title("RAG Q&A (Streamlit Frontend)")
@@ -44,37 +64,63 @@ with st.sidebar.expander("Ingest PDFs"):
     if st.button("Ingest", key="ingest_btn"):
         if not uploaded_files:
             st.warning("No files selected.")
+        elif len(uploaded_files) > MAX_UPLOAD_FILES:
+            st.error(f"Too many files ({len(uploaded_files)}); max {MAX_UPLOAD_FILES} per ingest.")
         else:
             save_dir = "data"
             os.makedirs(save_dir, exist_ok=True)
+            real_save_dir = os.path.realpath(save_dir)
             saved_paths = []
+            rejected = []
             for f in uploaded_files:
-                path = os.path.join(save_dir, f.name)
-                with open(path, "wb") as out:
-                    out.write(f.getbuffer())
-                saved_paths.append(path)
+                # B2/B9: strip directory components and confirm the resolved path stays in save_dir
+                safe_name = os.path.basename(f.name)
+                if not safe_name.lower().endswith(".pdf"):
+                    rejected.append(f"{f.name} (not a .pdf)")
+                    continue
+                dest = os.path.realpath(os.path.join(real_save_dir, safe_name))
+                if os.path.commonpath([real_save_dir, dest]) != real_save_dir:
+                    rejected.append(f"{f.name} (unsafe path)")
+                    continue
+                # B3: enforce per-file size cap and validate PDF magic bytes before writing
+                data = f.getbuffer()
+                if data.nbytes > MAX_UPLOAD_BYTES:
+                    rejected.append(f"{safe_name} (exceeds {MAX_UPLOAD_BYTES // (1024 * 1024)} MB)")
+                    continue
+                if bytes(data[: len(PDF_MAGIC)]) != PDF_MAGIC:
+                    rejected.append(f"{safe_name} (not a valid PDF)")
+                    continue
+                with open(dest, "wb") as out:
+                    out.write(data)
+                saved_paths.append(dest)
 
-            with st.spinner("Ingesting ..."):
-                # Ingest operates on a directory; use the save directory
-                from backend.config import COLLECTION_NAME
-                from backend.ingest import (
-                    connect_to_weaviate,
-                    ingest,
-                )
-                from backend.models import load_embedder
+            if rejected:
+                st.warning("Skipped: " + ", ".join(rejected))
 
-                client = connect_to_weaviate()
-                try:
-                    model = load_embedder()
-                    ingest(
-                        directory=save_dir,
-                        collection_name=COLLECTION_NAME,
-                        weaviate_client=client,
-                        embedding_model=model,
+            if not saved_paths:
+                st.error("No valid PDF files to ingest.")
+            else:
+                with st.spinner("Ingesting ..."):
+                    # Ingest operates on a directory; use the save directory
+                    from backend.config import COLLECTION_NAME
+                    from backend.ingest import (
+                        connect_to_weaviate,
+                        ingest,
                     )
-                finally:
-                    client.close()
-            st.success(f"Ingested {len(saved_paths)} file(s).")
+                    from backend.models import load_embedder
+
+                    client = connect_to_weaviate()
+                    try:
+                        model = load_embedder()
+                        ingest(
+                            directory=save_dir,
+                            collection_name=COLLECTION_NAME,
+                            weaviate_client=client,
+                            embedding_model=model,
+                        )
+                    finally:
+                        client.close()
+                st.success(f"Ingested {len(saved_paths)} file(s).")
 
 with st.form("question_form"):
     question = st.text_area("Ask a question:", height=100)
@@ -128,11 +174,8 @@ if submitted and question.strip():
 
     def on_token(token):
         answer_tokens.append(token)
-        # Render with a stable locator for Playwright and include both label and content
-        answer_html = (
-            f"<div data-testid='answer'><h3>Answer</h3><div class='answer-content'>{''.join(answer_tokens)}</div></div>"
-        )
-        answer_placeholder.markdown(answer_html, unsafe_allow_html=True)
+        # Render with a stable locator for Playwright; content is HTML-escaped (XSS-safe)
+        _render_answer(answer_placeholder, answer_tokens)
 
     def on_debug(msg):
         st.session_state["debug_lines"].append(msg)
@@ -144,10 +187,7 @@ if submitted and question.strip():
         for ch in fake_answer:
             on_token(ch)
         # Ensure final full content is rendered for visibility tests
-        final_html = (
-            f"<div data-testid='answer'><h3>Answer</h3><div class='answer-content'>{''.join(answer_tokens)}</div></div>"
-        )
-        answer_placeholder.markdown(final_html, unsafe_allow_html=True)
+        _render_answer(answer_placeholder, answer_tokens)
         # Explicit marker for fake-mode to help E2E tests verify bypassed backend
         st.markdown("<div data-testid='fake-mode'></div>", unsafe_allow_html=True)
     else:

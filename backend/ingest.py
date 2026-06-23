@@ -58,6 +58,15 @@ from backend.vector_utils import to_float_list
 logger = get_logger(__name__)
 
 
+def _is_valid_pdf(path: str) -> bool:
+    """Defense-in-depth: confirm a .pdf file actually starts with the PDF magic bytes."""
+    try:
+        with open(path, "rb") as fh:
+            return fh.read(5) == b"%PDF-"
+    except OSError:
+        return False
+
+
 def load_and_split_documents(path: str) -> List[Document]:
     """Load documents from a directory or a single file, then split into chunks."""
     # Fast path: if the path does not exist, skip gracefully
@@ -86,6 +95,9 @@ def load_and_split_documents(path: str) -> List[Document]:
     if os.path.isfile(path):
         ext = os.path.splitext(path)[1].lower()
         if ext == ".pdf":
+            if not _is_valid_pdf(path):
+                logger.warning(f"Skipping '{path}': not a valid PDF (bad magic bytes).")
+                return []
             loader = pdf_loader_cls(path)
             docs.extend(loader.load())
             file_count = 1
