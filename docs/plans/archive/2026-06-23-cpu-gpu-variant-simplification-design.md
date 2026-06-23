@@ -1,7 +1,7 @@
 # Design: Simplify the CPU/GPU torch variant scheme
 
 **Date:** 2026-06-23
-**Status:** Approved design (not yet implemented — ready for `/impag` in a fresh session)
+**Status:** Implemented 2026-06-23 (commits `df70be1`, `476003c`, `54321d8`; see `pyproject.toml` torch/conflicts config). Archived.
 **Supersedes:** the conflict-extras variant scheme from `docs/plans/archive/2026-06-23-gpu-cpu-torch-extras.md`
 
 ## Goal
