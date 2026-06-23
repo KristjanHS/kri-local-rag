@@ -112,11 +112,13 @@ constraint-dependencies = [
     "pygments>=2.20.0",         # CVE-2026-4539 (rich transitive)
     "virtualenv>=20.36.1",      # CVE-2026-22702 (pre-commit transitive, dev group)
     # transformers (sentence-transformers transitive; we don't import it directly):
-    # the 4.56.1 advisories (incl. CVE-2026-1839 / GHSA-69w3-r845-3855) are fixed in the
-    # 5.x line, now shipped stable (no pre-release needed). 5.x requires sentence-transformers
-    # >=5.2.0 (5.1.0 capped <5.0.0) — direct floor bumped to >=5.6.0 above. Floor here forces
-    # the transitive resolution onto 5.x so a future re-lock can't silently regress to 4.x.
-    "transformers>=5.12.1,<6.0.0",
+    # CVE-2026-1839 / GHSA-69w3-r845-3855 (Trainer RCE) is the only 4.56.1 advisory needing
+    # 5.x — fixed in 5.0.0rc3, so >=5.0.0 stable is the minimum-safe boundary (all other
+    # transformers advisories were fixed in 4.x). 5.x requires sentence-transformers >=5.2.0
+    # (5.1.0 capped <5.0.0) — direct floor bumped to >=5.6.0 above. This floor forces the
+    # transitive resolution onto the 5.x line so a future re-lock can't silently regress to
+    # 4.x; uv resolves to the latest 5.x and CI `uv audit` gates the specific locked version.
+    "transformers>=5.0.0,<6.0.0",
     # Third wave (uv audit / OSV, 2026-06): non-major fixes only.
     "fonttools>=4.60.2",       # GHSA-768j-98cg-p3fv (arbitrary file write / XML injection)
     "marshmallow>=3.26.2",     # GHSA-428g-f7cq-pgp5 (Schema.load DoS; stays on 3.x)
