@@ -26,8 +26,11 @@ dependencies = [
 # targets) always pass `--extra cpu` or `--extra gpu` based on the gitignored
 # `.kri-variant.local` file (or the KRI_VARIANT env override). GPU is the default
 # for local/bare-metal dev; CPU is the fallback for CI, act, and the Docker app
-# image. Bare `uv sync` with no extra installs neither torch — undefined; always
-# select a variant. torchvision is index-pinned alongside torch to avoid the
+# image. WARNING: a bare `uv sync` with no extra does NOT skip torch — because
+# sentence-transformers depends on torch unconditionally, uv falls back to the
+# default PyPI torch wheel (CUDA-bundled on Linux, no index-pin / ABI guarantee).
+# Always select a variant (run_uv.sh / make use-gpu|use-cpu / KRI_VARIANT).
+# torchvision is index-pinned alongside torch to avoid the
 # `operator torchvision::nms does not exist` ABI mismatch.
 cpu = [
     "torch>=2.8.0,<3.0.0",

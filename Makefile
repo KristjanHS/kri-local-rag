@@ -5,10 +5,6 @@
         semgrep-local actionlint uv-sync-test pre-push stack-up stack-down stack-reset ingest cli app-logs ask e2e coverage dev-setup ollama-pull deptry \
         sync use-gpu use-cpu show-variant
 
-# Resolve the per-machine uv extras variant (cpu | gpu). KRI_VARIANT env >
-# .kri-variant.local file > gpu default. CI/act export KRI_VARIANT=cpu.
-VARIANT := $(shell ./scripts/select_variant.sh)
-
 # Use bash with strict flags for recipes
 SHELL := bash
 .SHELLFLAGS := -euo pipefail -c
@@ -70,8 +66,13 @@ help: ## Show this help (grouped)
 
 # uv sync re-locks before syncing unless you pass --locked or --frozen.
 # If pyproject.toml changed and uv.lock wasn’t regenerated, --frozen will still proceed, while --locked will stop.
+# Resolve the per-machine uv extras variant (cpu | gpu) in-recipe so a bad
+# KRI_VARIANT / .kri-variant.local aborts the recipe with the selector's error
+# (under .ONESHELL + set -e) instead of producing an empty --extra. KRI_VARIANT
+# env > .kri-variant.local file > gpu default. CI/act export KRI_VARIANT=cpu.
 uv-sync-test: ## uv sync test group (frozen) + pip check
-	uv sync --locked --extra $(VARIANT) --group test
+	V=$$(./scripts/select_variant.sh)
+	uv sync --locked --extra "$$V" --group test
 	uv pip check
 
 # Variant-aware sync: run_uv.sh reads the selected variant (gpu by default) and
@@ -87,14 +88,8 @@ use-cpu: ## Select the CPU extra for this checkout and sync
 	@echo cpu > .kri-variant.local
 	@./run_uv.sh
 
-show-variant: ## Print the currently selected variant (gpu by default)
-	@if [ -n "$${KRI_VARIANT:-}" ]; then \
-		echo "$$KRI_VARIANT (from KRI_VARIANT env)"; \
-	elif [ -f .kri-variant.local ]; then \
-		cat .kri-variant.local; \
-	else \
-		echo "(default: gpu — no .kri-variant.local present)"; \
-	fi
+show-variant: ## Print the resolved variant (gpu by default; rejects typos)
+	@./scripts/select_variant.sh
 
 setup-hooks: ## Configure Git hooks path
 	@echo "Configuring Git hooks path..."
@@ -305,7 +300,8 @@ pyright: ## Run Pyright type checking
 
 yamlfmt: ## Validate YAML formatting via pre-commit
 	# Ensure dev + test groups are present so later test steps still work
-	uv sync --extra $(VARIANT) --group dev --group test --frozen
+	V=$$(./scripts/select_variant.sh)
+	uv sync --extra "$$V" --group dev --group test --frozen
 	uv run pre-commit run yamlfmt -a
 
 # Ruff targets
@@ -318,7 +314,8 @@ ruff-fix: ## Run Ruff lint with autofix
 # Run full pre-commit suite (dev deps required)
 pre-commit: ## Run all pre-commit hooks on all files
 	# Keep test deps installed to avoid breaking local test runs after this target
-	uv sync --extra $(VARIANT) --group dev --group test --frozen
+	V=$$(./scripts/select_variant.sh)
+	uv sync --extra "$$V" --group dev --group test --frozen
 	uv run pre-commit run --all-files
 
 # =========================

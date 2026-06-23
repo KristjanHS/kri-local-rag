@@ -98,14 +98,29 @@ Offline-first loading, all settings in `backend/config.py`:
 
 Start the stack with `make stack-up` (builds, starts, waits for health). Service operations and reset: `docs/operate/docker-management.md`.
 
-Torch wheel channel selects CPU/GPU at build time:
+**Torch variant (CPU/GPU).** torch + torchvision live in mutually-exclusive
+`cpu` / `gpu` uv extras (index-pinned to pytorch-cpu / pytorch-cu128; see
+`pyproject.toml` and `docs/plans/2026-06-23-gpu-cpu-torch-extras.md`). The active
+variant is resolved by `scripts/select_variant.sh` with precedence
+`KRI_VARIANT` env > `.kri-variant.local` (gitignored, per-machine) > **gpu**
+(the local-dev default).
 
 ```bash
-export TORCH_WHEEL_INDEX=https://download.pytorch.org/whl/cpu        # default
-# ...whl/cu121 (CUDA 12.1) or ...whl/rocm6.1 (ROCm 6.1)
-DOCKER_BUILDKIT=1 docker build --build-arg TORCH_WHEEL_INDEX=$TORCH_WHEEL_INDEX \
-  -f docker/app.Dockerfile -t kri-local-rag:local .
-uv venv --seed && make uv-sync-test                                 # local venv (CPU wheels via pyproject)
+make use-gpu          # local/bare-metal dev (cu128) — writes .kri-variant.local + syncs
+make use-cpu          # CPU-only box — writes .kri-variant.local + syncs
+make show-variant     # print the resolved variant
+make sync             # sync the current variant (./run_uv.sh)
+KRI_VARIANT=cpu make uv-sync-test   # one-off CPU sync (what CI does)
+```
+
+Always select a variant — a bare `uv sync` with no `--extra` falls back to the
+default PyPI torch wheel (CUDA-bundled on Linux, not index-pinned).
+
+The **Docker app image stays CPU** (slim runtime; only Ollama uses the GPU). Its
+`uv sync` lines hardcode `--extra cpu`, so no build arg is needed:
+
+```bash
+DOCKER_BUILDKIT=1 docker build -f docker/app.Dockerfile -t kri-local-rag:local .
 ```
 
 ## Helper scripts

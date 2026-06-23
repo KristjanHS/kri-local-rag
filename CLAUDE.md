@@ -39,6 +39,7 @@ Local RAG system: document ingestion → vector index → retrieval → answer. 
 - Lint/format/types: `ruff check . --fix`, `ruff format .`, `make pyright`.
 - Tests: `make unit`, `make integration`; dockerized: `make test-up` → `make test-integration` → `make test-down`.
 - Pre-commit: `make pre-commit`. Deps: edit `pyproject.toml`, then `make export-reqs`.
+- Torch variant: `make use-gpu` (default, cu128) / `make use-cpu`, or `KRI_VARIANT=cpu` (CI). `make show-variant`.
 
 ## Rules Index (path-gated — auto-loaded when touching matching files)
 
