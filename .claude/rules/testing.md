@@ -13,4 +13,5 @@ last_verified: 2026-06-23
   - `tests/e2e/` — full stack via Docker Compose.
   - `tests/ui/` — Playwright browser tests.
 - Unit tests must do no real network I/O — put network behavior in integration/e2e.
+- Import integration helpers (`get_service_url`, `is_service_healthy`) from `tests/integration/conftest.py` — never reimplement.
 - On a failing test: state what it asserts, then the code's actual behavior, then decide which is wrong before editing. Stop and surface logs after 3 failed attempts.

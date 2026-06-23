@@ -16,9 +16,7 @@ Local RAG system: document ingestion → vector index → retrieval → answer. 
 | Trigger | Read |
 |---------|------|
 | Quick start, run commands, Makefile targets | `README.md`, `Makefile` |
-| Pre-commit, GitHub Actions, CI/release flow | `docs/dev_test_CI/ci-cd-release-mgmt.md` |
-| Test layout, commands, env vars, patterns | `docs/dev_test_CI/testing_approach.md` |
-| Import strategy, editable install, dev env | `docs/dev_test_CI/DEVELOPMENT.md` |
+| Dev setup, test suites, CI/release flow, env vars | `docs/dev_test_CI/README.md` |
 | Docker stack management, volumes, reset | `docs/operate/docker-management.md` |
 
 ## Critical Rules

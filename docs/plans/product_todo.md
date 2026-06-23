@@ -43,8 +43,7 @@ This file tracks outstanding tasks and planned improvements for the project.
 ## Quick References
 
 - **AI agent cheatsheet and E2E commands**: [`docs/AI_coder/AI_instructions.md`](AI_instructions.md)
-- **Human dev quickstart**: [`docs/dev_test_CI/DEVELOPMENT.md`](../dev_test_CI/DEVELOPMENT.md)
-- **Testing approach**: [`docs/dev_test_CI/testing_approach.md`](../dev_test_CI/testing_approach.md)
+- **Dev, testing & CI/CD**: [`docs/dev_test_CI/README.md`](../dev_test_CI/README.md)
 
 ## Prioritized Backlog
 
@@ -437,7 +436,7 @@ def test_something(mocker, mock_embedding_model):
   - Verify: Failures are actionable; runs are deterministic and isolated.
 
 - [ ] Step 8 — Wire into scripts/docs/CI (PENDING)
-  - Action: Document commands in `docs/dev_test_CI/DEVELOPMENT.md` and `AI_instructions.md`; mention in `scripts/dev/test.sh e2e` help; add a CI job for the containerized CLI subset.
+  - Action: Document commands in `docs/dev_test_CI/README.md` and `AI_instructions.md`; mention in `scripts/dev/test.sh e2e` help; add a CI job for the containerized CLI subset.
   - Verify: Fresh env runs `tests/e2e/*_container_e2e.py` green; CI job passes locally under `act` and on hosted runners.
 
 #### P5 — E2E retrieval failure: QA test returns no context (Weaviate)

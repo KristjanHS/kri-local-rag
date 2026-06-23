@@ -8,8 +8,7 @@ Purpose
 
 See also:
 - Commands and golden targets: root `README.md` and `make help` (also summarized in `CLAUDE.md`).
-- Test suites and markers: `docs/dev_test_CI/testing_approach.md`.
-- Human dev quickstart: `docs/dev_test_CI/DEVELOPMENT.md`.
+- Dev setup, test suites, CI/release: `docs/dev_test_CI/README.md`.
 
 
 Context

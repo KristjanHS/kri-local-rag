@@ -17,7 +17,6 @@ __pycache__/
 gemini
 gemini.md
 AGENTS.md
-docs/AI_coder/CODEX_RULES.md
 
 # Runtime artifacts
 logs/
