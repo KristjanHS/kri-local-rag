@@ -123,12 +123,11 @@ def answer(
     *,
     metadata_filter: Optional[Dict[str, Any]] = None,
     on_token: Optional[Callable[[str], None]] = None,
-    on_debug: Optional[Callable[[str], None]] = None,
     stop_event: Optional[threading.Event] = None,
     context_tokens: int = 8192,
     collection_name: Optional[str] = None,
 ) -> str:
-    """Return an answer from the LLM using RAG with optional debug output and streaming callbacks.
+    """Return an answer from the LLM using RAG with an optional streaming token callback.
     Can be interrupted with stop_event.
     """
 
@@ -185,10 +184,6 @@ def answer(
     logger.debug("Prompt being sent to Ollama (%d chars, %d chunks)", len(prompt_text), len(context_chunks))
 
     # ---------- 4) Query the LLM -------------------------------------------------
-    # Use a simple print callback for CLI debug mode
-    def cli_on_debug(msg: str) -> None:
-        logger.debug("[Ollama Debug] %s", msg)
-
     # Collect tokens for CLI output
     collected_tokens: list[str] = []
     first_token_processed = False
@@ -207,8 +202,6 @@ def answer(
             # Print tokens immediately for better UX
             console.print(token, end="")
 
-    if on_debug is None:
-        on_debug = cli_on_debug
     if on_token is None:
         on_token = cli_on_token
 
@@ -222,7 +215,6 @@ def answer(
         OLLAMA_MODEL,
         _ollama_context,
         on_token=on_token,
-        on_debug=on_debug,
         stop_event=stop_event,
         context_tokens=context_tokens,
     )
