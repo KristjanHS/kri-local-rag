@@ -34,11 +34,17 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
 COPY backend/ /app/backend/
 COPY cli.py /app/
 
-# INSTALL_DEV toggles dev/test groups for CI/dev images, and make project package editable
+# INSTALL_DEV toggles dev/test groups for CI/dev images, and makes the project package editable.
+# INSTALL_EDITABLE installs the project editable WITHOUT dev/test groups, so a dev `app`
+# container can hot-mount ../backend:/app/backend and pick up edits without a rebuild.
+# Default (both 0) keeps the shippable runtime image self-contained (--no-editable).
 ARG INSTALL_DEV=0
+ARG INSTALL_EDITABLE=0
 RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
   if [ "$INSTALL_DEV" = "1" ]; then \
   uv sync --locked --extra cpu --group dev --group test; \
+  elif [ "$INSTALL_EDITABLE" = "1" ]; then \
+  uv sync --locked --extra cpu --no-dev; \
   else \
   uv sync --locked --extra cpu --no-editable --no-dev; \
   fi

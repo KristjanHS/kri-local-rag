@@ -48,7 +48,7 @@ st.sidebar.markdown(
 **GPU Monitoring:**
 To monitor your GPU VRAM usage while running large context windows, open a terminal and run:
 ```
-./monitor_gpu.sh
+./scripts/dev/monitor_gpu.sh
 ```
 This shows GPU memory, utilization, and container resource usage.
 
