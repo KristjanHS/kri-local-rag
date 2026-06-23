@@ -108,7 +108,7 @@ class TestStartupValidationUnit:
 
         # Test that config import doesn't trigger external connections
         with patch("backend.qa_loop.ensure_weaviate_ready_and_populated") as mock_weaviate:
-            with patch("backend.ollama_client.ensure_model_available") as mock_ollama:
+            with patch("backend.ollama_client.pull_if_missing") as mock_ollama:
                 # Import should not trigger any external calls
                 from backend import config
 

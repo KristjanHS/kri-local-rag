@@ -213,22 +213,6 @@ def preload_models() -> None:
     logger.debug("All models preloaded successfully")
 
 
-def clear_model_cache() -> None:
-    """Clear the global model cache. Useful for testing."""
-    global _embedding_model, _cross_encoder
-    _embedding_model = None
-    _cross_encoder = None
-    logger.info("Model cache cleared")
-
-
-def get_model_status() -> dict[str, bool]:
-    """Get current status of model loading for monitoring."""
-    return {
-        "embedding_model_cached": _embedding_model is not None,
-        "reranker_model_cached": _cross_encoder is not None,
-    }
-
-
 def load_model(model_name: str, is_embedding: bool) -> Any:
     """
     Load model using HuggingFace's built-in caching mechanism.
@@ -262,14 +246,3 @@ def load_model(model_name: str, is_embedding: bool) -> Any:
     except Exception as e:
         error_msg = f"Could not load model '{model_name}': {e}"
         raise RuntimeError(error_msg) from e
-
-
-# Legacy aliases for backward compatibility
-def get_embedder() -> "SentenceTransformer":
-    """Legacy alias for load_embedder()."""
-    return load_embedder()
-
-
-def get_cross_encoder() -> "CrossEncoder":
-    """Legacy alias for load_reranker()."""
-    return load_reranker()
