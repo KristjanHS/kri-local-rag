@@ -302,7 +302,8 @@ yamlfmt: ## Validate YAML formatting via pre-commit
 	# Ensure dev + test groups are present so later test steps still work
 	V=$$(./scripts/select_variant.sh)
 	uv sync --extra "$$V" --group dev --group test --frozen
-	uv run pre-commit run yamlfmt -a
+	# --no-sync: a bare `uv run` re-syncs WITHOUT --extra, reverting the variant torch.
+	uv run --no-sync pre-commit run yamlfmt -a
 
 # Ruff targets
 ruff-format: ## Auto-format code with Ruff
@@ -316,7 +317,8 @@ pre-commit: ## Run all pre-commit hooks on all files
 	# Keep test deps installed to avoid breaking local test runs after this target
 	V=$$(./scripts/select_variant.sh)
 	uv sync --extra "$$V" --group dev --group test --frozen
-	uv run pre-commit run --all-files
+	# --no-sync: a bare `uv run` re-syncs WITHOUT --extra, reverting the variant torch.
+	uv run --no-sync pre-commit run --all-files
 
 # =========================
 # CI Helpers & Git
