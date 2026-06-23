@@ -27,7 +27,7 @@ Local RAG system: document ingestion → vector index → retrieval → answer. 
 4. **No `print` in app or test code** — use `logging` (Ruff `T201` enforces). Log files only under `logs/`.
 5. **Never `docker compose down -v` on non-test stacks** — it destroys persisted Weaviate/Ollama volumes. Plain `down` only.
 6. **Run pre-commit + tests after edits.** On a failure that persists, stop and surface logs (max 3 attempts); state expected vs. actual before changing the test or the code.
-7. **Conventional Commits.** Feature/fix work on `dev` (permanent integration branch — never delete/auto-merge it as if disposable); primary branch is `main`. The pre-commit wrapper **auto-stages all modified tracked files**, not just what you staged — `git stash push -- <path>` unrelated working-tree edits (or `git add` only your files + `git commit --no-verify`) so parallel edits aren't swept in.
+7. **Conventional Commits.** Feature/fix work on `dev` (permanent integration branch — never delete/auto-merge it as if disposable); primary branch is `main`. The pre-commit wrapper re-stages only files already staged for the commit, so unrelated working-tree edits aren't swept in.
 8. **Secrets stay out of git** — `.secrets.baseline` (detect-secrets) gates this; don't bypass.
 9. **No trailing summary docs** (`TASK_SUMMARY.md`-style). End summaries go in chat or the commit message. Approved plans go in `docs/plans/`.
 10. **Prefer local installed tools** over Docker/CI wrappers for local dev; CI uses Docker for consistency.
