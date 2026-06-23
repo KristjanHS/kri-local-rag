@@ -4,10 +4,30 @@ import pytest
 from langchain.docstore.document import Document
 
 from backend.ingest import (
+    _is_valid_pdf,
     deterministic_uuid,
     load_and_split_documents,
     process_and_upload_chunks,
 )
+
+
+def test_is_valid_pdf_accepts_real_magic_bytes(tmp_path):
+    """A file starting with the PDF magic bytes is accepted."""
+    pdf = tmp_path / "good.pdf"
+    pdf.write_bytes(b"%PDF-1.7\n...rest...")
+    assert _is_valid_pdf(str(pdf)) is True
+
+
+def test_is_valid_pdf_rejects_bad_magic_bytes(tmp_path):
+    """A non-PDF payload renamed to .pdf is rejected by the magic-byte guard."""
+    fake = tmp_path / "evil.pdf"
+    fake.write_bytes(b"<html><script>alert(1)</script>")
+    assert _is_valid_pdf(str(fake)) is False
+
+
+def test_is_valid_pdf_rejects_unreadable_file(tmp_path):
+    """A path that cannot be opened returns False rather than raising."""
+    assert _is_valid_pdf(str(tmp_path / "nope.pdf")) is False
 
 
 @pytest.fixture

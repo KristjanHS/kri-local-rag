@@ -24,7 +24,8 @@ def _render_answer(placeholder, tokens):
     The wrapper is static, trusted HTML; the model/document-derived content is
     HTML-escaped to prevent script injection (XSS) from ingested documents.
     """
-    content = html.escape("".join(tokens))
+    # quote=False: body-text context (not an attribute), so literal quotes render cleanly
+    content = html.escape("".join(tokens), quote=False)
     placeholder.markdown(
         f"<div data-testid='answer'><h3>Answer</h3><div class='answer-content'>{content}</div></div>",
         unsafe_allow_html=True,
@@ -75,7 +76,7 @@ with st.sidebar.expander("Ingest PDFs"):
             for f in uploaded_files:
                 # B2/B9: strip directory components and confirm the resolved path stays in save_dir
                 safe_name = os.path.basename(f.name)
-                if not safe_name.lower().endswith(".pdf"):
+                if len(safe_name) <= len(".pdf") or not safe_name.lower().endswith(".pdf"):
                     rejected.append(f"{f.name} (not a .pdf)")
                     continue
                 dest = os.path.realpath(os.path.join(real_save_dir, safe_name))
