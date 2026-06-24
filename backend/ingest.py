@@ -24,7 +24,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, List, Optional, Protocol, cast, runtime_checkable
+from typing import Any, Callable, List, Optional, Protocol, cast, runtime_checkable
 
 import weaviate
 from langchain_core.documents import Document
@@ -83,6 +83,35 @@ def _load_text(path: str) -> List[Document]:
     return [Document(page_content=Path(path).read_text(encoding="utf-8"), metadata={"source": path})]
 
 
+_Loader = Callable[[str], List[Document]]
+# Supported ingest extensions → loader. Iteration order (PDF, then Markdown) is the
+# load order; keep it stable.
+_LOADERS: dict[str, _Loader] = {".pdf": _load_pdf, ".md": _load_text}
+
+
+def _resolve_ingest_files(path: str) -> list[tuple[str, _Loader]]:
+    """Map an ingest path (a single file or a directory) to (file, loader) pairs.
+
+    Centralizes file discovery so the single-file and directory cases share one
+    per-file load loop instead of duplicating the magic-byte/error-isolation logic.
+    """
+    if os.path.isfile(path):
+        ext = os.path.splitext(path)[1].lower()
+        if ext not in _LOADERS:
+            logger.warning(f"Unsupported file extension '{ext}' for path '{path}'.")
+            return []
+        return [(path, _LOADERS[ext])]
+
+    # Directory: recursive glob per supported extension; sorted for deterministic order.
+    import glob
+
+    return [
+        (file_path, loader_fn)
+        for ext, loader_fn in _LOADERS.items()
+        for file_path in sorted(glob.glob(os.path.join(path, f"**/*{ext}"), recursive=True))
+    ]
+
+
 def load_and_split_documents(path: str) -> List[Document]:
     """Load documents from a directory or a single file, then split into chunks."""
     # Fast path: if the path does not exist, skip gracefully
@@ -90,47 +119,21 @@ def load_and_split_documents(path: str) -> List[Document]:
         logger.warning(f"Path not found: '{path}'. Skipping ingestion.")
         return []
 
-    # 1) Single file path support
     docs: List[Document] = []
     file_count = 0
-    if os.path.isfile(path):
-        ext = os.path.splitext(path)[1].lower()
-        if ext == ".pdf" and not _is_valid_pdf(path):
-            logger.warning(f"Skipping '{path}': not a valid PDF (bad magic bytes).")
-            return []
-        if ext in (".pdf", ".md"):
-            # Same error isolation as the directory walk: a corrupt PDF or
-            # non-UTF-8 file logs and yields nothing rather than aborting.
-            try:
-                docs.extend(_load_pdf(path) if ext == ".pdf" else _load_text(path))
-                file_count = 1
-            except Exception as e:
-                logger.error(f"Error loading '{path}': {e}")
-                logger.exception("Full traceback for loading error:")
-                return []
-        else:
-            logger.warning(f"Unsupported file extension '{ext}' for path '{path}'.")
-            return []
-    else:
-        # 2) Directory path with glob patterns. Per-file try/except so one bad
-        #    file logs and is skipped rather than aborting the whole batch.
-        import glob
-
-        loader_configs = {
-            "**/*.pdf": _load_pdf,
-            "**/*.md": _load_text,
-        }
-        for glob_pattern, loader_fn in loader_configs.items():
-            for file_path in glob.glob(os.path.join(path, glob_pattern), recursive=True):
-                try:
-                    if file_path.lower().endswith(".pdf") and not _is_valid_pdf(file_path):
-                        logger.warning(f"Skipping '{file_path}': not a valid PDF (bad magic bytes).")
-                        continue
-                    docs.extend(loader_fn(file_path))
-                    file_count += 1
-                except Exception as e:
-                    logger.error(f"Error loading '{file_path}' with pattern '{glob_pattern}': {e}")
-                    logger.exception("Full traceback for loading error:")
+    # Single per-file loop for both the single-file and directory cases. Per-file
+    # try/except so one corrupt PDF or non-UTF-8 file logs and is skipped rather
+    # than aborting the whole batch.
+    for file_path, loader_fn in _resolve_ingest_files(path):
+        try:
+            if file_path.lower().endswith(".pdf") and not _is_valid_pdf(file_path):
+                logger.warning(f"Skipping '{file_path}': not a valid PDF (bad magic bytes).")
+                continue
+            docs.extend(loader_fn(file_path))
+            file_count += 1
+        except Exception as e:
+            logger.error(f"Error loading '{file_path}': {e}")
+            logger.exception("Full traceback for loading error:")
 
     # Drop pages with no extractable text (e.g. image-only/scanned PDF pages):
     # empty content would yield colliding deterministic UUIDs and junk vectors.
