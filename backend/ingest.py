@@ -237,7 +237,10 @@ def process_and_upload_chunks(
                 eta_s = (remaining / rate) if rate > 0 else 0.0
                 logger.info(
                     f"Progress: {idx}/{total_chunks} chunks ({idx / max(total_chunks, 1):.0%}), "
-                    f"{rate:.1f} chunks/s, ETA ~{eta_s:.0f}s"
+                    f"{rate:.1f} chunks/s, ETA ~{eta_s:.0f}s",
+                    # Structured payload so the Streamlit ingest UI can drive a progress bar
+                    # without parsing the message string (see frontend/rag_app.py).
+                    extra={"ingest_progress": {"current": idx, "total": total_chunks, "rate": rate, "eta_s": eta_s}},
                 )
                 last_log_ts = now
 
