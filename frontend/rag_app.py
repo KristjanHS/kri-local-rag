@@ -264,10 +264,15 @@ if submitted and question.strip():
                 raise
 
             # Route backend diagnostics into the debug panel via logging (replaces on_debug).
-            # Temporarily lower the module logger to DEBUG so its records reach the handler.
+            # Raise the module logger to DEBUG so its records reach the handler. This is done
+            # idempotently and NOT restored: the logger is a process-wide singleton shared by
+            # every Streamlit session thread, so restoring a prior level in this thread's
+            # finally would silence DEBUG for a concurrent thread still inside answer(). DEBUG
+            # records are still filtered out at the root handler (INFO) and the per-thread
+            # _DebugPanelHandler only feeds this session's panel, so leaving it on is safe.
             ollama_logger = logging.getLogger("backend.ollama_client")
-            prev_level = ollama_logger.level
-            ollama_logger.setLevel(logging.DEBUG)
+            if ollama_logger.level > logging.DEBUG or ollama_logger.level == logging.NOTSET:
+                ollama_logger.setLevel(logging.DEBUG)
             debug_handler = _DebugPanelHandler(threading.get_ident(), debug_placeholder)
             ollama_logger.addHandler(debug_handler)
             try:
@@ -281,7 +286,6 @@ if submitted and question.strip():
                 )
             finally:
                 ollama_logger.removeHandler(debug_handler)
-                ollama_logger.setLevel(prev_level)
     # After streaming, keep showing the debug info
     debug_placeholder.text("\n".join(st.session_state["debug_lines"]))
 
