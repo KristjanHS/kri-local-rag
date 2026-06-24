@@ -368,8 +368,9 @@ def app_compose_up(weaviate_compose_up, ollama_compose_up):  # type: ignore[no-r
 
     # <!-- external-process-test-gate-override: e2e app fixture drives docker compose by design -->
     # The image-existence guard only applies to the default project, which builds
-    # `kri-local-rag-app:latest`. The run-id test stack uses a different tag
-    # (`kri-local-rag-app:test`) built by `make test-up`, so don't gate it on :latest.
+    # `kri-local-rag-app:latest`. The fixed-name test stack (`kri-local-rag-test`)
+    # uses a different tag (`kri-local-rag-app:test`) built by `make test-up`, so
+    # don't gate it on :latest.
     if ctx.project is None:
         image_name = "kri-local-rag-app:latest"
         try:

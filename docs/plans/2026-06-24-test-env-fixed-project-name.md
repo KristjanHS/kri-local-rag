@@ -1,7 +1,7 @@
 # Plan: Replace per-run `RUN_ID` with a fixed test project name
 
 **Date:** 2026-06-24
-**Status:** Proposed
+**Status:** Implemented (`dev`, commit `aaa9f61`; host live-verify owed)
 **Scope:** `scripts/dev/test-env.sh`, `scripts/dev/test.sh`, `Makefile` (comments), `.gitignore`, `.dockerignore`
 
 ## Problem
