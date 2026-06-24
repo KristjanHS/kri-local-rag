@@ -159,6 +159,10 @@ def set_log_level(level: str | None) -> None:
 
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "Document")
 
+# Magic bytes every PDF file starts with — single source of truth for the
+# defense-in-depth checks in backend.ingest and the frontend upload handler.
+PDF_MAGIC = b"%PDF-"
+
 # Text splitting parameters
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 100

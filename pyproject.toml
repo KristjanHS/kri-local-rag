@@ -256,6 +256,7 @@ DEP002 = [
     "boto3",                                       # AWS libs pulled in indirectly
     "langdetect",                                  # planned/optional language detection
     "pillow",                                      # transitive (streamlit/langchain), not first-party-imported
+    "torch",                                       # sentence-transformers backend + CPU/GPU wheel split (not imported directly by first-party code)
     "torchvision",                                 # ABI peer of torch (not imported directly by first-party code)
 ]
 

@@ -4,6 +4,7 @@
 import os
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 # Disable torch.compile during these mocked tests to avoid unnecessary compile overhead
@@ -25,9 +26,8 @@ class TestHybridSearchFix:
         """Retriever vectorizes the query locally and runs hybrid search (no BM25 fallback)."""
         from backend.retriever import get_top_k
 
-        mock_array = MagicMock()
-        mock_array.tolist.return_value = [0.1, 0.2, 0.3]
-        mock_embedding_model.encode.return_value = mock_array
+        # encode() returns an ndarray in production; mirror that here.
+        mock_embedding_model.encode.return_value = np.array([0.1, 0.2, 0.3])
 
         mock_client = MagicMock()
         mocker.patch("backend.weaviate_client.get_weaviate_client", return_value=mock_client)
@@ -65,9 +65,8 @@ class TestHybridSearchFix:
         # Loader returns None: only the explicit model can satisfy vectorization.
         mocker.patch("backend.retriever.load_embedder", return_value=None)
 
-        mock_array = MagicMock()
-        mock_array.tolist.return_value = [0.1, 0.2, 0.3]
-        mock_embedding_model.encode.return_value = mock_array
+        # encode() returns an ndarray in production; mirror that here.
+        mock_embedding_model.encode.return_value = np.array([0.1, 0.2, 0.3])
 
         mock_client = MagicMock()
         mocker.patch("backend.weaviate_client.get_weaviate_client", return_value=mock_client)
