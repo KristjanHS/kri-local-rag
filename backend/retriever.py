@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import Any, List, Optional
 
 # Defer torch import to runtime to avoid heavy import-time side effects
 from weaviate.exceptions import WeaviateQueryError
@@ -14,43 +14,12 @@ from backend.models import load_embedder
 from backend.vector_utils import to_float_list
 from backend.weaviate_client import get_weaviate_client
 
-# Optional dependency note: if sentence-transformers is not installed, the missing
-# dependency is handled gracefully inside the lazy loader (load_embedder) that
-# _get_embedding_model delegates to.
-
-# For manual vectorization – import type only for type-checkers
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    from sentence_transformers import SentenceTransformer as SentenceTransformerType  # type: ignore
-else:
-    SentenceTransformerType = object  # runtime fallback for type checkers only
-
-# Cache the embedding model instance after first load
-_embedding_model: Any = None
-
 # Set up logging for this module
 logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Retriever helpers
 # ---------------------------------------------------------------------------
-
-
-def _get_embedding_model() -> Any:
-    """Return a (cached) SentenceTransformer instance for manual vectorization.
-
-    Uses the offline-first model loader for better reliability and reproducibility.
-    """
-    global _embedding_model
-
-    try:
-        # Use cached model if available
-        if _embedding_model is None:
-            _embedding_model = load_embedder()
-
-        return _embedding_model
-    except Exception as e:
-        logger.warning("Failed to load embedding model: %s", e)
-        return None
 
 
 def get_top_k(
@@ -63,10 +32,8 @@ def get_top_k(
 ) -> List[str]:
     """Return the *content* strings of the **k** chunks most relevant to *question*.
 
-    Improvements over the old implementation:
-    1. **Hybrid search** – combines BM25 lexical matching with vector similarity.
-    2. Automatic **fallback** to *near_text* if hybrid search is not available
-       (e.g. older Weaviate versions without the hybrid module).
+    Uses **hybrid search** – BM25 lexical matching combined with vector similarity
+    from a query vector produced by the local embedding model.
     """
 
     # Get Weaviate client - note: client is cached and should be closed at application level
@@ -77,23 +44,18 @@ def get_top_k(
 
     q = collection.query
     try:
-        # For manual vectorization, we need to provide the vector ourselves
+        # For manual vectorization, we need to provide the vector ourselves.
+        # load_embedder() is the single cache owner; it raises on failure (never None).
         if embedding_model is None:
-            embedding_model = _get_embedding_model()
+            embedding_model = load_embedder()
 
-        if embedding_model is not None:
-            # Vectorize the query using the same model as ingestion
-            query_vector_raw = embedding_model.encode(question)
-            # Normalize to a plain Python list of floats for Weaviate client
-            query_vector: List[float] = to_float_list(query_vector_raw)
-            # Hybrid search with manually provided vector
-            res = q.hybrid(vector=query_vector, query=question, alpha=alpha, limit=k)
-            logger.info("hybrid search used with manual vectorization (alpha=%s)", alpha)
-        else:
-            # Fallback: try hybrid search without manual vectorization (legacy behavior)
-            # This might fail if no vectorizer is configured
-            res = q.hybrid(query=question, alpha=alpha, limit=k)
-            logger.info("hybrid search used (alpha=%s)", alpha)
+        # Vectorize the query using the same model as ingestion
+        query_vector_raw = embedding_model.encode(question)
+        # Normalize to a plain Python list of floats for Weaviate client
+        query_vector: List[float] = to_float_list(query_vector_raw)
+        # Hybrid search with manually provided vector
+        res = q.hybrid(vector=query_vector, query=question, alpha=alpha, limit=k)
+        logger.info("hybrid search used with manual vectorization (alpha=%s)", alpha)
     except (TypeError, WeaviateQueryError) as e:
         # Hybrid search failed - this should not happen in tests with proper setup
         logger.error("hybrid search failed (%s)", e)

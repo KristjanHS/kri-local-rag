@@ -9,7 +9,8 @@ import os
 import pytest
 from weaviate.classes.config import Configure, DataType, Property
 
-from backend import retriever
+from backend.models import load_embedder
+from backend.vector_utils import to_float_list
 from tests.integration.conftest import connect_to_weaviate_with_fallback
 
 pytestmark = pytest.mark.requires_weaviate
@@ -45,21 +46,11 @@ def test_manual_vectorization_uses_local_embedding_compose(tmp_path):
         coll.config.get()
 
         # Load the same embedding model used by the application
-        model = retriever._get_embedding_model()
-        if model is None:
-            pytest.fail(
-                "Local embedding model unavailable; non-unit tests require the real SentenceTransformer to be present."
-            )
+        model = load_embedder()
 
         # Insert two small objects WITH manual vectors using batch (like application code)
-        v1 = model.encode("The Eiffel Tower is in Paris.")
-        v2 = model.encode("Mount Everest is the highest mountain.")
-        try:
-            vec1 = list(v1.tolist())  # type: ignore[attr-defined]
-            vec2 = list(v2.tolist())  # type: ignore[attr-defined]
-        except AttributeError:
-            vec1 = list(v1)  # type: ignore[arg-type]
-            vec2 = list(v2)  # type: ignore[arg-type]
+        vec1 = to_float_list(model.encode("The Eiffel Tower is in Paris."))
+        vec2 = to_float_list(model.encode("Mount Everest is the highest mountain."))
 
         # Use batch insertion like the application code
         with coll.batch.dynamic() as batch:
@@ -80,11 +71,7 @@ def test_manual_vectorization_uses_local_embedding_compose(tmp_path):
             pass
 
         # Query using the same local model vector (hybrid search like application code)
-        qv = model.encode("Paris landmark")
-        try:
-            qv_list = list(qv.tolist())  # type: ignore[attr-defined]
-        except AttributeError:
-            qv_list = list(qv)  # type: ignore[arg-type]
+        qv_list = to_float_list(model.encode("Paris landmark"))
 
         # Use hybrid search like the application code
         res = coll.query.hybrid(vector=qv_list, query="Paris landmark", alpha=1.0, limit=1)

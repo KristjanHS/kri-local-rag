@@ -14,14 +14,6 @@ os.environ["RETRIEVER_EMBEDDING_TORCH_COMPILE"] = "false"
 class TestHybridSearchFix:
     """Test hybrid search with manual vectorization and error scenarios."""
 
-    def test_embedding_model_unavailable(self, mocker):
-        """When the loader returns None, _get_embedding_model returns None (no raise)."""
-        from backend import retriever
-
-        mocker.patch("backend.retriever.load_embedder", return_value=None)
-
-        assert retriever._get_embedding_model() is None
-
     def test_retrieval_uses_local_embedding_model(self, mocker, mock_embedding_model: MagicMock):
         """Retriever vectorizes the query locally and runs hybrid search (no BM25 fallback)."""
         from backend.retriever import get_top_k
@@ -109,16 +101,11 @@ class TestHybridSearchFix:
 
         assert result == []
 
-    @pytest.mark.parametrize("embedding_available", [True, False])
-    def test_hybrid_search_failure_raises(self, mocker, mock_embedding_model: MagicMock, embedding_available: bool):
-        """A hybrid-query failure raises RuntimeError and never falls back to BM25 —
-        whether or not a local embedding model is available."""
+    def test_hybrid_search_failure_raises(self, mocker, mock_embedding_model: MagicMock):
+        """A hybrid-query failure raises RuntimeError and never falls back to BM25."""
         from weaviate.exceptions import WeaviateQueryError
 
         from backend.retriever import get_top_k
-
-        if not embedding_available:
-            mocker.patch("backend.retriever.load_embedder", return_value=None)
 
         mock_client = MagicMock()
         mocker.patch("backend.weaviate_client.get_weaviate_client", return_value=mock_client)

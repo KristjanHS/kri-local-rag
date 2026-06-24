@@ -16,9 +16,9 @@ COLLECTION_NAME = TEST_COLLECTION_NAME  # Use the shared test collection constan
 def test_ingest_pipeline_with_real_weaviate_compose(weaviate_client, sample_documents_path):
     """Test the full ingestion pipeline with a real Weaviate instance, using a local model."""
     # Run the ingestion process on the test directory with only PDF files
-    from backend.retriever import _get_embedding_model
+    from backend.models import load_embedder
 
-    embedding_model = _get_embedding_model()
+    embedding_model = load_embedder()
     ingest.ingest(
         directory=sample_documents_path,
         collection_name=COLLECTION_NAME,
