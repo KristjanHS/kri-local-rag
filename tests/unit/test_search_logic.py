@@ -58,6 +58,39 @@ class TestHybridSearchFix:
         mock_query.bm25.assert_not_called()
         assert result == ["Test content 1", "Test content 2"]
 
+    def test_retrieval_uses_explicit_embedding_model(self, mocker, mock_embedding_model: MagicMock):
+        """A caller-supplied embedding_model is used directly, bypassing the loader."""
+        from backend.retriever import get_top_k
+
+        # Loader returns None: only the explicit model can satisfy vectorization.
+        mocker.patch("backend.retriever.load_embedder", return_value=None)
+
+        mock_array = MagicMock()
+        mock_array.tolist.return_value = [0.1, 0.2, 0.3]
+        mock_embedding_model.encode.return_value = mock_array
+
+        mock_client = MagicMock()
+        mocker.patch("backend.weaviate_client.get_weaviate_client", return_value=mock_client)
+        mock_collection = MagicMock()
+        mock_query = MagicMock()
+        mock_result = MagicMock()
+
+        class MockObject:
+            def __init__(self, content):
+                self.properties = {"content": content}
+
+        mock_result.objects = [MockObject("explicit model used")]
+        mock_client.collections.get.return_value = mock_collection
+        mock_collection.query = mock_query
+        mock_query.hybrid.return_value = mock_result
+
+        result = get_top_k("test question", k=1, embedding_model=mock_embedding_model)
+
+        mock_embedding_model.encode.assert_called_once_with("test question")
+        mock_query.hybrid.assert_called_once_with(vector=[0.1, 0.2, 0.3], query="test question", alpha=0.5, limit=1)
+        mock_query.bm25.assert_not_called()
+        assert result == ["explicit model used"]
+
     def test_hybrid_search_with_empty_collection(self, mocker, mock_embedding_model: MagicMock):
         """An empty collection yields an empty result list."""
         from backend.retriever import get_top_k
