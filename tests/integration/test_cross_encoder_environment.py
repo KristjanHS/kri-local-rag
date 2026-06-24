@@ -15,8 +15,12 @@ def test_cross_encoder_is_loaded_and_used_for_reranking(cross_encoder_cache_dir)
     """Verify that the real CrossEncoder is loaded from the local cache and used for reranking."""
     # Ensure heavy compile optimizations are disabled for speed in tests
     os.environ["RERANKER_CROSS_ENCODER_OPTIMIZATIONS"] = "false"
-    # Point to the local cache for offline loading
-    os.environ["SENTENCE_TRANSFORMERS_HOME"] = cross_encoder_cache_dir
+    # Point to the local cache for offline loading.
+    # Use HF_HUB_CACHE (not the legacy SENTENCE_TRANSFORMERS_HOME): the latter populates
+    # sentence-transformers' `cache_folder`, which it then forwards to its own internal
+    # Transformer `cache_dir=` argument and logs a "cache_dir is deprecated" WARNING.
+    # HF_HUB_CACHE points transformers/HF Hub at the same snapshot dir without that path.
+    os.environ["HF_HUB_CACHE"] = cross_encoder_cache_dir
 
     # Reload qa_loop to ensure it picks up the changed environment variables
     if "backend.qa_loop" in sys.modules:

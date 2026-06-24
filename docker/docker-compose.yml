@@ -5,9 +5,17 @@ services:
     # Digest-pinned for supply-chain integrity (B7). Renovate's docker:pinDigests
     # keeps the tag@sha256 pair current.
     image: cr.weaviate.io/semitechnologies/weaviate:1.32.0@sha256:9452e68c58c287c8c29a525ff1468c209cd5e106cc927d67b7d34d61533151b3
+    # Defense-in-depth: restart on unexpected crashes. The eth0-IP startup race that
+    # originally motivated this directive is now fixed at the source via
+    # CLUSTER_IN_LOCALHOST below (memberlist binds to 127.0.0.1, always up at boot).
+    restart: on-failure
+    # Host ports are parametrized so the `test` profile can run alongside the live
+    # stack on distinct ports (scripts/dev/test-env.sh sets the *_HOST_PORT vars).
+    # Container-side ports stay fixed at 8080/50051 — internal DNS and healthchecks
+    # are unaffected.
     ports:
-      - "127.0.0.1:8080:8080"
-      - "127.0.0.1:50051:50051"
+      - "127.0.0.1:${WEAVIATE_HTTP_HOST_PORT:-8080}:8080"
+      - "127.0.0.1:${WEAVIATE_GRPC_HOST_PORT:-50051}:50051"
     volumes:
       - weaviate_db:/var/lib/weaviate
     environment:
@@ -21,10 +29,14 @@ services:
       DEFAULT_VECTORIZER_MODULE: 'none' # We are providing vectors manually
       # ENABLE_MODULES: 'text2vec-huggingface,reranker-huggingface' # Still needed for reranker
       CLUSTER_HOSTNAME: 'node1'
-      # Pin the gossip advertise address to the container's primary interface.
-      # Without this, Weaviate's memberlist auto-detection fails ("No private IP
-      # address found") in some Docker/WSL2 networks and the container exits 1.
-      CLUSTER_ADVERTISE_INTERFACE: 'eth0'
+      # Single-node deployment: pin memberlist/gossip to loopback. Without this,
+      # Weaviate tries to advertise on the primary interface's private IP, which on
+      # WSL2/Docker is often not assigned yet at boot — memberlist then exits 1 with
+      # "No private IP address found" and the container flaps (restart: on-failure
+      # never converges because eth0 stays IP-less). 127.0.0.1 is always up at boot,
+      # so startup is deterministic. Targeting CLUSTER_ADVERTISE_INTERFACE: eth0 did
+      # not help — it still depends on eth0 having a routable IP in time.
+      CLUSTER_IN_LOCALHOST: 'true'
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1"]
       interval: 5s
@@ -47,7 +59,7 @@ services:
     volumes:
       - ../model_cache:/root/.ollama
     ports:
-      - "127.0.0.1:11434:11434"
+      - "127.0.0.1:${OLLAMA_HOST_PORT:-11434}:11434"
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
@@ -68,7 +80,9 @@ services:
         INSTALL_EDITABLE: "1"
 
     ports:
-      - "8501:8501"
+      # Parametrized so the test stack's app-test (which inherits this via `extends`)
+      # lands on a distinct host port instead of colliding with the live app on 8501.
+      - "${APP_HOST_PORT:-8501}:8501"
     volumes:
       - ../backend:/app/backend # Live backend code (for editable runtime package in Dev)
       - ../frontend:/app/frontend # Live frontend code            (for hot reload in Dev)
@@ -111,8 +125,14 @@ services:
         INSTALL_DEV: "1"
     ports: []
     command: ["tail", "-f", "/dev/null"]
+    # app-test runs `tail -f /dev/null`, so there is nothing to probe. `extends app`
+    # otherwise drags in app's healthcheck *timing* (interval 5s, start_period 30s) even
+    # when `test` is overridden — and `up --wait` then blocks ~5s waiting for the first
+    # no-op probe before app-test flips to healthy. Disabling the healthcheck lets
+    # `--wait` return as soon as the container is running; readiness that actually matters
+    # (weaviate + ollama) is still gated via depends_on. Saves ~5s per `make test-up`.
     healthcheck:
-      test: ["CMD-SHELL", "exit 0"]
+      disable: true
 
   # ---------- One-off Ingestion Utility -----------------------------------------
   ingester:
