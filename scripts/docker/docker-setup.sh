@@ -123,11 +123,13 @@ echo "The script will wait for all services to report a 'healthy' status."
 echo "Detailed output is being saved to '$LOG_FILE'."
 
 compose_up_with_logs() {
-    # --force-recreate: never reuse a stale container. A weaviate container left over from a
-    # prior run can, on mere restart, come up before its eth0 gets a private IP — memberlist then
-    # dies with "No private IP address found" (exit 1) and the whole `up --wait` fails. Recreating
-    # from scratch reattaches the network cleanly. Volumes are preserved (recreate ≠ down -v).
-    if docker compose --file "$DOCKER_COMPOSE_FILE" up --detach --wait --force-recreate "${SERVICES_UP[@]}"; then
+    # Plain 'up' reuses already-healthy containers (~2s warm path) instead of cold-starting
+    # everything (~17s). The weaviate eth0-IP restart race that previously prompted
+    # --force-recreate is handled at the source by `restart: on-failure` on the weaviate service
+    # (see compose file): if memberlist dies with "No private IP address found", Docker re-runs
+    # the container once eth0 has its IP, and `up --wait` still converges — without taxing every
+    # startup with a full teardown + cold start.
+    if docker compose --file "$DOCKER_COMPOSE_FILE" up --detach --wait "${SERVICES_UP[@]}"; then
         return 0
     else
         rc=$?

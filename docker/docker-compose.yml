@@ -5,6 +5,10 @@ services:
     # Digest-pinned for supply-chain integrity (B7). Renovate's docker:pinDigests
     # keeps the tag@sha256 pair current.
     image: cr.weaviate.io/semitechnologies/weaviate:1.32.0@sha256:9452e68c58c287c8c29a525ff1468c209cd5e106cc927d67b7d34d61533151b3
+    # Self-heal the eth0-IP startup race: if memberlist boots before eth0 has a private IP it
+    # exits 1 ("No private IP address found"). on-failure lets Docker re-run the container — by
+    # the retry eth0 has its IP — so `up --wait` converges without a blanket --force-recreate.
+    restart: on-failure
     ports:
       - "127.0.0.1:8080:8080"
       - "127.0.0.1:50051:50051"
