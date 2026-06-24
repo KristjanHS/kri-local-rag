@@ -175,8 +175,6 @@ def answer(
 
 
 # ---------- Backend readiness / first-run bootstrap (shared with the Streamlit frontend) ----------
-from weaviate.classes.query import Filter
-
 from backend import config as app_config
 from backend.config import get_service_url
 from backend.weaviate_client import close_weaviate_client, get_weaviate_client
@@ -193,66 +191,19 @@ def ensure_weaviate_ready_and_populated():
         client.is_ready()  # Raises if not ready
         logger.debug("   ✓ Connection successful.")
 
-        # Check if collection exists
+        # Check if collection exists; create an empty schema if it's missing.
         logger.debug("2. Checking if collection '%s' exists...", collection_name)
         if not client.collections.exists(collection_name):
-            # First-time setup: create the collection, ingest examples, then clean up.
-            logger.info("   → Collection does not exist. Running one-time initialization...")
-            # Defer heavy import to avoid torch initialization during module import
-            from backend.ingest import ingest
+            # First-time setup: create the empty collection schema only. The embedder and
+            # other heavy modules load lazily on the first real query (load_embedder is an
+            # idempotent in-process cache), so there is no need to "warm" them by ingesting
+            # example_data/test.pdf and immediately deleting it — that round-trip only ran on
+            # a fresh DB and added zero steady-state benefit. Creating the schema is all the
+            # bootstrap owes the user.
+            logger.info("   → Collection does not exist. Creating empty collection schema...")
             from backend.weaviate_client import ensure_collection
 
             ensure_collection(client, collection_name)
-
-            # Ingest example data to ensure all modules are warm; hard-fail if it's missing.
-            # Get the absolute path to the project root, which is the parent of the 'backend' directory
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-            logger.debug("Resolved project_root: %s", project_root)
-            # Only accept project-root example_data when running outside Docker
-            example_data_path = os.path.join(project_root, "example_data")
-            logger.debug(
-                "Checking example_data_path: %s (exists=%s)",
-                example_data_path,
-                os.path.isdir(example_data_path),
-            )
-            if not os.path.isdir(example_data_path):
-                raise FileNotFoundError(f"Directory not found: '{example_data_path}'")
-
-            # Warmup using the example PDF file only
-            test_pdf_path = os.path.join(example_data_path, "test.pdf")
-            if not os.path.isfile(test_pdf_path):
-                raise FileNotFoundError(f"File not found: '{test_pdf_path}'")
-
-            logger.info("   → Ingesting example test PDF from %s", test_pdf_path)
-            # Reuse the already connected client to avoid separate gRPC/port issues in tests
-            from backend.models import load_embedder
-
-            embedding_model = load_embedder()
-            ingest(
-                test_pdf_path,
-                collection_name=collection_name,
-                weaviate_client=client,
-                embedding_model=embedding_model,
-            )
-
-            # Clean up the example data now that the schema is created.
-            # This check is important in case the example_data folder was empty.
-            try:
-                collection = client.collections.use(collection_name)
-            except Exception:
-                collection = client.collections.get(collection_name)
-            # Use the robust iterator method to check for objects
-            try:
-                next(collection.iterator())
-                has_objects = True
-            except StopIteration:
-                has_objects = False
-
-            if has_objects:
-                # Remove the example PDF, leaving an empty collection schema for the user
-                collection.data.delete_many(where=Filter.by_property("source_file").equal("test.pdf"))
-                logger.info("   ✓ Example data removed, leaving a clean collection for the user.")
-
             return
 
         # If the collection already exists, we do nothing. This avoids checking if it's empty

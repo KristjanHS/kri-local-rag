@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """E2E test: when the target collection is missing in a real Weaviate,
-running ensure_weaviate_ready_and_populated should create it by ingesting
-example_data/test.pdf, then remove the example data, leaving an empty
-collection schema present.
+running ensure_weaviate_ready_and_populated should create an empty
+collection schema (manual-vector config), leaving it present but empty.
 
 This prepares Weaviate by starting the docker-compose service (no rebuild of the app).
 """
@@ -79,8 +78,8 @@ def test_bootstrap_creates_missing_collection_and_cleans_example_data(tmp_path, 
                 except Exception as e:  # pragma: no cover - diagnostic in CI
                     pytest.fail(f"Collection '{TEST_COLLECTION_NAME}' does not exist after bootstrap: {e}")
 
-                # - Example data should have been ingested and then removed, so the
-                #   collection should now be empty
+                # - Bootstrap creates an empty schema only (no example-data round-trip),
+                #   so the collection should now be empty
                 has_objects = _collection_has_any_objects(fresh_client, target_collection)
                 assert has_objects is False
             finally:

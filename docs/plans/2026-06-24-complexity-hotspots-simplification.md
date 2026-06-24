@@ -27,7 +27,7 @@ the day Ollama changes its API.
 | 3 | `generate_response` token-extraction generality | ollama_client.py:194-232 | **HIGH** | SSE/`[DONE]`/`choices` paths Ollama never sends |
 | 4 | `to_float_list` 6-branch converter | vector_utils.py (full) | **HIGH** | Speculative; untested fallbacks |
 | 5 | Triple-layered embedding-model caching | models + retriever + qa_loop | **HIGH** | 3 caches for 1 singleton |
-| 6 | `ensure_weaviate_ready_and_populated` bootstrap | qa_loop.py:243-323 | **HIGH** | Ingest-then-delete dance in hot path |
+| 6 | `ensure_weaviate_ready_and_populated` bootstrap | qa_loop.py:243-323 | **HIGH** | ✅ DONE 2026-06-24 — D6 investigation: warmup NOT load-bearing (embedder lazy-loads+caches on first query; dance only ran on fresh DB). Collapsed to `ensure_collection()` (empty schema only); dropped PDF round-trip + delete_many + version-fallback + `Filter` import |
 | 7 | Streamlit per-thread logging plumbing | rag_app.py:51-79,185-226 | **HIGH** | 60 lines of handler gymnastics |
 | 8 | `answer()` does 6 jobs | qa_loop.py:118-230 | **HIGH** | Retrieve+rerank+prompt+stream+CLI+test-hook |
 | 9 | Duplicated `RAG_FAKE_ANSWER` bypass | qa_loop.py:137 + rag_app.py:27-29,245 | MEDIUM | Two char-streaming fake paths |
@@ -348,6 +348,19 @@ collapsing `ensure_weaviate_ready_and_populated` to a plain `bootstrap_empty_col
 trace whether anything depends on the warmup side-effect (first-query cold-start latency). If
 warmup proves load-bearing, replace the PDF round-trip with a direct model-warm call (no
 vector-DB round-trip); if not, drop it entirely. Decision deferred to that investigation.
+
+**RESOLVED 2026-06-24 (`/impag` batch-7): warmup NOT load-bearing → dropped entirely.**
+Trace: (1) the ingest-then-delete block runs ONLY when the collection is missing (a fresh
+DB); every subsequent run hits `exists()==True` and no-ops, yet queries work fine. (2)
+`models.load_embedder()` is an idempotent in-process cache — the first real query lazy-loads
+it regardless, so the one-time cold-start cost is paid during the first query whether or not
+bootstrap pre-warmed it; moving it out adds ZERO steady-state latency. (3) The dance's only
+durable effect was an empty schema, which `weaviate_client.ensure_collection()` already
+creates directly. Fix: replaced the whole block with `ensure_collection(client, name)`;
+removed the `example_data/test.pdf` resolution, `load_embedder()` warmup, iterator check,
+`delete_many`, the `collections.use`/`get` version-fallback, and the now-unused `Filter`
+import. The e2e test (`test_weaviate_bootstrap_missing_collection_e2e`) assertions
+(collection exists + empty) are unchanged; only its docstring/comment were updated.
 
 ---
 
