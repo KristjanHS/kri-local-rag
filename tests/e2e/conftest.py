@@ -24,15 +24,16 @@ logger = logging.getLogger(__name__)
 _DIAGNOSTIC_SERVICES = ("app", "weaviate", "ollama")
 _DIAGNOSTIC_LOG_TAIL = 200
 
-# docker-compose.yml + the run-id pointer written by `make test-up` (scripts/dev/test-env.sh).
+# docker-compose.yml + the fixed test project name used by `make test-up`
+# (scripts/dev/test-env.sh). Keep in sync with PROJECT_NAME there.
 _COMPOSE_FILE = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
-_RUN_ID_FILE = Path(__file__).resolve().parents[2] / ".run_id"
+_TEST_PROJECT_NAME = os.environ.get("COMPOSE_PROJECT_NAME") or "kri-local-rag-test"
 
 
 class ComposeContext(NamedTuple):
     """Which docker compose stack the e2e fixtures should drive.
 
-    `make test-up` runs the stack under a run-id project (from ``.run_id``) with the
+    `make test-up` runs the stack under a fixed project (``kri-local-rag-test``) with the
     ``test`` profile and an ``app-test`` service; the default project (``app`` service,
     no profile) is what `make stack-up` uses. e2e fixtures must REUSE an already-running
     test stack — starting a second default-project stack spawns a conflicting Weaviate
@@ -59,9 +60,9 @@ def _resolve_compose_context() -> ComposeContext:
 
     Cache lifetime is the process (the `lru_cache`), which for pytest equals the
     session — the active stack is treated as fixed for the run, so a mid-run stack
-    change is intentionally invisible. Never raises: any docker/`.run_id` error
-    falls back to the default-project context so the fixtures' own health checks
-    decide skip-vs-run.
+    change is intentionally invisible. Never raises: any docker error falls back to
+    the default-project context so the fixtures' own health checks decide
+    skip-vs-run.
     """
     default = ComposeContext(
         project=None,
@@ -69,18 +70,12 @@ def _resolve_compose_context() -> ComposeContext:
         app_service="app",
         diagnostic_services=_DIAGNOSTIC_SERVICES,
     )
-    try:
-        run_id = _RUN_ID_FILE.read_text().strip()
-    except OSError:
-        return default
-    if not run_id:
-        return default
 
     test_base = ["docker", "compose", "-f", _COMPOSE_FILE, "--profile", "test"]
     try:
         ps = subprocess.run(
             test_base + ["ps", "-q", "app-test"],
-            env=_compose_env(run_id),
+            env=_compose_env(_TEST_PROJECT_NAME),
             capture_output=True,
             text=True,
             check=False,
@@ -92,7 +87,7 @@ def _resolve_compose_context() -> ComposeContext:
         return default
 
     return ComposeContext(
-        project=run_id,
+        project=_TEST_PROJECT_NAME,
         base=test_base,
         app_service="app-test",
         diagnostic_services=("app-test", "weaviate", "ollama"),

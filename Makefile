@@ -194,14 +194,14 @@ test-down: ## Stop docker test env if running (preserves volumes; use test-clean
 test-logs: ## Show docker test env logs
 	bash scripts/dev/test-env.sh logs
 
-# Run integration tests inside the app container using existing .run_id
+# Run integration tests inside the app container of the fixed-name test stack
 test-integration: ## Run integration tests inside docker test env
 	bash scripts/dev/test-env.sh run-integration
 
-test-e2e: ## Run E2E tests on host against docker test env using existing .run_id
+test-e2e: ## Run E2E tests on host against the fixed-name docker test stack
 	bash scripts/dev/test-env.sh run-e2e
 
-test-clean: ## Remove test env volumes and run/build metadata
+test-clean: ## Remove test env volumes and build metadata
 	bash scripts/dev/test-env.sh clean
 
 # =========================

@@ -92,9 +92,6 @@ third_party/
 secrets/
 secrets.*
 
-# Ignore the temporary run ID file used by the Makefile
-.run_id
-
 # requirements.txt is a derived artifact (uv export from uv.lock); not committed.
 # Regenerate with `make export-reqs`. Source of truth: pyproject.toml + uv.lock.
 requirements.txt
