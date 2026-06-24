@@ -16,21 +16,10 @@ LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 _logging_configured = False
 
 
-def _setup_logging():
-    """Configure the root logger. This should only be called once."""
-    global _logging_configured
-    if _logging_configured:
-        return
-
-    # Determine log level from environment
-    try:
-        log_level = getattr(logging, LOG_LEVEL)
-    except AttributeError:
-        log_level = logging.INFO
-
-    # Console handler: Rich for TTY, plain StreamHandler otherwise
+def _make_console_handler(log_level: int) -> logging.Handler:
+    """Rich handler for a TTY, plain stderr StreamHandler otherwise."""
     if sys.stderr.isatty():
-        console_handler = RichHandler(
+        console_handler: logging.Handler = RichHandler(
             show_time=False,
             show_path=False,
             rich_tracebacks=True,
@@ -42,43 +31,45 @@ def _setup_logging():
         console_handler = logging.StreamHandler(stream=sys.stderr)
         console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
     console_handler.setLevel(log_level)
+    return console_handler
 
-    # Root logger configuration
-    root_logger = logging.getLogger()
-    root_logger.setLevel(log_level)
-    root_logger.addHandler(console_handler)
 
-    # Optional file logging only when APP_LOG_DIR is explicitly provided
+def _attach_file_handler(root_logger: logging.Logger, log_level: int) -> None:
+    """Add a midnight-rotating file handler when APP_LOG_DIR is set (best-effort)."""
     app_log_dir = os.getenv("APP_LOG_DIR")
-    if app_log_dir:
+    if not app_log_dir:
+        return
+    try:
+        log_dir_path = Path(app_log_dir)
+        log_dir_path.mkdir(parents=True, exist_ok=True)
+        # Rotating file handler: rotate at midnight, keep limited backups
+        backup_count_str = os.getenv("APP_LOG_BACKUP_COUNT", "5").strip()
         try:
-            log_dir_path = Path(app_log_dir)
-            log_dir_path.mkdir(parents=True, exist_ok=True)
-            # Rotating file handler: rotate at midnight, keep limited backups
-            backup_count_str = os.getenv("APP_LOG_BACKUP_COUNT", "5").strip()
-            try:
-                backup_count = max(0, int(backup_count_str))
-            except ValueError:
-                backup_count = 5
-                logging.warning(
-                    "Invalid value for APP_LOG_BACKUP_COUNT: '%s'. Defaulting to 5.",
-                    backup_count_str,
-                )
-
-            file_handler = TimedRotatingFileHandler(
-                filename=log_dir_path / "rag_system.log",
-                when="midnight",
-                backupCount=backup_count,
-                encoding="utf-8",
-                utc=True,
+            backup_count = max(0, int(backup_count_str))
+        except ValueError:
+            backup_count = 5
+            logging.warning(
+                "Invalid value for APP_LOG_BACKUP_COUNT: '%s'. Defaulting to 5.",
+                backup_count_str,
             )
-            file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-            file_handler.setLevel(log_level)
-            root_logger.addHandler(file_handler)
-        except (PermissionError, OSError) as e:
-            # If file logging fails, log a warning and continue with console-only logging
-            logging.warning("Failed to configure file logging to '%s'. Error: %s", app_log_dir, e)
 
+        file_handler = TimedRotatingFileHandler(
+            filename=log_dir_path / "rag_system.log",
+            when="midnight",
+            backupCount=backup_count,
+            encoding="utf-8",
+            utc=True,
+        )
+        file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+        file_handler.setLevel(log_level)
+        root_logger.addHandler(file_handler)
+    except (PermissionError, OSError) as e:
+        # If file logging fails, log a warning and continue with console-only logging
+        logging.warning("Failed to configure file logging to '%s'. Error: %s", app_log_dir, e)
+
+
+def _quiet_noisy_loggers() -> None:
+    """Dial back chatty third-party loggers and route warnings through logging."""
     # Suppress detailed HTTP request logging from httpx while keeping important info
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -94,6 +85,25 @@ def _setup_logging():
 
     # Capture warnings issued by the warnings module (e.g., from library deprecations)
     logging.captureWarnings(True)
+
+
+def _setup_logging():
+    """Configure the root logger. This should only be called once."""
+    global _logging_configured
+    if _logging_configured:
+        return
+
+    # Determine log level from environment
+    try:
+        log_level = getattr(logging, LOG_LEVEL)
+    except AttributeError:
+        log_level = logging.INFO
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+    root_logger.addHandler(_make_console_handler(log_level))
+    _attach_file_handler(root_logger, log_level)
+    _quiet_noisy_loggers()
 
     _logging_configured = True
 
