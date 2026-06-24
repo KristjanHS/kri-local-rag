@@ -30,16 +30,6 @@ def test_check_model_exists_exact_and_prefix():
     assert oc._check_model_exists("z", models) is False
 
 
-def test_detect_model_uses_tags_endpoint(monkeypatch):
-    def fake_get(url, timeout):  # noqa: ARG001
-        assert url.endswith("/api/tags")
-        return DummyResp(200)
-
-    monkeypatch.setattr(httpx, "get", fake_get)
-    model = oc._detect_ollama_model()
-    assert isinstance(model, str) and model
-
-
 def test_generate_response_handles_empty_and_exception(monkeypatch, caplog):
     # Force base url
     monkeypatch.setenv("DOCKER_ENV", "0")
@@ -67,7 +57,7 @@ def test_generate_response_handles_empty_and_exception(monkeypatch, caplog):
 
     monkeypatch.setattr(httpx, "stream", fake_stream)
 
-    text, _ = oc.generate_response("hi", on_token=None, on_debug=None, stop_event=None, context_tokens=64)
+    text, _ = oc.generate_response("hi", on_token=None, stop_event=None, context_tokens=64)
     assert "hello" in text
 
     # Now simulate exception path
@@ -79,45 +69,10 @@ def test_generate_response_handles_empty_and_exception(monkeypatch, caplog):
     caplog.set_level(_logging.ERROR, logger=oc.__name__)
 
     monkeypatch.setattr(httpx, "stream", fake_stream_err)
-    text, _ = oc.generate_response("hi", on_token=None, on_debug=None, stop_event=None, context_tokens=64)
+    text, _ = oc.generate_response("hi", on_token=None, stop_event=None, context_tokens=64)
     assert "Error generating response" in text
     msgs = [rec.getMessage() for rec in caplog.records]
     assert any("Exception in generate_response" in m for m in msgs)
-
-
-def test_ensure_model_available_streams_pull_with_300s_timeout(monkeypatch):
-    seen: dict[str, object] = {"method": None, "url": None, "timeout": None}
-
-    class FakeStream:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):  # noqa: D401, ARG001
-            return False
-
-        def raise_for_status(self):
-            return None
-
-        def iter_lines(self):
-            yield b'{"status": "verifying"}'
-            yield b'{"status": "complete"}'
-
-    def fake_stream(method, url, json, timeout):  # noqa: ARG001
-        seen["method"] = method
-        seen["url"] = url
-        seen["timeout"] = timeout
-        return FakeStream()
-
-    monkeypatch.setenv("DOCKER_ENV", "0")
-    monkeypatch.setattr(httpx, "stream", fake_stream)
-
-    ok = oc.ensure_model_available("some/model:tag")
-    assert ok is True
-
-    seen_url = cast(str, seen["url"])
-    assert seen["method"] == "POST"
-    assert seen_url.endswith("/api/pull")
-    assert seen["timeout"] == 300
 
 
 def test_download_model_with_progress_uses_timeout_in_stream(monkeypatch):

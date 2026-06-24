@@ -1,14 +1,132 @@
 #!/usr/bin/env python3
 """E2E test configuration and fixtures."""
 
+import logging
+import os
 import subprocess
+from functools import lru_cache
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 
 from backend.config import get_service_url
 from backend.weaviate_client import close_weaviate_client, get_weaviate_client
 from tests.conftest import get_integration_config, is_service_healthy
+
+logger = logging.getLogger(__name__)
+
+# When a containerized CLI call fails, dump these services' recent logs so the
+# failure is actionable without a manual `docker compose logs` round-trip
+# (P3 Step 7 — diagnostics & isolation). This e2e-tier conftest already shells
+# out to `docker compose` for the live stack; the dump is on that same path.
+# <!-- external-process-test-gate-override: e2e-tier conftest already drives docker compose -->
+_DIAGNOSTIC_SERVICES = ("app", "weaviate", "ollama")
+_DIAGNOSTIC_LOG_TAIL = 200
+
+# docker-compose.yml + the fixed test project name used by `make test-up`
+# (scripts/dev/test-env.sh). Keep in sync with PROJECT_NAME there.
+_COMPOSE_FILE = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
+_TEST_PROJECT_NAME = os.environ.get("COMPOSE_PROJECT_NAME") or "kri-local-rag-test"
+
+
+class ComposeContext(NamedTuple):
+    """Which docker compose stack the e2e fixtures should drive.
+
+    `make test-up` runs the stack under a fixed project (``kri-local-rag-test``) with the
+    ``test`` profile and an ``app-test`` service; the default project (``app`` service,
+    no profile) is what `make stack-up` uses. e2e fixtures must REUSE an already-running
+    test stack — starting a second default-project stack spawns a conflicting Weaviate
+    that dies on cluster init (``could not init cluster state``) and forces a skip.
+    """
+
+    project: str | None  # COMPOSE_PROJECT_NAME to set (None = compose default)
+    base: list[str]  # `docker compose -f ... [--profile test]`
+    app_service: str  # "app-test" (active test stack) or "app" (default project)
+    diagnostic_services: tuple[str, ...]
+
+
+def _compose_env(project: str | None) -> dict[str, str]:
+    """Process env with COMPOSE_PROJECT_NAME pinned to the target project (if any)."""
+    env = os.environ.copy()
+    if project:
+        env["COMPOSE_PROJECT_NAME"] = project
+    return env
+
+
+@lru_cache(maxsize=1)
+def _resolve_compose_context() -> ComposeContext:
+    """Target a running `make test-up` stack when present; else the default project.
+
+    Cache lifetime is the process (the `lru_cache`), which for pytest equals the
+    session — the active stack is treated as fixed for the run, so a mid-run stack
+    change is intentionally invisible. Never raises: any docker error falls back to
+    the default-project context so the fixtures' own health checks decide
+    skip-vs-run.
+    """
+    default = ComposeContext(
+        project=None,
+        base=["docker", "compose", "-f", _COMPOSE_FILE],
+        app_service="app",
+        diagnostic_services=_DIAGNOSTIC_SERVICES,
+    )
+
+    test_base = ["docker", "compose", "-f", _COMPOSE_FILE, "--profile", "test"]
+    try:
+        ps = subprocess.run(
+            test_base + ["ps", "-q", "app-test"],
+            env=_compose_env(_TEST_PROJECT_NAME),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=15,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return default
+    if ps.returncode != 0 or not ps.stdout.strip():
+        return default
+
+    return ComposeContext(
+        project=_TEST_PROJECT_NAME,
+        base=test_base,
+        app_service="app-test",
+        diagnostic_services=("app-test", "weaviate", "ollama"),
+    )
+
+
+def _dump_container_diagnostics(ctx: ComposeContext, result: subprocess.CompletedProcess[str]) -> None:
+    """Log exit code + recent service logs after a failed containerized CLI run.
+
+    Best-effort: it must never raise (it runs on the failure path and must not
+    mask the original assertion error). Logs are pulled from the same compose
+    project/profile the CLI ran against (``ctx``), not the default project.
+    """
+    logger.error("Containerized CLI exited %s; dumping diagnostics.", result.returncode)
+    if result.stdout:
+        logger.error("CLI stdout (tail):\n%s", result.stdout[-4000:])
+    if result.stderr:
+        logger.error("CLI stderr (tail):\n%s", result.stderr[-4000:])
+    for service in ctx.diagnostic_services:
+        try:
+            logs = subprocess.run(
+                ctx.base + ["logs", "--tail", str(_DIAGNOSTIC_LOG_TAIL), service],
+                env=_compose_env(ctx.project),
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=30,
+            )
+            # Concatenate both streams: `docker compose logs` writes the log
+            # stream to stdout but surfaces its own errors on stderr.
+            combined = f"{logs.stdout}\n{logs.stderr}".strip()
+            logger.error(
+                "--- %s logs (last %d lines) ---\n%s",
+                service,
+                _DIAGNOSTIC_LOG_TAIL,
+                combined,
+            )
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.error("Failed to collect %s logs: %s", service, e)
 
 
 def _detect_environment() -> str:
@@ -157,78 +275,117 @@ def _cleanup_testcollection_after_session():  # type: ignore[no-redef]
         # Best-effort cleanup only; do not fail the test suite on cleanup issues
 
 
-@pytest.fixture(scope="session")
-def weaviate_compose_up():  # type: ignore[no-redef]
-    """Ensure compose Weaviate is up (no app rebuild) for e2e tests needing gRPC.
-
-    Starts only the `weaviate` service using docker-compose. Volumes are preserved
-    and the global teardown is handled by the outer harness if used.
-    Skips tests gracefully if Docker is not available.
-    """
-    # Check if Docker is available
+# <!-- external-process-test-gate-override: e2e compose fixtures drive docker compose by design -->
+def _docker_available_or_skip() -> None:
+    """Skip the test cleanly when the Docker daemon is unreachable."""
     try:
         subprocess.run(["docker", "info"], check=True, capture_output=True, timeout=5)
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
         pytest.skip("Docker is not available or not running")
 
-    compose_file = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
+
+def _ensure_compose_service_up(service_name: str) -> None:
+    """Start one compose service under the *active* project, or skip gracefully.
+
+    Targeting the active project (a running `make test-up` stack when present) is
+    what keeps this from spawning a second, conflicting default-project Weaviate.
+    """
+    _docker_available_or_skip()
+    ctx = _resolve_compose_context()
     try:
-        subprocess.run(["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "weaviate"], check=True)
-    except subprocess.CalledProcessError as e:
-        pytest.skip(f"Failed to start Weaviate container: {e}")
+        subprocess.run(
+            ctx.base + ["up", "-d", "--wait", service_name],
+            env=_compose_env(ctx.project),
+            check=True,
+            timeout=120,  # match `--wait-timeout 120` in scripts/dev/test-env.sh
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        pytest.skip(f"Failed to start {service_name} container: {e}")
+
+
+def _app_service_running(ctx: ComposeContext) -> bool:
+    """True if the resolved compose project already has a running app service."""
+    try:
+        ps = subprocess.run(
+            ctx.base + ["ps", "-q", ctx.app_service],
+            env=_compose_env(ctx.project),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=15,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return False
+    return ps.returncode == 0 and bool(ps.stdout.strip())
+
+
+@pytest.fixture(scope="session")
+def weaviate_compose_up():  # type: ignore[no-redef]
+    """Ensure a healthy Weaviate is reachable for e2e tests needing gRPC.
+
+    Reuse-first: if Weaviate already answers its health check (e.g. a running
+    `make test-up` stack), yield immediately. Otherwise start only the `weaviate`
+    service under the active compose project. Volumes are preserved; teardown is
+    handled by the outer harness. Skips gracefully if Docker is unavailable.
+    """
+    if is_service_healthy("weaviate"):
+        yield
+        return
+    _ensure_compose_service_up("weaviate")
     yield
 
 
 @pytest.fixture(scope="session")
 def ollama_compose_up():  # type: ignore[no-redef]
-    """Ensure compose Ollama is up (no app rebuild) for e2e tests needing real LLM.
+    """Ensure a healthy Ollama is reachable for e2e tests needing a real LLM.
 
-    Starts only the `ollama` service using docker-compose. Volumes are preserved
-    and global teardown is handled elsewhere.
-    Skips tests gracefully if Docker is not available.
+    Reuse-first: if Ollama already answers its health check, yield immediately;
+    otherwise start only the `ollama` service under the active compose project.
+    Skips gracefully if Docker is unavailable.
     """
-    # Check if Docker is available
-    try:
-        subprocess.run(["docker", "info"], check=True, capture_output=True, timeout=5)
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-        pytest.skip("Docker is not available or not running")
-
-    compose_file = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
-    try:
-        subprocess.run(["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "ollama"], check=True)
-    except subprocess.CalledProcessError as e:
-        pytest.skip(f"Failed to start Ollama container: {e}")
+    if is_service_healthy("ollama"):
+        yield
+        return
+    _ensure_compose_service_up("ollama")
     yield
 
 
 @pytest.fixture(scope="session")
 def app_compose_up(weaviate_compose_up, ollama_compose_up):  # type: ignore[no-redef]
-    """Ensure compose app is up for e2e tests needing the full stack.
+    """Ensure the app container is available for e2e tests needing the full stack.
 
-    Skips tests gracefully if Docker or the required image is not available.
+    Reuse-first: if the active compose project already runs its app service (the
+    `app-test` container from `make test-up`), yield immediately. Otherwise build/
+    start the default-project `app` service, skipping gracefully if Docker or the
+    image is unavailable.
     """
-    # Check if Docker is available
-    try:
-        subprocess.run(["docker", "info"], check=True, capture_output=True, timeout=5)
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-        pytest.skip("Docker is not available or not running")
+    ctx = _resolve_compose_context()
+    if _app_service_running(ctx):
+        yield
+        return
 
-    # Check if the image exists
-    image_name = "kri-local-rag-app:latest"
-    try:
-        subprocess.run(["docker", "image", "inspect", image_name], check=True, capture_output=True)
-    except subprocess.CalledProcessError:
-        pytest.skip(
-            f"Docker image {image_name} not found. Please build it first, e.g., with './scripts/docker/build_app.sh'"
-        )
+    _docker_available_or_skip()
 
-    compose_file = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
+    # <!-- external-process-test-gate-override: e2e app fixture drives docker compose by design -->
+    # The image-existence guard only applies to the default project, which builds
+    # `kri-local-rag-app:latest`. The fixed-name test stack (`kri-local-rag-test`)
+    # uses a different tag (`kri-local-rag-app:test`) built by `make test-up`, so
+    # don't gate it on :latest.
+    if ctx.project is None:
+        image_name = "kri-local-rag-app:latest"
+        try:
+            subprocess.run(["docker", "image", "inspect", image_name], check=True, capture_output=True)
+        except subprocess.CalledProcessError:
+            pytest.skip(f"Docker image {image_name} not found. Build it first: ./scripts/docker/build_app.sh")
+
     try:
         subprocess.run(
-            ["docker", "compose", "-f", compose_file, "up", "-d", "--wait", "app"],
+            ctx.base + ["up", "-d", "--wait", ctx.app_service],
+            env=_compose_env(ctx.project),
             check=True,
+            timeout=120,
         )
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
         pytest.skip(f"Failed to start app container: {e}")
 
     yield
@@ -236,36 +393,38 @@ def app_compose_up(weaviate_compose_up, ollama_compose_up):  # type: ignore[no-r
 
 @pytest.fixture(scope="session")
 def run_cli_in_container(app_compose_up):
+    """Return a callable that runs ``python -m backend.qa_loop <args>`` in the app container.
+
+    Targets whichever compose project is active — the running `make test-up` stack's
+    `app-test` service when present, else the default-project `app` service — so the
+    exec lands in the live stack instead of an unrelated project.
     """
-    Returns a callable that executes a command in the 'app' docker-compose service.
-    Uses the existing app container which can run both Streamlit and CLI commands.
-    """
-    compose_file = str(Path(__file__).resolve().parents[2] / "docker" / "docker-compose.yml")
+    ctx = _resolve_compose_context()
 
     def _run_cli(args: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
-        """
-        Runs a command in the 'app' service using docker compose exec.
-        This leverages the existing app container that can run CLI commands.
+        """Run a CLI command in the app service via ``docker compose exec``.
 
         Args:
-            args: Command-line arguments to pass to the python command.
-            env: Optional dictionary of environment variables to set in the container.
+            args: Command-line arguments appended to ``python -m backend.qa_loop``.
+            env: Optional environment variables to set inside the container.
 
         Returns:
-            A subprocess.CompletedProcess instance with stdout, stderr, and returncode.
+            A subprocess.CompletedProcess with stdout, stderr, and returncode.
         """
-        # Use docker compose exec to run commands in the existing app container
-        base_command = ["docker", "compose", "-f", compose_file, "exec", "-T"]
+        base_command = ctx.base + ["exec", "-T"]
 
-        env_vars = []
+        env_vars: list[str] = []
         if env:
             for key, value in env.items():
                 env_vars.extend(["-e", f"{key}={value}"])
 
-        # The command to run in the app container
-        full_command = base_command + env_vars + ["app", "python", "-m", "backend.qa_loop"] + args
+        full_command = base_command + env_vars + [ctx.app_service, "python", "-m", "backend.qa_loop"] + args
 
-        result = subprocess.run(full_command, capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            full_command, env=_compose_env(ctx.project), capture_output=True, text=True, check=False
+        )
+        if result.returncode != 0:
+            _dump_container_diagnostics(ctx, result)
         return result
 
     return _run_cli

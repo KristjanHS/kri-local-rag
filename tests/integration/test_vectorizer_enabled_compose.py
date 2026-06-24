@@ -12,8 +12,6 @@ from weaviate.classes.config import Configure, DataType, Property
 from backend import retriever
 from tests.integration.conftest import connect_to_weaviate_with_fallback
 
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-
 pytestmark = pytest.mark.requires_weaviate
 
 
@@ -47,7 +45,7 @@ def test_manual_vectorization_uses_local_embedding_compose(tmp_path):
         coll.config.get()
 
         # Load the same embedding model used by the application
-        model = retriever._get_embedding_model(EMBEDDING_MODEL)
+        model = retriever._get_embedding_model()
         if model is None:
             pytest.fail(
                 "Local embedding model unavailable; non-unit tests require the real SentenceTransformer to be present."

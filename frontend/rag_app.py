@@ -19,6 +19,21 @@ MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "50")) * 1024 * 1024
 PDF_MAGIC = b"%PDF-"
 
 
+# --- Test-only hooks -------------------------------------------------------
+# These env vars let CLI/UI e2e tests bypass the real backend. They are read
+# only through the helpers below so the test surface stays explicit and in one
+# place (Tier 2.6 of complexity-cleanup). The backend's own RAG_FAKE_ANSWER
+# bypass lives independently in backend.qa_loop.answer().
+def _fake_answer() -> str | None:
+    """Return the canned answer for fake-mode, or None when the hook is unset/empty."""
+    return os.getenv("RAG_FAKE_ANSWER") or None
+
+
+def _skip_startup_checks() -> bool:
+    """True when startup Weaviate/ingest checks should be bypassed for tests."""
+    return os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes")
+
+
 def _render_answer(placeholder, tokens):
     """Render streamed answer tokens inside a stable Playwright locator.
 
@@ -31,6 +46,37 @@ def _render_answer(placeholder, tokens):
         f"<div data-testid='answer'><h3>Answer</h3><div class='answer-content'>{content}</div></div>",
         unsafe_allow_html=True,
     )
+
+
+class _DebugPanelHandler(logging.Handler):
+    """Feed backend ``logger.debug`` records into the Streamlit debug panel.
+
+    Replaces the old hand-maintained ``on_debug`` callback channel: backend code now emits
+    diagnostics solely via logging, and the UI captures them by attaching this handler around
+    the ``answer()`` call. Restricted to the originating ScriptRunner thread so concurrent
+    sessions don't cross-feed each other's debug lines (mirrors ``_ThreadLogFilter`` below).
+    """
+
+    def __init__(self, thread_id: int, placeholder) -> None:
+        super().__init__(level=logging.DEBUG)
+        self._thread_id = thread_id
+        self._placeholder = placeholder
+        self.setFormatter(logging.Formatter("%(message)s"))
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.thread != self._thread_id:
+            return
+        lines = st.session_state.get("debug_lines")
+        if lines is None:
+            return
+        lines.append(self.format(record))
+        try:
+            self._placeholder.text("\n".join(lines))
+        except Exception:
+            # Placeholder may be unavailable after a rerun; the sidebar expander still
+            # renders the accumulated buffer at the end of the run. handleError writes to
+            # stderr (never via a logger), so it can't re-enter emit().
+            self.handleError(record)
 
 
 st.set_page_config(page_title="RAG Q&A", layout="centered")
@@ -156,12 +202,11 @@ if "init_done" not in st.session_state:
     root_logger = logging.getLogger()
     root_logger.addHandler(capture_handler)
     try:
-        skip_checks = os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes")
-        fake_answer_present = bool(os.getenv("RAG_FAKE_ANSWER"))
+        skip_checks = _skip_startup_checks()
         logger.info(
             "App startup env: RAG_SKIP_STARTUP_CHECKS=%s, RAG_FAKE_ANSWER=%s",
             str(skip_checks),
-            str(fake_answer_present),
+            str(_fake_answer() is not None),
         )
         if skip_checks:
             logger.info("Startup checks skipped via RAG_SKIP_STARTUP_CHECKS")
@@ -196,12 +241,8 @@ if submitted and question.strip():
         # Render with a stable locator for Playwright; content is HTML-escaped (XSS-safe)
         _render_answer(answer_placeholder, answer_tokens)
 
-    def on_debug(msg):
-        st.session_state["debug_lines"].append(msg)
-        debug_placeholder.text("\n".join(st.session_state["debug_lines"]))
-
     # If tests requested a fake answer, render it immediately to satisfy E2E
-    fake_answer = os.getenv("RAG_FAKE_ANSWER")
+    fake_answer = _fake_answer()
     if fake_answer:
         for ch in fake_answer:
             on_token(ch)
@@ -222,15 +263,25 @@ if submitted and question.strip():
                 st.error("CrossEncoder model could not be loaded. Ensure the model is available or try again later.")
                 raise
 
-            answer(
-                question,
-                k=k,
-                on_token=on_token,
-                on_debug=on_debug,
-                stop_event=st.session_state.stop_event,
-                context_tokens=context_tokens,
-                cross_encoder=cross_encoder,
-            )
+            # Route backend diagnostics into the debug panel via logging (replaces on_debug).
+            # Temporarily lower the module logger to DEBUG so its records reach the handler.
+            ollama_logger = logging.getLogger("backend.ollama_client")
+            prev_level = ollama_logger.level
+            ollama_logger.setLevel(logging.DEBUG)
+            debug_handler = _DebugPanelHandler(threading.get_ident(), debug_placeholder)
+            ollama_logger.addHandler(debug_handler)
+            try:
+                answer(
+                    question,
+                    k=k,
+                    on_token=on_token,
+                    stop_event=st.session_state.stop_event,
+                    context_tokens=context_tokens,
+                    cross_encoder=cross_encoder,
+                )
+            finally:
+                ollama_logger.removeHandler(debug_handler)
+                ollama_logger.setLevel(prev_level)
     # After streaming, keep showing the debug info
     debug_placeholder.text("\n".join(st.session_state["debug_lines"]))
 
