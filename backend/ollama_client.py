@@ -12,6 +12,10 @@ from backend.config import OLLAMA_CONTEXT_TOKENS, OLLAMA_MODEL, get_logger, get_
 # Set up logging for this module
 logger = get_logger(__name__)
 
+# Marks high-frequency per-token DEBUG records so the Streamlit debug panel suppresses them
+# (see frontend/rag_app.py ``_DebugPanelHandler``). They still reach file/console log handlers.
+_HIDE_FROM_UI: dict[str, bool] = {"hide_from_ui": True}
+
 
 def _check_model_exists(model_name: str, models: list[dict[str, str]]) -> bool:
     """Check if a model exists in the list of available models."""
@@ -159,12 +163,14 @@ def generate_response(
                     break
                 line_count += 1
                 if not line:
-                    logger.debug("Empty line received, continuing...")
+                    logger.debug("Empty line received, continuing...", extra=_HIDE_FROM_UI)
                     continue
 
                 # Ollama /api/generate streams newline-separated JSON objects.
                 line_str = line.strip()
-                logger.debug("Processing line: %s", line_str[:100])  # Log first 100 chars
+                # Per-token trace: kept at DEBUG for file/console logs but flagged so the
+                # Streamlit debug panel suppresses it (one record per token floods the UI).
+                logger.debug("Processing line: %s", line_str[:100], extra=_HIDE_FROM_UI)
 
                 try:
                     data = json.loads(line_str)
