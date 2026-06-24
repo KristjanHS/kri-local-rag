@@ -7,7 +7,7 @@ import threading
 
 import streamlit as st
 
-from backend.config import OLLAMA_CONTEXT_TOKENS, get_logger
+from backend.config import OLLAMA_CONTEXT_TOKENS, PDF_MAGIC, get_logger
 
 # Set up logging for this module
 logger = get_logger(__name__)
@@ -16,14 +16,14 @@ logger = get_logger(__name__)
 # Overridable via env: MAX_UPLOAD_FILES (count), MAX_UPLOAD_MB (per-file size).
 MAX_UPLOAD_FILES = int(os.getenv("MAX_UPLOAD_FILES", "150"))
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "50")) * 1024 * 1024
-PDF_MAGIC = b"%PDF-"
 
 
 # --- Test-only hooks -------------------------------------------------------
 # These env vars let CLI/UI e2e tests bypass the real backend. They are read
 # only through the helpers below so the test surface stays explicit and in one
-# place (Tier 2.6 of complexity-cleanup). The backend's own RAG_FAKE_ANSWER
-# bypass lives independently in backend.qa_loop.answer().
+# place (Tier 2.6 of complexity-cleanup). The fake-answer bypass is owned by each
+# presentation surface (this frontend + cli.py); backend.qa_loop.answer() no longer
+# carries one (#9 removed it as dead code — surfaces short-circuit before calling it).
 def _fake_answer() -> str | None:
     """Return the canned answer for fake-mode, or None when the hook is unset/empty."""
     return os.getenv("RAG_FAKE_ANSWER") or None
@@ -151,13 +151,11 @@ with st.sidebar.expander("Ingest PDFs"):
                 with st.spinner("Ingesting ..."):
                     # Ingest operates on a directory; use the save directory
                     from backend.config import COLLECTION_NAME
-                    from backend.ingest import (
-                        connect_to_weaviate,
-                        ingest,
-                    )
+                    from backend.ingest import ingest
                     from backend.models import load_embedder
+                    from backend.weaviate_client import get_weaviate_client
 
-                    client = connect_to_weaviate()
+                    client = get_weaviate_client()
                     try:
                         model = load_embedder()
                         ingest(

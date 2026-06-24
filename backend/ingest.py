@@ -49,6 +49,7 @@ from backend.config import (
     CHUNK_SIZE,
     COLLECTION_NAME,
     EMBEDDING_MODEL,
+    PDF_MAGIC,
     WEAVIATE_BATCH_SIZE,
     WEAVIATE_CONCURRENT_REQUESTS,
     get_logger,
@@ -63,7 +64,7 @@ def _is_valid_pdf(path: str) -> bool:
     """Defense-in-depth: confirm a .pdf file actually starts with the PDF magic bytes."""
     try:
         with open(path, "rb") as fh:
-            return fh.read(5) == b"%PDF-"
+            return fh.read(len(PDF_MAGIC)) == PDF_MAGIC
     except OSError:
         return False
 
@@ -151,12 +152,6 @@ def load_and_split_documents(path: str) -> List[Document]:
 from backend.weaviate_client import ensure_collection, get_weaviate_client, reset_collection
 
 
-def connect_to_weaviate() -> weaviate.WeaviateClient:
-    """Deprecated: use backend.weaviate_client.get_weaviate_client instead."""
-    # Maintain backward compatibility for any external scripts
-    return get_weaviate_client()
-
-
 def _safe_created_at(source_path: Optional[str]) -> str:
     """Return ISO timestamp from file mtime if path exists, else current UTC time."""
     try:
@@ -174,9 +169,7 @@ def deterministic_uuid(doc: Document) -> str:
     # Combine the source file basename with a SHA-256 of the content
     # and derive a stable RFC 4122 UUIDv5 from that name.
     content_hash = hashlib.sha256(doc.page_content.encode("utf-8")).hexdigest()
-    # Avoid direct attribute access that Pyright may mark as Unknown
-    meta_for_uuid: dict[str, Any] = getattr(doc, "metadata", {})
-    source: str = "unknown" if (source_val := meta_for_uuid.get("source")) is None else str(source_val)
+    source: str = "unknown" if (source_val := doc.metadata.get("source")) is None else str(source_val)
     source_file = os.path.basename(source)
     name = f"{source_file}:{content_hash}"
     return str(uuid.uuid5(uuid.NAMESPACE_URL, name))
@@ -201,8 +194,7 @@ def process_and_upload_chunks(
         concurrent_requests=WEAVIATE_CONCURRENT_REQUESTS,
     ) as batch:
         for idx, doc in enumerate(docs, start=1):
-            # Avoid direct attribute access that Pyright may mark as Unknown
-            meta: dict[str, Any] = cast(dict[str, Any], getattr(doc, "metadata", {}))
+            meta: dict[str, Any] = doc.metadata
             uuid = deterministic_uuid(doc)
             vector_tensor = model.encode(doc.page_content)
             # Normalize to a plain Python list of floats for the Weaviate client
@@ -220,18 +212,11 @@ def process_and_upload_chunks(
                 "created_at": _safe_created_at(src),
             }
 
-            # This logic remains manual as requested, but uses batching for efficiency
-            # Note: A true "check-then-update" is less efficient in batch.
-            # A more common pattern is to just upsert, which Weaviate handles.
-            # Here we simulate the original logic's intent within the batch context.
             batch.add_object(
                 properties=properties,
                 uuid=uuid,
                 vector=vector,
             )
-            # A full upsert logic would require checking existence first,
-            # which defeats the purpose of batching. Weaviate's batching
-            # with specified UUIDs effectively handles this as an upsert.
 
             # Periodic progress logging (every ~100 chunks or 10 seconds)
             now = time.time()
@@ -291,7 +276,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Create a single Weaviate client instance
-    client = connect_to_weaviate()
+    client = get_weaviate_client()
 
     # Load the embedding model once
     logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")

@@ -1,22 +1,21 @@
-#!/usr/bin/env python3
-"""RAG CLI: Interactive console for Retrieval-Augmented Generation."""
+"""RAG orchestration: answer(), prompt building, cross-encoder re-ranking, and the
+shared Weaviate readiness/bootstrap (also used by the Streamlit frontend).
+
+The CLI entrypoint (argparse, interactive loop, readiness driver) lives in the
+repo-root `cli.py` — this module is no longer invoked directly."""
 
 # External libraries
 from __future__ import annotations
 
 import os
-import sys
 import threading
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple
-
-from rich.rule import Rule
+from typing import Any, Callable, List, Optional, Tuple
 
 # Local .py imports
-from backend.config import OLLAMA_MODEL, get_logger, set_log_level
-from backend.console import console
+from backend.config import OLLAMA_MODEL, get_logger
 from backend.models import load_reranker
-from backend.ollama_client import generate_response, pull_if_missing
+from backend.ollama_client import generate_response
 from backend.retriever import get_top_k
 
 # Set up logging for this module
@@ -25,25 +24,6 @@ logger = get_logger(__name__)
 
 # Constants
 MAX_RETRIES = 3
-
-
-def _setup_cli_logging(log_level: str | None, verbose_count: int, quiet_count: int):
-    """Configure logging based on CLI flags."""
-    if log_level:
-        level = log_level.upper()
-    elif verbose_count >= 2:
-        level = "DEBUG"
-    elif verbose_count == 1:
-        level = "INFO"  # Default, but explicit
-    elif quiet_count >= 1:
-        level = "WARNING"
-    else:
-        # Default to INFO (overridable via LOG_LEVEL) when no flags are provided
-        level = os.getenv("LOG_LEVEL", "INFO").upper()
-
-    # Use the centralized logging configuration
-    set_log_level(level)
-    logger.debug("Log level set to %s", level)
 
 
 # ---------- cross-encoder helpers --------------------------------------------------
@@ -121,28 +101,28 @@ def answer(
     cross_encoder: Optional[Any] = None,
     k: int = 3,
     *,
-    metadata_filter: Optional[Dict[str, Any]] = None,
     on_token: Optional[Callable[[str], None]] = None,
     stop_event: Optional[threading.Event] = None,
     context_tokens: int = 8192,
     collection_name: Optional[str] = None,
 ) -> str:
-    """Return an answer from the LLM using RAG with an optional streaming token callback.
-    Can be interrupted with stop_event.
+    """Return an answer from the LLM using RAG, streaming raw tokens via *on_token*.
+
+    Pure orchestration: retrieve → re-rank → build prompt → generate. All user-facing
+    presentation (the "Answer: " banner, the streaming display, trailing newline) lives
+    in the caller — ``cli.py`` for the CLI, ``frontend/rag_app.py`` for the UI — so this
+    function never touches the console. When *on_token* is supplied, every user-facing
+    string (including the no-context message) is emitted through it. The fake-answer test
+    hook also lives in the presentation layers, not here. Interruptible via *stop_event*.
     """
 
     global _ollama_context
 
-    # Test hook: deterministic fake answer (used by CLI/UI e2e tests)
-    fake_answer = os.getenv("RAG_FAKE_ANSWER")
-    if fake_answer is not None:
-        # Stream tokens if a callback is provided to emulate real-time output
-        if on_token is not None:
-            for ch in fake_answer:
-                if stop_event is not None and stop_event.is_set():
-                    break
-                on_token(ch)
-        return fake_answer
+    # Lazily load the cross-encoder when the caller didn't supply one (e.g. the CLI
+    # entrypoint), so answer() is self-sufficient for the real RAG path. Frontend and
+    # tests pass an explicit cross_encoder, so this branch is CLI-only.
+    if cross_encoder is None:
+        cross_encoder = _get_cross_encoder()
 
     # ---------- 1) Retrieve -----------------------------------------------------
     # Ask vector DB for more than we eventually keep to improve re-ranking quality
@@ -150,21 +130,13 @@ def answer(
     candidates = get_top_k(
         question,
         k=initial_k,
-        metadata_filter=metadata_filter,
         embedding_model=embedding_model,
         collection_name=collection_name,
     )
     if not candidates:
-        # Ensure the CLI emits a message to stdout in one-shot mode as well
         msg = "I found no relevant context to answer that question. The database may be empty. Ingest a PDF first."
-        try:
-            if on_token is None:
-                # Mirror the normal CLI behaviour that prefixes with 'Answer: '
-                console.print(f"Answer: {msg}")
-        except Exception:
-            # Best-effort console output; always return the message regardless.
-            # (Avoids `return` inside `finally`, deprecated in Python 3.14.)
-            logger.debug("Failed to print empty-context answer to console", exc_info=True)
+        if on_token is not None:
+            on_token(msg)
         return msg
 
     # ---------- 2) Re-rank ------------------------------------------------------
@@ -184,31 +156,6 @@ def answer(
     logger.debug("Prompt being sent to Ollama (%d chars, %d chunks)", len(prompt_text), len(context_chunks))
 
     # ---------- 4) Query the LLM -------------------------------------------------
-    # Collect tokens for CLI output
-    collected_tokens: list[str] = []
-    first_token_processed = False
-
-    def cli_on_token(token: str) -> None:
-        nonlocal first_token_processed
-
-        # Trim leading whitespace from the first token only
-        if not first_token_processed:
-            token = token.lstrip()
-            first_token_processed = True
-
-        # Only output if token has content (avoid empty first tokens)
-        if token:
-            collected_tokens.append(token)
-            # Print tokens immediately for better UX
-            console.print(token, end="")
-
-    if on_token is None:
-        on_token = cli_on_token
-
-    # Show "Answer: " before streaming starts (for CLI mode)
-    if on_token is not None:
-        console.print("Answer: ", end="")
-
     logger.debug("About to call generate_response with model=%s context_tokens=%d", OLLAMA_MODEL, context_tokens)
     answer_text, updated_context = generate_response(
         prompt_text,
@@ -219,20 +166,15 @@ def answer(
         context_tokens=context_tokens,
     )
 
-    # Add newline after streaming completes to position cursor properly
-    if on_token is not None:
-        console.print()
-
     # Update context for next interaction
     _ollama_context = updated_context
 
-    # Ensure no leading whitespace in the final answer
+    # Single leading-whitespace trim of the returned text. Display-side trimming of the
+    # first streamed token is the caller's concern (see cli.py._print_streamed_answer).
     return answer_text.lstrip()
 
 
-# ---------- CLI --------------------------------------------------
-import argparse
-
+# ---------- Backend readiness / first-run bootstrap (shared with the Streamlit frontend) ----------
 from weaviate.classes.query import Filter
 
 from backend import config as app_config
@@ -323,126 +265,7 @@ def ensure_weaviate_ready_and_populated():
             logger.debug("Failed to close Weaviate client gracefully: %s", e)
 
 
-def qa_loop(
-    question: str,
-    embedding_model: Any,
-    cross_encoder: Any,
-    k: int = 3,
-    metadata_filter: Optional[Dict[str, Any]] = None,
-):
-    """
-    Perform a single question-answering loop.
-    This function is a refactoring of the original __main__ block to be reusable.
-    """
-    with console.status("[bold green]Checking backend services...", spinner="dots"):
-        ensure_weaviate_ready_and_populated()
-
-        # Ensure the required Ollama model is available locally before accepting questions
-        if not pull_if_missing(OLLAMA_MODEL):
-            logger.error(
-                "Failed to ensure Ollama model %s is available. Check the logs above for details.", OLLAMA_MODEL
-            )
-            sys.exit(1)
-
-    result = answer(
-        question,
-        embedding_model=embedding_model,
-        cross_encoder=cross_encoder,
-        k=k,
-        metadata_filter=metadata_filter,
-    )
-    return result
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Interactive RAG console with optional metadata filtering.")
-    parser.add_argument("--source", help="Filter chunks by source field (e.g. 'pdf')")
-    parser.add_argument("--language", help="Filter chunks by detected language code (e.g. 'en', 'et')")
-    parser.add_argument("--k", type=int, default=3, help="Number of top chunks to keep after re-ranking")
-    parser.add_argument("--question", help="If provided, run a single query and exit.")
-    # Logging controls
-    parser.add_argument(
-        "-q", "--quiet", action="count", default=0, help="Decrease verbosity (can be used multiple times)"
-    )
-    parser.add_argument(
-        "-v", "--verbose", action="count", default=0, help="Increase verbosity (can be used multiple times)"
-    )
-    parser.add_argument("--log-level", help="Set explicit log level (e.g., DEBUG, INFO, WARNING)")
-    args = parser.parse_args()
-
-    # Set up logging as the very first action
-    _setup_cli_logging(log_level=args.log_level, verbose_count=args.verbose, quiet_count=args.quiet)
-
-    # Build metadata filter dict (AND-combination of provided fields)
-    meta_filter: Optional[Dict[str, Any]] = None
-    if args.source or args.language:
-        clauses: list[Dict[str, Any]] = []
-        if args.source:
-            clauses.append({"path": ["source"], "operator": "Equal", "valueText": args.source})
-        if args.language:
-            clauses.append({"path": ["language"], "operator": "Equal", "valueText": args.language})
-
-        if len(clauses) == 1:
-            meta_filter = clauses[0]
-        else:
-            meta_filter = {"operator": "And", "operands": clauses}
-
-    # Load models once (public loader)
-    from backend.models import load_embedder
-
-    embedding_model = load_embedder()
-    cross_encoder = _get_cross_encoder()
-
-    if args.question:
-        try:
-            qa_loop(
-                args.question,
-                embedding_model=embedding_model,
-                cross_encoder=cross_encoder,
-                k=args.k,
-                metadata_filter=meta_filter,
-            )
-        finally:
-            # Ensure Weaviate client connections are closed in one-shot mode
-            try:
-                close_weaviate_client()
-            except Exception as e:
-                logger.debug("Failed to close Weaviate client gracefully: %s", e)
-        sys.exit(0)
-
-    # Interactive loop - show readiness spinners and then the prompt
-    with console.status("[bold green]Verifying backend services...", spinner="dots"):
-        ensure_weaviate_ready_and_populated()
-        if not pull_if_missing(OLLAMA_MODEL):
-            logger.error(
-                "Failed to ensure Ollama model %s is available. Check the logs above for details.", OLLAMA_MODEL
-            )
-            sys.exit(1)
-
-    console.print(Rule(style="blue"))
-    console.print("💬 [bold]RAG CLI Ready.[/] Ask a question to begin.", justify="center")
-    console.print(Rule(style="blue"))
-
-    try:
-        while True:
-            question = console.input("→ ")
-            if not question.strip():
-                continue
-
-            qa_loop(
-                question,
-                embedding_model=embedding_model,
-                cross_encoder=cross_encoder,
-                k=args.k,
-                metadata_filter=meta_filter,
-            )
-            console.print()  # Add a blank line for readability before the next prompt
-
-    except (EOFError, KeyboardInterrupt):
-        console.print("\n[bold]Exiting RAG CLI.[/]")
-    finally:
-        # Ensure Weaviate client is properly closed to prevent resource leaks
-        try:
-            close_weaviate_client()
-        except Exception as e:
-            logger.debug("Failed to close Weaviate client gracefully: %s", e)
+# NOTE: The CLI entrypoint (argparse, interactive loop, readiness driver, sys.exit)
+# now lives in the repo-root `cli.py`. `qa_loop.py` is pure orchestration + the shared
+# readiness/bootstrap above (also imported by the Streamlit frontend). See the A2
+# resolution in docs/plans/2026-06-24-complexity-hotspots-simplification.md.

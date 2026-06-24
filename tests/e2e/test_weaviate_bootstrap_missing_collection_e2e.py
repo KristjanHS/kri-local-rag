@@ -46,11 +46,14 @@ def _collection_has_any_objects(client, collection_name: str) -> bool:
 
 
 def test_bootstrap_creates_missing_collection_and_cleans_example_data(tmp_path, weaviate_compose_up):
-    # We'll target the explicit test collection name and local compose port
+    # Target the explicit test collection. Do NOT hardcode the Weaviate URL: the
+    # client resolves it via get_service_url("weaviate"), which reads the
+    # compose-injected WEAVIATE_URL — "http://weaviate:8080" inside the test
+    # container, "http://localhost:8080" on the host. Overriding it here broke the
+    # hermetic in-container run (`make test-e2e`) with connection refused.
     target_collection = TEST_COLLECTION_NAME
-    weaviate_url = "http://localhost:8080"
 
-    with _env_vars({"WEAVIATE_URL": weaviate_url, "DOCKER_ENV": "", "COLLECTION_NAME": target_collection}):
+    with _env_vars({"COLLECTION_NAME": target_collection}):
         # Connect a client to the compose Weaviate via centralized wrapper
         client = get_weaviate_client()
         try:

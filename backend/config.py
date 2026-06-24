@@ -108,6 +108,20 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
 
+def resolve_cli_log_level(log_level: str | None, verbose_count: int, quiet_count: int) -> str:
+    """Resolve the effective log-level name from CLI flags. Pure: no logging side effects."""
+    if log_level:
+        return log_level.upper()
+    if verbose_count >= 2:
+        return "DEBUG"
+    if verbose_count == 1:
+        return "INFO"  # Default, but explicit
+    if quiet_count >= 1:
+        return "WARNING"
+    # Default to INFO (overridable via LOG_LEVEL) when no flags are provided
+    return os.getenv("LOG_LEVEL", "INFO").upper()
+
+
 def set_log_level(level: str | None) -> None:
     """
     Set the log level for the root logger and console handler.
@@ -159,6 +173,10 @@ def set_log_level(level: str | None) -> None:
 
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "Document")
 
+# Magic bytes every PDF file starts with — single source of truth for the
+# defense-in-depth checks in backend.ingest and the frontend upload handler.
+PDF_MAGIC = b"%PDF-"
+
 # Text splitting parameters
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 100
@@ -198,10 +216,6 @@ def get_service_url(service: str) -> str:
         return os.getenv("WEAVIATE_URL", "http://localhost:8080")
     raise ValueError(f"Unknown service: {service}")
 
-
-# Backwards-compatible constants sourced from the centralized resolver
-OLLAMA_URL = get_service_url("ollama")
-WEAVIATE_URL = get_service_url("weaviate")
 
 # Weaviate batching settings (tune for performance)
 # Larger batches can be faster but use more memory.

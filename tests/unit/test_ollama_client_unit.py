@@ -49,7 +49,8 @@ def test_generate_response_handles_empty_and_exception(monkeypatch, caplog):
             return None
 
         def iter_lines(self):
-            yield 'data: {"response": "hello", "done": true}\n'
+            # Real Ollama /api/generate frame: newline-delimited JSON, no SSE prefix.
+            yield '{"response": "hello", "done": true}\n'
 
     def fake_stream(method, url, json, timeout):  # noqa: ARG001
         assert method == "POST" and url.endswith("/api/generate")
