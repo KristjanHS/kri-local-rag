@@ -65,6 +65,25 @@ def test_load_and_split_documents(tmp_path):
     assert {"doc.pdf", "notes.md"} <= sources
 
 
+def test_load_and_split_documents_explicit_list_ignores_siblings(tmp_path):
+    """A file LIST is processed verbatim — sibling files in the same dir are left untouched.
+
+    Guards the GUI upload path: ingesting the freshly-uploaded PDF must NOT re-process the
+    rest of the data/ corpus sitting alongside it (the bug that made every upload appear to
+    hang by re-embedding thousands of chunks).
+    """
+    fixture_pdf = Path(__file__).resolve().parents[1] / "test_data" / "test.pdf"
+    shutil.copyfile(fixture_pdf, tmp_path / "uploaded.pdf")
+    # Siblings that must NOT be pulled in (bystanders proving selectivity).
+    shutil.copyfile(fixture_pdf, tmp_path / "other.pdf")
+    (tmp_path / "notes.md").write_text("Sibling markdown content. " * 200, encoding="utf-8")
+
+    chunks = load_and_split_documents([str(tmp_path / "uploaded.pdf")])
+
+    sources = {Path(str(d.metadata.get("source", ""))).name for d in chunks}
+    assert sources == {"uploaded.pdf"}
+
+
 def test_deterministic_uuid(mock_docs):
     """Test that the UUID generation is deterministic."""
     # Act

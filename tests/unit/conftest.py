@@ -69,9 +69,9 @@ def managed_cross_encoder(mocker):
 @pytest.fixture(autouse=True)
 def reset_embedding_model_cache():
     """Reset the embedding model cache before each test to prevent state leakage."""
-    from backend import retriever
+    from backend import models
 
-    retriever._embedding_model = None
+    models._embedding_model = None
 
 
 # ---------------------------------------------------------------------------

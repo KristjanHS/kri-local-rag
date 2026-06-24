@@ -4,6 +4,7 @@
 import logging
 import os
 import subprocess
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
@@ -359,6 +360,12 @@ def app_compose_up(weaviate_compose_up, ollama_compose_up):  # type: ignore[no-r
     start the default-project `app` service, skipping gracefully if Docker or the
     image is unavailable.
     """
+    # Already inside the compose network (pytest in the app container): there's no
+    # Docker socket and nothing to start — we ARE the app service.
+    if _detect_environment() == "Docker":
+        yield
+        return
+
     ctx = _resolve_compose_context()
     if _app_service_running(ctx):
         yield
@@ -393,36 +400,39 @@ def app_compose_up(weaviate_compose_up, ollama_compose_up):  # type: ignore[no-r
 
 @pytest.fixture(scope="session")
 def run_cli_in_container(app_compose_up):
-    """Return a callable that runs ``python -m backend.qa_loop <args>`` in the app container.
+    """Return a callable that runs ``python cli.py <args>`` in the app container.
 
     Targets whichever compose project is active — the running `make test-up` stack's
     `app-test` service when present, else the default-project `app` service — so the
     exec lands in the live stack instead of an unrelated project.
     """
     ctx = _resolve_compose_context()
+    in_container = _detect_environment() == "Docker"
 
     def _run_cli(args: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
-        """Run a CLI command in the app service via ``docker compose exec``.
+        """Run ``python cli.py <args>`` against the app image.
+
+        Inside the compose network (pytest in the app container) the CLI is invoked
+        directly — we are already running in the app image. On the host it is run via
+        ``docker compose exec`` into the active project's app service.
 
         Args:
-            args: Command-line arguments appended to ``python -m backend.qa_loop``.
-            env: Optional environment variables to set inside the container.
+            args: Command-line arguments appended to ``python cli.py``.
+            env: Optional environment variables to set for the CLI process.
 
         Returns:
             A subprocess.CompletedProcess with stdout, stderr, and returncode.
         """
-        base_command = ctx.base + ["exec", "-T"]
+        if in_container:
+            full_command = [sys.executable, "cli.py", *args]
+            run_env = {**os.environ, **(env or {})}
+        else:
+            env_vars = [token for key, value in (env or {}).items() for token in ("-e", f"{key}={value}")]
+            cli = [ctx.app_service, "python", "cli.py", *args]
+            full_command = ctx.base + ["exec", "-T"] + env_vars + cli
+            run_env = _compose_env(ctx.project)
 
-        env_vars: list[str] = []
-        if env:
-            for key, value in env.items():
-                env_vars.extend(["-e", f"{key}={value}"])
-
-        full_command = base_command + env_vars + [ctx.app_service, "python", "-m", "backend.qa_loop"] + args
-
-        result = subprocess.run(
-            full_command, env=_compose_env(ctx.project), capture_output=True, text=True, check=False
-        )
+        result = subprocess.run(full_command, env=run_env, capture_output=True, text=True, check=False)
         if result.returncode != 0:
             _dump_container_diagnostics(ctx, result)
         return result

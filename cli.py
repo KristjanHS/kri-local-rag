@@ -1,77 +1,119 @@
 #!/usr/bin/env python3
-"""
-Main CLI entry point for the RAG system.
-Follows Python best practices for command-line interfaces.
+"""Root CLI entry point for the RAG system.
+
+This is the single CLI surface for the project: the ``kri-local-rag = cli:main``
+console script, ``python cli.py``, the docker-compose ``/app/cli.py`` mount, and
+``make cli``/``scripts/cli.sh``. It owns argument parsing, log-level resolution,
+backend readiness, and the interactive loop. ``backend.qa_loop`` holds the
+orchestration (``answer``) and the shared readiness bootstrap
+(``ensure_weaviate_ready_and_populated``, also used by the Streamlit frontend).
+
+Heavy imports (``backend.qa_loop``, ``backend.ollama_client``) are deferred until
+needed so startup stays fast — especially in test paths that use fake answers and
+skip readiness checks.
 """
 
-import logging
+from __future__ import annotations
+
+import argparse
 import os
 import sys
 
+from rich.rule import Rule
+
+from backend.config import resolve_cli_log_level, set_log_level
 from backend.console import console, get_logger
 
 logger = get_logger(__name__)
 
 
-# Defer heavy imports (qa_loop, ollama) until needed to keep CLI startup fast,
-# especially in test paths that use fake answers and skip startup checks.
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the CLI argument parser (canonical -v/-q/--log-level surface)."""
+    parser = argparse.ArgumentParser(description="RAG System CLI")
+    parser.add_argument("--question", help="Ask a single question and exit")
+    parser.add_argument("--k", "-k", type=int, default=3, help="Number of context chunks to retrieve (default: 3)")
+    parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity (-v INFO, -vv DEBUG)")
+    parser.add_argument("-q", "--quiet", action="count", default=0, help="Decrease verbosity (-q WARNING)")
+    parser.add_argument("--log-level", help="Explicit log level (DEBUG/INFO/WARNING/ERROR); overrides -v/-q")
+    return parser
 
 
-def main():
-    """Main CLI entry point."""
-    import argparse
+def _flush_stdout() -> None:
+    """Flush stdout promptly so piped/non-tty test environments see output."""
+    try:
+        sys.stdout.flush()
+    except Exception as e:
+        logger.debug("Failed to flush stdout: %s", e)
 
-    parser = argparse.ArgumentParser(
-        description="RAG System CLI",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python cli.py                    # Start interactive mode
-  python cli.py --question "What is AI?"  # Single question
-  python cli.py --debug            # Enable debug logging
-  python cli.py --help             # Show this help
-        """,
+
+def _skip_startup_checks() -> bool:
+    """Whether to bypass slow readiness checks (tests / explicit offline opt-in)."""
+    return (
+        os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes")
+        or os.getenv("PYTEST_CURRENT_TEST") is not None
     )
 
-    parser.add_argument("--question", "-q", help="Ask a single question and exit")
-    parser.add_argument("--debug", "-d", action="store_true", help="Enable debug logging")
-    parser.add_argument("--k", "-k", type=int, default=3, help="Number of context chunks to retrieve (default: 3)")
-    parser.add_argument("--version", "-v", action="version", version="RAG CLI v1.0.0")
 
-    args = parser.parse_args()
+def _print_streamed_answer(question: str, k: int) -> None:
+    """Stream a real answer to the console with the CLI "Answer: " presentation.
 
-    # Set debug logging if requested
-    if args.debug:
-        logging.getLogger().setLevel(logging.DEBUG)
+    Owns the CLI-side presentation that used to live inside ``answer()`` (#8): the
+    "Answer: " banner, trimming leading whitespace off the first streamed token, and the
+    trailing newline. ``backend.qa_loop.answer`` is now pure orchestration and emits raw
+    tokens through this callback.
+    """
+    import backend.qa_loop as qa
+
+    console.print("Answer: ", end="")
+    first_token = True
+
+    def on_token(token: str) -> None:
+        nonlocal first_token
+        # Trim leading whitespace from the first token only (display concern).
+        if first_token:
+            token = token.lstrip()
+            first_token = False
+        # Only output if the token has content (avoids an empty first token).
+        if token:
+            console.print(token, end="")
+
+    qa.answer(question, k=k, on_token=on_token)
+    console.print()  # newline after streaming completes
+
+
+def ensure_backend_ready() -> None:
+    """Block until Weaviate is ready/populated and the Ollama model is available.
+
+    Single readiness door — the formerly-duplicated startup blocks (#22) collapse
+    here. Exits the process with status 1 if the required Ollama model is missing.
+    """
+    import backend.qa_loop as qa
+    from backend.config import OLLAMA_MODEL
+    from backend.ollama_client import pull_if_missing
+
+    with console.status("[bold green]Checking backend services...", spinner="dots"):
+        qa.ensure_weaviate_ready_and_populated()
+        if not pull_if_missing(OLLAMA_MODEL):
+            logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
+            sys.exit(1)
+
+
+def main() -> int:
+    """Main CLI entry point."""
+    args = _build_parser().parse_args()
+    set_log_level(resolve_cli_log_level(args.log_level, args.verbose, args.quiet))
+
+    # Test hooks
+    verbose_test = os.getenv("RAG_VERBOSE_TEST", "0").lower() in ("1", "true", "yes")
+    fake_answer = os.getenv("RAG_FAKE_ANSWER")
 
     try:
-        # Test hooks
-        verbose_test = os.getenv("RAG_VERBOSE_TEST", "0").lower() in ("1", "true", "yes")
-        fake_answer = os.getenv("RAG_FAKE_ANSWER")
-
         if verbose_test:
             console.print("PHASE: startup")
-        # Allow tests or offline runs to skip slow startup checks
-        skip_startup_checks = (
-            os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes")
-            or os.getenv("PYTEST_CURRENT_TEST") is not None
-        )
-
-        if not skip_startup_checks:
-            # Ensure Weaviate is ready
-            import backend.qa_loop as qa
-            from backend.config import OLLAMA_MODEL
-            from backend.ollama_client import pull_if_missing
-
-            qa.ensure_weaviate_ready_and_populated()
-
-            # Ensure the required Ollama model is available
-            if not pull_if_missing(OLLAMA_MODEL):
-                logger.error("Required Ollama model %s is not available. Exiting.", OLLAMA_MODEL)
-                sys.exit(1)
-        else:
-            if verbose_test:
-                console.print("PHASE: startup skipped")
+        if not _skip_startup_checks():
+            ensure_backend_ready()
+        elif verbose_test:
+            console.print("PHASE: startup skipped")
 
         if args.question:
             # Single question mode
@@ -80,82 +122,53 @@ Examples:
             console.print(f"Question: {args.question}")
             console.print("-" * 50)
             if fake_answer is not None:
-                response = fake_answer
-                console.print(f"Answer: {response}")
-                # Ensure output is flushed promptly in test environments
-                try:
-                    sys.stdout.flush()
-                except Exception as e:
-                    logger.debug("Failed to flush stdout: %s", e)
-                return 0
+                console.print(f"Answer: {fake_answer}")
             else:
-                # Real path streams tokens to stdout; no extra final print to avoid duplication
-                import backend.qa_loop as qa
+                # Real path: presentation (banner, first-token trim, newline) owned by cli.py
+                _print_streamed_answer(args.question, args.k)
+            _flush_stdout()
+            return 0
 
-                qa.answer(args.question, k=args.k)
-                try:
-                    sys.stdout.flush()
-                except Exception as e:
-                    logger.debug("Failed to flush stdout: %s", e)
-                return 0
-        else:
-            # Interactive mode
-            if verbose_test:
-                console.print("PHASE: interactive")
-            console.print("RAG System CLI - Interactive Mode")
-            console.print("Type 'quit' or 'exit' to leave")
-            console.print("=" * 50)
+        # Interactive mode
+        if verbose_test:
+            console.print("PHASE: interactive")
+        console.print(Rule(style="blue"))
+        console.print("💬 RAG CLI Ready. Type 'quit' or 'exit' to leave.")
+        console.print(Rule(style="blue"))
 
-            while True:
-                try:
-                    # Use stdout write + flush to support non-tty/piped stdin (avoid print per lint rules)
-                    try:
-                        sys.stdout.write("\nQuestion: ")
-                        sys.stdout.flush()
-                    except Exception as e:
-                        logger.debug("Failed to flush stdout: %s", e)
-                    question = input().strip()
+        while True:
+            try:
+                # stdout write + flush (not print) to support non-tty/piped stdin per lint rules
+                sys.stdout.write("\nQuestion: ")
+                sys.stdout.flush()
+                question = input().strip()
+            except (KeyboardInterrupt, EOFError):
+                console.print("\nGoodbye!")
+                break
 
-                    if question.lower() in ["quit", "exit", "q"]:
-                        console.print("Goodbye!")
-                        break
+            if question.lower() in ("quit", "exit", "q"):
+                console.print("Goodbye!")
+                break
+            if not question:
+                continue
 
-                    if not question:
-                        continue
-
-                    console.print("-" * 30)
-                    if fake_answer is not None:
-                        # Deterministic test path: print fake answer once
-                        console.print(fake_answer)
-                        try:
-                            sys.stdout.flush()
-                        except Exception as e:
-                            logger.debug("Failed to flush stdout: %s", e)
-                    else:
-                        # Real path streams tokens to stdout via qa.answer
-                        import backend.qa_loop as qa
-
-                        qa.answer(question, k=args.k)
-                        try:
-                            sys.stdout.flush()
-                        except Exception as e:
-                            logger.debug("Failed to flush stdout: %s", e)
-                except KeyboardInterrupt:
-                    console.print("\nGoodbye!")
-                    break
-                except EOFError:
-                    console.print("\nGoodbye!")
-                    break
+            console.print("-" * 30)
+            if fake_answer is not None:
+                # Deterministic test path: print fake answer once
+                console.print(fake_answer)
+            else:
+                # Real path: presentation (banner, first-token trim, newline) owned by cli.py
+                _print_streamed_answer(question, args.k)
+            _flush_stdout()
 
         return 0
     except Exception as e:
         from rich.console import Console
 
-        console_stderr = Console(file=sys.stderr)
-        console_stderr.print(f"[bold red]Error:[/] {e}")
+        Console(file=sys.stderr).print(f"[bold red]Error:[/] {e}")
         sys.exit(1)
     finally:
-        # Ensure Weaviate client is properly closed to prevent resource leaks
+        # Ensure the Weaviate client is closed to prevent resource leaks
         try:
             from backend.weaviate_client import close_weaviate_client
 

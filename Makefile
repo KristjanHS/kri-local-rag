@@ -138,7 +138,7 @@ cli: ## Start CLI Q&A (pass ARGS='--question "..."')
 
 # Run CLI inside the app container (bind-mount code; editable in Dev)
 cli-docker: ## Run CLI inside the app container (ARGS='--question "..."')
-	@$(COMPOSE_APP) exec -T app /opt/venv/bin/python -m backend.qa_loop ${ARGS}
+	@$(COMPOSE_APP) exec -T app /opt/venv/bin/python cli.py ${ARGS}
 
 # Convenience: ask a one-off question without passing ARGS
 ask: ## One-off question via CLI (Q='...')
@@ -162,8 +162,13 @@ ollama-pull: ## Pull Ollama model in container (MODEL=...)
 		fi
 	@$(COMPOSE_APP) exec -T ollama ollama pull "$(MODEL)"
 
-# Run E2E tests with automatic stack lifecycle
-e2e: ## Run E2E tests on host; needs kri-local-rag-app:latest (auto-built by `make stack-up`), else tests skip. For fully-automated build+run, use `make test-up && make test-e2e`. Set PRESERVE=0 to stack-down
+# Run E2E tests with automatic stack lifecycle.
+# Coverage: pytest runs ON THE HOST and targets WHICHEVER stack is up via localhost —
+# the live stack (`make stack-up`) OR a running test stack (`make test-up`); with none
+# up it auto-starts the live (default-project) stack. The container-CLI test execs into
+# that stack's app container, so it exercises the packaged image either way.
+# Needs Docker + kri-local-rag-app:latest (else tests skip, they don't fail). Set PRESERVE=0 to stack-down.
+e2e: ## Run E2E on host vs whichever stack is up (live or test); auto-starts the live stack if none. Needs kri-local-rag-app:latest else skips. PRESERVE=0 to stack-down
 	@set -euo pipefail; \
 	EXIT=0; \
 	$(PYTEST) tests/e2e $(PYTEST_BASE) $${PYTEST_ARGS:-} || EXIT=$$?; \
@@ -198,7 +203,11 @@ test-logs: ## Show docker test env logs
 test-integration: ## Run integration tests inside docker test env
 	bash scripts/dev/test-env.sh run-integration
 
-test-e2e: ## Run E2E tests on host against the fixed-name docker test stack
+# Coverage: pytest runs INSIDE the app-test (:test image) container of the fixed-name
+# test stack — hermetic, CI-faithful, ONLY the test stack (never the live one). Requires
+# `make test-up` first (errors if absent). The container-CLI test runs in-process here,
+# since the live image ships without pytest.
+test-e2e: ## Run E2E inside the test stack's app-test container (hermetic, test-only; needs `make test-up`)
 	bash scripts/dev/test-env.sh run-e2e
 
 test-clean: ## Remove test env volumes and build metadata

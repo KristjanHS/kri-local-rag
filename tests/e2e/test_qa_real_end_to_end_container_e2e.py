@@ -13,11 +13,20 @@ def test_e2e_answer_with_real_services_in_container(docker_services_ready, run_c
     # Ask a generic question; retrieval should find some context from example_data
     result = run_cli_in_container(["--question", "Give me a brief summary of the indexed content.", "--k=2"])
 
-    # Simple stable assertions: CLI succeeded and printed a single-line answer prefix first
+    # CLI succeeded and rendered an answer section. The CLI prints a
+    # "Question:\n----\nAnswer: ..." block, so assert the banner is present
+    # rather than at the very start of stdout.
     assert result.returncode == 0
     out = result.stdout.strip()
     assert out, "Expected non-empty CLI output"
-    assert out.startswith("Answer:"), "Expected CLI to prefix output with 'Answer:'"
+    assert "Answer:" in out, "Expected CLI output to contain an 'Answer:' section"
+    # Retrieval must actually find context from the ingested example data. The
+    # empty-DB fallback means the collection was never populated (e.g. the
+    # docker_services_ready ingestion fixture was shadowed) — fail loudly with a
+    # retrieval-specific message instead of a cryptic banner mismatch.
+    assert "I found no relevant context" not in out, (
+        "Retrieval returned no context — the e2e collection was not populated by docker_services_ready"
+    )
     # Ensure no crashes or tracebacks leaked to output
     combined = (result.stdout or "") + "\n" + (result.stderr or "")
     assert "Traceback" not in combined

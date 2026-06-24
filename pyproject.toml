@@ -225,9 +225,6 @@ filterwarnings = [
     "error::DeprecationWarning:frontend",
     "error::PendingDeprecationWarning:backend",
     "error::PendingDeprecationWarning:frontend",
-    # Third-party noise: torch's own internals emit this when sentence-transformers
-    # loads a TorchScript model (one burst per model load). Not actionable here.
-    "ignore:`torch.jit.script_method` is deprecated:DeprecationWarning",
 ]
 
 [tool.deptry]
@@ -254,11 +251,12 @@ weaviate-client = ["weaviate"]  # if you ever install it optional-only
 
 
 [tool.deptry.per_rule_ignores]
-DEP004 = ["numpy"]                                   # optional runtime in vector_utils
+DEP004 = ["numpy"]                                   # required runtime in vector_utils (to_float_list)
 DEP002 = [
     "boto3",                                       # AWS libs pulled in indirectly
     "langdetect",                                  # planned/optional language detection
     "pillow",                                      # transitive (streamlit/langchain), not first-party-imported
+    "torch",                                       # sentence-transformers backend + CPU/GPU wheel split (not imported directly by first-party code)
     "torchvision",                                 # ABI peer of torch (not imported directly by first-party code)
 ]
 

@@ -39,6 +39,10 @@ Any design doc that lands a long ordered step list (≥10 steps, even a single-P
 
 Test deletes go where the prod-code removal lands, not where the topic finishes — late-stage test deletes leave earlier stages pytest-broken.
 
+## Cross-plan conflict check (overlapping campaigns)
+
+When a plan finding targets code a *different* recently-shipped plan rewrote, `git log --oneline -20 -- <file>` the touched symbols BEFORE implementing — a later finding can silently reverse a deliberate earlier decision. Seen: hotspots #7 ("give `answer()` an `on_debug` callback, delete the logging-handler gymnastics") reversed complexity-cleanup Tier 2.3 (`7dac225`), which had *deliberately* removed that callback and rejected `_ThreadLogFilter` removal as out-of-scope. If a finding reverses shipped work, surface the conflict and defer to the user — don't steamroll, don't silently skip.
+
 ## Feature-removal grep
 
 Before finalizing a removal design, sweep `raise.*Error.*"`, `"""` docstrings, and `\.value\s*=\s*"` literals — see `~/.claude/references/pre-ship-sweeps.md` § "Grep user-facing prose when designing a feature removal".
