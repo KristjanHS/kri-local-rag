@@ -192,7 +192,7 @@ with st.sidebar.expander("Ingest PDFs"):
                 from backend.config import COLLECTION_NAME
                 from backend.ingest import ingest
                 from backend.models import load_embedder
-                from backend.weaviate_client import get_weaviate_client
+                from backend.weaviate_client import close_weaviate_client, get_weaviate_client
 
                 # Route backend.ingest progress logs into a live status widget + progress bar.
                 with st.status("Ingesting documents…", expanded=True) as status:
@@ -211,7 +211,10 @@ with st.sidebar.expander("Ingest PDFs"):
                                 embedding_model=model,
                             )
                         finally:
-                            client.close()
+                            # Close AND null the module-level cache (matches qa_loop/cli); a raw
+                            # client.close() would leave the shared cached client dead, breaking
+                            # the next query/ingest, since retriever reuses get_weaviate_client().
+                            close_weaviate_client()
                         progress_bar.progress(1.0, text="Done")
                         status.update(label=f"Ingested {len(saved_paths)} file(s).", state="complete")
                     except Exception as e:
