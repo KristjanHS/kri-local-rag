@@ -251,7 +251,7 @@ weaviate-client = ["weaviate"]  # if you ever install it optional-only
 
 
 [tool.deptry.per_rule_ignores]
-DEP004 = ["numpy"]                                   # optional runtime in vector_utils
+DEP004 = ["numpy"]                                   # required runtime in vector_utils (to_float_list)
 DEP002 = [
     "boto3",                                       # AWS libs pulled in indirectly
     "langdetect",                                  # planned/optional language detection
