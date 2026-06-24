@@ -66,6 +66,10 @@ class _DebugPanelHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         if record.thread != self._thread_id:
             return
+        # Backend tags high-frequency per-token traces (e.g. ``Processing line: …``) with this
+        # flag so they stay in file/console logs but don't flood the user-facing panel.
+        if getattr(record, "hide_from_ui", False):
+            return
         lines = st.session_state.get("debug_lines")
         if lines is None:
             return
