@@ -15,12 +15,13 @@ Suites map to folders (`tests/unit|integration|e2e|ui`; defined in `.claude/rule
 
 ```bash
 make unit                                    # fast, sockets blocked
-make e2e                                     # full stack via Docker Compose
+make e2e                                     # host pytest vs localhost services (see ## E2E tests)
 .venv/bin/python -m pytest tests/ui --no-cov -q   # Playwright/Streamlit
 make pre-push                                # unit bundle; respects SKIP_TESTS=1
 ```
 
 Integration tests need real services — see `## Integration tests` below.
+E2E tests run the full stack two ways — see `## E2E tests` below.
 
 ## Test notifications
 
@@ -55,6 +56,29 @@ make integration PYTEST_ARGS='-m "requires_weaviate"'
 make integration PYTEST_ARGS='-m "requires_ollama"'
 make integration PYTEST_ARGS='-m "requires_weaviate and requires_ollama"'
 ```
+
+## E2E tests
+
+End-to-end tests exercise the real stack (Weaviate + Ollama + the packaged app
+image) and run in **two modes**. Both resolve service URLs through
+`get_service_url`, so the same test code works either way — never hardcode a URL
+in a test.
+
+```bash
+# Mode 1 — host: pytest runs on the host against localhost services.
+make e2e                 # targets whichever stack is up (live OR test); auto-
+                         # starts the live stack if none. PRESERVE=0 to stack-down after.
+
+# Mode 2 — in-container: pytest runs inside the app-test container (hermetic, CI-faithful).
+make test-up && make test-e2e && make test-down
+```
+
+Because the test stack reuses the live host ports (`8080/50051/11434/8501`), the
+two stacks can't run at once — `make e2e` hits `http://localhost:8080`, while
+`make test-e2e` hits the compose hostname `http://weaviate:8080` from inside the
+container (see the URL table under `## Test utilities & service URLs`). `make e2e`
+needs the `kri-local-rag-app:latest` image or it skips; `make test-e2e` needs a
+running test stack (`make test-up`).
 
 ## Test markers
 

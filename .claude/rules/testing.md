@@ -10,7 +10,7 @@ last_verified: 2026-06-23
 - Folder-based suites (see `pyproject.toml` `testpaths`):
   - `tests/unit/` — fast, sockets blocked (`pytest-socket`), parallel via `-n auto` (`pytest-xdist`).
   - `tests/integration/` — one real component, network allowed.
-  - `tests/e2e/` — full stack via Docker Compose.
+  - `tests/e2e/` — full stack, two modes: `make e2e` (host vs localhost) and `make test-e2e` (in the app-test container). URLs resolve via `get_service_url` — never hardcode in a test.
   - `tests/ui/` — Playwright browser tests.
 - Unit tests must do no real network I/O — put network behavior in integration/e2e.
 - Import integration helpers (`get_service_url`, `is_service_healthy`) from `tests/integration/conftest.py` — never reimplement.
