@@ -76,8 +76,8 @@ services:
         INSTALL_EDITABLE: "1"
 
     ports:
-      # Parametrized so the test stack's app-test (which inherits this via `extends`)
-      # lands on a distinct host port instead of colliding with the live app on 8501.
+      # app-test inherits this via `extends` but overrides with `ports: []`, so it
+      # publishes nothing and never collides with the live app on 8501.
       - "8501:8501"
     volumes:
       - ../backend:/app/backend # Live backend code (for editable runtime package in Dev)
