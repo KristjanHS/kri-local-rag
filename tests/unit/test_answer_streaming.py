@@ -1,37 +1,33 @@
-import logging as _logging
 from unittest.mock import MagicMock, patch
-
 
 import backend.qa_loop as qa_loop
 
 
-def test_answer_streaming_output_integration(capsys, caplog):
-    """Integration test that ensures answer() streams tokens to stdout.
+def test_answer_streams_raw_tokens_and_returns_trimmed():
+    """answer() forwards raw tokens to on_token and returns the leading-trimmed full text.
 
-    Uses patched retriever and generator but exercises the public answer flow.
+    Presentation (the 'Answer: ' banner, first-token trim, console printing) moved to the
+    caller in #8; this pins answer()'s pure streaming contract: raw tokens out, one trim of
+    the returned string.
     """
     mock_get_top_k = MagicMock(return_value=["Some context."])
 
     def mock_streamer(prompt, model, context, on_token, **kwargs):
-        on_token("Hello")
+        # Leading whitespace is preserved in the stream; trimming is a display concern.
+        on_token("  Hello")
         on_token(" World")
-        return "Hello World", None
-
-    mock_generate_response = MagicMock(side_effect=mock_streamer)
-
-    caplog.set_level(_logging.ERROR, logger="backend.qa_loop")
+        return "  Hello World", None
 
     # Mock the reranker: the real model can't load under the unit tier's socket block.
     cross_encoder = MagicMock()
     cross_encoder.predict.side_effect = lambda pairs: [1.0] * len(pairs)
+
+    streamed: list[str] = []
     with (
         patch("backend.qa_loop.get_top_k", mock_get_top_k),
-        patch("backend.qa_loop.generate_response", mock_generate_response),
+        patch("backend.qa_loop.generate_response", MagicMock(side_effect=mock_streamer)),
     ):
-        qa_loop.answer(
-            "test question",
-            cross_encoder=cross_encoder,
-        )
-    captured = capsys.readouterr()
-    # The output may contain logging messages, so we check for the expected answer
-    assert "Answer: Hello World" in captured.out
+        result = qa_loop.answer("test question", cross_encoder=cross_encoder, on_token=streamed.append)
+
+    assert streamed == ["  Hello", " World"]
+    assert result == "Hello World"

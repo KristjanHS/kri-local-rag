@@ -49,7 +49,8 @@ def test_generate_response_handles_empty_and_exception(monkeypatch, caplog):
             return None
 
         def iter_lines(self):
-            yield 'data: {"response": "hello", "done": true}\n'
+            # Real Ollama /api/generate frame: newline-delimited JSON, no SSE prefix.
+            yield '{"response": "hello", "done": true}\n'
 
     def fake_stream(method, url, json, timeout):  # noqa: ARG001
         assert method == "POST" and url.endswith("/api/generate")
@@ -73,6 +74,36 @@ def test_generate_response_handles_empty_and_exception(monkeypatch, caplog):
     assert "Error generating response" in text
     msgs = [rec.getMessage() for rec in caplog.records]
     assert any("Exception in generate_response" in m for m in msgs)
+
+
+def test_generate_response_on_debug_feeds_panel_but_suppresses_per_token(monkeypatch):
+    """on_debug receives user-facing diagnostics but NOT the per-token traces (ui=False)."""
+    monkeypatch.setenv("DOCKER_ENV", "0")
+
+    class StreamResp:
+        status_code = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):  # noqa: ARG002
+            return False
+
+        def raise_for_status(self):
+            return None
+
+        def iter_lines(self):
+            yield '{"response": "hi", "done": true}\n'
+
+    monkeypatch.setattr(httpx, "stream", lambda *a, **k: StreamResp())
+
+    lines: list[str] = []
+    text, _ = oc.generate_response("hi", on_debug=lines.append, stop_event=None, context_tokens=64)
+    assert "hi" in text
+    # Kept: a user-facing diagnostic reaches the panel.
+    assert any("Received 'done' flag" in ln for ln in lines)
+    # Bystander/selectivity: per-token traces are flagged ui=False and must NOT reach the panel.
+    assert not any(ln.startswith("Processing line:") for ln in lines)
 
 
 def test_download_model_with_progress_uses_timeout_in_stream(monkeypatch):

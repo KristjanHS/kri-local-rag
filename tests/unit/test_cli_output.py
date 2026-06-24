@@ -6,8 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.config import set_log_level
-from backend.qa_loop import _setup_cli_logging
+from backend.config import resolve_cli_log_level, set_log_level
 
 
 @pytest.fixture(autouse=True)
@@ -45,12 +44,8 @@ def reset_logging_state():
         os.environ["LOG_LEVEL"] = original_log_level_env
 
 
-def test_cli_logging_setup_with_different_flags():
-    """Test that CLI logging setup correctly interprets different flag combinations."""
-    import logging
-
-    logger = logging.getLogger(__name__)
-
+def test_resolve_cli_log_level_with_different_flags():
+    """Test that the CLI flag resolver returns the right level name for each combination."""
     test_cases = [
         # (log_level, verbose_count, quiet_count, expected_level)
         (None, 0, 0, "INFO"),  # Default
@@ -63,34 +58,15 @@ def test_cli_logging_setup_with_different_flags():
     ]
 
     for log_level, verbose_count, quiet_count, expected_level in test_cases:
-        # Set up logging
-        _setup_cli_logging(log_level, verbose_count, quiet_count)
-
-        # Verify the level was set correctly
-        root_logger = logging.getLogger()
-        expected_logging_level = getattr(logging, expected_level)
-
-        logger.debug(
-            "Testing flags: log_level=%s, verbose=%d, quiet=%d. Expected: %s, Got: %s",
-            log_level,
-            verbose_count,
-            quiet_count,
-            expected_level,
-            logging.getLevelName(root_logger.level),
-        )
-
-        assert root_logger.level == expected_logging_level, (
+        assert resolve_cli_log_level(log_level, verbose_count, quiet_count) == expected_level, (
             f"Expected {expected_level} for flags: log_level={log_level}, verbose={verbose_count}, quiet={quiet_count}"
         )
 
 
-def test_cli_logging_setup_with_environment_variable():
-    """Test that CLI logging setup respects the LOG_LEVEL environment variable."""
+def test_resolve_cli_log_level_with_environment_variable():
+    """Test that the resolver respects the LOG_LEVEL environment variable when no flags are set."""
     with patch.dict("os.environ", {"LOG_LEVEL": "WARNING"}):
-        _setup_cli_logging(None, 0, 0)
-
-        root_logger = logging.getLogger()
-        assert root_logger.level == logging.WARNING
+        assert resolve_cli_log_level(None, 0, 0) == "WARNING"
 
 
 def test_set_log_level_function():
