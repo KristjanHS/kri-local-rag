@@ -313,8 +313,8 @@ code from `qa_loop`, so it does not collide with the A2 split.
    anyway (no Weaviate vectorizer configured), so deleting it is strictly safe.
 5. **A2 split first**, then **#6, #8, #9, #22 fall out** of it. **#7** (Streamlit logging) is
    independent structural work — slot alongside.
-6. **Remainder (resolved 2026-06-24 — see D7):** #15/#24 shipped; #17 keep; #23/A3 declined;
-   **#7+#10 deferred to a USER DECISION** (reverses shipped Tier 2.3). (**#12 shipped 2026-06-24** —
+6. **Remainder (resolved 2026-06-24 — see D7/D8):** #15/#24 shipped; #17 keep; #23/A3 declined;
+   **#7+#10 shipped 2026-06-24 — see D8** (reversed Tier 2.3 via the bridge form). (**#12 shipped 2026-06-24** —
    see table; surfaced while investigating the `torch.jit.script_method` 3.14 deprecation warning,
    whose sole trigger was this dead `torch.compile` call.)
 
@@ -365,16 +365,46 @@ senior-architect verdict (no re-architecture buys 2x; module reorg explicitly ru
   `_setup_logging` is private and now decomposed by #24). Splitting logging into its own module
   would touch all 9 importers to move clean code around — net churn, no complexity cut.
 
-**Still owed — USER DECISION (not actioned, per plan-hygiene cross-plan-conflict rule):**
-- **#7 (Streamlit logging → `on_debug` callback) + #10 (per-token/line debug spam).** #7 REVERSES
-  shipped complexity-cleanup Tier 2.3 (`7dac225`), which *deliberately* removed the `on_debug`
-  param and replaced it with the `_DebugPanelHandler` logging design. #10 shares the same
-  `ollama_client` debug-stream surface, so they resolve together. Decision owed: reverse 2.3
-  (adopt the callback, accept backend re-threading) **or** keep the shipped handler design and
-  mark #7/#10 superseded. Until the user decides, neither is touched.
+### D8 — #7 + #10 resolved 2026-06-24: REVERSE Tier 2.3 via the *bridge* form (user decision)
 
-With #7/#10 deferred to the user, this is the **last automated batch** — the rest of the
-24-finding catalogue is shipped or explicitly declined.
+The binary framing (reverse-and-re-thread **vs** keep-the-handler) hid a dominating third
+option, and that's what shipped. Tier 2.3 and #7 each objected to a *different* cost, and
+neither cost is inherent to its design:
+- **Tier 2.3's** objection was **duplication** — 18× `logger.debug(x); if on_debug: on_debug(x)`.
+  That's the *naïve* callback form, not callbacks as such.
+- **#7's** objection was **logging gymnastics + a layering violation** — `_DebugPanelHandler` +
+  the process-wide `backend.ollama_client` DEBUG level-flip (deliberately never restored) +
+  the frontend reaching into a backend logger *by string name*. That machinery exists only
+  because a logging `Handler` can't see DEBUG records unless the logger's level is lowered — a
+  constraint a *direct* callback doesn't have.
+
+**Shipped fix:** a single bridge helper `_emit(msg, *args, level=DEBUG, ui=True)` inside
+`generate_response` (`ollama_client.py`). It calls `logger.log(level, …)` for every line
+(file/console broadcast unchanged for ALL consumers — CLI included) and, when `on_debug` is
+supplied, pushes the formatted string to the callback directly. `on_debug` is threaded
+`rag_app → answer() → generate_response()` (two optional params, one line each).
+- **Satisfies Tier 2.3:** the 18 duplicated `if on_debug:` blocks become one helper — no
+  duplication reintroduced.
+- **Captures #7's win:** deletes `_DebugPanelHandler`, the level-flip, the by-name logger
+  reach, and the per-session thread filter (a direct callback closes over its own buffer, so
+  concurrent sessions can't cross-feed). Net ~60 lines deleted from the frontend.
+- **Resolves #10 for free:** per-token traces pass `ui=False`, replacing the `_HIDE_FROM_UI`
+  record-attribute coupling (deleted) — the panel never sees per-token spam.
+- **Scope refinement:** the init-log StringIO/root-logger capture (`rag_app.py`, "Backend init
+  logs") is left intact. #7's write-up lumped it in, but it's a different pattern (one-shot,
+  root logger, no hot loop, no duplication) and re-threading a callback through the whole
+  Weaviate-readiness path would be high-cost/no-payoff. The reversal is scoped to the
+  `answer()` debug-panel path only.
+- **Coverage:** added `test_generate_response_on_debug_feeds_panel_but_suppresses_per_token`
+  (kept-line + suppressed-line bystander assertions), closing the manual-verification gap
+  `7dac225` had flagged for the panel feed.
+
+This is **not** a wholesale revert of 2.3 — it preserves exactly what 2.3 protected (single
+diagnostic definition for file/console; no per-callsite duplication) while removing the dead
+weight #7 correctly identified.
+
+With #7/#10 resolved, this **closes** the 24-finding catalogue — the rest is shipped or
+explicitly declined.
 
 **RESOLVED 2026-06-24 (`/impag` batch-7): warmup NOT load-bearing → dropped entirely.**
 Trace: (1) the ingest-then-delete block runs ONLY when the collection is missing (a fresh

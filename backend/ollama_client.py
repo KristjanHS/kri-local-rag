@@ -2,6 +2,7 @@
 """Ollama client utilities for model management and inference."""
 
 import json
+import logging
 from typing import Optional, Callable
 import threading
 
@@ -11,10 +12,6 @@ from backend.config import OLLAMA_CONTEXT_TOKENS, OLLAMA_MODEL, get_logger, get_
 
 # Set up logging for this module
 logger = get_logger(__name__)
-
-# Marks high-frequency per-token DEBUG records so the Streamlit debug panel suppresses them
-# (see frontend/rag_app.py ``_DebugPanelHandler``). They still reach file/console log handlers.
-_HIDE_FROM_UI: dict[str, bool] = {"hide_from_ui": True}
 
 
 def _check_model_exists(model_name: str, models: list[dict[str, str]]) -> bool:
@@ -99,22 +96,39 @@ def generate_response(
     model_name: str = OLLAMA_MODEL,
     context: Optional[list[int]] = None,
     on_token: Optional[Callable[[str], None]] = None,
+    on_debug: Optional[Callable[[str], None]] = None,
     stop_event: Optional[threading.Event] = None,
     context_tokens: Optional[int] = 8192,
 ) -> tuple[str, Optional[list[int]]]:
     """Generate a response from Ollama for the given prompt, optionally streaming tokens via a callback.
 
-    Diagnostic progress is emitted via ``logger.debug``; the Streamlit UI surfaces it by attaching a
-    logging handler to this module's logger (see ``frontend/rag_app.py``). Can be interrupted with stop_event.
+    Diagnostic progress is emitted via ``logger`` for file/console handlers. When *on_debug* is
+    supplied (the Streamlit UI passes it), each user-facing diagnostic is also pushed to that
+    callback directly — a single bridge (``_emit``) replaces the old hand-maintained parallel
+    ``if on_debug: on_debug(x)`` blocks. Can be interrupted with stop_event.
     """
     import sys
+
+    def _emit(msg: str, *args: object, level: int = logging.DEBUG, ui: bool = True) -> None:
+        """Send one diagnostic to the logger and, when *ui* and *on_debug* are set, the debug panel.
+
+        Per-token traces pass ``ui=False`` so they stay in file/console logs but don't flood the panel.
+        """
+        logger.log(level, msg, *args)
+        if on_debug is not None and ui:
+            try:
+                on_debug(msg % args if args else msg)
+            except TypeError:
+                # Mirror stdlib logging: a format-spec/arg mismatch must not escalate a
+                # diagnostic into a generation failure. Fall back to the raw template.
+                on_debug(msg)
 
     if context_tokens is None:
         context_tokens = OLLAMA_CONTEXT_TOKENS
 
     base_url = get_service_url("ollama")
     url = f"{base_url.rstrip('/')}/api/generate"
-    logger.debug("generate_response: base_url=%s url=%s", base_url, url)
+    _emit("generate_response: base_url=%s url=%s", base_url, url)
 
     payload: dict[str, object] = {
         "model": model_name,
@@ -125,63 +139,64 @@ def generate_response(
     if context is not None:
         payload["context"] = context
 
-    logger.debug("Calling Ollama at: %s", url)
-    logger.debug("Model: %s", model_name)
-    logger.debug("Ollama context window: %d tokens", context_tokens)
-    logger.debug("Prompt length: %d characters", len(prompt))
-    logger.debug("Context provided: %s", context is not None)
+    _emit("Calling Ollama at: %s", url)
+    _emit("Model: %s", model_name)
+    _emit("Ollama context window: %d tokens", context_tokens)
+    _emit("Prompt length: %d characters", len(prompt))
+    _emit("Context provided: %s", context is not None)
     approx_tokens = len(prompt) // 4
     if approx_tokens > context_tokens:
-        logger.warning(
+        _emit(
             "WARNING: Prompt is estimated at %d tokens, which exceeds the context window (%d). "
             "Ollama will truncate the prompt and you may lose context.",
             approx_tokens,
             context_tokens,
+            level=logging.WARNING,
         )
     elif approx_tokens > context_tokens * 0.9:
-        logger.debug(
+        _emit(
             "NOTE: Prompt is estimated at %d tokens, which is close to the context window (%d).",
             approx_tokens,
             context_tokens,
         )
 
     try:
-        logger.debug("Making HTTP request to Ollama...")
-        logger.debug("httpx.stream POST timeout=300 json_keys=%s", list(payload.keys()))
+        _emit("Making HTTP request to Ollama...")
+        _emit("httpx.stream POST timeout=300 json_keys=%s", list(payload.keys()))
         with httpx.stream("POST", url, json=payload, timeout=300) as resp:  # 5 minute timeout
-            logger.debug("Response status: %d", resp.status_code)
+            _emit("Response status: %d", resp.status_code)
 
             response_text = ""
             updated_context = context
             line_count = 0
             first_token = True
 
-            logger.debug("Waiting for Ollama to start streaming response...")
+            _emit("Waiting for Ollama to start streaming response...")
             for line in resp.iter_lines():
                 if stop_event is not None and stop_event.is_set():
-                    logger.debug("Stop event set, aborting stream.")
+                    _emit("Stop event set, aborting stream.")
                     break
                 line_count += 1
                 if not line:
-                    logger.debug("Empty line received, continuing...", extra=_HIDE_FROM_UI)
+                    _emit("Empty line received, continuing...", ui=False)
                     continue
 
                 # Ollama /api/generate streams newline-separated JSON objects.
                 line_str = line.strip()
-                # Per-token trace: kept at DEBUG for file/console logs but flagged so the
-                # Streamlit debug panel suppresses it (one record per token floods the UI).
-                logger.debug("Processing line: %s", line_str[:100], extra=_HIDE_FROM_UI)
+                # Per-token trace: kept in file/console logs but suppressed from the UI panel
+                # (ui=False) since one record per token would flood it.
+                _emit("Processing line: %s", line_str[:100], ui=False)
 
                 try:
                     data = json.loads(line_str)
                 except json.JSONDecodeError as e:
-                    logger.debug("Failed to parse JSON: %s... Error: %s", line_str[:50], e)
+                    _emit("Failed to parse JSON: %s... Error: %s", line_str[:50], e)
                     continue
 
                 token_str = data.get("response", "")
 
                 if first_token and token_str:
-                    logger.debug("Ollama started streaming tokens...")
+                    _emit("Ollama started streaming tokens...")
                     first_token = False
 
                 response_text += token_str
@@ -193,18 +208,18 @@ def generate_response(
 
                 # Capture the conversation context if provided with the final chunk.
                 if data.get("done"):
-                    logger.debug("Received 'done' flag")
+                    _emit("Received 'done' flag")
                     updated_context = data.get("context", context)
                     break
 
-            logger.debug("Processed %d lines from response", line_count)
+            _emit("Processed %d lines from response", line_count)
 
             # Validate response
             if not response_text.strip():
-                logger.warning("Received empty response from Ollama")
+                _emit("Received empty response from Ollama", level=logging.WARNING)
                 return "(No response generated)", updated_context
 
             return response_text, updated_context
     except Exception as e:
-        logger.error("Exception in generate_response: %s", e)
+        _emit("Exception in generate_response: %s", e, level=logging.ERROR)
         return f"[Error generating response: {e}]", context
