@@ -188,7 +188,7 @@ test-up: ## Start docker test env; use FORCE=1 to rebuild
 test-up-force-build: ## Alias for test-up with FORCE=1
 	bash scripts/dev/test-env.sh up --force
 
-test-down: ## Stop docker test env if running
+test-down: ## Stop docker test env if running (preserves volumes; use test-clean to remove them)
 	bash scripts/dev/test-env.sh down
 
 test-logs: ## Show docker test env logs
@@ -201,7 +201,7 @@ test-integration: ## Run integration tests inside docker test env
 test-e2e: ## Run E2E tests on host against docker test env using existing .run_id
 	bash scripts/dev/test-env.sh run-e2e
 
-test-clean: ## Remove test env run/build metadata
+test-clean: ## Remove test env volumes and run/build metadata
 	bash scripts/dev/test-env.sh clean
 
 # =========================

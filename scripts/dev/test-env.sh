@@ -23,12 +23,12 @@ usage() {
 Usage: $0 <command> [options]
 Commands:
   up [--force|-f]        Start docker test env (rebuild if --force)
-  down                   Stop docker test env and remove volumes
+  down                   Stop docker test env, preserving volumes
   logs [--lines|-n N]    Show logs from app-test/weaviate/ollama
   run-integration        Run integration tests inside app-test container
   run-e2e                Run E2E tests tests inside app-test container
   build-if-needed        Rebuild image if deps changed [--run-id ID]
-  clean                  Remove run/build metadata files
+  clean                  Remove test volumes and run/build metadata
 EOF
 }
 
@@ -115,6 +115,7 @@ cmd_up() {
     esac
   done
 
+  local run_id=""
   if [[ -f "$RUN_ID_FILE" ]]; then
     local existing_id
     existing_id=$(<"$RUN_ID_FILE")
@@ -124,14 +125,18 @@ cmd_up() {
         log "Use 'make test-down' to stop it, or 'make test-logs' to view logs."
         return 0
       fi
+      run_id="$existing_id"
     else
-      warn "Stale RUN_ID file found, cleaning up..."
-      rm -f "$RUN_ID_FILE"
+      # Env stopped but RUN_ID preserved by 'down' — reuse it so preserved
+      # volumes are reattached instead of orphaned.
+      log "Reusing preserved RUN_ID=$existing_id (volumes from previous run)."
+      run_id="$existing_id"
     fi
   fi
 
-  local run_id
-  run_id=$(date +%s)
+  if [[ -z "$run_id" ]]; then
+    run_id=$(date +%s)
+  fi
   write_run_id "$run_id"
 
   if (( force == 1 )); then
@@ -148,9 +153,11 @@ cmd_down() {
   if [[ -f "$RUN_ID_FILE" ]]; then
     local run_id
     run_id=$(<"$RUN_ID_FILE")
-    log "Stopping test environment with RUN_ID=$run_id ..."
-    dc "$run_id" down -v
-    rm -f "$RUN_ID_FILE"
+    log "Stopping test environment with RUN_ID=$run_id (preserving volumes) ..."
+    # Plain 'down' keeps named volumes so the next 'up' can reuse them.
+    # Keep the RUN_ID file so 'make test-clean' can still target this project
+    # to remove its volumes.
+    dc "$run_id" down
   else
     log "No active test environment found."
   fi
@@ -214,8 +221,14 @@ cmd_build_if_needed() {
 }
 
 cmd_clean() {
+  if [[ -f "$RUN_ID_FILE" ]]; then
+    local run_id
+    run_id=$(<"$RUN_ID_FILE")
+    log "Removing test environment with RUN_ID=$run_id and its volumes ..."
+    dc "$run_id" down -v
+  fi
   rm -f "$BUILD_HASH_FILE" "$RUN_ID_FILE" || true
-  echo "Test build cache cleaned."
+  echo "Test volumes and build cache cleaned."
 }
 
 main() {
