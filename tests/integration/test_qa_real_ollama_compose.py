@@ -25,7 +25,7 @@ def test_answer_uses_real_ollama_compose(weaviate_client, test_collection_name, 
 
     embedding_model = load_embedder()
     ingest.ingest(
-        directory=sample_documents_path,
+        source=sample_documents_path,
         collection_name=TEST_COLLECTION_NAME,
         weaviate_client=weaviate_client,
         embedding_model=embedding_model,
