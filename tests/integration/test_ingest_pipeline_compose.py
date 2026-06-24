@@ -20,7 +20,7 @@ def test_ingest_pipeline_with_real_weaviate_compose(weaviate_client, sample_docu
 
     embedding_model = load_embedder()
     ingest.ingest(
-        directory=sample_documents_path,
+        source=sample_documents_path,
         collection_name=COLLECTION_NAME,
         weaviate_client=weaviate_client,
         embedding_model=embedding_model,
