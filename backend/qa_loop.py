@@ -177,7 +177,7 @@ def answer(
 # ---------- Backend readiness / first-run bootstrap (shared with the Streamlit frontend) ----------
 from backend import config as app_config
 from backend.config import get_service_url
-from backend.weaviate_client import close_weaviate_client, get_weaviate_client
+from backend.weaviate_client import close_weaviate_client, ensure_collection, get_weaviate_client
 
 
 def ensure_weaviate_ready_and_populated():
@@ -201,8 +201,6 @@ def ensure_weaviate_ready_and_populated():
             # a fresh DB and added zero steady-state benefit. Creating the schema is all the
             # bootstrap owes the user.
             logger.info("   → Collection does not exist. Creating empty collection schema...")
-            from backend.weaviate_client import ensure_collection
-
             ensure_collection(client, collection_name)
             return
 
