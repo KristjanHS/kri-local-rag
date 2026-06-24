@@ -104,7 +104,7 @@ export-reqs: ## Export requirements.txt from uv.lock (omits torch/torchvision)
 # App Runtime
 # =========================
 # Start of full stack (Weaviate, Ollama, App)
-stack-up: ## Build and start app + deps via script
+stack-up: ## Build and start app + deps via script (FORCE=1 to force image rebuild)
 	@./scripts/docker/docker-setup.sh
 
 # Non-interactive: start app stack (weaviate, ollama, app) and wait for health
@@ -188,20 +188,20 @@ test-up: ## Start docker test env; use FORCE=1 to rebuild
 test-up-force-build: ## Alias for test-up with FORCE=1
 	bash scripts/dev/test-env.sh up --force
 
-test-down: ## Stop docker test env if running
+test-down: ## Stop docker test env if running (preserves volumes; use test-clean to remove them)
 	bash scripts/dev/test-env.sh down
 
 test-logs: ## Show docker test env logs
 	bash scripts/dev/test-env.sh logs
 
-# Run integration tests inside the app container using existing .run_id
+# Run integration tests inside the app container of the fixed-name test stack
 test-integration: ## Run integration tests inside docker test env
 	bash scripts/dev/test-env.sh run-integration
 
-test-e2e: ## Run E2E tests on host against docker test env using existing .run_id
+test-e2e: ## Run E2E tests on host against the fixed-name docker test stack
 	bash scripts/dev/test-env.sh run-e2e
 
-test-clean: ## Remove test env run/build metadata
+test-clean: ## Remove test env volumes and build metadata
 	bash scripts/dev/test-env.sh clean
 
 # =========================

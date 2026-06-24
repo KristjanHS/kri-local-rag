@@ -99,7 +99,7 @@ def test_frontend_module_imports_with_stub(monkeypatch) -> None:
 
     # Mock backend initialization to prevent real connections
     with patch("backend.qa_loop.ensure_weaviate_ready_and_populated") as mock_weaviate:
-        with patch("backend.ollama_client.ensure_model_available") as mock_ollama:
+        with patch("backend.ollama_client.pull_if_missing") as mock_ollama:
             # Mock successful initialization
             mock_weaviate.return_value = True
             mock_ollama.return_value = True

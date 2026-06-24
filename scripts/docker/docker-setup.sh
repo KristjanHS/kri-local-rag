@@ -68,6 +68,35 @@ log INFO "Starting $SCRIPT_NAME" | tee -a "$LOG_FILE"
 # Default Ollama model (hardcoded to avoid import issues)
 DEFAULT_OLLAMA_MODEL="cas/mistral-7b-instruct-v0.3"
 
+# --- App image build cache (mirrors scripts/dev/test-env.sh) ---
+# Rebuilding the app image is cheap when cached, but a cached BuildKit rebuild
+# still mints a NEW image ID, which makes `compose up` recreate the app container
+# and re-wait its Streamlit healthcheck (~10s). We therefore gate the rebuild on a
+# hash of its inputs so the warm path stays fast. Set FORCE=1 to rebuild anyway.
+# Derive the app image name from the compose `app` service so a rename there can't
+# silently break the gate (a wrong literal would make `docker image inspect` always
+# miss → rebuild every run). Falls back to the known literal if parsing turns up empty.
+APP_IMAGE=$(awk '/^  [a-zA-Z]/ { in_app = ($1 == "app:") } in_app && $1 == "image:" { print $2; exit }' "$DOCKER_COMPOSE_FILE")
+APP_IMAGE="${APP_IMAGE:-kri-local-rag-app}"
+APP_BUILD_HASH_FILE="${APP_BUILD_HASH_FILE:-.app-build.hash}"
+APP_BUILD_DEPS=(pyproject.toml uv.lock docker/app.Dockerfile docker/docker-compose.yml)
+FORCE_BUILD="${FORCE:-0}"
+
+build_app_if_needed() {
+    local new_hash old_hash=""
+    new_hash=$(sha256sum "${APP_BUILD_DEPS[@]}" | sha256sum | awk '{print $1}')
+    if [ -f "$APP_BUILD_HASH_FILE" ]; then
+        old_hash=$(<"$APP_BUILD_HASH_FILE")
+    fi
+    if [ "$FORCE_BUILD" != "1" ] && [ "$new_hash" = "$old_hash" ] \
+        && docker image inspect "$APP_IMAGE" >/dev/null 2>&1; then
+        log INFO "Build inputs unchanged and image present; skipping app rebuild (FORCE=1 to override)." | tee -a "$LOG_FILE"
+        return 0
+    fi
+    ./scripts/docker/build_app.sh
+    echo "$new_hash" > "$APP_BUILD_HASH_FILE"
+}
+
 # Function to check if hardcoded model matches the Python config
 check_model_synchronization() {
     local config_file="$PROJECT_ROOT/backend/config.py"
@@ -111,7 +140,7 @@ echo ""
 log INFO "Starting Docker image build process" | tee -a "$LOG_FILE"
 echo -e "${BOLD}--- Step 1: Building custom Docker images... ---${NC}"
 echo "This may take a few minutes. Detailed output is being saved to '$LOG_FILE'."
-run_step "Build app image" "$LOG_FILE" ./scripts/docker/build_app.sh
+run_step "Build app image" "$LOG_FILE" build_app_if_needed
 echo -e "${GREEN}✓ Build complete.${NC}"
 
 # --- Step 2: Start Services ---
@@ -123,6 +152,12 @@ echo "The script will wait for all services to report a 'healthy' status."
 echo "Detailed output is being saved to '$LOG_FILE'."
 
 compose_up_with_logs() {
+    # Plain 'up' reuses already-healthy containers (~2s warm path) instead of cold-starting
+    # everything (~17s). The weaviate eth0-IP restart race that previously prompted
+    # --force-recreate is handled at the source by `restart: on-failure` on the weaviate service
+    # (see compose file): if memberlist dies with "No private IP address found", Docker re-runs
+    # the container once eth0 has its IP, and `up --wait` still converges — without taxing every
+    # startup with a full teardown + cold start.
     if docker compose --file "$DOCKER_COMPOSE_FILE" up --detach --wait "${SERVICES_UP[@]}"; then
         return 0
     else

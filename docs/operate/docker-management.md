@@ -2,7 +2,7 @@
 
 > **Note:** Other documentation files refer to this guide for all Docker usage, troubleshooting, and advanced commands.
 
-> For basic startup and quick reference commands, see the root [README.md](../README.md). This guide covers advanced operations and troubleshooting only.
+> For basic startup and quick reference commands, see the root [README.md](../../README.md). This guide covers advanced operations and troubleshooting only.
 
 ## Services
 
@@ -200,8 +200,8 @@ After running the cleanup, your persistent data remains safe. The following volu
 
 ## Next Steps
 
-- [Development Guide](DEVELOPMENT.md)
-- [Document Processing Guide](document-processing.md)
+- [Development, Testing & CI/CD](../dev_test_CI/README.md)
+- [MVP Deployment runbook](mvp_deployment.md)
 
 ## Destructive Reset (Delete Volumes)
 

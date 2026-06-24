@@ -63,48 +63,14 @@ E2E tests should use the same proven design pattern as integration tests, but wi
 - **Test Environment**: `app-test`, `weaviate`, `ollama`
 - **Production Environment**: `app`, `weaviate`, `ollama`
 
-## Benefits
+## Testing
 
-1. **Proven Design Pattern**: Uses same successful approach as integration tests
-2. **Dual Environment Support**: E2E tests work in both Docker and local environments
-3. **Environment Consistency**: Docker tests run in same environment as integration tests
-4. **Flexibility**: Developers can choose between Docker or local execution
-5. **Dependency Management**: Docker environment has all dependencies pre-installed
-6. **Service Connectivity**: Docker uses internal networking, local uses localhost
-7. **Production Parity**: Docker tests run in environment closer to production deployment
-8. **Simplified Configuration**: No TEST_DOCKER environment variable needed
-9. **Automatic Environment Detection**: Service URLs automatically configured by environment
-10. **Code Reuse**: Leverages existing integration test infrastructure and patterns
+Run in either environment with the same test code (service URLs auto-resolve, no `TEST_DOCKER`):
 
-## Testing Strategy
+- **Docker test env**: `make test-up` → `make test-e2e` → `make test-down`.
+- **Local**: start services (`make stack-up`, or run Weaviate/Ollama manually) → `make e2e`
+  (teardown controlled by `PRESERVE=0`).
 
-### Docker Test Environment
-1. Run `make test-up` to start test environment
-2. Run `make test-e2e` to execute E2E tests in container
-3. Verify all tests pass and services are accessible
-4. Check logs for any connectivity issues
-5. Run `make test-down` to clean up
-
-### Local Environment
-1. Start services manually (Weaviate, Ollama) or use `make stack-up`
-2. Run `make e2e` to execute E2E tests on host
-3. Verify all tests pass and services are accessible
-4. Check logs for any connectivity issues
-5. Optionally run `make stack-down` (controlled by PRESERVE=0)
-
-### Both Environments
-- Same test code works in both modes
-- Service URLs automatically configured by environment
-- No manual environment variable configuration needed
-
-## Notes
-
-- TEST_DOCKER environment variable has been eliminated
-- E2E tests should follow the same proven design pattern as integration tests
-- Service URLs are automatically configured by environment (Docker Compose or defaults)
-- Integration tests already work correctly with container networking
-- E2E tests will support both Docker and local execution modes
-- No manual environment variable configuration needed
-- Service URLs work automatically in both container and host environments
-- Developers can choose the execution mode that best fits their workflow
-- Will use same service health check and URL resolution logic as integration tests
+Verify tests pass and check logs for connectivity issues in both modes. Rationale: reusing the
+proven integration-test pattern (shared health-check + URL resolution) gives E2E dual-environment
+support and closer production parity for free.

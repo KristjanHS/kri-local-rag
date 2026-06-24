@@ -1,6 +1,6 @@
-"""Smoke tests for the Streamlit app using Playwright.
+"""Smoke test for the Streamlit app using Playwright.
 
-These tests rely on env hooks to keep them fast and deterministic:
+This test relies on env hooks to keep it fast and deterministic:
 - RAG_SKIP_STARTUP_CHECKS=1   → skip slow readiness checks in backend
 - RAG_FAKE_ANSWER=...         → bypass network/model calls in backend.answer
 - RAG_VERBOSE_TEST=1          → optional log banners
@@ -14,7 +14,6 @@ import socket
 import subprocess
 import sys
 import time
-import urllib.parse
 from contextlib import closing
 
 import pytest
@@ -101,15 +100,6 @@ def streamlit_server():
             pass
 
 
-def test_root_health(streamlit_server):
-    base_url = os.environ.get("RAG_E2E_BASE_URL", "http://localhost:8501")
-    parsed_url = urllib.parse.urlparse(base_url)
-    assert parsed_url.hostname in ("localhost", "127.0.0.1"), f"Unsafe base_url: {base_url}"
-    resp = requests.get(base_url)
-    assert resp.status_code == 200
-    assert "streamlit" in resp.text.lower()
-
-
 def test_interaction_basic(streamlit_server, page: Page):
     # Navigate to the app
     page.set_default_timeout(15000)
@@ -139,57 +129,3 @@ def test_interaction_basic(streamlit_server, page: Page):
     answer_root = page.locator("[data-testid='answer']")
     expect(answer_root).to_be_visible(timeout=20000)
     expect(answer_root.locator(".answer-content")).to_contain_text("TEST_ANSWER", timeout=20000)
-
-
-def test_server_is_fully_responsive(streamlit_server):
-    base_url = os.environ.get("RAG_E2E_BASE_URL", "http://localhost:8501")
-    resp = requests.get(base_url)
-    assert resp.status_code == 200
-    assert "streamlit" in resp.text.lower()
-
-
-def test_input_field_interaction(streamlit_server, page: Page):
-    base_url = os.environ.get("RAG_E2E_BASE_URL", "http://localhost:8501")
-    page.goto(base_url)
-    input_textbox = page.get_by_label("Ask a question:")
-    expect(input_textbox).to_be_visible()
-    test_input_text = "Test Query"
-    input_textbox.fill(test_input_text)
-    expect(input_textbox).to_have_value(test_input_text)
-
-
-def test_submit_button_locator(streamlit_server, page: Page):
-    base_url = os.environ.get("RAG_E2E_BASE_URL", "http://localhost:8501")
-    page.goto(base_url)
-    submit_button = page.get_by_role("button", name="Get Answer")
-    expect(submit_button).to_be_visible()
-
-
-def test_answer_display_area_locator(streamlit_server, page: Page):
-    base_url = os.environ.get("RAG_E2E_BASE_URL", "http://localhost:8501")
-    page.goto(base_url)
-    # Only present after submission, so verify after click
-    page.get_by_label("Ask a question:").fill("X")
-    page.get_by_role("button", name="Get Answer").click()
-    answer_area = page.locator("[data-testid='answer']")
-    expect(answer_area).to_be_visible(timeout=15000)
-
-
-def test_basic_interaction_flow(streamlit_server, page: Page):
-    base_url = os.environ.get("RAG_E2E_BASE_URL", "http://localhost:8501")
-    page.goto(base_url)
-    page.get_by_label("Ask a question:").fill("Hello, AI!")
-    page.get_by_role("button", name="Get Answer").click()
-    answer_root = page.locator("[data-testid='answer']")
-    expect(answer_root).to_be_visible(timeout=15000)
-    answer_content = answer_root.locator(".answer-content")
-    expect(answer_content).not_to_be_empty()
-
-
-def test_fake_mode_marker_present(streamlit_server, page: Page):
-    base_url = os.environ.get("RAG_E2E_BASE_URL", "http://localhost:8501")
-    page.goto(base_url)
-    page.get_by_label("Ask a question:").fill("Hello")
-    page.get_by_role("button", name="Get Answer").click()
-    fake_mode_locator = page.locator("[data-testid='fake-mode']")
-    expect(fake_mode_locator).to_have_count(1)

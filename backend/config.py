@@ -171,23 +171,9 @@ DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 DEFAULT_OLLAMA_MODEL = "cas/mistral-7b-instruct-v0.3"
 
-# Model paths and caching
-HF_CACHE_DIR = os.getenv("HF_HOME", "/data/hf")
-
 # Working model names (with environment variable overrides)
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
 RERANKER_MODEL = os.getenv("RERANK_MODEL", DEFAULT_RERANKER_MODEL)
-
-# Model repository and revision configuration
-EMBED_COMMIT = os.getenv("EMBED_COMMIT")
-RERANK_COMMIT = os.getenv("RERANK_COMMIT")
-
-# Offline mode configuration
-# Parse TRANSFORMERS_OFFLINE environment variable properly
-# "1", "true", "yes" (case-insensitive) → True (offline mode enabled)
-# "0", "false", "no", empty, or not set → False (offline mode disabled)
-transformers_offline_env = os.getenv("TRANSFORMERS_OFFLINE", "").lower()
-TRANSFORMERS_OFFLINE = transformers_offline_env in ("1", "true", "yes")
 
 # Ollama LLM settings (used by qa_loop.py)
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
@@ -226,22 +212,6 @@ WEAVIATE_CONCURRENT_REQUESTS = int(os.getenv("WEAVIATE_CONCURRENT_REQUESTS", 2))
 
 # Default context window (max tokens) for Ollama LLM requests
 OLLAMA_CONTEXT_TOKENS = int(os.getenv("OLLAMA_CONTEXT_TOKENS", 8192))  # e.g. 4096, 8192, etc.
-
-
-def is_running_in_docker() -> bool:
-    """
-    Detect if the current process is running inside a Docker container.
-
-    Uses TEST_DOCKER environment variable for explicit environment control.
-    This is simpler and more testable than file-based detection.
-
-    Returns:
-        bool: True if running inside Docker, False otherwise
-    """
-    # Use TEST_DOCKER environment variable for explicit control
-    # This is much simpler and more reliable than file-based detection
-    test_docker = os.getenv("TEST_DOCKER", "false").lower()
-    return test_docker == "true"
 
 
 # (base) PS C:\Users\PC> ollama show cas/mistral-7b-instruct-v0.3

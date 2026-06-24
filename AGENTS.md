@@ -1,82 +1,17 @@
-## Purpose  
-This file tells coding agents how to work on this repository **safely and correctly**: where to run from, which
-commands to execute, quality gates to pass, and project conventions. Agents should follow these rules unless a human
-explicitly overrides them.
+# AGENTS.md — Instructions for Coding Agents
 
-## Repo profile (read me first)  
-- **Primary stack:** Python 3.12 (via `.venv`), Streamlit UI, Weaviate, Ollama, Docker Compose.  
-- **Top modules:**  
-  - `backend/` — ingestion (`ingest.py`), retrieval/QA (`qa_loop.py`), Weaviate/Ollama clients, config.  
-  - `frontend/` — Streamlit app (`rag_app.py`).  
-  - `scripts/` — Docker + developer helpers (`docker/docker-setup.sh`, `ingest.sh`, `cli.sh`).  
-  - `tests/` — `unit/`, `integration/`, `e2e/`, `ui/` with `conftest.py`.  
-  - `docker/` — compose + Dockerfiles.  
-  - `reports/` — artifacts, coverage.  
-  - `data/`, `example_data/` — sample datasets.
+Local RAG system: document ingestion → vector index → retrieval → answer.
+Python 3.13, Streamlit UI, Weaviate (vector DB), Ollama (local embeddings + LLM), Docker Compose.
 
-## Golden rules (non-negotiable)  
-1) **Run commands from repo root.** If you need a shell 
-2) **Use the project venv:** run Python via `.venv/bin/python` (never the system interpreter).  
-3) **Never commit secrets**; `.secrets.baseline` is enforced. If you touch secrets, stop and ask a human.  
+**This file is a pointer.** To avoid drift, all project instructions live in one place:
 
-## Setup & environment  
-- Create/activate venv if missing and install deps as needed (ask before changing pinned versions).  
-- Docker is available; prefer the provided scripts to start services.  
-- Network calls to external services must be isolated behind Docker where possible.
+- **`CLAUDE.md`** — project overview, Reference Index, Critical Rules, Tooling Quickref.
+  Read this first: it covers where to run from (repo root), the `.venv/bin/python`
+  interpreter, secrets policy, test/quality gates, and Conventional Commits.
+- **`.claude/rules/*.md`** — topic-specific rules (linting, logging, langchain, testing,
+  imports/deps, docker-safety, plan-hygiene, rule-authoring). Mirrored as `.cursor/rules/*.mdc`
+  for Cursor.
+- **`README.md`**, **`docs/dev_test_CI/README.md`**, **`docs/operate/`** — deeper reference docs.
 
-## Common tasks (agents may run these automatically)  
-> Agents: prefer these exact commands and **stop on first failure**.
-
-- **Start full stack (recommended path):**  
-  `make stack-up`  
-  _Builds app, starts Weaviate, Ollama, Streamlit._
-
-- **Stop stack:**  
-  `make stack-down`
-
-- **Open Web UI:** visit `http://localhost:8501`.  
-  _Dev alternative:_ `streamlit run frontend/rag_app.py`.
-
-- **Ingest documents (from host `./data`):**  
-  `make ingest`  
-  _Runs ingestion inside the app container._
-
-- **CLI Q&A:**  
-  `make cli`  
-  _Example (one-off question):_ `make cli ARGS='--question "..."'`
-
-- **View logs (app, weaviate, ollama):**  
-  `make app-logs`  
-  _Options:_ `LINES=500` to change lines, `FOLLOW=1` to tail.
-
-## Testing & quality gates (must pass before you conclude work)  
-- **Local fast path (as module):**  
-  `make unit`  
-  `make integration`  
-  _Coverage outputs to `reports/coverage`._
-
-- **Full integration harness (dockerized):**  
-  `make test-up` → `make test-integration` → `make test-down`
-
-- **Pre-commit (mandatory) bash command:**  
-  `make pre-commit`
-
-- **If UI or logs change intentionally:** update any snapshots or expectations the tests rely on.  
-  _If failing, fix the code or tests; do **not** disable checks._
-
-## Code style & conventions  
-- Obey the rules in `.cursor/rules/` (and the mirrored `.claude/rules/`) for lint, type checks, import order, logging, and Docker safety posture.  
-- Keep lines ≤120 chars. Prefer small, composable functions and explicit error handling.  
-- Add or update tests when changing behavior.
-
-## Safe edit policy  
-- For risky edits (schema changes, cross-module refactors), propose a plan in the PR description first.  
-- Never change Dockerfiles, Compose, or security-sensitive configs without clearly stating risks and mitigations.  
-
-## Glossary (min spec for agents)  
-- **Weaviate:** vector DB used for retrieval.  
-- **Ollama:** local model runner backing embeddings/LLM endpoints.  
-- **RAG:** retrieval-augmented generation; our system wires ingestion → index → retrieval → answer.
-
-## Agent etiquette  
-- When in doubt about security or data handling, stop and request human guidance.
+Follow those as if written for you. When in doubt about security or data handling, stop and
+ask a human.

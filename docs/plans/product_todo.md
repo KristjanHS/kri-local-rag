@@ -6,46 +6,18 @@ This file tracks **outstanding / undone** tasks for the project. Completed work
 
 ## Context
 
-- **App**: Local RAG using Weaviate (8080), Ollama (11434), Streamlit UI (8501)
-- **Security**: Only Streamlit should be user-visible. Other services should be local-only (loopback or compose-internal)
-- **Python execution**: Avoid `PYTHONPATH`; run modules with `python -m` from project root to ensure imports work
-- **Environment**: Prefer the project venv (`.venv/bin/python`) or an equivalent Python environment
-- **Vectorization**: Uses a local `SentenceTransformer` model for client-side embeddings. Weaviate is configured for manually provided vectors.
-- **Reranking**: A separate, local `CrossEncoder` model is used to re-score initial search results for relevance.
+- **App**: Local RAG — Weaviate (8080), Ollama (11434), Streamlit UI (8501); only Streamlit is user-visible.
+- **Vectorization / reranking**: local `SentenceTransformer` for client-side embeddings (Weaviate stores manually provided vectors); a local `CrossEncoder` re-scores results.
+- Repo-root / `.venv/bin/python` / no-`PYTHONPATH` execution and commit conventions live in `CLAUDE.md` and `.claude/rules/`.
 
-## Common Pitfalls and Solutions
+## Working method
 
-### Docker Compose Path Resolution
-- **Issue**: `docker compose -f docker/docker-compose.yml` resolves paths relative to compose file location, not working directory
-- **Fix**: Use `.env.docker` (not `./docker/.env.docker`) in compose files
-- **Verify**: `docker compose -f docker/docker-compose.yml config`
-
-### CI Test Execution Strategy
-- **Issue**: Integration and E2E tests require the full Docker stack (Weaviate, Ollama) which cannot run reliably on GitHub CI runners
-- **Fix**: Integration and E2E tests are excluded from GitHub CI entirely and only execute locally via act (nektos/act) on manual `workflow_dispatch` or scheduled runs
-- **Verify**: Fast tests (unit tests only) run on every PR, while integration/E2E tests run only locally via act
-
-### Task Verification
-- **Issue**: File existence ≠ functional working
-- **Fix**: Test actual commands that were failing, not just file presence
-
-## Conventions
-
-- **Commands are examples**: Any equivalent approach that achieves the same outcome is acceptable
-- **Paths, ports, and model names**: Adapt to your environment as needed
-- Each step has Action and Verify. Aim for one change per step to allow quick fix-and-retry.
-- On any Verify failure: stop and create a focused debugging plan before proceeding (assume even these TODO instructions may be stale or mistaken). The plan should:
-  - Summarize expected vs. actual behavior
-  - Re-check key assumptions
-  - Consider that the step description might be wrong; cross-check code for the source of truth.
-  - Propose 1–3 small, reversible next actions with a clear Verify for each. Apply the smallest change first.
-  - After a change, re-run the same Verify command from the failed step. Only then continue.
-  - If blocked, mark the step as `[BLOCKED: <short reason/date>]` in this todo file and proceed to the smallest independent next step if any; otherwise stop and request help.
+Each item has Action + Verify; make one change per step. On a Verify failure, stop and create a focused debugging plan before proceeding (per `CLAUDE.md` rule 6) — assume even these instructions may be stale. Mark a stuck item `[BLOCKED: <reason/date>]` and move to the next independent step. Gotchas worth recalling: Docker Compose resolves paths relative to the compose-file location (use `.env.docker`, not `./docker/.env.docker`); integration/E2E tests run only locally via `act`, never on GitHub CI (see `docs/operate/auto-merge.md`).
 
 ## Quick References
 
-- **AI agent cheatsheet and E2E commands**: [`docs/AI_coder/AI_instructions.md`](AI_instructions.md)
 - **Dev, testing & CI/CD**: [`docs/dev_test_CI/README.md`](../dev_test_CI/README.md)
+- **Run commands / Makefile targets**: root `README.md`, `make help`, `CLAUDE.md`
 
 ## Prioritized Backlog
 
@@ -57,7 +29,7 @@ This file tracks **outstanding / undone** tasks for the project. Completed work
 >
 > | Phase | Item(s) | Why here |
 > |-------|---------|----------|
-> | **A** | P5 **(+ P3 Step 7 folded in)** | Fix the Weaviate collection/schema root cause. Pull P3 Step 7 (diagnostics & isolation) forward as the instrumentation that makes P5 debugging actionable. |
+> | **A** | ~~P5 + P3 Step 7~~ ✅ **DONE 2026-06-23** | P5 (Weaviate collection/schema root cause) found already-resolved on live triage — QA retrieval E2E passes. P3 Step 7 diagnostics shipped (`_dump_container_diagnostics`); isolation half deferred to `e2e_container.md`. |
 > | **B** | P3 Steps 6, 8 | With P5 green, verify build-reuse (Step 6) and wire the containerized CLI subset into scripts/docs/CI (Step 8). Also satisfies P2's Integration-Suite / Docker-Env / Docs sub-items. |
 > | **C** | P2 (remaining gaps) | Full app-validation sweep as *confirmation*, skipping what A+B already covered. Model-loading layers (Integration Suite, Real Model Ops) are independent of P5 and can run anytime. |
 > | **D** | P7 | Low-value / partly moot — **defer** unless Phase C surfaces a concrete compile-time pain point. |
@@ -150,42 +122,64 @@ twin `test_qa_real_end_to_end_container_e2e.py`).
   - Verify: second run is faster due to image reuse. *(Partially verified — build works,
     but tests fail on the Weaviate blockers below.)*
 
-- [ ] **Step 7 — Diagnostics and isolation** *(PULLED INTO PHASE A — build first, then use it to debug P5)*
+- [x] **Step 7 — Diagnostics and isolation** *(diagnostics DONE 2026-06-23; isolation deferred)*
   - Action: on failure, print exit code, last 200 lines of app logs, and tails of
     `weaviate`/`ollama` logs; use ephemeral dirs/volumes.
-  - Verify: failures are actionable; runs are deterministic and isolated.
+  - **Done:** `tests/e2e/conftest.py::_dump_container_diagnostics` — `run_cli_in_container`
+    now dumps exit code + CLI stdout/stderr tails + `docker compose logs --tail 200` for
+    `app`/`weaviate`/`ollama` whenever a containerized CLI call returns non-zero
+    (best-effort, never raises). Covered by `tests/unit/test_e2e_diagnostics_unit.py`
+    (service-list + never-raise contract, subprocess mocked → fast unit tier).
+  - **Deferred:** the "ephemeral dirs/volumes" isolation half belongs to the compose-fixture
+    redesign (`e2e_container.md`); the current fixtures intentionally reuse the shared
+    `make test-up` stack and preserve volumes.
 
 - [ ] **Step 8 — Wire into scripts/docs/CI**
-  - Action: document commands in `docs/dev_test_CI/README.md` and `AI_instructions.md`;
+  - Action: document commands in `docs/dev_test_CI/README.md`;
     mention in `scripts/dev/test.sh e2e` help; add a CI job for the containerized CLI subset.
   - Verify: fresh env runs `tests/e2e/*_container_e2e.py` green; CI job passes locally under
     `act` and on hosted runners.
 
-**Blockers / Next Steps** (overlaps P5 — same root cause):
+**Blockers / Next Steps** — **reframed 2026-06-23 after live triage** (the original
+"schema mismatch" framing was stale; see P5 RESOLVED below):
 
-- **Weaviate connection** — `test_e2e_ingest_with_heavy_optimizations_into_real_weaviate`
-  fails with `WeaviateConnectionError ... [Errno 111] Connection refused`. Uses
-  `testcontainers`; container may not be ready/accessible. Pinned image to
-  `cr.weaviate.io/semitechnologies/weaviate:1.32.0` in
-  `tests/e2e/test_heavy_optimizations_weaviate_e2e.py`; re-run to confirm.
-- **Weaviate schema** — `test_e2e_answer_with_real_services` fails with
-  `could not find class Document in schema` (falls back to bm25). Confirm
-  `COLLECTION_NAME` (`backend/config.py` default `Document`) and that
-  `ensure_weaviate_ready_and_populated()` creates the schema + populates data before the test.
+- **~~Weaviate schema~~ — RESOLVED.** `test_e2e_answer_with_real_services` now **passes**;
+  no `could not find class Document in schema`. See P5.
+- **Compose-fixture project conflict** (the real cause of the 3 e2e SKIPs) — the e2e
+  compose fixtures (`weaviate_compose_up`/`ollama_compose_up`/`app_compose_up` in
+  `tests/e2e/conftest.py`) run `docker compose -f docker/docker-compose.yml up -d --wait
+  <svc>` under the **default** project name (`kri-local-rag`), which spawns a *second*
+  Weaviate alongside the already-running `make test-up` stack (run-id project). The second
+  container dies on cluster init (`Failed to get final advertise address: No private IP
+  address found … could not init cluster state`) and the fixture `pytest.skip`s. Fix
+  belongs to `e2e_container.md`: make the fixtures detect an already-healthy service and
+  reuse it instead of starting a conflicting project, **and** make `run_cli_in_container`
+  target the active compose project (env-aware helper) rather than the default name.
+- **Weaviate connection (heavy-optimizations test)** — `test_heavy_optimizations_weaviate_e2e.py`
+  uses `testcontainers` (its own ephemeral Weaviate, image pinned
+  `cr.weaviate.io/semitechnologies/weaviate:1.32.0`); re-run standalone (no competing stack)
+  to confirm. Not the same path as the compose-fixture conflict above.
 
 ---
 
-#### P5 — E2E retrieval failure: QA test returns no context (Weaviate) — **PHASE A — DO FIRST (keystone)**
+#### P5 — E2E retrieval failure: QA test returns no context (Weaviate) — **PHASE A — ✅ RESOLVED (verified live 2026-06-23)**
 
-> **Note**: same root cause as the P3 blockers above (collection/schema mismatch). Resolve
-> together. Likely mismatch between the collection name used by retrieval vs. ingestion, or
-> ingestion not executed.
+> **RESOLVED 2026-06-23 (live verification against the `make test-up` stack).** The
+> `Document`/`TestCollection` schema-mismatch this section was built around **no longer
+> exists**. `tests/e2e/test_qa_real_end_to_end.py::test_e2e_answer_with_real_services`
+> **passes** end-to-end against real Weaviate + Ollama: it ingests into `TestCollection`
+> and queries `TestCollection` (both sides pass `collection_name=TEST_COLLECTION_NAME`),
+> retrieval returns context, no "could not find class Document in schema". Full host E2E
+> run: **4 passed, 3 skipped** (the 3 skips are a compose-fixture infra conflict, not P5 —
+> see the reframed P3 blockers below). Tasks 1–7 are obsolete diagnosis for an
+> already-fixed bug; left for history.
 >
-> **Phase A folds in P3 Step 7.** Build the P3 Step 7 diagnostics/isolation harness (exit
-> code + app/`weaviate`/`ollama` log tails on failure, ephemeral volumes) *before* cracking
-> P5 — it turns the "no context returned" failure into an actionable trace. The load-bearing
-> fix in this phase is **Task 5: standardize on one E2E collection name** across tests,
-> fixtures, and config; the other tasks are diagnosis around it.
+> **Residual nuance (not a retrieval bug):** two collection names still coexist in the e2e
+> layer — `fixtures_ingestion.py::docker_services_ready` populates `COLLECTION_NAME`
+> (`Document`) via `ensure_weaviate_ready_and_populated()`, while `test_qa_real_end_to_end.py`
+> and conftest cleanup use `TestCollection`. Harmless today (each test queries the name it
+> populated), but worth standardizing — folded into the `e2e_container.md` "simplify compose
+> fixtures" work.
 
 - [ ] **Task 1 — Reproduce quickly**
   - Action: run only the failing test (e.g. `pytest tests/e2e/test_qa_real_end_to_end.py`).
@@ -247,3 +241,18 @@ MagicMock)" message no longer exists.
   - Action: more informative optimization-status messages; consider caching compiled models
     to disk to avoid re-compilation across process restarts.
   - Verify: users understand what's happening and the process feels responsive.
+
+---
+
+#### Post-MVP — Launch hardening (DEFERRED)
+
+Carried over from the archived `docs/plans/archive/launch_prep_todo.md` bring-up checklist
+(the bring-up steps themselves shipped; these were its open "Post-MVP (defer)" items). The
+deploy runbook is `docs/operate/mvp_deployment.md`.
+
+- [ ] Add app healthcheck / readiness probe for the Streamlit container.
+- [ ] Produce a lean production image (drop dev deps, avoid the editable install).
+- [ ] Enable Weaviate auth; front with a reverse proxy / SSO; terminate HTTPS.
+- [ ] Define container resource limits and a GPU scheduling policy.
+- [ ] Pin model/versions and warm an offline model cache at build time.
+- [ ] Add metrics, tracing, and alerts.

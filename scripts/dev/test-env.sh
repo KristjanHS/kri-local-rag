@@ -2,16 +2,40 @@
 set -euo pipefail
 
 # Orchestrates the docker-compose based test environment.
+#
+# The test stack uses a single FIXED compose project name (kri-local-rag-test),
+# mirroring how the live stack reuses "kri-local-rag". up/down/clean operate on
+# that one project; there is no per-run id to mint, persist, or orphan.
+#
+# Concurrency note: running N isolated test stacks on one host is intentionally
+# NOT supported. The fixed host ports below already block it (two stacks collide
+# on the same ports regardless of project name). If concurrent stacks are ever
+# wanted back, a per-run project name AND per-run ports must return together —
+# the two features are coupled; reviving one without the other is a no-op.
 
-RUN_ID_FILE=${RUN_ID_FILE:-.run_id}
 LOG_DIR=${LOG_DIR:-logs}
 BUILD_HASH_FILE=${BUILD_HASH_FILE:-.test-build.hash}
 COMPOSE_FILE=${COMPOSE_FILE:-docker/docker-compose.yml}
 PROFILE=${PROFILE:-test}
+# Fixed project name (overridable via env as an escape hatch).
+PROJECT_NAME=${COMPOSE_PROJECT_NAME:-kri-local-rag-test}
 COMPOSE=(docker compose -f "$COMPOSE_FILE" --profile "$PROFILE")
 BUILD_DEPS=(pyproject.toml uv.lock docker/app.Dockerfile docker/docker-compose.yml)
+TEST_IMAGE=${TEST_IMAGE:-kri-local-rag-app:test}
 # Centralized service list used by up/logs
 SERVICES=(weaviate ollama app-test)
+
+# Distinct host ports so the test stack can run alongside the live stack (which uses
+# the compose defaults 8080/50051/11434). Container-side ports are unchanged, so the
+# in-network DNS used by app-test (weaviate:8080, ollama:11434) is unaffected. Override
+# if these collide with something else on the host.
+export WEAVIATE_HTTP_HOST_PORT=${WEAVIATE_HTTP_HOST_PORT:-18080}
+export WEAVIATE_GRPC_HOST_PORT=${WEAVIATE_GRPC_HOST_PORT:-50052}
+export OLLAMA_HOST_PORT=${OLLAMA_HOST_PORT:-21434}
+# app-test inherits app's port mapping via `extends`; give it a distinct host port
+# (it runs `tail -f /dev/null`, so nothing actually serves here — this only avoids a
+# bind collision with the live app on 8501).
+export APP_HOST_PORT=${APP_HOST_PORT:-18501}
 
 # Minimal logging helpers
 log() { echo "$*"; }
@@ -23,12 +47,12 @@ usage() {
 Usage: $0 <command> [options]
 Commands:
   up [--force|-f]        Start docker test env (rebuild if --force)
-  down                   Stop docker test env and remove volumes
+  down                   Stop docker test env, preserving volumes
   logs [--lines|-n N]    Show logs from app-test/weaviate/ollama
   run-integration        Run integration tests inside app-test container
   run-e2e                Run E2E tests tests inside app-test container
-  build-if-needed        Rebuild image if deps changed [--run-id ID]
-  clean                  Remove run/build metadata files
+  build-if-needed        Rebuild image if deps changed
+  clean                  Remove test volumes and build metadata
 EOF
 }
 
@@ -39,48 +63,17 @@ ensure_repo_root() {
   fi
 }
 
-write_run_id() {
-  local id="$1"
-  echo "$id" > "$RUN_ID_FILE"
-}
-
-# Return 0 if docker compose project has any containers
-is_env_running() {
-  local id="$1"
-  if COMPOSE_PROJECT_NAME="$id" "${COMPOSE[@]}" ps -q 2>/dev/null | grep -q .; then
-    return 0
-  fi
-  return 1
-}
-
-# Wrapper for docker compose that sets project name from arg1
+# Wrapper for docker compose that pins the fixed project name.
 dc() {
-  local proj="$1"; shift
-  COMPOSE_PROJECT_NAME="$proj" "${COMPOSE[@]}" "$@"
+  COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" "$@"
 }
 
-# Resolve a run id based on mode:
-#  - require: error if no RUN_ID file/env
-#  - create: generate new if missing and persist
-resolve_run_id() {
-  local mode=${1:-require}
-  local id=${RUN_ID:-}
-  if [[ -z "$id" && -f "$RUN_ID_FILE" ]]; then
-    id=$(<"$RUN_ID_FILE")
-  fi
-  if [[ -z "$id" ]]; then
-    if [[ "$mode" == "require" ]]; then
-      err "No active test environment found. Run 'make test-up' first."
-      return 1
-    fi
-    id=$(date +%s)
-    write_run_id "$id"
-  fi
-  printf '%s\n' "$id"
+# Return 0 if the test compose project has any containers
+is_env_running() {
+  dc ps -q 2>/dev/null | grep -q .
 }
 
 build_if_needed() {
-  local run_id="$1"
   mkdir -p "$LOG_DIR"
   # Hash the build deps list deterministically
   local new_hash
@@ -89,17 +82,9 @@ build_if_needed() {
   if [[ -f "$BUILD_HASH_FILE" ]]; then
     old_hash=$(<"$BUILD_HASH_FILE")
   fi
-  if [[ "$new_hash" != "$old_hash" ]]; then
-    log "Build deps changed; rebuilding images..."
-    DOCKER_BUILDKIT=1 dc "$run_id" build app-test 2>&1 | tee "$LOG_DIR/test-build-$run_id.log"
-    ln -sf "test-build-$run_id.log" "$LOG_DIR/test-build.log"
-    # Prune older build logs, keep latest 5
-    if ls -1t "$LOG_DIR"/test-build-*.log >/dev/null 2>&1; then
-      mapfile -t _logs < <(ls -1t "$LOG_DIR"/test-build-*.log 2>/dev/null)
-      if (( ${#_logs[@]} > 5 )); then
-        for ((i=5; i<${#_logs[@]}; i++)); do rm -f "${_logs[$i]}"; done
-      fi
-    fi
+  if [[ "$new_hash" != "$old_hash" ]] || ! docker image inspect "$TEST_IMAGE" >/dev/null 2>&1; then
+    log "Build deps changed or image missing; rebuilding images..."
+    DOCKER_BUILDKIT=1 dc build app-test 2>&1 | tee "$LOG_DIR/test-build.log"
     echo "$new_hash" > "$BUILD_HASH_FILE"
   else
     log "Build deps unchanged; skipping 'docker compose build'."
@@ -115,45 +100,26 @@ cmd_up() {
     esac
   done
 
-  if [[ -f "$RUN_ID_FILE" ]]; then
-    local existing_id
-    existing_id=$(<"$RUN_ID_FILE")
-    if is_env_running "$existing_id"; then
-      if (( force == 0 )); then
-        log "Test env RUN_ID=$existing_id already running."
-        log "Use 'make test-down' to stop it, or 'make test-logs' to view logs."
-        return 0
-      fi
-    else
-      warn "Stale RUN_ID file found, cleaning up..."
-      rm -f "$RUN_ID_FILE"
-    fi
+  if (( force == 0 )) && is_env_running; then
+    log "Test env (project $PROJECT_NAME) already running."
+    log "Use 'make test-down' to stop it, or 'make test-logs' to view logs."
+    return 0
   fi
-
-  local run_id
-  run_id=$(date +%s)
-  write_run_id "$run_id"
 
   if (( force == 1 )); then
     rm -f "$BUILD_HASH_FILE" || true
   fi
 
-  build_if_needed "$run_id"
-  log "Starting test environment with RUN_ID=$run_id..."
-  dc "$run_id" up -d --wait --wait-timeout 120 "${SERVICES[@]}"
+  build_if_needed
+  log "Starting test environment (project $PROJECT_NAME)..."
+  dc up -d --wait --wait-timeout 120 "${SERVICES[@]}"
   log "Test environment started."
 }
 
 cmd_down() {
-  if [[ -f "$RUN_ID_FILE" ]]; then
-    local run_id
-    run_id=$(<"$RUN_ID_FILE")
-    log "Stopping test environment with RUN_ID=$run_id ..."
-    dc "$run_id" down -v
-    rm -f "$RUN_ID_FILE"
-  else
-    log "No active test environment found."
-  fi
+  log "Stopping test environment (project $PROJECT_NAME, preserving volumes) ..."
+  # Plain 'down' keeps named volumes so the next 'up' can reuse them.
+  dc down
 }
 
 cmd_logs() {
@@ -164,58 +130,38 @@ cmd_logs() {
       *) break ;;
     esac
   done
-  if [[ -f "$RUN_ID_FILE" ]]; then
-    local run_id
-    run_id=$(<"$RUN_ID_FILE")
-    log "Fetching logs for test environment with RUN_ID=$run_id ..."
-    dc "$run_id" logs -n "$lines" "${SERVICES[@]}"
-  else
-    log "No active test environment found."
-  fi
+  log "Fetching logs for test environment (project $PROJECT_NAME) ..."
+  dc logs -n "$lines" "${SERVICES[@]}"
 }
 
 cmd_run_integration() {
-  if [[ -f "$RUN_ID_FILE" ]]; then
-    local run_id
-    run_id=$(<"$RUN_ID_FILE")
-    # Set TEST_DOCKER=true to indicate we're running in Docker test environment
-    dc "$run_id" exec -T -e TEST_DOCKER=true app-test /opt/venv/bin/python3 -m pytest tests/integration -q --junitxml=reports/junit_compose_integration.xml
-  else
+  if ! is_env_running; then
     err "No active test environment found. Run 'make test-up' first."
     exit 1
   fi
+  # Set TEST_DOCKER=true to indicate we're running in Docker test environment
+  dc exec -T -e TEST_DOCKER=true app-test /opt/venv/bin/python3 -m pytest tests/integration -q --junitxml=reports/junit_compose_integration.xml
 }
 
 cmd_run_e2e() {
-  if [[ -f "$RUN_ID_FILE" ]]; then
-    local run_id
-    run_id=$(<"$RUN_ID_FILE")
-    mkdir -p reports
-    # Set TEST_DOCKER=true to indicate we're running in Docker test environment
-    dc "$run_id" exec -T -e TEST_DOCKER=true app-test /opt/venv/bin/python3 -m pytest tests/e2e -q --junitxml=reports/junit_compose_e2e.xml
-  else
+  if ! is_env_running; then
     err "No active test environment found. Run 'make test-up' first."
     exit 1
   fi
+  mkdir -p reports
+  # Set TEST_DOCKER=true to indicate we're running in Docker test environment
+  dc exec -T -e TEST_DOCKER=true app-test /opt/venv/bin/python3 -m pytest tests/e2e -q --junitxml=reports/junit_compose_e2e.xml
 }
 
 cmd_build_if_needed() {
-  local run_id="${RUN_ID:-}"
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --run-id) run_id="$2"; shift 2 || true ;;
-      *) break ;;
-    esac
-  done
-  if [[ -z "$run_id" ]]; then
-    run_id=$(resolve_run_id create)
-  fi
-  build_if_needed "$run_id"
+  build_if_needed
 }
 
 cmd_clean() {
-  rm -f "$BUILD_HASH_FILE" "$RUN_ID_FILE" || true
-  echo "Test build cache cleaned."
+  log "Removing test environment (project $PROJECT_NAME) and its volumes ..."
+  dc down -v
+  rm -f "$BUILD_HASH_FILE" || true
+  echo "Test volumes and build cache cleaned."
 }
 
 main() {
