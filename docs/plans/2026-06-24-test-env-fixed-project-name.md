@@ -21,10 +21,13 @@ returns:
    live-stack model.
 
 2. **Fixed host ports make concurrent stacks impossible anyway.** Since
-   `84d8344`, every test stack binds the same host ports (18080 / 50052 /
-   21434 / 18501). Two test stacks at once collide on those ports regardless of
-   project name. The one capability the unique id exists for is already blocked
-   by the port scheme — the two features work against each other.
+   `84d8344`, every test stack binds the same host ports (originally 18080 /
+   50052 / 21434 / 18501; **later converged to the live ports 8080 / 50051 /
+   11434 / 8501** — the test stack now reuses the live ports outright, so it
+   can't run alongside the live stack either). Two test stacks at once collide on
+   those ports regardless of project name. The one capability the unique id
+   exists for is already blocked by the port scheme — the two features work
+   against each other.
 
 3. **CI doesn't need it.** The `integration`/`e2e` jobs each run on their own
    fresh `ubuntu-latest` VM (and are `nektos/act`-gated), so they are isolated

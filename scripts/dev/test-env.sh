@@ -7,11 +7,9 @@ set -euo pipefail
 # mirroring how the live stack reuses "kri-local-rag". up/down/clean operate on
 # that one project; there is no per-run id to mint, persist, or orphan.
 #
-# Concurrency note: running N isolated test stacks on one host is intentionally
-# NOT supported. The fixed host ports below already block it (two stacks collide
-# on the same ports regardless of project name). If concurrent stacks are ever
-# wanted back, a per-run project name AND per-run ports must return together —
-# the two features are coupled; reviving one without the other is a no-op.
+# The test stack reuses the same host ports as the live stack (8080/50051/11434/8501),
+# so the two cannot run at the same time — by design, since they're never needed
+# concurrently. `make test-down`/`make stack-down` the other one first.
 
 LOG_DIR=${LOG_DIR:-logs}
 BUILD_HASH_FILE=${BUILD_HASH_FILE:-.test-build.hash}
@@ -24,18 +22,6 @@ BUILD_DEPS=(pyproject.toml uv.lock docker/app.Dockerfile docker/docker-compose.y
 TEST_IMAGE=${TEST_IMAGE:-kri-local-rag-app:test}
 # Centralized service list used by up/logs
 SERVICES=(weaviate ollama app-test)
-
-# Distinct host ports so the test stack can run alongside the live stack (which uses
-# the compose defaults 8080/50051/11434). Container-side ports are unchanged, so the
-# in-network DNS used by app-test (weaviate:8080, ollama:11434) is unaffected. Override
-# if these collide with something else on the host.
-export WEAVIATE_HTTP_HOST_PORT=${WEAVIATE_HTTP_HOST_PORT:-18080}
-export WEAVIATE_GRPC_HOST_PORT=${WEAVIATE_GRPC_HOST_PORT:-50052}
-export OLLAMA_HOST_PORT=${OLLAMA_HOST_PORT:-21434}
-# app-test inherits app's port mapping via `extends`; give it a distinct host port
-# (it runs `tail -f /dev/null`, so nothing actually serves here — this only avoids a
-# bind collision with the live app on 8501).
-export APP_HOST_PORT=${APP_HOST_PORT:-18501}
 
 # Minimal logging helpers
 log() { echo "$*"; }

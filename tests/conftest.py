@@ -53,18 +53,30 @@ def _ensure_logs_dir() -> Iterator[None]:
 
 
 def get_integration_config() -> dict[str, Any]:
-    """Read integration config from pyproject.toml (service health endpoints/timeouts)."""
+    """Read integration config from pyproject.toml (service health endpoints/timeouts).
+
+    Resolve pyproject.toml relative to the repo (this file lives at <repo>/tests/),
+    not the CWD. In-container test runs have CWD=/app with no pyproject there, so a
+    CWD-relative open silently returns {} and every service-gated test skips with a
+    misleading "service not available" message even when the services are healthy.
+    """
     try:
         import tomllib  # Python 3.11+
     except ImportError:
         return {}
 
-    try:
-        with open("pyproject.toml", "rb") as f:
-            config = tomllib.load(f)
-        return config.get("tool", {}).get("integration", {})
-    except Exception:
-        return {}
+    # Prefer the repo-root pyproject (CWD-independent); fall back to CWD.
+    candidates = [Path(__file__).resolve().parent.parent / "pyproject.toml", Path("pyproject.toml")]
+    for pyproject in candidates:
+        try:
+            with open(pyproject, "rb") as f:
+                config = tomllib.load(f)
+            return config.get("tool", {}).get("integration", {})
+        except FileNotFoundError:
+            continue
+        except Exception:
+            return {}
+    return {}
 
 
 def is_http_service_available(url: str, timeout: float = 2.0) -> bool:
