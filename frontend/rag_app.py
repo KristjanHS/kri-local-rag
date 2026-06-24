@@ -21,8 +21,9 @@ MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "50")) * 1024 * 1024
 # --- Test-only hooks -------------------------------------------------------
 # These env vars let CLI/UI e2e tests bypass the real backend. They are read
 # only through the helpers below so the test surface stays explicit and in one
-# place (Tier 2.6 of complexity-cleanup). The backend's own RAG_FAKE_ANSWER
-# bypass lives independently in backend.qa_loop.answer().
+# place (Tier 2.6 of complexity-cleanup). The fake-answer bypass is owned by each
+# presentation surface (this frontend + cli.py); backend.qa_loop.answer() no longer
+# carries one (#9 removed it as dead code — surfaces short-circuit before calling it).
 def _fake_answer() -> str | None:
     """Return the canned answer for fake-mode, or None when the hook is unset/empty."""
     return os.getenv("RAG_FAKE_ANSWER") or None
