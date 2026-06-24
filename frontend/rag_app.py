@@ -83,6 +83,42 @@ class _DebugPanelHandler(logging.Handler):
             self.handleError(record)
 
 
+class _IngestProgressHandler(logging.Handler):
+    """Surface ``backend.ingest`` INFO records into the Streamlit ingest status widget.
+
+    Periodic records carry a structured ``ingest_progress`` payload (current/total/rate/eta)
+    that drives the progress bar; other milestone messages (loading, splitting, complete) are
+    appended to the ``st.status`` log. Restricted to the originating ScriptRunner thread so a
+    concurrent session's ingest can't bleed into this one (mirrors ``_DebugPanelHandler``).
+    """
+
+    def __init__(self, thread_id: int, progress_bar, status) -> None:
+        super().__init__(level=logging.INFO)
+        self._thread_id = thread_id
+        self._progress_bar = progress_bar
+        self._status = status
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.thread != self._thread_id:
+            return
+        try:
+            prog = getattr(record, "ingest_progress", None)
+            if prog and prog.get("total"):
+                frac = min(prog["current"] / prog["total"], 1.0)
+                self._progress_bar.progress(
+                    frac,
+                    text=(
+                        f"{prog['current']}/{prog['total']} chunks ({frac:.0%}) · "
+                        f"{prog['rate']:.0f} chunks/s · ETA ~{prog['eta_s']:.0f}s"
+                    ),
+                )
+            else:
+                # High-level milestone (e.g. "Loaded N pages", "Split into N chunks").
+                self._status.write(record.getMessage())
+        except Exception:
+            self.handleError(record)
+
+
 st.set_page_config(page_title="RAG Q&A", layout="centered")
 st.title("RAG Q&A (Streamlit Frontend)")
 
@@ -152,25 +188,38 @@ with st.sidebar.expander("Ingest PDFs"):
             if not saved_paths:
                 st.error("No valid PDF files to ingest.")
             else:
-                with st.spinner("Ingesting ..."):
-                    # Ingest operates on a directory; use the save directory
-                    from backend.config import COLLECTION_NAME
-                    from backend.ingest import ingest
-                    from backend.models import load_embedder
-                    from backend.weaviate_client import get_weaviate_client
+                # Ingest operates on a directory; use the save directory
+                from backend.config import COLLECTION_NAME
+                from backend.ingest import ingest
+                from backend.models import load_embedder
+                from backend.weaviate_client import get_weaviate_client
 
-                    client = get_weaviate_client()
+                # Route backend.ingest progress logs into a live status widget + progress bar.
+                with st.status("Ingesting documents…", expanded=True) as status:
+                    progress_bar = st.progress(0.0, text="Preparing…")
+                    ingest_logger = logging.getLogger("backend.ingest")
+                    handler = _IngestProgressHandler(threading.get_ident(), progress_bar, status)
+                    ingest_logger.addHandler(handler)
                     try:
-                        model = load_embedder()
-                        ingest(
-                            directory=save_dir,
-                            collection_name=COLLECTION_NAME,
-                            weaviate_client=client,
-                            embedding_model=model,
-                        )
+                        client = get_weaviate_client()
+                        try:
+                            model = load_embedder()
+                            ingest(
+                                directory=save_dir,
+                                collection_name=COLLECTION_NAME,
+                                weaviate_client=client,
+                                embedding_model=model,
+                            )
+                        finally:
+                            client.close()
+                        progress_bar.progress(1.0, text="Done")
+                        status.update(label=f"Ingested {len(saved_paths)} file(s).", state="complete")
+                    except Exception as e:
+                        status.update(label="Ingestion failed.", state="error")
+                        logger.error("Ingestion failed: %s", e)
+                        st.error(f"Ingestion failed: {e}")
                     finally:
-                        client.close()
-                st.success(f"Ingested {len(saved_paths)} file(s).")
+                        ingest_logger.removeHandler(handler)
 
 with st.form("question_form"):
     question = st.text_area("Ask a question:", height=100)
