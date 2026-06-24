@@ -50,7 +50,7 @@ def _download_model_with_progress(model_name: str, base_url: str, timeout_second
 
                 total = data.get("total")
                 completed = data.get("completed")
-                if total and completed:
+                if total and completed is not None:
                     percent = int(completed / total * 100)
                     if percent - last_logged_percent >= 10:  # throttle to every 10%
                         last_logged_percent = percent
