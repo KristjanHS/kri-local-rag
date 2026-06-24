@@ -54,6 +54,33 @@ def _skip_startup_checks() -> bool:
     )
 
 
+def _print_streamed_answer(question: str, k: int) -> None:
+    """Stream a real answer to the console with the CLI "Answer: " presentation.
+
+    Owns the CLI-side presentation that used to live inside ``answer()`` (#8): the
+    "Answer: " banner, trimming leading whitespace off the first streamed token, and the
+    trailing newline. ``backend.qa_loop.answer`` is now pure orchestration and emits raw
+    tokens through this callback.
+    """
+    import backend.qa_loop as qa
+
+    console.print("Answer: ", end="")
+    first_token = True
+
+    def on_token(token: str) -> None:
+        nonlocal first_token
+        # Trim leading whitespace from the first token only (display concern).
+        if first_token:
+            token = token.lstrip()
+            first_token = False
+        # Only output if the token has content (avoids an empty first token).
+        if token:
+            console.print(token, end="")
+
+    qa.answer(question, k=k, on_token=on_token)
+    console.print()  # newline after streaming completes
+
+
 def ensure_backend_ready() -> None:
     """Block until Weaviate is ready/populated and the Ollama model is available.
 
@@ -97,10 +124,8 @@ def main() -> int:
             if fake_answer is not None:
                 console.print(f"Answer: {fake_answer}")
             else:
-                # Real path streams tokens to stdout; no extra final print to avoid duplication
-                import backend.qa_loop as qa
-
-                qa.answer(args.question, k=args.k)
+                # Real path: presentation (banner, first-token trim, newline) owned by cli.py
+                _print_streamed_answer(args.question, args.k)
             _flush_stdout()
             return 0
 
@@ -132,10 +157,8 @@ def main() -> int:
                 # Deterministic test path: print fake answer once
                 console.print(fake_answer)
             else:
-                # Real path streams tokens to stdout via qa.answer
-                import backend.qa_loop as qa
-
-                qa.answer(question, k=args.k)
+                # Real path: presentation (banner, first-token trim, newline) owned by cli.py
+                _print_streamed_answer(question, args.k)
             _flush_stdout()
 
         return 0

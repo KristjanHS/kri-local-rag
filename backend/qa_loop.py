@@ -14,7 +14,6 @@ from typing import Any, Callable, List, Optional, Tuple
 
 # Local .py imports
 from backend.config import OLLAMA_MODEL, get_logger
-from backend.console import console
 from backend.models import load_reranker
 from backend.ollama_client import generate_response
 from backend.retriever import get_top_k
@@ -107,22 +106,17 @@ def answer(
     context_tokens: int = 8192,
     collection_name: Optional[str] = None,
 ) -> str:
-    """Return an answer from the LLM using RAG with an optional streaming token callback.
-    Can be interrupted with stop_event.
+    """Return an answer from the LLM using RAG, streaming raw tokens via *on_token*.
+
+    Pure orchestration: retrieve → re-rank → build prompt → generate. All user-facing
+    presentation (the "Answer: " banner, the streaming display, trailing newline) lives
+    in the caller — ``cli.py`` for the CLI, ``frontend/rag_app.py`` for the UI — so this
+    function never touches the console. When *on_token* is supplied, every user-facing
+    string (including the no-context message) is emitted through it. The fake-answer test
+    hook also lives in the presentation layers, not here. Interruptible via *stop_event*.
     """
 
     global _ollama_context
-
-    # Test hook: deterministic fake answer (used by CLI/UI e2e tests)
-    fake_answer = os.getenv("RAG_FAKE_ANSWER")
-    if fake_answer is not None:
-        # Stream tokens if a callback is provided to emulate real-time output
-        if on_token is not None:
-            for ch in fake_answer:
-                if stop_event is not None and stop_event.is_set():
-                    break
-                on_token(ch)
-        return fake_answer
 
     # Lazily load the cross-encoder when the caller didn't supply one (e.g. the CLI
     # entrypoint), so answer() is self-sufficient for the real RAG path. Frontend and
@@ -140,16 +134,9 @@ def answer(
         collection_name=collection_name,
     )
     if not candidates:
-        # Ensure the CLI emits a message to stdout in one-shot mode as well
         msg = "I found no relevant context to answer that question. The database may be empty. Ingest a PDF first."
-        try:
-            if on_token is None:
-                # Mirror the normal CLI behaviour that prefixes with 'Answer: '
-                console.print(f"Answer: {msg}")
-        except Exception:
-            # Best-effort console output; always return the message regardless.
-            # (Avoids `return` inside `finally`, deprecated in Python 3.14.)
-            logger.debug("Failed to print empty-context answer to console", exc_info=True)
+        if on_token is not None:
+            on_token(msg)
         return msg
 
     # ---------- 2) Re-rank ------------------------------------------------------
@@ -169,31 +156,6 @@ def answer(
     logger.debug("Prompt being sent to Ollama (%d chars, %d chunks)", len(prompt_text), len(context_chunks))
 
     # ---------- 4) Query the LLM -------------------------------------------------
-    # Collect tokens for CLI output
-    collected_tokens: list[str] = []
-    first_token_processed = False
-
-    def cli_on_token(token: str) -> None:
-        nonlocal first_token_processed
-
-        # Trim leading whitespace from the first token only
-        if not first_token_processed:
-            token = token.lstrip()
-            first_token_processed = True
-
-        # Only output if token has content (avoid empty first tokens)
-        if token:
-            collected_tokens.append(token)
-            # Print tokens immediately for better UX
-            console.print(token, end="")
-
-    if on_token is None:
-        on_token = cli_on_token
-
-    # Show "Answer: " before streaming starts (for CLI mode)
-    if on_token is not None:
-        console.print("Answer: ", end="")
-
     logger.debug("About to call generate_response with model=%s context_tokens=%d", OLLAMA_MODEL, context_tokens)
     answer_text, updated_context = generate_response(
         prompt_text,
@@ -204,14 +166,11 @@ def answer(
         context_tokens=context_tokens,
     )
 
-    # Add newline after streaming completes to position cursor properly
-    if on_token is not None:
-        console.print()
-
     # Update context for next interaction
     _ollama_context = updated_context
 
-    # Ensure no leading whitespace in the final answer
+    # Single leading-whitespace trim of the returned text. Display-side trimming of the
+    # first streamed token is the caller's concern (see cli.py._print_streamed_answer).
     return answer_text.lstrip()
 
 
