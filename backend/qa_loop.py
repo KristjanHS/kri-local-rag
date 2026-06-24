@@ -5,18 +5,15 @@
 from __future__ import annotations
 
 import os
-import sys
 import threading
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Tuple
 
-from rich.rule import Rule
-
 # Local .py imports
-from backend.config import OLLAMA_MODEL, get_logger, set_log_level
+from backend.config import OLLAMA_MODEL, get_logger
 from backend.console import console
 from backend.models import load_reranker
-from backend.ollama_client import generate_response, pull_if_missing
+from backend.ollama_client import generate_response
 from backend.retriever import get_top_k
 
 # Set up logging for this module
@@ -25,20 +22,6 @@ logger = get_logger(__name__)
 
 # Constants
 MAX_RETRIES = 3
-
-
-def _resolve_cli_log_level(log_level: str | None, verbose_count: int, quiet_count: int) -> str:
-    """Resolve the effective log-level name from CLI flags. Pure: no logging side effects."""
-    if log_level:
-        return log_level.upper()
-    if verbose_count >= 2:
-        return "DEBUG"
-    if verbose_count == 1:
-        return "INFO"  # Default, but explicit
-    if quiet_count >= 1:
-        return "WARNING"
-    # Default to INFO (overridable via LOG_LEVEL) when no flags are provided
-    return os.getenv("LOG_LEVEL", "INFO").upper()
 
 
 # ---------- cross-encoder helpers --------------------------------------------------
@@ -138,6 +121,12 @@ def answer(
                 on_token(ch)
         return fake_answer
 
+    # Lazily load the cross-encoder when the caller didn't supply one (e.g. the CLI
+    # entrypoint), so answer() is self-sufficient for the real RAG path. Frontend and
+    # tests pass an explicit cross_encoder, so this branch is CLI-only.
+    if cross_encoder is None:
+        cross_encoder = _get_cross_encoder()
+
     # ---------- 1) Retrieve -----------------------------------------------------
     # Ask vector DB for more than we eventually keep to improve re-ranking quality
     initial_k = k * 20
@@ -223,9 +212,7 @@ def answer(
     return answer_text.lstrip()
 
 
-# ---------- CLI --------------------------------------------------
-import argparse
-
+# ---------- Backend readiness / first-run bootstrap (shared with the Streamlit frontend) ----------
 from weaviate.classes.query import Filter
 
 from backend import config as app_config
@@ -316,106 +303,7 @@ def ensure_weaviate_ready_and_populated():
             logger.debug("Failed to close Weaviate client gracefully: %s", e)
 
 
-def qa_loop(
-    question: str,
-    embedding_model: Any,
-    cross_encoder: Any,
-    k: int = 3,
-):
-    """
-    Perform a single question-answering loop.
-    This function is a refactoring of the original __main__ block to be reusable.
-    """
-    with console.status("[bold green]Checking backend services...", spinner="dots"):
-        ensure_weaviate_ready_and_populated()
-
-        # Ensure the required Ollama model is available locally before accepting questions
-        if not pull_if_missing(OLLAMA_MODEL):
-            logger.error(
-                "Failed to ensure Ollama model %s is available. Check the logs above for details.", OLLAMA_MODEL
-            )
-            sys.exit(1)
-
-    result = answer(
-        question,
-        embedding_model=embedding_model,
-        cross_encoder=cross_encoder,
-        k=k,
-    )
-    return result
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Interactive RAG console.")
-    parser.add_argument("--k", type=int, default=3, help="Number of top chunks to keep after re-ranking")
-    parser.add_argument("--question", help="If provided, run a single query and exit.")
-    # Logging controls
-    parser.add_argument(
-        "-q", "--quiet", action="count", default=0, help="Decrease verbosity (can be used multiple times)"
-    )
-    parser.add_argument(
-        "-v", "--verbose", action="count", default=0, help="Increase verbosity (can be used multiple times)"
-    )
-    parser.add_argument("--log-level", help="Set explicit log level (e.g., DEBUG, INFO, WARNING)")
-    args = parser.parse_args()
-
-    # Set up logging as the very first action
-    set_log_level(_resolve_cli_log_level(log_level=args.log_level, verbose_count=args.verbose, quiet_count=args.quiet))
-
-    # Load models once (public loader)
-    from backend.models import load_embedder
-
-    embedding_model = load_embedder()
-    cross_encoder = _get_cross_encoder()
-
-    if args.question:
-        try:
-            qa_loop(
-                args.question,
-                embedding_model=embedding_model,
-                cross_encoder=cross_encoder,
-                k=args.k,
-            )
-        finally:
-            # Ensure Weaviate client connections are closed in one-shot mode
-            try:
-                close_weaviate_client()
-            except Exception as e:
-                logger.debug("Failed to close Weaviate client gracefully: %s", e)
-        sys.exit(0)
-
-    # Interactive loop - show readiness spinners and then the prompt
-    with console.status("[bold green]Verifying backend services...", spinner="dots"):
-        ensure_weaviate_ready_and_populated()
-        if not pull_if_missing(OLLAMA_MODEL):
-            logger.error(
-                "Failed to ensure Ollama model %s is available. Check the logs above for details.", OLLAMA_MODEL
-            )
-            sys.exit(1)
-
-    console.print(Rule(style="blue"))
-    console.print("💬 [bold]RAG CLI Ready.[/] Ask a question to begin.", justify="center")
-    console.print(Rule(style="blue"))
-
-    try:
-        while True:
-            question = console.input("→ ")
-            if not question.strip():
-                continue
-
-            qa_loop(
-                question,
-                embedding_model=embedding_model,
-                cross_encoder=cross_encoder,
-                k=args.k,
-            )
-            console.print()  # Add a blank line for readability before the next prompt
-
-    except (EOFError, KeyboardInterrupt):
-        console.print("\n[bold]Exiting RAG CLI.[/]")
-    finally:
-        # Ensure Weaviate client is properly closed to prevent resource leaks
-        try:
-            close_weaviate_client()
-        except Exception as e:
-            logger.debug("Failed to close Weaviate client gracefully: %s", e)
+# NOTE: The CLI entrypoint (argparse, interactive loop, readiness driver, sys.exit)
+# now lives in the repo-root `cli.py`. `qa_loop.py` is pure orchestration + the shared
+# readiness/bootstrap above (also imported by the Streamlit frontend). See the A2
+# resolution in docs/plans/2026-06-24-complexity-hotspots-simplification.md.

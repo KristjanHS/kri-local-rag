@@ -236,7 +236,7 @@ echo "The selected services are now running in the background."
 
 # Post-setup hints
 echo -e "You can access the Streamlit app at: ${BOLD}http://localhost:8501${NC}"
-echo "To open an interactive RAG CLI shell, run: ./scripts/cli.sh (starts qa_loop.py by default)"
+echo "To open an interactive RAG CLI shell, run: ./scripts/cli.sh (starts cli.py by default)"
 echo ""
 echo "To stop all services, run: docker compose --file $DOCKER_COMPOSE_FILE down"
 echo "To completely reset the environment, run: ./scripts/docker/docker-reset.sh"

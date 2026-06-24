@@ -348,3 +348,69 @@ collapsing `ensure_weaviate_ready_and_populated` to a plain `bootstrap_empty_col
 trace whether anything depends on the warmup side-effect (first-query cold-start latency). If
 warmup proves load-bearing, replace the PDF round-trip with a direct model-warm call (no
 vector-DB round-trip); if not, drop it entirely. Decision deferred to that investigation.
+
+---
+
+## A2 resolution — two-CLI consolidation (2026-06-24, `mybrain` deep session)
+
+**Discovery that the A2 deep-dive missed:** A2 was written assuming `cli.py` did not exist and
+would be *created* as the thin presentation layer. In reality there are **two divergent,
+both-live CLI entrypoints** doing the same job:
+
+| | root `cli.py` (`main()`) | `backend/qa_loop.py` `__main__` |
+|---|---|---|
+| Invoked by | `[project.scripts] kri-local-rag = "cli:main"`, `python cli.py`, `docker-compose.yml:87` mount, `tests/integration/test_cli_script_integration.py`, `tests/e2e/test_qa_real_end_to_end_container_e2e.py`, two unit tests (`test_cli_error_handling_unit`, `test_startup_model_check_unit`) | `scripts/cli.sh`, `make cli` (Makefile:141), e2e `run_cli_in_container` (`python -m backend.qa_loop`) |
+| Flags | `--debug`, `--version`, `-q/--question` | `-q/-v` (repeatable), `--log-level`, `--k`, `--question` |
+| UX | `Question:` prompt, `===` separators | Rich rules, spinner, `→ ` prompt |
+| Test hooks | `RAG_VERBOSE_TEST` (`PHASE:` prints), `RAG_SKIP_STARTUP_CHECKS`, `PYTEST_CURRENT_TEST` auto-skip | none |
+
+Presentation/readiness logic is **triplicated**: root `cli.py` + `qa_loop.__main__` + embedded
+in `answer()`.
+
+### Decisions (user-confirmed)
+- **The user's real path is `make cli`/`scripts/cli.sh` → `python -m backend.qa_loop`.** That
+  makes `qa_loop.__main__`'s surface **canonical**; root `cli.py` is vestigial (kept alive only
+  by tests + packaging).
+- **One door.** Collapse to a single invocation path. Survivor = **root `cli.py`** (the
+  packaging-idiomatic `cli:main` console-script, already declared + docker-mounted + test-targeted).
+- **`backend/qa_loop.py` → orchestration + shared readiness.** Keeps `answer()`, `build_prompt`,
+  `_rerank`, `_score_chunks`, `_get_cross_encoder`, `ScoredChunk`, `_resolve_cli_log_level` (pure
+  helper — stays here, zero test churn), and **`ensure_weaviate_ready_and_populated`**. The last
+  one is **shared with the Streamlit frontend** (`frontend/rag_app.py:212`) + e2e/unit tests — so
+  it is NOT CLI-only and must NOT move to `cli.py` (the A2 deep-dive's "readiness → cli.py" was
+  wrong on this point). **Deletes:** the `__main__` block, the `qa_loop()` driver, argparse.
+- **Root `cli.py` → single CLI entrypoint** (stays at repo root — do not create `backend/cli.py`;
+  the docker-compose mount + in-container e2e test depend on the repo-root path). Absorbs the
+  canonical surface (`-v/-q/--log-level` + `set_log_level(_resolve_cli_log_level(...))`,
+  spinner-wrapped readiness, Rich-rules interactive banner, model preload). Keeps its
+  test-pinned scaffolding (`RAG_*` hooks, `PHASE:` banners, inline fake-answer print, `Error:`
+  stderr + exit-1 wrapper, `pull_if_missing`→`Required Ollama model`+exit-1). Adds
+  `ensure_backend_ready()` (spinner + readiness + `pull_if_missing` + `sys.exit` — **dedup of
+  #22**). **Drops** `--debug`/`--version` (untested vestigial) and the `-q`→`--question` alias.
+- **Wiring → one door:** repoint `make cli`, `scripts/cli.sh`, e2e `run_cli_in_container` from
+  `python -m backend.qa_loop` → `python cli.py`. `[project.scripts]` + docker mount already target
+  `cli.py`.
+
+### Conflicts resolved
+- **`-q` alias collision (caught in pre-mortem):** root `cli.py` binds `-q`→`--question`;
+  `qa_loop` binds `-q`→`--quiet`. Resolution: `-q/-v` become quiet/verbose (canonical);
+  `--question` keeps only its long form (the `-q` alias was untested).
+- **Interactive banner:** keep `qa_loop`'s **Rich rules** (the user's real UX); **update** the
+  integration test's `"RAG System CLI - Interactive Mode"` assertion to match (it was
+  test-scaffolding, not a contract).
+
+### Scope boundary
+This A2 work is a **behavior-preserving relocation + one-door consolidation + #22 dedup**, in
+one commit. **#8** (purify `answer()`'s embedded console printing) and **#9** (collapse the
+fake-answer paths — note `answer()`'s fake path streams chars with no prefix, while `cli.py`'s
+inline fake prints `Answer: {fake}`, which the integration test pins) are **deferred to an
+immediate follow-up** — they are behavioral surgery on the most-tested function and force test
+rewrites that would muddy the structural diff. They "fall out" of A2 more safely as the next step.
+
+### Pre-mortem mitigations baked in
+- Sweep all 4 invocation surfaces (Makefile, `scripts/cli.sh`, e2e conftest, docker-compose) in
+  the **same commit** as the `__main__` deletion; verify zero remaining `backend.qa_loop`
+  *invocation* refs (imports of `answer`/`ensure_*` are fine).
+- Confirm nothing external imports the `qa_loop()` driver before deleting it (grep showed only
+  `__main__` calls it).
+- Keep `cli.py` at repo root; no new top-level module → docker mount + in-container e2e unchanged.

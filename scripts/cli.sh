@@ -21,5 +21,5 @@ fi
 # Ensure text-only Transformers import path in CPU environments
 export TRANSFORMERS_NO_TORCHVISION=${TRANSFORMERS_NO_TORCHVISION:-1}
 
-# Run the QA loop from the project root with the venv Python.
-exec "${VENV_PY}" -m backend.qa_loop "$@"
+# Run the CLI from the project root with the venv Python.
+exec "${VENV_PY}" cli.py "$@"

@@ -6,8 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.config import set_log_level
-from backend.qa_loop import _resolve_cli_log_level
+from backend.config import resolve_cli_log_level, set_log_level
 
 
 @pytest.fixture(autouse=True)
@@ -59,7 +58,7 @@ def test_resolve_cli_log_level_with_different_flags():
     ]
 
     for log_level, verbose_count, quiet_count, expected_level in test_cases:
-        assert _resolve_cli_log_level(log_level, verbose_count, quiet_count) == expected_level, (
+        assert resolve_cli_log_level(log_level, verbose_count, quiet_count) == expected_level, (
             f"Expected {expected_level} for flags: log_level={log_level}, verbose={verbose_count}, quiet={quiet_count}"
         )
 
@@ -67,7 +66,7 @@ def test_resolve_cli_log_level_with_different_flags():
 def test_resolve_cli_log_level_with_environment_variable():
     """Test that the resolver respects the LOG_LEVEL environment variable when no flags are set."""
     with patch.dict("os.environ", {"LOG_LEVEL": "WARNING"}):
-        assert _resolve_cli_log_level(None, 0, 0) == "WARNING"
+        assert resolve_cli_log_level(None, 0, 0) == "WARNING"
 
 
 def test_set_log_level_function():

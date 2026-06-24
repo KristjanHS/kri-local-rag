@@ -138,7 +138,7 @@ cli: ## Start CLI Q&A (pass ARGS='--question "..."')
 
 # Run CLI inside the app container (bind-mount code; editable in Dev)
 cli-docker: ## Run CLI inside the app container (ARGS='--question "..."')
-	@$(COMPOSE_APP) exec -T app /opt/venv/bin/python -m backend.qa_loop ${ARGS}
+	@$(COMPOSE_APP) exec -T app /opt/venv/bin/python cli.py ${ARGS}
 
 # Convenience: ask a one-off question without passing ARGS
 ask: ## One-off question via CLI (Q='...')

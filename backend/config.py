@@ -108,6 +108,20 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
 
+def resolve_cli_log_level(log_level: str | None, verbose_count: int, quiet_count: int) -> str:
+    """Resolve the effective log-level name from CLI flags. Pure: no logging side effects."""
+    if log_level:
+        return log_level.upper()
+    if verbose_count >= 2:
+        return "DEBUG"
+    if verbose_count == 1:
+        return "INFO"  # Default, but explicit
+    if quiet_count >= 1:
+        return "WARNING"
+    # Default to INFO (overridable via LOG_LEVEL) when no flags are provided
+    return os.getenv("LOG_LEVEL", "INFO").upper()
+
+
 def set_log_level(level: str | None) -> None:
     """
     Set the log level for the root logger and console handler.

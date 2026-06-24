@@ -400,7 +400,7 @@ def app_compose_up(weaviate_compose_up, ollama_compose_up):  # type: ignore[no-r
 
 @pytest.fixture(scope="session")
 def run_cli_in_container(app_compose_up):
-    """Return a callable that runs ``python -m backend.qa_loop <args>`` in the app container.
+    """Return a callable that runs ``python cli.py <args>`` in the app container.
 
     Targets whichever compose project is active — the running `make test-up` stack's
     `app-test` service when present, else the default-project `app` service — so the
@@ -410,25 +410,25 @@ def run_cli_in_container(app_compose_up):
     in_container = _detect_environment() == "Docker"
 
     def _run_cli(args: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
-        """Run ``python -m backend.qa_loop <args>`` against the app image.
+        """Run ``python cli.py <args>`` against the app image.
 
         Inside the compose network (pytest in the app container) the CLI is invoked
         directly — we are already running in the app image. On the host it is run via
         ``docker compose exec`` into the active project's app service.
 
         Args:
-            args: Command-line arguments appended to ``python -m backend.qa_loop``.
+            args: Command-line arguments appended to ``python cli.py``.
             env: Optional environment variables to set for the CLI process.
 
         Returns:
             A subprocess.CompletedProcess with stdout, stderr, and returncode.
         """
         if in_container:
-            full_command = [sys.executable, "-m", "backend.qa_loop", *args]
+            full_command = [sys.executable, "cli.py", *args]
             run_env = {**os.environ, **(env or {})}
         else:
             env_vars = [token for key, value in (env or {}).items() for token in ("-e", f"{key}={value}")]
-            cli = [ctx.app_service, "python", "-m", "backend.qa_loop", *args]
+            cli = [ctx.app_service, "python", "cli.py", *args]
             full_command = ctx.base + ["exec", "-T"] + env_vars + cli
             run_env = _compose_env(ctx.project)
 
