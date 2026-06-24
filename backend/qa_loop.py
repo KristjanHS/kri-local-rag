@@ -1,5 +1,8 @@
-#!/usr/bin/env python3
-"""RAG CLI: Interactive console for Retrieval-Augmented Generation."""
+"""RAG orchestration: answer(), prompt building, cross-encoder re-ranking, and the
+shared Weaviate readiness/bootstrap (also used by the Streamlit frontend).
+
+The CLI entrypoint (argparse, interactive loop, readiness driver) lives in the
+repo-root `cli.py` — this module is no longer invoked directly."""
 
 # External libraries
 from __future__ import annotations

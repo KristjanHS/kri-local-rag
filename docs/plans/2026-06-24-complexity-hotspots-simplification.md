@@ -374,8 +374,11 @@ in `answer()`.
 - **One door.** Collapse to a single invocation path. Survivor = **root `cli.py`** (the
   packaging-idiomatic `cli:main` console-script, already declared + docker-mounted + test-targeted).
 - **`backend/qa_loop.py` → orchestration + shared readiness.** Keeps `answer()`, `build_prompt`,
-  `_rerank`, `_score_chunks`, `_get_cross_encoder`, `ScoredChunk`, `_resolve_cli_log_level` (pure
-  helper — stays here, zero test churn), and **`ensure_weaviate_ready_and_populated`**. The last
+  `_rerank`, `_score_chunks`, `_get_cross_encoder`, `ScoredChunk`, and
+  **`ensure_weaviate_ready_and_populated`**. (CORRECTION at implementation: the log-level resolver
+  did NOT stay here — it moved to `backend.config` as the public `resolve_cli_log_level()` so
+  `cli.py` can resolve log level without importing heavy `qa_loop`/torch. config is already a
+  module-level import in cli.py, so this is free; `test_cli_output` repoints its import.) The last
   one is **shared with the Streamlit frontend** (`frontend/rag_app.py:212`) + e2e/unit tests — so
   it is NOT CLI-only and must NOT move to `cli.py` (the A2 deep-dive's "readiness → cli.py" was
   wrong on this point). **Deletes:** the `__main__` block, the `qa_loop()` driver, argparse.
