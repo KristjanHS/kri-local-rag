@@ -44,7 +44,7 @@ def _collection_has_any_objects(client, collection_name: str) -> bool:
         return False
 
 
-def test_bootstrap_creates_missing_collection_and_cleans_example_data(tmp_path, weaviate_compose_up):
+def test_bootstrap_creates_missing_collection_schema_only(tmp_path, weaviate_compose_up):
     # Target the explicit test collection. Do NOT hardcode the Weaviate URL: the
     # client resolves it via get_service_url("weaviate"), which reads the
     # compose-injected WEAVIATE_URL — "http://weaviate:8080" inside the test
