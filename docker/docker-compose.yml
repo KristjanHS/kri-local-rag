@@ -25,10 +25,14 @@ services:
       DEFAULT_VECTORIZER_MODULE: 'none' # We are providing vectors manually
       # ENABLE_MODULES: 'text2vec-huggingface,reranker-huggingface' # Still needed for reranker
       CLUSTER_HOSTNAME: 'node1'
-      # Pin the gossip advertise address to the container's primary interface.
-      # Without this, Weaviate's memberlist auto-detection fails ("No private IP
-      # address found") in some Docker/WSL2 networks and the container exits 1.
-      CLUSTER_ADVERTISE_INTERFACE: 'eth0'
+      # Single-node deployment: pin memberlist/gossip to loopback. Without this,
+      # Weaviate tries to advertise on the primary interface's private IP, which on
+      # WSL2/Docker is often not assigned yet at boot — memberlist then exits 1 with
+      # "No private IP address found" and the container flaps (restart: on-failure
+      # never converges because eth0 stays IP-less). 127.0.0.1 is always up at boot,
+      # so startup is deterministic. Targeting CLUSTER_ADVERTISE_INTERFACE: eth0 did
+      # not help — it still depends on eth0 having a routable IP in time.
+      CLUSTER_IN_LOCALHOST: 'true'
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/v1/.well-known/ready || exit 1"]
       interval: 5s
