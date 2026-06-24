@@ -9,13 +9,9 @@ services:
     # originally motivated this directive is now fixed at the source via
     # CLUSTER_IN_LOCALHOST below (memberlist binds to 127.0.0.1, always up at boot).
     restart: on-failure
-    # Host ports are parametrized so the `test` profile can run alongside the live
-    # stack on distinct ports (scripts/dev/test-env.sh sets the *_HOST_PORT vars).
-    # Container-side ports stay fixed at 8080/50051 — internal DNS and healthchecks
-    # are unaffected.
     ports:
-      - "127.0.0.1:${WEAVIATE_HTTP_HOST_PORT:-8080}:8080"
-      - "127.0.0.1:${WEAVIATE_GRPC_HOST_PORT:-50051}:50051"
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:50051:50051"
     volumes:
       - weaviate_db:/var/lib/weaviate
     environment:
@@ -59,7 +55,7 @@ services:
     volumes:
       - ../model_cache:/root/.ollama
     ports:
-      - "127.0.0.1:${OLLAMA_HOST_PORT:-11434}:11434"
+      - "127.0.0.1:11434:11434"
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
@@ -80,13 +76,15 @@ services:
         INSTALL_EDITABLE: "1"
 
     ports:
-      # Parametrized so the test stack's app-test (which inherits this via `extends`)
-      # lands on a distinct host port instead of colliding with the live app on 8501.
-      - "${APP_HOST_PORT:-8501}:8501"
+      # app-test inherits this via `extends` but overrides with `ports: []`, so it
+      # publishes nothing and never collides with the live app on 8501.
+      - "8501:8501"
     volumes:
       - ../backend:/app/backend # Live backend code (for editable runtime package in Dev)
       - ../frontend:/app/frontend # Live frontend code            (for hot reload in Dev)
       - ../tests:/app/tests:ro # Live tests for in-container testing
+      - ../pyproject.toml:/app/pyproject.toml:ro # Integration test config ([tool.integration])
+      - ../cli.py:/app/cli.py:ro # CLI entrypoint exercised by integration tests
       - ../data:/app/data # Live data access (read-write: GUI ingest writes uploaded PDFs here)
       - ../example_data:/app/example_data:ro # Ensure example_data matches project layout
     working_dir: /app

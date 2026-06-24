@@ -33,12 +33,12 @@ the day Ollama changes its API.
 | 9 | Duplicated `RAG_FAKE_ANSWER` bypass | qa_loop.py:137 + rag_app.py:27-29,245 | MEDIUM | Two char-streaming fake paths |
 | 10 | Debug-log spam per token/line | ollama_client.py:185-234 | MEDIUM | ~20 debug calls, one per token |
 | 11 | Three URL-resolution mechanisms | config.py:183-204 + ollama_client.py:16-28 | MEDIUM | `get_service_url` + consts + `_get_ollama_base_url` |
-| 12 | `optimize_embedding_model` torch.compile | ingest.py:256-280 | MEDIUM | max-autotune + marker-attr hack on CPU MiniLM |
+| 12 | `optimize_embedding_model` torch.compile | ingest.py:256-280 | MEDIUM | ✅ DONE 2026-06-24 — proven no-op (`.encode()` bypasses compiled forward); removed fn + call + `torch` import |
 | 13 | `connect_to_weaviate` "deprecated" shim | ingest.py:155-158 | MEDIUM | Comment lies; it's the live path |
 | 14 | Three logging config entry points | config.py + qa_loop.py:30-46 | MEDIUM | `_setup_logging`/`set_log_level`/`_setup_cli_logging` |
 | 15 | `load_and_split_documents` dual path | ingest.py:86-149 | MEDIUM | file-branch & dir-branch duplicate logic |
 | 16 | Duplicated PDF magic-byte validation | ingest.py:63-69 + rag_app.py:138 | MEDIUM | Two impls of the same 5-byte check |
-| 17 | `SupportsEncode`/`TModel`/`runtime_checkable` | ingest.py:41-44,253 | LOW | Protocol+TypeVar for one concrete class |
+| 17 | `SupportsEncode`/`TModel`/`runtime_checkable` | ingest.py:41-44,253 | LOW | Partial: `TModel` removed with #12 (2026-06-24); `SupportsEncode`/`runtime_checkable` still used |
 | 18 | Re-sort of already-sorted results | retriever.py:122-124 | LOW | "just in case" sort on dubious key |
 | 19 | Over-defensive `getattr`/`cast` on `Document` | ingest.py:179,206 | LOW | `.metadata` always exists |
 | 20 | Dead comments describing non-behavior | ingest.py:224-235 | LOW | 3 comment blocks on upsert we don't do |
@@ -313,7 +313,9 @@ code from `qa_loop`, so it does not collide with the A2 split.
    anyway (no Weaviate vectorizer configured), so deleting it is strictly safe.
 5. **A2 split first**, then **#6, #8, #9, #22 fall out** of it. **#7** (Streamlit logging) is
    independent structural work — slot alongside.
-6. **Remainder as capacity allows:** #10, #12, #15, #17, #23, #24, A3.
+6. **Remainder as capacity allows:** #10, #15, #17, #23, #24, A3. (**#12 shipped 2026-06-24** —
+   see table; surfaced while investigating the `torch.jit.script_method` 3.14 deprecation warning,
+   whose sole trigger was this dead `torch.compile` call.)
 
 ### Re-work note
 Only **#5** (touches `answer()` params) edits `qa_loop` before A2 relocates that code; it is
