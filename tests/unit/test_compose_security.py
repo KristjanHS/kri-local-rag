@@ -23,9 +23,15 @@ def test_compose_service_ports_binding_security() -> None:
     ollama_ports = services.get("ollama", {}).get("ports", [])
     app_ports = services.get("app", {}).get("ports", [])
 
-    assert any(str(p).startswith("127.0.0.1:8080:") for p in weaviate_ports), "Weaviate must bind to loopback"
-    assert any(str(p).startswith("127.0.0.1:50051:") for p in weaviate_ports), "Weaviate gRPC must bind to loopback"
-    assert any(str(p).startswith("127.0.0.1:11434:") for p in ollama_ports), "Ollama must bind to loopback"
+    # Host ports are parametrized (e.g. "127.0.0.1:${WEAVIATE_HTTP_HOST_PORT:-8080}:8080")
+    # so the test profile can run on distinct host ports. The security property is the
+    # loopback (127.0.0.1) binding prefix; the container-side port suffix stays fixed.
+    def binds_loopback(ports: list[object], container_port: int) -> bool:
+        return any(str(p).startswith("127.0.0.1:") and str(p).endswith(f":{container_port}") for p in ports)
+
+    assert binds_loopback(weaviate_ports, 8080), "Weaviate must bind to loopback"
+    assert binds_loopback(weaviate_ports, 50051), "Weaviate gRPC must bind to loopback"
+    assert binds_loopback(ollama_ports, 11434), "Ollama must bind to loopback"
 
     # Streamlit app should be published (no strict binding required here)
     assert any(":8501" in str(p) for p in app_ports), "App should publish port 8501"

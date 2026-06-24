@@ -26,9 +26,10 @@ def test_qa_pipeline_produces_answer():
     mock_generate_response = MagicMock(side_effect=_fake_generate_response)
 
     question = "What is the capital of France?"
-    from backend.qa_loop import _get_cross_encoder
 
-    cross_encoder = _get_cross_encoder()
+    # Mock the reranker: the real model can't load under the unit tier's socket block.
+    cross_encoder = MagicMock()
+    cross_encoder.predict.side_effect = lambda pairs: [1.0] * len(pairs)
     with (
         patch("backend.qa_loop.get_top_k", mock_get_top_k),
         patch("backend.qa_loop.generate_response", mock_generate_response),
@@ -62,9 +63,9 @@ def test_qa_pipeline_no_context():
     mock_get_top_k = MagicMock(return_value=[])
 
     question = "What is the capital of France?"
-    from backend.qa_loop import _get_cross_encoder
 
-    cross_encoder = _get_cross_encoder()
+    # No retrieved chunks: reranking short-circuits, but pass a mock for consistency.
+    cross_encoder = MagicMock()
     with patch("backend.qa_loop.get_top_k", mock_get_top_k):
         result = answer(question, cross_encoder=cross_encoder)
 

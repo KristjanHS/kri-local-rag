@@ -62,7 +62,6 @@ __pycache__/
 .ruff_cache/
 .cache/
 model_cache/
-.run_id
 .test-build.hash
 .test-build-timestamp
 

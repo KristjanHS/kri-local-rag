@@ -120,17 +120,16 @@ case "$command" in
     ;;
     
   integration)
-    # Check if test environment is running
-    if [[ ! -f .run_id ]]; then
-      echo "Error: Test environment not running. Run '$0 up' first." >&2
-      exit 1
-    fi
-    
-    RUN_ID=$(cat .run_id)
-    echo "Running integration tests in Compose environment (RUN_ID=$RUN_ID)..."
-    
+    # NOTE: this path is stale — it references a non-existent compose.test.yml and the
+    # `app` service rather than `app-test`. `make test-integration` routes through
+    # scripts/dev/test-env.sh instead. Kept here only as a minimal fixed-project-name
+    # swap; fixing or removing this branch (and the unused COMPOSE_TEST_FILE var) is a
+    # tracked follow-up.
+    PROJECT_NAME="${COMPOSE_PROJECT_NAME:-kri-local-rag-test}"
+    echo "Running integration tests in Compose environment (project=$PROJECT_NAME)..."
+
     # Run tests inside the app container
-    docker compose -f "$COMPOSE_FILE" -f "$COMPOSE_TEST_FILE" -p "$RUN_ID" exec -T app /opt/venv/bin/python3 -m pytest tests/integration -q "$@"
+    docker compose -f "$COMPOSE_FILE" -f "$COMPOSE_TEST_FILE" -p "$PROJECT_NAME" exec -T app /opt/venv/bin/python3 -m pytest tests/integration -q "$@"
     ;;
     
   e2e)
