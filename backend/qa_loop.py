@@ -27,23 +27,18 @@ logger = get_logger(__name__)
 MAX_RETRIES = 3
 
 
-def _setup_cli_logging(log_level: str | None, verbose_count: int, quiet_count: int):
-    """Configure logging based on CLI flags."""
+def _resolve_cli_log_level(log_level: str | None, verbose_count: int, quiet_count: int) -> str:
+    """Resolve the effective log-level name from CLI flags. Pure: no logging side effects."""
     if log_level:
-        level = log_level.upper()
-    elif verbose_count >= 2:
-        level = "DEBUG"
-    elif verbose_count == 1:
-        level = "INFO"  # Default, but explicit
-    elif quiet_count >= 1:
-        level = "WARNING"
-    else:
-        # Default to INFO (overridable via LOG_LEVEL) when no flags are provided
-        level = os.getenv("LOG_LEVEL", "INFO").upper()
-
-    # Use the centralized logging configuration
-    set_log_level(level)
-    logger.debug("Log level set to %s", level)
+        return log_level.upper()
+    if verbose_count >= 2:
+        return "DEBUG"
+    if verbose_count == 1:
+        return "INFO"  # Default, but explicit
+    if quiet_count >= 1:
+        return "WARNING"
+    # Default to INFO (overridable via LOG_LEVEL) when no flags are provided
+    return os.getenv("LOG_LEVEL", "INFO").upper()
 
 
 # ---------- cross-encoder helpers --------------------------------------------------
@@ -365,7 +360,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Set up logging as the very first action
-    _setup_cli_logging(log_level=args.log_level, verbose_count=args.verbose, quiet_count=args.quiet)
+    set_log_level(_resolve_cli_log_level(log_level=args.log_level, verbose_count=args.verbose, quiet_count=args.quiet))
 
     # Load models once (public loader)
     from backend.models import load_embedder
