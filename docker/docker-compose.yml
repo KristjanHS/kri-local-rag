@@ -125,8 +125,14 @@ services:
         INSTALL_DEV: "1"
     ports: []
     command: ["tail", "-f", "/dev/null"]
+    # app-test runs `tail -f /dev/null`, so there is nothing to probe. `extends app`
+    # otherwise drags in app's healthcheck *timing* (interval 5s, start_period 30s) even
+    # when `test` is overridden — and `up --wait` then blocks ~5s waiting for the first
+    # no-op probe before app-test flips to healthy. Disabling the healthcheck lets
+    # `--wait` return as soon as the container is running; readiness that actually matters
+    # (weaviate + ollama) is still gated via depends_on. Saves ~5s per `make test-up`.
     healthcheck:
-      test: ["CMD-SHELL", "exit 0"]
+      disable: true
 
   # ---------- One-off Ingestion Utility -----------------------------------------
   ingester:
