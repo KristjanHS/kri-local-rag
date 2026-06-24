@@ -123,7 +123,11 @@ echo "The script will wait for all services to report a 'healthy' status."
 echo "Detailed output is being saved to '$LOG_FILE'."
 
 compose_up_with_logs() {
-    if docker compose --file "$DOCKER_COMPOSE_FILE" up --detach --wait "${SERVICES_UP[@]}"; then
+    # --force-recreate: never reuse a stale container. A weaviate container left over from a
+    # prior run can, on mere restart, come up before its eth0 gets a private IP — memberlist then
+    # dies with "No private IP address found" (exit 1) and the whole `up --wait` fails. Recreating
+    # from scratch reattaches the network cleanly. Volumes are preserved (recreate ≠ down -v).
+    if docker compose --file "$DOCKER_COMPOSE_FILE" up --detach --wait --force-recreate "${SERVICES_UP[@]}"; then
         return 0
     else
         rc=$?
