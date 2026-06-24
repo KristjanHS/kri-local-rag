@@ -36,9 +36,9 @@ the day Ollama changes its API.
 | 12 | `optimize_embedding_model` torch.compile | ingest.py:256-280 | MEDIUM | ✅ DONE 2026-06-24 — proven no-op (`.encode()` bypasses compiled forward); removed fn + call + `torch` import |
 | 13 | `connect_to_weaviate` "deprecated" shim | ingest.py:155-158 | MEDIUM | Comment lies; it's the live path |
 | 14 | Three logging config entry points | config.py + qa_loop.py:30-46 | MEDIUM | `_setup_logging`/`set_log_level`/`_setup_cli_logging` |
-| 15 | `load_and_split_documents` dual path | ingest.py:86-149 | MEDIUM | file-branch & dir-branch duplicate logic |
+| 15 | `load_and_split_documents` dual path | ingest.py:86-149 | MEDIUM | ✅ DONE 2026-06-24 — collapsed to one per-file loop; file discovery → `_resolve_ingest_files`; magic-byte check + error isolation now single-source |
 | 16 | Duplicated PDF magic-byte validation | ingest.py:63-69 + rag_app.py:138 | MEDIUM | Two impls of the same 5-byte check |
-| 17 | `SupportsEncode`/`TModel`/`runtime_checkable` | ingest.py:41-44,253 | LOW | Partial: `TModel` removed with #12 (2026-06-24); `SupportsEncode`/`runtime_checkable` still used |
+| 17 | `SupportsEncode`/`TModel`/`runtime_checkable` | ingest.py:41-44,253 | LOW | ✅ RESOLVED (KEEP) 2026-06-24 — `TModel` removed with #12; `SupportsEncode` is a legitimate lightweight type on 2 prod signatures + `runtime_checkable` carries real `DummyEmbedder` coverage. No churn warranted |
 | 18 | Re-sort of already-sorted results | retriever.py:122-124 | LOW | "just in case" sort on dubious key |
 | 19 | Over-defensive `getattr`/`cast` on `Document` | ingest.py:179,206 | LOW | `.metadata` always exists |
 | 20 | Dead comments describing non-behavior | ingest.py:224-235 | LOW | 3 comment blocks on upsert we don't do |
@@ -170,8 +170,8 @@ It surfaced **4 findings absent from pass 1**, plus useful precision on existing
 |---|---------|-----------|----------|---------|
 | 21 | `_download_model_with_progress` complexity | ollama_client.py:41-94 | **HIGH** | Cognitive complexity **42**, nesting depth **6** — the single most complex function in the repo, missed by pass 1 |
 | 22 | Duplicated "ensure backend ready" block | qa_loop.py:338-345 + 414-420 | MEDIUM | `ensure_weaviate_ready_and_populated()` + `pull_if_missing` + error + `sys.exit(1)` copy-pasted verbatim in two callers |
-| 23 | `answer()` 9-parameter signature | qa_loop.py:118 | MEDIUM | Distinct from #8's job-count: the *signature* is a config-object candidate (`AnswerRequest` dataclass) |
-| 24 | `_setup_logging` length | config.py:19-79 | LOW | 61 lines, reinforces #14 (three logging entry points) |
+| 23 | `answer()` 9-parameter signature | qa_loop.py:118 | MEDIUM | ❌ DECLINED 2026-06-24 — an `AnswerRequest` dataclass relocates complexity without reducing it and forces every caller (cli.py/frontend/tests) to build an object. The kw-only split already groups call-control params. Ceremony, not simplification |
+| 24 | `_setup_logging` length | config.py:19-79 | LOW | ✅ DONE 2026-06-24 — decomposed into `_make_console_handler`/`_attach_file_handler`/`_quiet_noisy_loggers`; orchestrator now reads level→console→file→quiet |
 
 **Revised weighted total:** pass-1 28 + (1 HIGH ×2) + (2 MEDIUM ×2) + (1 LOW ×1) = **35**.
 
@@ -313,7 +313,8 @@ code from `qa_loop`, so it does not collide with the A2 split.
    anyway (no Weaviate vectorizer configured), so deleting it is strictly safe.
 5. **A2 split first**, then **#6, #8, #9, #22 fall out** of it. **#7** (Streamlit logging) is
    independent structural work — slot alongside.
-6. **Remainder as capacity allows:** #10, #15, #17, #23, #24, A3. (**#12 shipped 2026-06-24** —
+6. **Remainder (resolved 2026-06-24 — see D7):** #15/#24 shipped; #17 keep; #23/A3 declined;
+   **#7+#10 deferred to a USER DECISION** (reverses shipped Tier 2.3). (**#12 shipped 2026-06-24** —
    see table; surfaced while investigating the `torch.jit.script_method` 3.14 deprecation warning,
    whose sole trigger was this dead `torch.compile` call.)
 
@@ -348,6 +349,32 @@ collapsing `ensure_weaviate_ready_and_populated` to a plain `bootstrap_empty_col
 trace whether anything depends on the warmup side-effect (first-query cold-start latency). If
 warmup proves load-bearing, replace the PDF round-trip with a direct model-warm call (no
 vector-DB round-trip); if not, drop it entirely. Decision deferred to that investigation.
+
+### D7 — Campaign tail (#15/#17/#23/#24/A3) resolved 2026-06-24 (`/impag` batch-8)
+
+The remainder of the authoritative-order step 6 was triaged against YAGNI and the
+senior-architect verdict (no re-architecture buys 2x; module reorg explicitly ruled out):
+- **#15 — DONE** (collapsed dual path; see table). **#24 — DONE** (decomposed `_setup_logging`).
+- **#17 — KEEP/RESOLVED.** `SupportsEncode` is a legitimate lightweight Protocol on two prod
+  signatures; `runtime_checkable` + its single isinstance assertion ride a test file that
+  carries real `DummyEmbedder` ingest coverage. Churning it deletes no real complexity.
+- **#23 — DECLINED.** `AnswerRequest` dataclass = ceremony, not simplification (see table).
+- **A3 — DECLINED (module reorg).** senior-architect (line ~212) ruled out layer extraction /
+  module reorg — "no structural rot, just hub weight." #11 (URL) shipped; #14 (logging entry
+  points) is effectively done (`get_logger` + `set_log_level` are the two public entries,
+  `_setup_logging` is private and now decomposed by #24). Splitting logging into its own module
+  would touch all 9 importers to move clean code around — net churn, no complexity cut.
+
+**Still owed — USER DECISION (not actioned, per plan-hygiene cross-plan-conflict rule):**
+- **#7 (Streamlit logging → `on_debug` callback) + #10 (per-token/line debug spam).** #7 REVERSES
+  shipped complexity-cleanup Tier 2.3 (`7dac225`), which *deliberately* removed the `on_debug`
+  param and replaced it with the `_DebugPanelHandler` logging design. #10 shares the same
+  `ollama_client` debug-stream surface, so they resolve together. Decision owed: reverse 2.3
+  (adopt the callback, accept backend re-threading) **or** keep the shipped handler design and
+  mark #7/#10 superseded. Until the user decides, neither is touched.
+
+With #7/#10 deferred to the user, this is the **last automated batch** — the rest of the
+24-finding catalogue is shipped or explicitly declined.
 
 **RESOLVED 2026-06-24 (`/impag` batch-7): warmup NOT load-bearing → dropped entirely.**
 Trace: (1) the ingest-then-delete block runs ONLY when the collection is missing (a fresh
