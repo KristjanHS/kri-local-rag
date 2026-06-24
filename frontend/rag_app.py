@@ -70,13 +70,15 @@ class _IngestProgressHandler(logging.Handler):
             prog = getattr(record, "ingest_progress", None)
             if prog and prog.get("total"):
                 frac = min(prog["current"] / prog["total"], 1.0)
-                self._progress_bar.progress(
-                    frac,
-                    text=(
+                if prog.get("phase") == "load":
+                    # Load phase: per-file progress before any chunk has been encoded.
+                    text = f"Loading documents {prog['current']}/{prog['total']} ({frac:.0%})"
+                else:
+                    text = (
                         f"{prog['current']}/{prog['total']} chunks ({frac:.0%}) · "
-                        f"{prog['rate']:.0f} chunks/s · ETA ~{prog['eta_s']:.0f}s"
-                    ),
-                )
+                        f"{prog.get('rate', 0):.0f} chunks/s · ETA ~{prog.get('eta_s', 0):.0f}s"
+                    )
+                self._progress_bar.progress(frac, text=text)
             else:
                 # High-level milestone (e.g. "Loaded N pages", "Split into N chunks").
                 self._status.write(record.getMessage())
@@ -153,7 +155,7 @@ with st.sidebar.expander("Ingest PDFs"):
             if not saved_paths:
                 st.error("No valid PDF files to ingest.")
             else:
-                # Ingest operates on a directory; use the save directory
+                # Ingest only the files just saved from this upload (see source=saved_paths below).
                 from backend.config import COLLECTION_NAME
                 from backend.ingest import ingest
                 from backend.models import load_embedder
@@ -169,8 +171,11 @@ with st.sidebar.expander("Ingest PDFs"):
                         client = get_weaviate_client()
                         try:
                             model = load_embedder()
+                            # Ingest ONLY the freshly-uploaded files — not the whole
+                            # data/ corpus already on disk (which made every upload
+                            # re-embed thousands of chunks and appear to hang).
                             ingest(
-                                directory=save_dir,
+                                source=saved_paths,
                                 collection_name=COLLECTION_NAME,
                                 weaviate_client=client,
                                 embedding_model=model,

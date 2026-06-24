@@ -89,18 +89,34 @@ _Loader = Callable[[str], List[Document]]
 _LOADERS: dict[str, _Loader] = {".pdf": _load_pdf, ".md": _load_text}
 
 
-def _resolve_ingest_files(path: str) -> list[tuple[str, _Loader]]:
-    """Map an ingest path (a single file or a directory) to (file, loader) pairs.
+def _file_loader(file_path: str) -> Optional[tuple[str, _Loader]]:
+    """Pair a single file with its loader by extension, or warn+drop if missing/unsupported."""
+    if not os.path.isfile(file_path):
+        logger.warning(f"Path not found or not a file: '{file_path}'. Skipping.")
+        return None
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext not in _LOADERS:
+        logger.warning(f"Unsupported file extension '{ext}' for path '{file_path}'.")
+        return None
+    return (file_path, _LOADERS[ext])
 
-    Centralizes file discovery so the single-file and directory cases share one
-    per-file load loop instead of duplicating the magic-byte/error-isolation logic.
+
+def _resolve_ingest_files(source: str | list[str]) -> list[tuple[str, _Loader]]:
+    """Map an ingest source to (file, loader) pairs.
+
+    ``source`` is one of: an explicit list of files (e.g. the GUI's freshly-uploaded
+    paths — only these are processed, never the rest of the directory), a single file
+    path, or a directory (recursively globbed). Centralizes file discovery so every
+    case shares one per-file load loop instead of duplicating the magic-byte/error
+    isolation logic.
     """
-    if os.path.isfile(path):
-        ext = os.path.splitext(path)[1].lower()
-        if ext not in _LOADERS:
-            logger.warning(f"Unsupported file extension '{ext}' for path '{path}'.")
-            return []
-        return [(path, _LOADERS[ext])]
+    if isinstance(source, list):
+        # Explicit file list: process exactly these, no directory globbing.
+        return [pair for fp in source if (pair := _file_loader(fp)) is not None]
+
+    if os.path.isfile(source):
+        pair = _file_loader(source)
+        return [pair] if pair is not None else []
 
     # Directory: recursive glob per supported extension; sorted for deterministic order.
     import glob
@@ -108,24 +124,40 @@ def _resolve_ingest_files(path: str) -> list[tuple[str, _Loader]]:
     return [
         (file_path, loader_fn)
         for ext, loader_fn in _LOADERS.items()
-        for file_path in sorted(glob.glob(os.path.join(path, f"**/*{ext}"), recursive=True))
+        for file_path in sorted(glob.glob(os.path.join(source, f"**/*{ext}"), recursive=True))
     ]
 
 
-def load_and_split_documents(path: str) -> List[Document]:
-    """Load documents from a directory or a single file, then split into chunks."""
-    # Fast path: if the path does not exist, skip gracefully
-    if not os.path.exists(path):
-        logger.warning(f"Path not found: '{path}'. Skipping ingestion.")
+def load_and_split_documents(source: str | list[str]) -> List[Document]:
+    """Load documents from an explicit file list, a single file, or a directory, then split.
+
+    A list of files is processed verbatim — only those files, never the surrounding
+    directory (this is what the GUI passes for its just-uploaded PDFs).
+    """
+    # Fast path: no source (empty list/string) or a single path that does not exist is
+    # skipped gracefully. (Non-empty lists are validated per-file in the loop below, so
+    # individual missing/unsupported entries just log and skip.)
+    if not source:
+        logger.warning("No ingest source provided; skipping ingestion.")
+        return []
+    if isinstance(source, str) and not os.path.exists(source):
+        logger.warning(f"Path not found: '{source}'. Skipping ingestion.")
         return []
 
-    files = _resolve_ingest_files(path)
+    files = _resolve_ingest_files(source)
+    total_files = len(files)
     docs: List[Document] = []
     file_count = 0
-    # Single per-file loop for both the single-file and directory cases. Per-file
+    # Single per-file loop for the file-list, single-file, and directory cases. Per-file
     # try/except so one corrupt PDF or non-UTF-8 file logs and is skipped rather
     # than aborting the whole batch.
-    for file_path, loader_fn in files:
+    for idx_f, (file_path, loader_fn) in enumerate(files, start=1):
+        # Per-file progress so the load phase isn't a silent wait before the upload
+        # phase reports anything (drives the Streamlit progress bar via ingest_progress).
+        logger.info(
+            f"Loading {os.path.basename(file_path)} ({idx_f}/{total_files})",
+            extra={"ingest_progress": {"current": idx_f, "total": total_files, "phase": "load"}},
+        )
         try:
             if file_path.lower().endswith(".pdf") and not _is_valid_pdf(file_path):
                 logger.warning(f"Skipping '{file_path}': not a valid PDF (bad magic bytes).")
@@ -145,9 +177,9 @@ def load_and_split_documents(path: str) -> List[Document]:
         # rejected/empty" — the per-file skip/error above already named the culprit,
         # so don't double-warn with a misleading "no documents found".
         if files:
-            logger.warning(f"Found {len(files)} file(s) in '{path}' but none yielded usable content.")
+            logger.warning(f"Found {total_files} file(s) but none yielded usable content.")
         else:
-            logger.warning(f"No documents found in '{path}'.")
+            logger.warning(f"No documents found for '{source}'.")
         return []
 
     logger.info(f"Loaded {len(docs)} pages from {file_count} files.")
@@ -240,7 +272,15 @@ def process_and_upload_chunks(
                     f"{rate:.1f} chunks/s, ETA ~{eta_s:.0f}s",
                     # Structured payload so the Streamlit ingest UI can drive a progress bar
                     # without parsing the message string (see frontend/rag_app.py).
-                    extra={"ingest_progress": {"current": idx, "total": total_chunks, "rate": rate, "eta_s": eta_s}},
+                    extra={
+                        "ingest_progress": {
+                            "current": idx,
+                            "total": total_chunks,
+                            "rate": rate,
+                            "eta_s": eta_s,
+                            "phase": "encode",
+                        }
+                    },
                 )
                 last_log_ts = now
 
@@ -248,17 +288,22 @@ def process_and_upload_chunks(
 
 
 def ingest(
-    directory: str,
+    source: str | list[str],
     collection_name: str,
     weaviate_client: weaviate.WeaviateClient,
     embedding_model: SupportsEncode,
     *,
     reset: bool = False,
 ):
-    """Main ingestion pipeline."""
+    """Main ingestion pipeline.
+
+    ``source`` is an explicit list of files, a single file, or a directory. The GUI
+    passes the freshly-uploaded paths so an upload ingests only those, not the whole
+    corpus already on disk.
+    """
     start_time = time.time()
 
-    chunked_docs = load_and_split_documents(directory)
+    chunked_docs = load_and_split_documents(source)
     if not chunked_docs:
         return
 
@@ -299,7 +344,7 @@ if __name__ == "__main__":
 
     try:
         ingest(
-            directory=str(args.data_dir),
+            source=str(args.data_dir),
             collection_name=COLLECTION_NAME,
             weaviate_client=client,
             embedding_model=model,
