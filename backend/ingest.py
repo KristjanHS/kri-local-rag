@@ -119,12 +119,13 @@ def load_and_split_documents(path: str) -> List[Document]:
         logger.warning(f"Path not found: '{path}'. Skipping ingestion.")
         return []
 
+    files = _resolve_ingest_files(path)
     docs: List[Document] = []
     file_count = 0
     # Single per-file loop for both the single-file and directory cases. Per-file
     # try/except so one corrupt PDF or non-UTF-8 file logs and is skipped rather
     # than aborting the whole batch.
-    for file_path, loader_fn in _resolve_ingest_files(path):
+    for file_path, loader_fn in files:
         try:
             if file_path.lower().endswith(".pdf") and not _is_valid_pdf(file_path):
                 logger.warning(f"Skipping '{file_path}': not a valid PDF (bad magic bytes).")
@@ -140,7 +141,13 @@ def load_and_split_documents(path: str) -> List[Document]:
     docs = [d for d in docs if d.page_content.strip()]
 
     if not docs:
-        logger.warning(f"No documents found in '{path}'.")
+        # Distinguish "nothing to ingest" from "files were found but all were
+        # rejected/empty" — the per-file skip/error above already named the culprit,
+        # so don't double-warn with a misleading "no documents found".
+        if files:
+            logger.warning(f"Found {len(files)} file(s) in '{path}' but none yielded usable content.")
+        else:
+            logger.warning(f"No documents found in '{path}'.")
         return []
 
     logger.info(f"Loaded {len(docs)} pages from {file_count} files.")
