@@ -102,6 +102,7 @@ def answer(
     k: int = 3,
     *,
     on_token: Optional[Callable[[str], None]] = None,
+    on_debug: Optional[Callable[[str], None]] = None,
     stop_event: Optional[threading.Event] = None,
     context_tokens: int = 8192,
     collection_name: Optional[str] = None,
@@ -114,6 +115,9 @@ def answer(
     function never touches the console. When *on_token* is supplied, every user-facing
     string (including the no-context message) is emitted through it. The fake-answer test
     hook also lives in the presentation layers, not here. Interruptible via *stop_event*.
+
+    LLM-stream diagnostics are forwarded to *on_debug* when supplied (the UI debug panel);
+    file/console logging is unaffected.
     """
 
     global _ollama_context
@@ -162,6 +166,7 @@ def answer(
         OLLAMA_MODEL,
         _ollama_context,
         on_token=on_token,
+        on_debug=on_debug,
         stop_event=stop_event,
         context_tokens=context_tokens,
     )
