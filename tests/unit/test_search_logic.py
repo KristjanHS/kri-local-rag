@@ -51,11 +51,11 @@ class TestHybridSearchFix:
         assert result == ["Test content 1", "Test content 2"]
 
     def test_retrieval_uses_explicit_embedding_model(self, mocker, mock_embedding_model: MagicMock):
-        """A caller-supplied embedding_model is used directly, bypassing the loader."""
+        """A caller-supplied embedding_model is used directly, without consulting the loader."""
         from backend.retriever import get_top_k
 
-        # Loader returns None: only the explicit model can satisfy vectorization.
-        mocker.patch("backend.retriever.load_embedder", return_value=None)
+        # Spy on the loader to prove it is never called when a model is supplied explicitly.
+        load_embedder_spy = mocker.patch("backend.retriever.load_embedder", return_value=mock_embedding_model)
 
         # encode() returns an ndarray in production; mirror that here.
         mock_embedding_model.encode.return_value = np.array([0.1, 0.2, 0.3])
@@ -77,6 +77,7 @@ class TestHybridSearchFix:
 
         result = get_top_k("test question", k=1, embedding_model=mock_embedding_model)
 
+        load_embedder_spy.assert_not_called()
         mock_embedding_model.encode.assert_called_once_with("test question")
         mock_query.hybrid.assert_called_once_with(vector=[0.1, 0.2, 0.3], query="test question", alpha=0.5, limit=1)
         mock_query.bm25.assert_not_called()
