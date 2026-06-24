@@ -123,14 +123,11 @@ def answer(
     *,
     metadata_filter: Optional[Dict[str, Any]] = None,
     on_token: Optional[Callable[[str], None]] = None,
-    on_debug: Optional[Callable[[str], None]] = None,
     stop_event: Optional[threading.Event] = None,
     context_tokens: int = 8192,
     collection_name: Optional[str] = None,
-    get_top_k_func: Callable[..., List[str]] = get_top_k,
-    generate_response_func: Callable[..., tuple[str, Optional[list[int]]]] = generate_response,
 ) -> str:
-    """Return an answer from the LLM using RAG with optional debug output and streaming callbacks.
+    """Return an answer from the LLM using RAG with an optional streaming token callback.
     Can be interrupted with stop_event.
     """
 
@@ -150,7 +147,7 @@ def answer(
     # ---------- 1) Retrieve -----------------------------------------------------
     # Ask vector DB for more than we eventually keep to improve re-ranking quality
     initial_k = k * 20
-    candidates = get_top_k_func(
+    candidates = get_top_k(
         question,
         k=initial_k,
         metadata_filter=metadata_filter,
@@ -187,10 +184,6 @@ def answer(
     logger.debug("Prompt being sent to Ollama (%d chars, %d chunks)", len(prompt_text), len(context_chunks))
 
     # ---------- 4) Query the LLM -------------------------------------------------
-    # Use a simple print callback for CLI debug mode
-    def cli_on_debug(msg: str) -> None:
-        logger.debug("[Ollama Debug] %s", msg)
-
     # Collect tokens for CLI output
     collected_tokens: list[str] = []
     first_token_processed = False
@@ -209,8 +202,6 @@ def answer(
             # Print tokens immediately for better UX
             console.print(token, end="")
 
-    if on_debug is None:
-        on_debug = cli_on_debug
     if on_token is None:
         on_token = cli_on_token
 
@@ -219,12 +210,11 @@ def answer(
         console.print("Answer: ", end="")
 
     logger.debug("About to call generate_response with model=%s context_tokens=%d", OLLAMA_MODEL, context_tokens)
-    answer_text, updated_context = generate_response_func(
+    answer_text, updated_context = generate_response(
         prompt_text,
         OLLAMA_MODEL,
         _ollama_context,
         on_token=on_token,
-        on_debug=on_debug,
         stop_event=stop_event,
         context_tokens=context_tokens,
     )
@@ -244,7 +234,6 @@ def answer(
 import argparse
 
 from weaviate.classes.query import Filter
-from weaviate.exceptions import WeaviateConnectionError
 
 from backend import config as app_config
 from backend.config import get_service_url
@@ -327,13 +316,6 @@ def ensure_weaviate_ready_and_populated():
         # If the collection already exists, we do nothing. This avoids checking if it's empty
         # and re-populating, which could be slow on large user databases.
         logger.info("   ✓ Collection '%s' exists.", collection_name)
-    except WeaviateConnectionError:
-        raise WeaviateConnectionError(
-            "Failed to connect to Weaviate. "
-            "Please ensure Weaviate is running and accessible before starting the backend."
-        ) from None
-    except Exception as e:
-        raise Exception(f"An unexpected error occurred during Weaviate check: {e}") from e
     finally:
         try:
             close_weaviate_client()

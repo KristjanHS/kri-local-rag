@@ -14,23 +14,15 @@ from backend.models import load_embedder
 from backend.vector_utils import to_float_list
 from backend.weaviate_client import get_weaviate_client
 
-# Optional dependency note: If sentence-transformers is not installed, we handle
-# ImportError: gracefully inside the lazy loader (_get_embedding_model).
-
-# Import SentenceTransformer for direct model loading
-try:
-    from sentence_transformers import SentenceTransformer
-except ImportError:
-    SentenceTransformer = None
+# Optional dependency note: if sentence-transformers is not installed, the missing
+# dependency is handled gracefully inside the lazy loader (load_embedder) that
+# _get_embedding_model delegates to.
 
 # For manual vectorization – import type only for type-checkers
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from sentence_transformers import SentenceTransformer as SentenceTransformerType  # type: ignore
 else:
     SentenceTransformerType = object  # runtime fallback for type checkers only
-
-# Provide a module-level hook for tests to patch without importing heavy deps.
-# Tests can patch `backend.retriever.SentenceTransformer` directly.
 
 # Cache the embedding model instance after first load
 _embedding_model: Any = None
@@ -43,23 +35,14 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _get_embedding_model(model_name: str | None = None) -> Any:
+def _get_embedding_model() -> Any:
     """Return a (cached) SentenceTransformer instance for manual vectorization.
 
-    Uses the new offline-first model loader for better reliability and reproducibility.
-
-    Args:
-        model_name: Optional model name to override the default. If None, uses config default.
+    Uses the offline-first model loader for better reliability and reproducibility.
     """
     global _embedding_model
 
     try:
-        if model_name is not None:
-            # For testing - load specific model without using global cache
-            if SentenceTransformer is None:
-                raise ImportError("sentence-transformers not available")
-            return SentenceTransformer(model_name)
-
         # Use cached model if available
         if _embedding_model is None:
             _embedding_model = load_embedder()

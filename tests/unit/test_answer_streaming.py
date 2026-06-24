@@ -1,5 +1,5 @@
 import logging as _logging
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 
 import backend.qa_loop as qa_loop
@@ -21,13 +21,17 @@ def test_answer_streaming_output_integration(capsys, caplog):
 
     caplog.set_level(_logging.ERROR, logger="backend.qa_loop")
 
-    cross_encoder = qa_loop._get_cross_encoder()
-    qa_loop.answer(
-        "test question",
-        cross_encoder=cross_encoder,
-        get_top_k_func=mock_get_top_k,
-        generate_response_func=mock_generate_response,
-    )
+    # Mock the reranker: the real model can't load under the unit tier's socket block.
+    cross_encoder = MagicMock()
+    cross_encoder.predict.side_effect = lambda pairs: [1.0] * len(pairs)
+    with (
+        patch("backend.qa_loop.get_top_k", mock_get_top_k),
+        patch("backend.qa_loop.generate_response", mock_generate_response),
+    ):
+        qa_loop.answer(
+            "test question",
+            cross_encoder=cross_encoder,
+        )
     captured = capsys.readouterr()
     # The output may contain logging messages, so we check for the expected answer
     assert "Answer: Hello World" in captured.out

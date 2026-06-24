@@ -188,11 +188,10 @@ def process_and_upload_chunks(
     docs: List[Document],
     model: SupportsEncode,
     collection_name: str,
-):
+) -> None:
     """Process each document chunk and upload it to Weaviate."""
     # Access collection (standard accessor for our tests/mocks)
     collection = client.collections.get(collection_name)
-    stats = {"inserts": 0, "updates": 0, "skipped": 0}
     total_chunks = len(docs)
     logger.info(f"Encoding and uploading {total_chunks} chunks… This can take a while on first run.")
     start_ts = time.time()
@@ -234,7 +233,6 @@ def process_and_upload_chunks(
             # A full upsert logic would require checking existence first,
             # which defeats the purpose of batching. Weaviate's batching
             # with specified UUIDs effectively handles this as an upsert.
-            stats["inserts"] += 1  # We'll count all as inserts for simplicity in batch mode.
 
             # Periodic progress logging (every ~100 chunks or 10 seconds)
             now = time.time()
@@ -249,8 +247,7 @@ def process_and_upload_chunks(
                 )
                 last_log_ts = now
 
-    logger.info(f"Batch ingestion complete: {stats}")
-    return stats
+    logger.info(f"Batch ingestion complete: {total_chunks} chunks processed.")
 
 
 TModel = TypeVar("TModel", bound=SupportsEncode)

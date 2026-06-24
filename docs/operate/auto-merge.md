@@ -29,7 +29,7 @@ PR opened/reopened/ready against main
 - Trigger: `pull_request_target` on `[opened, reopened, ready_for_review]`, `branches: [main]`.
 - Uses `pull_request_target` (not `pull_request`) so the **base-branch** copy of the workflow always runs — covering PRs from branches cut before it existed — and it never checks out PR code, so the write-scoped token is not exposed.
 - Skips drafts (`if: !github.event.pull_request.draft`). Mark a draft **Ready for review** to arm it.
-- Runs `gh pr merge --auto --merge` (merge commit, per the `dev`-is-permanent-integration convention).
+- Runs `gh pr merge --auto --merge "$PR_URL"` (merge commit, per the `dev`-is-permanent-integration convention). The PR is named explicitly via `$PR_URL` (`github.event.pull_request.html_url`) because the workflow never checks out PR code, so there is no local git context for `gh` to infer the current PR.
 
 ### Rulesets (the gate)
 | Ruleset | Applies to | Enforces |
@@ -53,7 +53,7 @@ CodeQL is already gated by the `code_scanning` rule in "protect Main and Dev", s
 
 - **PR sits green but `BLOCKED`?** Most likely waiting on the Copilot review from "protect Main and Dev". Confirm with `gh pr checks <n>` and the PR's "merge box".
 - **Add/remove a required check:** edit the "Require CI tests on main" ruleset. Only add checks that run on every PR (see above).
-- **Disable auto-merge temporarily:** disable the ruleset's enforcement, or set the workflow to draft-only — do not rely on memory; the gate is what guarantees tests pass.
+- **Disable auto-merge temporarily:** disable the ruleset's enforcement, or convert the PR to a draft (the workflow skips drafts) — do not rely on memory; the gate is what guarantees tests pass.
 - **Manual one-off arm** (e.g. before the workflow reaches a branch): `gh pr merge <n> --auto --merge`.
 
 ## Bootstrapping a brand-new clone of this setup

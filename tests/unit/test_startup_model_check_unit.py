@@ -33,9 +33,7 @@ def test_startup_ensures_model_and_exits_when_missing(monkeypatch, capsys, caplo
     def _pull_if_missing(_model: str) -> bool:  # noqa: ARG001
         return False
 
-    # Provide both names for backward compatibility in other imports
     fake_ollama_module.pull_if_missing = _pull_if_missing  # type: ignore[attr-defined]
-    fake_ollama_module.ensure_model_available = lambda _model: False  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "backend.ollama_client", fake_ollama_module)
     monkeypatch.setattr(backend, "ollama_client", fake_ollama_module, raising=False)
 
