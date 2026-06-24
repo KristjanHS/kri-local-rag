@@ -68,6 +68,31 @@ log INFO "Starting $SCRIPT_NAME" | tee -a "$LOG_FILE"
 # Default Ollama model (hardcoded to avoid import issues)
 DEFAULT_OLLAMA_MODEL="cas/mistral-7b-instruct-v0.3"
 
+# --- App image build cache (mirrors scripts/dev/test-env.sh) ---
+# Rebuilding the app image is cheap when cached, but a cached BuildKit rebuild
+# still mints a NEW image ID, which makes `compose up` recreate the app container
+# and re-wait its Streamlit healthcheck (~10s). We therefore gate the rebuild on a
+# hash of its inputs so the warm path stays fast. Set FORCE=1 to rebuild anyway.
+APP_IMAGE="kri-local-rag-app"
+APP_BUILD_HASH_FILE="${APP_BUILD_HASH_FILE:-.app-build.hash}"
+APP_BUILD_DEPS=(pyproject.toml uv.lock docker/app.Dockerfile docker/docker-compose.yml)
+FORCE_BUILD="${FORCE:-0}"
+
+build_app_if_needed() {
+    local new_hash old_hash=""
+    new_hash=$(sha256sum "${APP_BUILD_DEPS[@]}" | sha256sum | awk '{print $1}')
+    if [ -f "$APP_BUILD_HASH_FILE" ]; then
+        old_hash=$(<"$APP_BUILD_HASH_FILE")
+    fi
+    if [ "$FORCE_BUILD" != "1" ] && [ "$new_hash" = "$old_hash" ] \
+        && docker image inspect "$APP_IMAGE" >/dev/null 2>&1; then
+        log INFO "Build inputs unchanged and image present; skipping app rebuild (FORCE=1 to override)." | tee -a "$LOG_FILE"
+        return 0
+    fi
+    ./scripts/docker/build_app.sh
+    echo "$new_hash" > "$APP_BUILD_HASH_FILE"
+}
+
 # Function to check if hardcoded model matches the Python config
 check_model_synchronization() {
     local config_file="$PROJECT_ROOT/backend/config.py"
@@ -111,7 +136,7 @@ echo ""
 log INFO "Starting Docker image build process" | tee -a "$LOG_FILE"
 echo -e "${BOLD}--- Step 1: Building custom Docker images... ---${NC}"
 echo "This may take a few minutes. Detailed output is being saved to '$LOG_FILE'."
-run_step "Build app image" "$LOG_FILE" ./scripts/docker/build_app.sh
+run_step "Build app image" "$LOG_FILE" build_app_if_needed
 echo -e "${GREEN}✓ Build complete.${NC}"
 
 # --- Step 2: Start Services ---
