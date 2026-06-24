@@ -225,9 +225,6 @@ filterwarnings = [
     "error::DeprecationWarning:frontend",
     "error::PendingDeprecationWarning:backend",
     "error::PendingDeprecationWarning:frontend",
-    # Third-party noise: torch's own internals emit this when sentence-transformers
-    # loads a TorchScript model (one burst per model load). Not actionable here.
-    "ignore:`torch.jit.script_method` is deprecated:DeprecationWarning",
 ]
 
 [tool.deptry]
