@@ -319,3 +319,30 @@ code from `qa_loop`, so it does not collide with the A2 split.
 Only **#5** (touches `answer()` params) edits `qa_loop` before A2 relocates that code; it is
 small, so a minor relocation in A2 is accepted deliberately rather than blocking it. #1 no
 longer touches `qa_loop` adversely (D3 makes it a removal).
+
+### D4 — #2 is likely DEAD CODE, not an env-boundary fix; verify then delete outright
+New finding (supersedes the three-option env-boundary plan in the deep dive): `torchvision` is
+a **hard dependency in both** the default and `--extra cpu` paths (`pyproject.toml:21-22,
+38-39`, deliberately ABI-matched). But the 145-line stub only activates
+`if not _torchvision_available` (`models.py:32-42`) — i.e. *only when torchvision is absent*.
+The in-code comment already warns the stub would "clobber a working torchvision... breaking
+CrossEncoder loading." If torchvision is always installed now, the stub never executes and is
+pure dead weight (vestige of a pre-direct-dep era; it "broke once on the transformers 5.x
+upgrade").
+**Action:** one empirical check first — confirm `import torchvision` succeeds in the CPU/Docker
+app image (`--extra cpu`). If it does, **delete the entire stub block + the
+`TRANSFORMERS_NO_TORCHVISION` setdefault** as dead code (no pin, no wheel surgery). If it does
+*not* import cleanly in some env, fall back to the env-boundary fix for that env only.
+
+### D5 — Scope: FULL campaign (all 24 findings + A2 + A3), multi-session
+Commit to the whole catalogue, not a severity-bounded subset. Keep this as a single plan doc
+(plan-hygiene: no speculative multi-stage split until ≥2 stages have shipped and a handoff is
+actually needed). Drive by the authoritative order above; A3 (config shared-kernel) lands last
+as it pairs with #11/#14.
+
+### D6 — #6 warmup: INVESTIGATE before collapsing
+Do not assume the ingest-then-delete "warm modules" dance is pure dead weight. Before
+collapsing `ensure_weaviate_ready_and_populated` to a plain `bootstrap_empty_collection()`,
+trace whether anything depends on the warmup side-effect (first-query cold-start latency). If
+warmup proves load-bearing, replace the PDF round-trip with a direct model-warm call (no
+vector-DB round-trip); if not, drop it entirely. Decision deferred to that investigation.
