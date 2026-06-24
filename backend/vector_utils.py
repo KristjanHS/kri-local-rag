@@ -6,71 +6,16 @@ plain Python lists of floats suitable for clients like Weaviate.
 
 from __future__ import annotations
 
-import numbers
-from typing import Any, Sequence, cast
+from typing import Any
 
-from backend.config import get_logger
-
-logger = get_logger(__name__)
+import numpy as np
 
 
 def to_float_list(vector_like: Any) -> list[float]:
-    """Convert a vector-like object to a ``list[float]``.
+    """Convert a vector-like object to a ``list[float]`` for the Weaviate client.
 
-    Handles common cases produced by embedding models:
-    - torch.Tensor
-    - numpy.ndarray
-    - Python sequences (e.g., list, tuple)
-
-    The function avoids type-ignore pragmas by operating on ``Any`` input
-    and performing runtime checks, while maintaining a precise return type.
+    ``SentenceTransformer.encode`` returns a numpy ndarray by default; ``np.asarray``
+    coerces that (and CPU torch tensors, plain sequences, or scalars) uniformly,
+    then we flatten to 1-D and hand back plain Python floats.
     """
-
-    # Local imports to avoid hard dependency at import-time if optional
-    # packages are missing in some environments.
-    try:
-        import torch  # type: ignore
-    except Exception:  # pragma: no cover - torch may not be available
-        torch = None  # type: ignore
-
-    try:
-        import numpy as np  # type: ignore
-    except Exception:  # pragma: no cover - numpy may not be available
-        np = None  # type: ignore
-
-    # torch.Tensor → list[float]
-    if torch is not None and hasattr(torch, "Tensor") and isinstance(vector_like, torch.Tensor):
-        tensor: Any = vector_like
-        # Detach to CPU and flatten to 1-D, then convert to list of floats
-        return [float(x) for x in tensor.detach().cpu().reshape(-1).tolist()]
-
-    # numpy.ndarray → list[float]
-    if np is not None and isinstance(vector_like, np.ndarray):
-        arr: Any = cast(Any, vector_like)
-        flat: list[Any] = arr.reshape(-1).tolist()
-        return [float(x) for x in flat]
-
-    # Python sequence → list[float]
-    if isinstance(vector_like, numbers.Real):
-        return [float(vector_like)]
-
-    if isinstance(vector_like, Sequence) and not isinstance(vector_like, (str, bytes, bytearray)):
-        return [float(x) for x in vector_like]  # type: ignore[not-an-iterable]
-
-    # Fallbacks: try tolist(); else iterate directly.
-    tolist_method = getattr(vector_like, "tolist", None)
-    if callable(tolist_method):
-        as_list: Any = tolist_method()
-        if isinstance(as_list, Sequence):
-            as_seq: Sequence[Any] = cast(Sequence[Any], as_list)
-            return [float(x) for x in as_seq]
-        try:
-            seq: list[Any] = list(as_list)
-            return [float(x) for x in seq]
-        except Exception as e:
-            logger.debug("Could not convert to_list() result to list of floats: %s", e)
-
-    # Last resort: attempt to iterate and coerce to float
-    iterable_candidate: Any = vector_like
-    seq2: list[Any] = list(iterable_candidate)
-    return [float(x) for x in seq2]
+    return np.asarray(vector_like, dtype=float).reshape(-1).tolist()
