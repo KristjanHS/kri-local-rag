@@ -8,7 +8,7 @@ import os
 import sys
 import threading
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 from rich.rule import Rule
 
@@ -121,7 +121,6 @@ def answer(
     cross_encoder: Optional[Any] = None,
     k: int = 3,
     *,
-    metadata_filter: Optional[Dict[str, Any]] = None,
     on_token: Optional[Callable[[str], None]] = None,
     stop_event: Optional[threading.Event] = None,
     context_tokens: int = 8192,
@@ -150,7 +149,6 @@ def answer(
     candidates = get_top_k(
         question,
         k=initial_k,
-        metadata_filter=metadata_filter,
         embedding_model=embedding_model,
         collection_name=collection_name,
     )
@@ -328,7 +326,6 @@ def qa_loop(
     embedding_model: Any,
     cross_encoder: Any,
     k: int = 3,
-    metadata_filter: Optional[Dict[str, Any]] = None,
 ):
     """
     Perform a single question-answering loop.
@@ -349,15 +346,12 @@ def qa_loop(
         embedding_model=embedding_model,
         cross_encoder=cross_encoder,
         k=k,
-        metadata_filter=metadata_filter,
     )
     return result
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Interactive RAG console with optional metadata filtering.")
-    parser.add_argument("--source", help="Filter chunks by source field (e.g. 'pdf')")
-    parser.add_argument("--language", help="Filter chunks by detected language code (e.g. 'en', 'et')")
+    parser = argparse.ArgumentParser(description="Interactive RAG console.")
     parser.add_argument("--k", type=int, default=3, help="Number of top chunks to keep after re-ranking")
     parser.add_argument("--question", help="If provided, run a single query and exit.")
     # Logging controls
@@ -373,20 +367,6 @@ if __name__ == "__main__":
     # Set up logging as the very first action
     _setup_cli_logging(log_level=args.log_level, verbose_count=args.verbose, quiet_count=args.quiet)
 
-    # Build metadata filter dict (AND-combination of provided fields)
-    meta_filter: Optional[Dict[str, Any]] = None
-    if args.source or args.language:
-        clauses: list[Dict[str, Any]] = []
-        if args.source:
-            clauses.append({"path": ["source"], "operator": "Equal", "valueText": args.source})
-        if args.language:
-            clauses.append({"path": ["language"], "operator": "Equal", "valueText": args.language})
-
-        if len(clauses) == 1:
-            meta_filter = clauses[0]
-        else:
-            meta_filter = {"operator": "And", "operands": clauses}
-
     # Load models once (public loader)
     from backend.models import load_embedder
 
@@ -400,7 +380,6 @@ if __name__ == "__main__":
                 embedding_model=embedding_model,
                 cross_encoder=cross_encoder,
                 k=args.k,
-                metadata_filter=meta_filter,
             )
         finally:
             # Ensure Weaviate client connections are closed in one-shot mode
@@ -434,7 +413,6 @@ if __name__ == "__main__":
                 embedding_model=embedding_model,
                 cross_encoder=cross_encoder,
                 k=args.k,
-                metadata_filter=meta_filter,
             )
             console.print()  # Add a blank line for readability before the next prompt
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
 
 # Defer torch import to runtime to avoid heavy import-time side effects
 from weaviate.exceptions import WeaviateQueryError
@@ -53,23 +53,10 @@ def _get_embedding_model() -> Any:
         return None
 
 
-def _apply_metadata_filter(query: Any, metadata_filter: Optional[Dict[str, Any]]):
-    """Apply a Weaviate `where` filter if *metadata_filter* is provided.
-
-    The filter dict should follow Weaviate's GraphQL-like structure, e.g.::
-
-        {"path": ["source"], "operator": "Equal", "valueText": "manual"}
-    """
-    if metadata_filter:
-        return query.filter(metadata_filter)
-    return query
-
-
 def get_top_k(
     question: str,
     k: int = 5,
     *,
-    metadata_filter: Optional[Dict[str, Any]] = None,
     alpha: float = DEFAULT_HYBRID_ALPHA,  # 0 → pure BM25 search, 1 → pure vector search
     embedding_model: Optional[Any] = None,
     collection_name: Optional[str] = None,
@@ -78,8 +65,7 @@ def get_top_k(
 
     Improvements over the old implementation:
     1. **Hybrid search** – combines BM25 lexical matching with vector similarity.
-    2. Optional **metadata filtering** via the *metadata_filter* parameter.
-    3. Automatic **fallback** to *near_text* if hybrid search is not available
+    2. Automatic **fallback** to *near_text* if hybrid search is not available
        (e.g. older Weaviate versions without the hybrid module).
     """
 
@@ -90,8 +76,6 @@ def get_top_k(
     collection = client.collections.get(target_collection)
 
     q = collection.query
-    q = _apply_metadata_filter(q, metadata_filter)
-
     try:
         # For manual vectorization, we need to provide the vector ourselves
         if embedding_model is None:
