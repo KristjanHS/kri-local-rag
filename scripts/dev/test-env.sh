@@ -241,6 +241,22 @@ cmd_clean() {
     dc "$run_id" down -v
   fi
   rm -f "$BUILD_HASH_FILE" "$RUN_ID_FILE" || true
+
+  # Prune orphaned test projects left by earlier runs. A fresh run-id mints a new
+  # "<run_id>" project (its own containers + "<run_id>_weaviate_db" volume); a plain
+  # `down` preserves them, so old ones orphan across sessions. Test projects always use
+  # a numeric run-id as COMPOSE_PROJECT_NAME, so this never touches the live stack
+  # ("kri-local-rag"). Collect ids from both leftover containers and volumes, then tear
+  # each down with -v (removes its containers and volume together).
+  local ids
+  ids=$( { docker volume ls -q 2>/dev/null | grep -E '^[0-9]+_weaviate_db$' | sed 's/_weaviate_db$//';
+           docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^[0-9]+-' | sed -E 's/-[a-z].*$//'; } \
+         | sort -u || true)
+  local id
+  for id in $ids; do
+    log "Pruning orphaned test project: $id"
+    dc "$id" down -v --remove-orphans >/dev/null 2>&1 || true
+  done
   echo "Test volumes and build cache cleaned."
 }
 
