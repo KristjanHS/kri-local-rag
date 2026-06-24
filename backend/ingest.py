@@ -24,9 +24,8 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, List, Optional, Protocol, TypeVar, cast, runtime_checkable
+from typing import Any, List, Optional, Protocol, cast, runtime_checkable
 
-import torch
 import weaviate
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -250,36 +249,6 @@ def process_and_upload_chunks(
     logger.info(f"Batch ingestion complete: {total_chunks} chunks processed.")
 
 
-TModel = TypeVar("TModel", bound=SupportsEncode)
-
-
-def optimize_embedding_model(embedding_model: TModel) -> TModel:
-    """Compile the embedding model with torch.compile if not already compiled.
-
-    Adds a private marker attribute on the compiled instance to avoid duplicate work/logs.
-    """
-    if bool(getattr(embedding_model, "_is_torch_compiled", False)):
-        return embedding_model
-
-    try:
-        logger.info("torch.compile: optimizing embedding model – this may take a minute on first run…")
-        torch_compile = getattr(torch, "compile")
-        compiled_model = cast(
-            TModel,
-            torch_compile(embedding_model, backend="inductor", mode="max-autotune"),
-        )
-        # Mark the compiled instance so future calls are a no-op.
-        try:
-            setattr(compiled_model, "_is_torch_compiled", True)  # type: ignore[attr-defined]
-        except (AttributeError, TypeError) as attr_err:
-            logger.debug("Could not set _is_torch_compiled flag on compiled model: %s", attr_err)
-        logger.info("torch.compile optimization completed.")
-        return compiled_model
-    except Exception as e:
-        logger.warning(f"Could not apply torch.compile: {e}")
-        return embedding_model
-
-
 def ingest(
     directory: str,
     collection_name: str,
@@ -290,9 +259,6 @@ def ingest(
 ):
     """Main ingestion pipeline."""
     start_time = time.time()
-
-    # Apply torch.compile optimization to the embedding model (idempotent)
-    embedding_model = optimize_embedding_model(embedding_model)
 
     chunked_docs = load_and_split_documents(directory)
     if not chunked_docs:

@@ -23,9 +23,8 @@ def test_compose_service_ports_binding_security() -> None:
     ollama_ports = services.get("ollama", {}).get("ports", [])
     app_ports = services.get("app", {}).get("ports", [])
 
-    # Host ports are parametrized (e.g. "127.0.0.1:${WEAVIATE_HTTP_HOST_PORT:-8080}:8080")
-    # so the test profile can run on distinct host ports. The security property is the
-    # loopback (127.0.0.1) binding prefix; the container-side port suffix stays fixed.
+    # The security property is the loopback (127.0.0.1) binding prefix; the
+    # container-side port suffix is what we assert on.
     def binds_loopback(ports: list[object], container_port: int) -> bool:
         return any(str(p).startswith("127.0.0.1:") and str(p).endswith(f":{container_port}") for p in ports)
 
