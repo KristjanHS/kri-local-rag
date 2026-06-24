@@ -10,8 +10,21 @@ COMPOSE_FILE=${COMPOSE_FILE:-docker/docker-compose.yml}
 PROFILE=${PROFILE:-test}
 COMPOSE=(docker compose -f "$COMPOSE_FILE" --profile "$PROFILE")
 BUILD_DEPS=(pyproject.toml uv.lock docker/app.Dockerfile docker/docker-compose.yml)
+TEST_IMAGE=${TEST_IMAGE:-kri-local-rag-app:test}
 # Centralized service list used by up/logs
 SERVICES=(weaviate ollama app-test)
+
+# Distinct host ports so the test stack can run alongside the live stack (which uses
+# the compose defaults 8080/50051/11434). Container-side ports are unchanged, so the
+# in-network DNS used by app-test (weaviate:8080, ollama:11434) is unaffected. Override
+# if these collide with something else on the host.
+export WEAVIATE_HTTP_HOST_PORT=${WEAVIATE_HTTP_HOST_PORT:-18080}
+export WEAVIATE_GRPC_HOST_PORT=${WEAVIATE_GRPC_HOST_PORT:-50052}
+export OLLAMA_HOST_PORT=${OLLAMA_HOST_PORT:-21434}
+# app-test inherits app's port mapping via `extends`; give it a distinct host port
+# (it runs `tail -f /dev/null`, so nothing actually serves here — this only avoids a
+# bind collision with the live app on 8501).
+export APP_HOST_PORT=${APP_HOST_PORT:-18501}
 
 # Minimal logging helpers
 log() { echo "$*"; }
@@ -89,8 +102,8 @@ build_if_needed() {
   if [[ -f "$BUILD_HASH_FILE" ]]; then
     old_hash=$(<"$BUILD_HASH_FILE")
   fi
-  if [[ "$new_hash" != "$old_hash" ]]; then
-    log "Build deps changed; rebuilding images..."
+  if [[ "$new_hash" != "$old_hash" ]] || ! docker image inspect "$TEST_IMAGE" >/dev/null 2>&1; then
+    log "Build deps changed or image missing; rebuilding images..."
     DOCKER_BUILDKIT=1 dc "$run_id" build app-test 2>&1 | tee "$LOG_DIR/test-build-$run_id.log"
     ln -sf "test-build-$run_id.log" "$LOG_DIR/test-build.log"
     # Prune older build logs, keep latest 5

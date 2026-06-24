@@ -104,7 +104,7 @@ export-reqs: ## Export requirements.txt from uv.lock (omits torch/torchvision)
 # App Runtime
 # =========================
 # Start of full stack (Weaviate, Ollama, App)
-stack-up: ## Build and start app + deps via script
+stack-up: ## Build and start app + deps via script (FORCE=1 to force image rebuild)
 	@./scripts/docker/docker-setup.sh
 
 # Non-interactive: start app stack (weaviate, ollama, app) and wait for health

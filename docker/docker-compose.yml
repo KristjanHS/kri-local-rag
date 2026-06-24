@@ -5,13 +5,17 @@ services:
     # Digest-pinned for supply-chain integrity (B7). Renovate's docker:pinDigests
     # keeps the tag@sha256 pair current.
     image: cr.weaviate.io/semitechnologies/weaviate:1.32.0@sha256:9452e68c58c287c8c29a525ff1468c209cd5e106cc927d67b7d34d61533151b3
-    # Self-heal the eth0-IP startup race: if memberlist boots before eth0 has a private IP it
-    # exits 1 ("No private IP address found"). on-failure lets Docker re-run the container — by
-    # the retry eth0 has its IP — so `up --wait` converges without a blanket --force-recreate.
+    # Defense-in-depth: restart on unexpected crashes. The eth0-IP startup race that
+    # originally motivated this directive is now fixed at the source via
+    # CLUSTER_IN_LOCALHOST below (memberlist binds to 127.0.0.1, always up at boot).
     restart: on-failure
+    # Host ports are parametrized so the `test` profile can run alongside the live
+    # stack on distinct ports (scripts/dev/test-env.sh sets the *_HOST_PORT vars).
+    # Container-side ports stay fixed at 8080/50051 — internal DNS and healthchecks
+    # are unaffected.
     ports:
-      - "127.0.0.1:8080:8080"
-      - "127.0.0.1:50051:50051"
+      - "127.0.0.1:${WEAVIATE_HTTP_HOST_PORT:-8080}:8080"
+      - "127.0.0.1:${WEAVIATE_GRPC_HOST_PORT:-50051}:50051"
     volumes:
       - weaviate_db:/var/lib/weaviate
     environment:
@@ -55,7 +59,7 @@ services:
     volumes:
       - ../model_cache:/root/.ollama
     ports:
-      - "127.0.0.1:11434:11434"
+      - "127.0.0.1:${OLLAMA_HOST_PORT:-11434}:11434"
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
@@ -76,7 +80,9 @@ services:
         INSTALL_EDITABLE: "1"
 
     ports:
-      - "8501:8501"
+      # Parametrized so the test stack's app-test (which inherits this via `extends`)
+      # lands on a distinct host port instead of colliding with the live app on 8501.
+      - "${APP_HOST_PORT:-8501}:8501"
     volumes:
       - ../backend:/app/backend # Live backend code (for editable runtime package in Dev)
       - ../frontend:/app/frontend # Live frontend code            (for hot reload in Dev)

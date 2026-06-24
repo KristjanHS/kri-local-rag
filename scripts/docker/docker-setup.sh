@@ -73,7 +73,11 @@ DEFAULT_OLLAMA_MODEL="cas/mistral-7b-instruct-v0.3"
 # still mints a NEW image ID, which makes `compose up` recreate the app container
 # and re-wait its Streamlit healthcheck (~10s). We therefore gate the rebuild on a
 # hash of its inputs so the warm path stays fast. Set FORCE=1 to rebuild anyway.
-APP_IMAGE="kri-local-rag-app"
+# Derive the app image name from the compose `app` service so a rename there can't
+# silently break the gate (a wrong literal would make `docker image inspect` always
+# miss → rebuild every run). Falls back to the known literal if parsing turns up empty.
+APP_IMAGE=$(awk '/^  [a-zA-Z]/ { in_app = ($1 == "app:") } in_app && $1 == "image:" { print $2; exit }' "$DOCKER_COMPOSE_FILE")
+APP_IMAGE="${APP_IMAGE:-kri-local-rag-app}"
 APP_BUILD_HASH_FILE="${APP_BUILD_HASH_FILE:-.app-build.hash}"
 APP_BUILD_DEPS=(pyproject.toml uv.lock docker/app.Dockerfile docker/docker-compose.yml)
 FORCE_BUILD="${FORCE:-0}"
