@@ -285,16 +285,12 @@ def project_root():
     return Path(__file__).parent.parent
 
 
-# Lightweight default for docker-based tests outside specialized suites.
-# Suites can override this fixture in a closer-scope conftest (e.g. tests/e2e/conftest.py)
-# to perform heavier readiness checks.
-# Removed global auto-use fixture - individual tests should handle their own mocking
-
-
-@pytest.fixture(scope="session")
-def docker_services_ready():  # noqa: D401
-    """No-op readiness fixture for generic docker-marked tests."""
-    yield
-
+# NOTE: there is intentionally NO generic `docker_services_ready` fixture here.
+# A no-op default in this root conftest silently OVERRIDES the real ingesting
+# fixture in tests/e2e/fixtures_ingestion.py — pytest ranks conftest fixtures
+# above plugin fixtures (loaded via `pytest_plugins`), regardless of directory
+# depth. That shadowing left the e2e collection empty and made retrieval e2e
+# tests pass only when data happened to linger from a prior run. The real
+# fixture is the single source; don't reintroduce a default here.
 
 # (Unit-test-only fixtures have been moved to tests/unit/conftest.py)
