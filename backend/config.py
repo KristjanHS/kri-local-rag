@@ -203,10 +203,6 @@ def get_service_url(service: str) -> str:
     raise ValueError(f"Unknown service: {service}")
 
 
-# Backwards-compatible constants sourced from the centralized resolver
-OLLAMA_URL = get_service_url("ollama")
-WEAVIATE_URL = get_service_url("weaviate")
-
 # Weaviate batching settings (tune for performance)
 # Larger batches can be faster but use more memory.
 WEAVIATE_BATCH_SIZE = int(os.getenv("WEAVIATE_BATCH_SIZE", 100))

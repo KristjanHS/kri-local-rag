@@ -7,25 +7,10 @@ import threading
 
 import httpx
 
-from backend.config import OLLAMA_CONTEXT_TOKENS, OLLAMA_MODEL, OLLAMA_URL, get_logger
+from backend.config import OLLAMA_CONTEXT_TOKENS, OLLAMA_MODEL, get_logger, get_service_url
 
 # Set up logging for this module
 logger = get_logger(__name__)
-
-
-def _get_ollama_base_url() -> str:
-    """Return the Ollama base URL.
-
-    Precedence:
-      1) OLLAMA_URL env/config
-      2) default localhost
-    """
-    if OLLAMA_URL:
-        logger.debug("_get_ollama_base_url: using OLLAMA_URL=%s", OLLAMA_URL)
-        return OLLAMA_URL
-    url = "http://localhost:11434"
-    logger.debug("_get_ollama_base_url: defaulting to %s", url)
-    return url
 
 
 def _check_model_exists(model_name: str, models: list[dict[str, str]]) -> bool:
@@ -53,8 +38,8 @@ def _download_model_with_progress(model_name: str, base_url: str, timeout_second
         ) as response:
             response.raise_for_status()
 
-            # Track progress from streaming response
-            last_logged_percent = -5  # force first update
+            # Track progress from Ollama's well-defined /api/pull frames.
+            last_logged_percent = -10  # force first update
             for line in response.iter_lines():
                 if not line:
                     continue
@@ -63,29 +48,15 @@ def _download_model_with_progress(model_name: str, base_url: str, timeout_second
                 except json.JSONDecodeError:
                     continue
 
-                status = data.get("status", "")
-
-                # 1. Show percentage progress if total / completed present
                 total = data.get("total")
                 completed = data.get("completed")
-                if (
-                    total
-                    and completed
-                    and isinstance(total, (int, float))
-                    and isinstance(completed, (int, float))
-                    and total > 0
-                ):
+                if total and completed:
                     percent = int(completed / total * 100)
-                    if percent - last_logged_percent >= 5:  # log every 5%
+                    if percent - last_logged_percent >= 10:  # throttle to every 10%
                         last_logged_percent = percent
                         logger.info("Downloading… %d%%", percent)
 
-                # 2. Fallback status messages
-                if status == "verifying":
-                    logger.info("Verifying model integrity…")
-                elif status == "writing":
-                    logger.info("Writing model to disk…")
-                elif status == "complete":
+                if data.get("status") == "complete":
                     logger.info("✓ Model download completed!")
                     break
         return True
@@ -101,7 +72,7 @@ def pull_if_missing(model_name: str, timeout_seconds: int = 300) -> bool:
     - If the model is present (exact or tag-prefixed match), returns immediately
     - Otherwise, triggers a pull with progress via POST /api/pull
     """
-    base_url = _get_ollama_base_url()
+    base_url = get_service_url("ollama")
 
     # Quick existence check
     try:
@@ -137,7 +108,7 @@ def generate_response(
     if context_tokens is None:
         context_tokens = OLLAMA_CONTEXT_TOKENS
 
-    base_url = _get_ollama_base_url()
+    base_url = get_service_url("ollama")
     url = f"{base_url.rstrip('/')}/api/generate"
     logger.debug("generate_response: base_url=%s url=%s", base_url, url)
 
@@ -191,15 +162,9 @@ def generate_response(
                     logger.debug("Empty line received, continuing...")
                     continue
 
-                # Ollama sends newline-separated JSON objects
+                # Ollama /api/generate streams newline-separated JSON objects.
                 line_str = line.strip()
                 logger.debug("Processing line: %s", line_str[:100])  # Log first 100 chars
-                if line_str.startswith("data:"):
-                    line_str = line_str[len("data:") :].strip()
-
-                if line_str == "[DONE]":
-                    logger.debug("Received [DONE] marker")
-                    break
 
                 try:
                     data = json.loads(line_str)
@@ -207,12 +172,7 @@ def generate_response(
                     logger.debug("Failed to parse JSON: %s... Error: %s", line_str[:50], e)
                     continue
 
-                # Extract token from response
-                token_str = (
-                    data.get("response")
-                    or data.get("token")
-                    or (data.get("choices", [{}])[0].get("text") if "choices" in data else "")
-                )
+                token_str = data.get("response", "")
 
                 if first_token and token_str:
                     logger.debug("Ollama started streaming tokens...")
