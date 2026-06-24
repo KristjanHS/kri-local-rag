@@ -5,7 +5,6 @@ health checks and unified service management using pyproject.toml configuration.
 """
 
 import os
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -164,25 +163,7 @@ def get_available_services() -> dict[str, bool]:
     return services
 
 
-# Model cache and integration fixtures
-@pytest.fixture(scope="session")
-def integration_model_cache(tmp_path_factory):
-    """Create a session-level model cache for integration tests."""
-    cache_dir = tmp_path_factory.mktemp("integration_model_cache")
-    return str(cache_dir)
-
-
 # Mocking fixtures using monkeypatch
-@pytest.fixture
-def managed_embedding_model(mocker) -> MagicMock:
-    """Mock backend.retriever._get_embedding_model."""
-    mock_retriever = mocker.patch("backend.retriever._get_embedding_model")
-    mock_model_instance = MagicMock()
-    mock_model_instance.encode.return_value = [[0.1, 0.2, 0.3]]
-    mock_retriever.return_value = mock_model_instance
-    return mock_model_instance
-
-
 @pytest.fixture
 def mock_get_top_k(monkeypatch):
     """Mock get_top_k function using monkeypatch."""
@@ -190,26 +171,6 @@ def mock_get_top_k(monkeypatch):
 
     mock_func = MagicMock()
     monkeypatch.setattr("backend.qa_loop.get_top_k", mock_func)
-    return mock_func
-
-
-@pytest.fixture
-def mock_weaviate_connect(monkeypatch):
-    """Mock weaviate.connect_to_custom using monkeypatch."""
-    from unittest.mock import MagicMock
-
-    mock_func = MagicMock()
-    monkeypatch.setattr("weaviate.connect_to_custom", mock_func)
-    return mock_func
-
-
-@pytest.fixture
-def mock_httpx_get(monkeypatch):
-    """Mock httpx.get for Ollama client tests using monkeypatch."""
-    from unittest.mock import MagicMock
-
-    mock_func = MagicMock()
-    monkeypatch.setattr("backend.ollama_client.httpx.get", mock_func)
     return mock_func
 
 

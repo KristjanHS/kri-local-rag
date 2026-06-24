@@ -61,6 +61,10 @@ def test_load_embedder_real_model(reset_global_cache):
 
     assert model is not None, "Embedding model should be loaded"
 
+    # Caching: a second load returns the same cached instance.
+    model_again = load_embedder()
+    assert model is model_again, "Same embedder instance should be returned from cache"
+
     # Test basic functionality
     embedder_model = cast(SentenceTransformer, model)
     embedding = embedder_model.encode(TEST_SENTENCE)
