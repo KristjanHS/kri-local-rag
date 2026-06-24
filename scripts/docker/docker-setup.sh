@@ -82,9 +82,21 @@ APP_BUILD_HASH_FILE="${APP_BUILD_HASH_FILE:-.app-build.hash}"
 APP_BUILD_DEPS=(pyproject.toml uv.lock docker/app.Dockerfile docker/docker-compose.yml)
 FORCE_BUILD="${FORCE:-0}"
 
+# Emit a sha256 digest of stdin/args, portable across Linux (sha256sum) and macOS (shasum).
+sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$@"
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$@"
+    else
+        log ERROR "Neither sha256sum nor shasum is available; cannot hash build inputs." | tee -a "$LOG_FILE"
+        return 1
+    fi
+}
+
 build_app_if_needed() {
     local new_hash old_hash=""
-    new_hash=$(sha256sum "${APP_BUILD_DEPS[@]}" | sha256sum | awk '{print $1}')
+    new_hash=$(sha256 "${APP_BUILD_DEPS[@]}" | sha256 | awk '{print $1}') || return 1
     if [ -f "$APP_BUILD_HASH_FILE" ]; then
         old_hash=$(<"$APP_BUILD_HASH_FILE")
     fi
