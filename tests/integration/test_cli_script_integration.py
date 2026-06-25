@@ -55,7 +55,7 @@ def test_cli_entrypoint_interactive_mode_honors_fake_answer_hook():
     out = result.stdout + result.stderr
     # Entrypoint/argparse wiring reached interactive mode:
     assert "PHASE: interactive" in out
-    assert "RAG System CLI - Interactive Mode" in out
+    assert "RAG CLI Ready" in out
     # Fake-answer hook honored through the subprocess (injected constant, not a real answer):
     assert "Mocked answer." in out
     assert "Goodbye!" in out
