@@ -4,7 +4,7 @@ import weaviate
 from weaviate.classes.config import Configure
 from weaviate.exceptions import WeaviateConnectionError
 
-from backend.config import WEAVIATE_URL, get_logger
+from backend.config import get_logger, get_service_url
 
 logger = get_logger(__name__)
 
@@ -29,7 +29,8 @@ def get_weaviate_client() -> weaviate.WeaviateClient:
         return _client
 
     # Resolve URL from centralized config (preserves Docker service names vs localhost)
-    parsed_url = urlparse(WEAVIATE_URL)
+    weaviate_url = get_service_url("weaviate")
+    parsed_url = urlparse(weaviate_url)
     hostname = parsed_url.hostname
 
     # Ensure we have a valid hostname (handles Docker service names and localhost)
@@ -40,7 +41,7 @@ def get_weaviate_client() -> weaviate.WeaviateClient:
     grpc_host = hostname
 
     try:
-        logger.info(f"Connecting to Weaviate at {WEAVIATE_URL}")
+        logger.info(f"Connecting to Weaviate at {weaviate_url}")
         _client = weaviate.connect_to_custom(
             http_host=http_host,
             http_port=parsed_url.port or 80,

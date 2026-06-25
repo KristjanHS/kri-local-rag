@@ -27,7 +27,7 @@ the day Ollama changes its API.
 | 3 | `generate_response` token-extraction generality | ollama_client.py:194-232 | **HIGH** | SSE/`[DONE]`/`choices` paths Ollama never sends |
 | 4 | `to_float_list` 6-branch converter | vector_utils.py (full) | **HIGH** | Speculative; untested fallbacks |
 | 5 | Triple-layered embedding-model caching | models + retriever + qa_loop | **HIGH** | 3 caches for 1 singleton |
-| 6 | `ensure_weaviate_ready_and_populated` bootstrap | qa_loop.py:243-323 | **HIGH** | Ingest-then-delete dance in hot path |
+| 6 | `ensure_weaviate_ready_and_populated` bootstrap | qa_loop.py:243-323 | **HIGH** | ✅ DONE 2026-06-24 — D6 investigation: warmup NOT load-bearing (embedder lazy-loads+caches on first query; dance only ran on fresh DB). Collapsed to `ensure_collection()` (empty schema only); dropped PDF round-trip + delete_many + version-fallback + `Filter` import |
 | 7 | Streamlit per-thread logging plumbing | rag_app.py:51-79,185-226 | **HIGH** | 60 lines of handler gymnastics |
 | 8 | `answer()` does 6 jobs | qa_loop.py:118-230 | **HIGH** | Retrieve+rerank+prompt+stream+CLI+test-hook |
 | 9 | Duplicated `RAG_FAKE_ANSWER` bypass | qa_loop.py:137 + rag_app.py:27-29,245 | MEDIUM | Two char-streaming fake paths |
@@ -36,9 +36,9 @@ the day Ollama changes its API.
 | 12 | `optimize_embedding_model` torch.compile | ingest.py:256-280 | MEDIUM | ✅ DONE 2026-06-24 — proven no-op (`.encode()` bypasses compiled forward); removed fn + call + `torch` import |
 | 13 | `connect_to_weaviate` "deprecated" shim | ingest.py:155-158 | MEDIUM | Comment lies; it's the live path |
 | 14 | Three logging config entry points | config.py + qa_loop.py:30-46 | MEDIUM | `_setup_logging`/`set_log_level`/`_setup_cli_logging` |
-| 15 | `load_and_split_documents` dual path | ingest.py:86-149 | MEDIUM | file-branch & dir-branch duplicate logic |
+| 15 | `load_and_split_documents` dual path | ingest.py:86-149 | MEDIUM | ✅ DONE 2026-06-24 — collapsed to one per-file loop; file discovery → `_resolve_ingest_files`; magic-byte check + error isolation now single-source |
 | 16 | Duplicated PDF magic-byte validation | ingest.py:63-69 + rag_app.py:138 | MEDIUM | Two impls of the same 5-byte check |
-| 17 | `SupportsEncode`/`TModel`/`runtime_checkable` | ingest.py:41-44,253 | LOW | Partial: `TModel` removed with #12 (2026-06-24); `SupportsEncode`/`runtime_checkable` still used |
+| 17 | `SupportsEncode`/`TModel`/`runtime_checkable` | ingest.py:41-44,253 | LOW | ✅ RESOLVED (KEEP) 2026-06-24 — `TModel` removed with #12; `SupportsEncode` is a legitimate lightweight type on 2 prod signatures + `runtime_checkable` carries real `DummyEmbedder` coverage. No churn warranted |
 | 18 | Re-sort of already-sorted results | retriever.py:122-124 | LOW | "just in case" sort on dubious key |
 | 19 | Over-defensive `getattr`/`cast` on `Document` | ingest.py:179,206 | LOW | `.metadata` always exists |
 | 20 | Dead comments describing non-behavior | ingest.py:224-235 | LOW | 3 comment blocks on upsert we don't do |
@@ -170,8 +170,8 @@ It surfaced **4 findings absent from pass 1**, plus useful precision on existing
 |---|---------|-----------|----------|---------|
 | 21 | `_download_model_with_progress` complexity | ollama_client.py:41-94 | **HIGH** | Cognitive complexity **42**, nesting depth **6** — the single most complex function in the repo, missed by pass 1 |
 | 22 | Duplicated "ensure backend ready" block | qa_loop.py:338-345 + 414-420 | MEDIUM | `ensure_weaviate_ready_and_populated()` + `pull_if_missing` + error + `sys.exit(1)` copy-pasted verbatim in two callers |
-| 23 | `answer()` 9-parameter signature | qa_loop.py:118 | MEDIUM | Distinct from #8's job-count: the *signature* is a config-object candidate (`AnswerRequest` dataclass) |
-| 24 | `_setup_logging` length | config.py:19-79 | LOW | 61 lines, reinforces #14 (three logging entry points) |
+| 23 | `answer()` 9-parameter signature | qa_loop.py:118 | MEDIUM | ❌ DECLINED 2026-06-24 — an `AnswerRequest` dataclass relocates complexity without reducing it and forces every caller (cli.py/frontend/tests) to build an object. The kw-only split already groups call-control params. Ceremony, not simplification |
+| 24 | `_setup_logging` length | config.py:19-79 | LOW | ✅ DONE 2026-06-24 — decomposed into `_make_console_handler`/`_attach_file_handler`/`_quiet_noisy_loggers`; orchestrator now reads level→console→file→quiet |
 
 **Revised weighted total:** pass-1 28 + (1 HIGH ×2) + (2 MEDIUM ×2) + (1 LOW ×1) = **35**.
 
@@ -313,7 +313,8 @@ code from `qa_loop`, so it does not collide with the A2 split.
    anyway (no Weaviate vectorizer configured), so deleting it is strictly safe.
 5. **A2 split first**, then **#6, #8, #9, #22 fall out** of it. **#7** (Streamlit logging) is
    independent structural work — slot alongside.
-6. **Remainder as capacity allows:** #10, #15, #17, #23, #24, A3. (**#12 shipped 2026-06-24** —
+6. **Remainder (resolved 2026-06-24 — see D7/D8):** #15/#24 shipped; #17 keep; #23/A3 declined;
+   **#7+#10 shipped 2026-06-24 — see D8** (reversed Tier 2.3 via the bridge form). (**#12 shipped 2026-06-24** —
    see table; surfaced while investigating the `torch.jit.script_method` 3.14 deprecation warning,
    whose sole trigger was this dead `torch.compile` call.)
 
@@ -348,3 +349,141 @@ collapsing `ensure_weaviate_ready_and_populated` to a plain `bootstrap_empty_col
 trace whether anything depends on the warmup side-effect (first-query cold-start latency). If
 warmup proves load-bearing, replace the PDF round-trip with a direct model-warm call (no
 vector-DB round-trip); if not, drop it entirely. Decision deferred to that investigation.
+
+### D7 — Campaign tail (#15/#17/#23/#24/A3) resolved 2026-06-24 (`/impag` batch-8)
+
+The remainder of the authoritative-order step 6 was triaged against YAGNI and the
+senior-architect verdict (no re-architecture buys 2x; module reorg explicitly ruled out):
+- **#15 — DONE** (collapsed dual path; see table). **#24 — DONE** (decomposed `_setup_logging`).
+- **#17 — KEEP/RESOLVED.** `SupportsEncode` is a legitimate lightweight Protocol on two prod
+  signatures; `runtime_checkable` + its single isinstance assertion ride a test file that
+  carries real `DummyEmbedder` ingest coverage. Churning it deletes no real complexity.
+- **#23 — DECLINED.** `AnswerRequest` dataclass = ceremony, not simplification (see table).
+- **A3 — DECLINED (module reorg).** senior-architect (line ~212) ruled out layer extraction /
+  module reorg — "no structural rot, just hub weight." #11 (URL) shipped; #14 (logging entry
+  points) is effectively done (`get_logger` + `set_log_level` are the two public entries,
+  `_setup_logging` is private and now decomposed by #24). Splitting logging into its own module
+  would touch all 9 importers to move clean code around — net churn, no complexity cut.
+
+### D8 — #7 + #10 resolved 2026-06-24: REVERSE Tier 2.3 via the *bridge* form (user decision)
+
+The binary framing (reverse-and-re-thread **vs** keep-the-handler) hid a dominating third
+option, and that's what shipped. Tier 2.3 and #7 each objected to a *different* cost, and
+neither cost is inherent to its design:
+- **Tier 2.3's** objection was **duplication** — 18× `logger.debug(x); if on_debug: on_debug(x)`.
+  That's the *naïve* callback form, not callbacks as such.
+- **#7's** objection was **logging gymnastics + a layering violation** — `_DebugPanelHandler` +
+  the process-wide `backend.ollama_client` DEBUG level-flip (deliberately never restored) +
+  the frontend reaching into a backend logger *by string name*. That machinery exists only
+  because a logging `Handler` can't see DEBUG records unless the logger's level is lowered — a
+  constraint a *direct* callback doesn't have.
+
+**Shipped fix:** a single bridge helper `_emit(msg, *args, level=DEBUG, ui=True)` inside
+`generate_response` (`ollama_client.py`). It calls `logger.log(level, …)` for every line
+(file/console broadcast unchanged for ALL consumers — CLI included) and, when `on_debug` is
+supplied, pushes the formatted string to the callback directly. `on_debug` is threaded
+`rag_app → answer() → generate_response()` (two optional params, one line each).
+- **Satisfies Tier 2.3:** the 18 duplicated `if on_debug:` blocks become one helper — no
+  duplication reintroduced.
+- **Captures #7's win:** deletes `_DebugPanelHandler`, the level-flip, the by-name logger
+  reach, and the per-session thread filter (a direct callback closes over its own buffer, so
+  concurrent sessions can't cross-feed). Net ~60 lines deleted from the frontend.
+- **Resolves #10 for free:** per-token traces pass `ui=False`, replacing the `_HIDE_FROM_UI`
+  record-attribute coupling (deleted) — the panel never sees per-token spam.
+- **Scope refinement:** the init-log StringIO/root-logger capture (`rag_app.py`, "Backend init
+  logs") is left intact. #7's write-up lumped it in, but it's a different pattern (one-shot,
+  root logger, no hot loop, no duplication) and re-threading a callback through the whole
+  Weaviate-readiness path would be high-cost/no-payoff. The reversal is scoped to the
+  `answer()` debug-panel path only.
+- **Coverage:** added `test_generate_response_on_debug_feeds_panel_but_suppresses_per_token`
+  (kept-line + suppressed-line bystander assertions), closing the manual-verification gap
+  `7dac225` had flagged for the panel feed.
+
+This is **not** a wholesale revert of 2.3 — it preserves exactly what 2.3 protected (single
+diagnostic definition for file/console; no per-callsite duplication) while removing the dead
+weight #7 correctly identified.
+
+With #7/#10 resolved, this **closes** the 24-finding catalogue — the rest is shipped or
+explicitly declined.
+
+**RESOLVED 2026-06-24 (`/impag` batch-7): warmup NOT load-bearing → dropped entirely.**
+Trace: (1) the ingest-then-delete block runs ONLY when the collection is missing (a fresh
+DB); every subsequent run hits `exists()==True` and no-ops, yet queries work fine. (2)
+`models.load_embedder()` is an idempotent in-process cache — the first real query lazy-loads
+it regardless, so the one-time cold-start cost is paid during the first query whether or not
+bootstrap pre-warmed it; moving it out adds ZERO steady-state latency. (3) The dance's only
+durable effect was an empty schema, which `weaviate_client.ensure_collection()` already
+creates directly. Fix: replaced the whole block with `ensure_collection(client, name)`;
+removed the `example_data/test.pdf` resolution, `load_embedder()` warmup, iterator check,
+`delete_many`, the `collections.use`/`get` version-fallback, and the now-unused `Filter`
+import. The e2e test (`test_weaviate_bootstrap_missing_collection_e2e`) assertions
+(collection exists + empty) are unchanged; only its docstring/comment were updated.
+
+---
+
+## A2 resolution — two-CLI consolidation (2026-06-24, `mybrain` deep session)
+
+**Discovery that the A2 deep-dive missed:** A2 was written assuming `cli.py` did not exist and
+would be *created* as the thin presentation layer. In reality there are **two divergent,
+both-live CLI entrypoints** doing the same job:
+
+| | root `cli.py` (`main()`) | `backend/qa_loop.py` `__main__` |
+|---|---|---|
+| Invoked by | `[project.scripts] kri-local-rag = "cli:main"`, `python cli.py`, `docker-compose.yml:87` mount, `tests/integration/test_cli_script_integration.py`, `tests/e2e/test_qa_real_end_to_end_container_e2e.py`, two unit tests (`test_cli_error_handling_unit`, `test_startup_model_check_unit`) | `scripts/cli.sh`, `make cli` (Makefile:141), e2e `run_cli_in_container` (`python -m backend.qa_loop`) |
+| Flags | `--debug`, `--version`, `-q/--question` | `-q/-v` (repeatable), `--log-level`, `--k`, `--question` |
+| UX | `Question:` prompt, `===` separators | Rich rules, spinner, `→ ` prompt |
+| Test hooks | `RAG_VERBOSE_TEST` (`PHASE:` prints), `RAG_SKIP_STARTUP_CHECKS`, `PYTEST_CURRENT_TEST` auto-skip | none |
+
+Presentation/readiness logic is **triplicated**: root `cli.py` + `qa_loop.__main__` + embedded
+in `answer()`.
+
+### Decisions (user-confirmed)
+- **The user's real path is `make cli`/`scripts/cli.sh` → `python -m backend.qa_loop`.** That
+  makes `qa_loop.__main__`'s surface **canonical**; root `cli.py` is vestigial (kept alive only
+  by tests + packaging).
+- **One door.** Collapse to a single invocation path. Survivor = **root `cli.py`** (the
+  packaging-idiomatic `cli:main` console-script, already declared + docker-mounted + test-targeted).
+- **`backend/qa_loop.py` → orchestration + shared readiness.** Keeps `answer()`, `build_prompt`,
+  `_rerank`, `_score_chunks`, `_get_cross_encoder`, `ScoredChunk`, and
+  **`ensure_weaviate_ready_and_populated`**. (CORRECTION at implementation: the log-level resolver
+  did NOT stay here — it moved to `backend.config` as the public `resolve_cli_log_level()` so
+  `cli.py` can resolve log level without importing heavy `qa_loop`/torch. config is already a
+  module-level import in cli.py, so this is free; `test_cli_output` repoints its import.) The last
+  one is **shared with the Streamlit frontend** (`frontend/rag_app.py:212`) + e2e/unit tests — so
+  it is NOT CLI-only and must NOT move to `cli.py` (the A2 deep-dive's "readiness → cli.py" was
+  wrong on this point). **Deletes:** the `__main__` block, the `qa_loop()` driver, argparse.
+- **Root `cli.py` → single CLI entrypoint** (stays at repo root — do not create `backend/cli.py`;
+  the docker-compose mount + in-container e2e test depend on the repo-root path). Absorbs the
+  canonical surface (`-v/-q/--log-level` + `set_log_level(_resolve_cli_log_level(...))`,
+  spinner-wrapped readiness, Rich-rules interactive banner, model preload). Keeps its
+  test-pinned scaffolding (`RAG_*` hooks, `PHASE:` banners, inline fake-answer print, `Error:`
+  stderr + exit-1 wrapper, `pull_if_missing`→`Required Ollama model`+exit-1). Adds
+  `ensure_backend_ready()` (spinner + readiness + `pull_if_missing` + `sys.exit` — **dedup of
+  #22**). **Drops** `--debug`/`--version` (untested vestigial) and the `-q`→`--question` alias.
+- **Wiring → one door:** repoint `make cli`, `scripts/cli.sh`, e2e `run_cli_in_container` from
+  `python -m backend.qa_loop` → `python cli.py`. `[project.scripts]` + docker mount already target
+  `cli.py`.
+
+### Conflicts resolved
+- **`-q` alias collision (caught in pre-mortem):** root `cli.py` binds `-q`→`--question`;
+  `qa_loop` binds `-q`→`--quiet`. Resolution: `-q/-v` become quiet/verbose (canonical);
+  `--question` keeps only its long form (the `-q` alias was untested).
+- **Interactive banner:** keep `qa_loop`'s **Rich rules** (the user's real UX); **update** the
+  integration test's `"RAG System CLI - Interactive Mode"` assertion to match (it was
+  test-scaffolding, not a contract).
+
+### Scope boundary
+This A2 work is a **behavior-preserving relocation + one-door consolidation + #22 dedup**, in
+one commit. **#8** (purify `answer()`'s embedded console printing) and **#9** (collapse the
+fake-answer paths — note `answer()`'s fake path streams chars with no prefix, while `cli.py`'s
+inline fake prints `Answer: {fake}`, which the integration test pins) are **deferred to an
+immediate follow-up** — they are behavioral surgery on the most-tested function and force test
+rewrites that would muddy the structural diff. They "fall out" of A2 more safely as the next step.
+
+### Pre-mortem mitigations baked in
+- Sweep all 4 invocation surfaces (Makefile, `scripts/cli.sh`, e2e conftest, docker-compose) in
+  the **same commit** as the `__main__` deletion; verify zero remaining `backend.qa_loop`
+  *invocation* refs (imports of `answer`/`ensure_*` are fine).
+- Confirm nothing external imports the `qa_loop()` driver before deleting it (grep showed only
+  `__main__` calls it).
+- Keep `cli.py` at repo root; no new top-level module → docker mount + in-container e2e unchanged.

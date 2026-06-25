@@ -45,9 +45,9 @@ def docker_services_ready(weaviate_compose_up, ollama_compose_up):
             if not collection_exists or not has_data:
                 logger.info(f"--- Weaviate collection '{COLLECTION_NAME}' is empty. Ingesting test data. ---")
                 data_dir = Path(__file__).parent.parent / "test_data"
-                from backend.retriever import _get_embedding_model
+                from backend.models import load_embedder
 
-                embedding_model = _get_embedding_model()
+                embedding_model = load_embedder()
                 ingest(
                     str(data_dir),
                     collection_name=COLLECTION_NAME,

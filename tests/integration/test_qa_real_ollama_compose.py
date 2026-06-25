@@ -21,11 +21,11 @@ def test_answer_uses_real_ollama_compose(weaviate_client, test_collection_name, 
     """Test QA with real Ollama using both Docker and local environments."""
     # First, ensure we have data in Weaviate by running ingestion
     from backend import ingest
-    from backend.retriever import _get_embedding_model
+    from backend.models import load_embedder
 
-    embedding_model = _get_embedding_model()
+    embedding_model = load_embedder()
     ingest.ingest(
-        directory=sample_documents_path,
+        source=sample_documents_path,
         collection_name=TEST_COLLECTION_NAME,
         weaviate_client=weaviate_client,
         embedding_model=embedding_model,

@@ -7,7 +7,7 @@ import threading
 
 import streamlit as st
 
-from backend.config import OLLAMA_CONTEXT_TOKENS, get_logger
+from backend.config import OLLAMA_CONTEXT_TOKENS, PDF_MAGIC, get_logger
 
 # Set up logging for this module
 logger = get_logger(__name__)
@@ -16,14 +16,14 @@ logger = get_logger(__name__)
 # Overridable via env: MAX_UPLOAD_FILES (count), MAX_UPLOAD_MB (per-file size).
 MAX_UPLOAD_FILES = int(os.getenv("MAX_UPLOAD_FILES", "150"))
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "50")) * 1024 * 1024
-PDF_MAGIC = b"%PDF-"
 
 
 # --- Test-only hooks -------------------------------------------------------
 # These env vars let CLI/UI e2e tests bypass the real backend. They are read
 # only through the helpers below so the test surface stays explicit and in one
-# place (Tier 2.6 of complexity-cleanup). The backend's own RAG_FAKE_ANSWER
-# bypass lives independently in backend.qa_loop.answer().
+# place (Tier 2.6 of complexity-cleanup). The fake-answer bypass is owned by each
+# presentation surface (this frontend + cli.py); backend.qa_loop.answer() no longer
+# carries one (#9 removed it as dead code — surfaces short-circuit before calling it).
 def _fake_answer() -> str | None:
     """Return the canned answer for fake-mode, or None when the hook is unset/empty."""
     return os.getenv("RAG_FAKE_ANSWER") or None
@@ -48,34 +48,41 @@ def _render_answer(placeholder, tokens):
     )
 
 
-class _DebugPanelHandler(logging.Handler):
-    """Feed backend ``logger.debug`` records into the Streamlit debug panel.
+class _IngestProgressHandler(logging.Handler):
+    """Surface ``backend.ingest`` INFO records into the Streamlit ingest status widget.
 
-    Replaces the old hand-maintained ``on_debug`` callback channel: backend code now emits
-    diagnostics solely via logging, and the UI captures them by attaching this handler around
-    the ``answer()`` call. Restricted to the originating ScriptRunner thread so concurrent
-    sessions don't cross-feed each other's debug lines (mirrors ``_ThreadLogFilter`` below).
+    Periodic records carry a structured ``ingest_progress`` payload (current/total/rate/eta)
+    that drives the progress bar; other milestone messages (loading, splitting, complete) are
+    appended to the ``st.status`` log. Restricted to the originating ScriptRunner thread so a
+    concurrent session's ingest can't bleed into this one (mirrors ``_ThreadLogFilter`` below).
     """
 
-    def __init__(self, thread_id: int, placeholder) -> None:
-        super().__init__(level=logging.DEBUG)
+    def __init__(self, thread_id: int, progress_bar, status) -> None:
+        super().__init__(level=logging.INFO)
         self._thread_id = thread_id
-        self._placeholder = placeholder
-        self.setFormatter(logging.Formatter("%(message)s"))
+        self._progress_bar = progress_bar
+        self._status = status
 
     def emit(self, record: logging.LogRecord) -> None:
         if record.thread != self._thread_id:
             return
-        lines = st.session_state.get("debug_lines")
-        if lines is None:
-            return
-        lines.append(self.format(record))
         try:
-            self._placeholder.text("\n".join(lines))
+            prog = getattr(record, "ingest_progress", None)
+            if prog and prog.get("total"):
+                frac = min(prog["current"] / prog["total"], 1.0)
+                if prog.get("phase") == "load":
+                    # Load phase: per-file progress before any chunk has been encoded.
+                    text = f"Loading documents {prog['current']}/{prog['total']} ({frac:.0%})"
+                else:
+                    text = (
+                        f"{prog['current']}/{prog['total']} chunks ({frac:.0%}) · "
+                        f"{prog.get('rate', 0):.0f} chunks/s · ETA ~{prog.get('eta_s', 0):.0f}s"
+                    )
+                self._progress_bar.progress(frac, text=text)
+            else:
+                # High-level milestone (e.g. "Loaded N pages", "Split into N chunks").
+                self._status.write(record.getMessage())
         except Exception:
-            # Placeholder may be unavailable after a rerun; the sidebar expander still
-            # renders the accumulated buffer at the end of the run. handleError writes to
-            # stderr (never via a logger), so it can't re-enter emit().
             self.handleError(record)
 
 
@@ -148,27 +155,44 @@ with st.sidebar.expander("Ingest PDFs"):
             if not saved_paths:
                 st.error("No valid PDF files to ingest.")
             else:
-                with st.spinner("Ingesting ..."):
-                    # Ingest operates on a directory; use the save directory
-                    from backend.config import COLLECTION_NAME
-                    from backend.ingest import (
-                        connect_to_weaviate,
-                        ingest,
-                    )
-                    from backend.models import load_embedder
+                # Ingest only the files just saved from this upload (see source=saved_paths below).
+                from backend.config import COLLECTION_NAME
+                from backend.ingest import ingest
+                from backend.models import load_embedder
+                from backend.weaviate_client import close_weaviate_client, get_weaviate_client
 
-                    client = connect_to_weaviate()
+                # Route backend.ingest progress logs into a live status widget + progress bar.
+                with st.status("Ingesting documents…", expanded=True) as status:
+                    progress_bar = st.progress(0.0, text="Preparing…")
+                    ingest_logger = logging.getLogger("backend.ingest")
+                    handler = _IngestProgressHandler(threading.get_ident(), progress_bar, status)
+                    ingest_logger.addHandler(handler)
                     try:
-                        model = load_embedder()
-                        ingest(
-                            directory=save_dir,
-                            collection_name=COLLECTION_NAME,
-                            weaviate_client=client,
-                            embedding_model=model,
-                        )
+                        client = get_weaviate_client()
+                        try:
+                            model = load_embedder()
+                            # Ingest ONLY the freshly-uploaded files — not the whole
+                            # data/ corpus already on disk (which made every upload
+                            # re-embed thousands of chunks and appear to hang).
+                            ingest(
+                                source=saved_paths,
+                                collection_name=COLLECTION_NAME,
+                                weaviate_client=client,
+                                embedding_model=model,
+                            )
+                        finally:
+                            # Close AND null the module-level cache (matches qa_loop/cli); a raw
+                            # client.close() would leave the shared cached client dead, breaking
+                            # the next query/ingest, since retriever reuses get_weaviate_client().
+                            close_weaviate_client()
+                        progress_bar.progress(1.0, text="Done")
+                        status.update(label=f"Ingested {len(saved_paths)} file(s).", state="complete")
+                    except Exception as e:
+                        status.update(label="Ingestion failed.", state="error")
+                        logger.error("Ingestion failed: %s", e)
+                        st.error(f"Ingestion failed: {e}")
                     finally:
-                        client.close()
-                st.success(f"Ingested {len(saved_paths)} file(s).")
+                        ingest_logger.removeHandler(handler)
 
 with st.form("question_form"):
     question = st.text_area("Ask a question:", height=100)
@@ -263,29 +287,30 @@ if submitted and question.strip():
                 st.error("CrossEncoder model could not be loaded. Ensure the model is available or try again later.")
                 raise
 
-            # Route backend diagnostics into the debug panel via logging (replaces on_debug).
-            # Raise the module logger to DEBUG so its records reach the handler. This is done
-            # idempotently and NOT restored: the logger is a process-wide singleton shared by
-            # every Streamlit session thread, so restoring a prior level in this thread's
-            # finally would silence DEBUG for a concurrent thread still inside answer(). DEBUG
-            # records are still filtered out at the root handler (INFO) and the per-thread
-            # _DebugPanelHandler only feeds this session's panel, so leaving it on is safe.
-            ollama_logger = logging.getLogger("backend.ollama_client")
-            if ollama_logger.level > logging.DEBUG or ollama_logger.level == logging.NOTSET:
-                ollama_logger.setLevel(logging.DEBUG)
-            debug_handler = _DebugPanelHandler(threading.get_ident(), debug_placeholder)
-            ollama_logger.addHandler(debug_handler)
-            try:
-                answer(
-                    question,
-                    k=k,
-                    on_token=on_token,
-                    stop_event=st.session_state.stop_event,
-                    context_tokens=context_tokens,
-                    cross_encoder=cross_encoder,
-                )
-            finally:
-                ollama_logger.removeHandler(debug_handler)
+            # Backend LLM-stream diagnostics feed the debug panel directly via on_debug — no
+            # logging-handler attach, no process-wide level-flipping, no reaching into a backend
+            # logger by name. Each session's callback closes over its own buffer and placeholder,
+            # so concurrent sessions can't cross-feed (the old thread filter is unnecessary).
+            debug_lines = st.session_state["debug_lines"]
+
+            def on_debug(line):
+                debug_lines.append(line)
+                try:
+                    debug_placeholder.text("\n".join(debug_lines))
+                except Exception:
+                    # Placeholder may be unavailable after a rerun; the sidebar expander still
+                    # renders the accumulated buffer at the end of the run.
+                    logger.debug("Debug placeholder unavailable; buffering line for sidebar.")
+
+            answer(
+                question,
+                k=k,
+                on_token=on_token,
+                on_debug=on_debug,
+                stop_event=st.session_state.stop_event,
+                context_tokens=context_tokens,
+                cross_encoder=cross_encoder,
+            )
     # After streaming, keep showing the debug info
     debug_placeholder.text("\n".join(st.session_state["debug_lines"]))
 
