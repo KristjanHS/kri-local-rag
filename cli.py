@@ -19,11 +19,12 @@ import argparse
 import os
 import sys
 
+from rich.console import Console
 from rich.rule import Rule
 
-from backend.config import resolve_cli_log_level, set_log_level
-from backend.console import console, get_logger
+from backend.config import get_logger, resolve_cli_log_level, set_log_level
 
+console = Console()
 logger = get_logger(__name__)
 
 
@@ -163,8 +164,6 @@ def main() -> int:
 
         return 0
     except Exception as e:
-        from rich.console import Console
-
         Console(file=sys.stderr).print(f"[bold red]Error:[/] {e}")
         sys.exit(1)
     finally:
