@@ -48,11 +48,8 @@ def _flush_stdout() -> None:
 
 
 def _skip_startup_checks() -> bool:
-    """Whether to bypass slow readiness checks (tests / explicit offline opt-in)."""
-    return (
-        os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes")
-        or os.getenv("PYTEST_CURRENT_TEST") is not None
-    )
+    """Whether to bypass slow readiness checks (explicit offline opt-in)."""
+    return os.getenv("RAG_SKIP_STARTUP_CHECKS", "0").lower() in ("1", "true", "yes")
 
 
 def _print_streamed_answer(question: str, k: int) -> None:

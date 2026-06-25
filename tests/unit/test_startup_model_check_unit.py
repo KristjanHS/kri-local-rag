@@ -7,9 +7,8 @@ import pytest
 
 
 def test_startup_ensures_model_and_exits_when_missing(monkeypatch, capsys, caplog):
-    # Force startup checks to run: ensure both skip flags are unset
+    # Force startup checks to run: ensure the skip flag is unset
     monkeypatch.delenv("RAG_SKIP_STARTUP_CHECKS", raising=False)
-    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
 
     # Adjust argv to interactive mode so startup path runs before loop
     monkeypatch.setattr(sys, "argv", ["cli.py"], raising=False)
