@@ -1,10 +1,35 @@
 # Architectural Simplification — Critique & Steps
 
-**Status:** Proposed · **Branch:** `dev` · **Scope:** `backend/`, `frontend/`, `cli.py`, `docker/`, `scripts/`
+**Status:** Mostly shipped (see §Realized status) · **Branch:** `dev`/`main` · **Scope:** `backend/`, `frontend/`, `cli.py`, `docker/`, `scripts/`
 **Lens:** Ousterhout (deep vs. shallow modules, information leakage) + Linus (YAGNI, no speculative generality) + brutal-honesty review.
 **Method:** Four parallel subagent reviews (pipeline / clients-config / frontend-ops / test-architecture), every load-bearing claim grep-verified against the tree before inclusion. Reviewer overreaches are called out in [§Rejected](#rejected-recommendations-reviewer-overreach).
 
 > Companion to [`complexity-cleanup.md`](complexity-cleanup.md), which is the **tactical** tier (dead code + line-level smells). Tier 1 of that doc already shipped (commit `c234e99`). This doc is the **architectural** tier: it asks not "what's dead?" but "what shape is wrong?" Where the two overlap, this doc points back rather than restating.
+
+---
+
+## Realized status (2026-06-25)
+
+- **B1** (drop `console.py`) — ✅ shipped (`3888b35`).
+- **B2** (drop `_get_ollama_base_url`) — ✅ shipped earlier (ollama_client now imports `OLLAMA_URL`).
+- **A2** (retriever single cache / no model override) — ✅ shipped earlier (`95c0ef6` #5).
+- **A1** — ⏳ *partial*. `PYTEST_CURRENT_TEST` removed (`bd419d9`, the "worst offender"). The
+  remaining hooks (`RAG_VERBOSE_TEST`, `RAG_FAKE_ANSWER`, `RAG_SKIP_STARTUP_CHECKS`) are **left
+  intentionally**: they are consumed by *subprocess-launched* integration/UI tests
+  (`test_cli_script_integration.py`, `test_app_smoke.py`), where in-process `mock.patch` cannot
+  reach across the fork. Plus the Streamlit `RAG_FAKE_ANSWER` branch is still pending the e2e
+  decision (§A1, tactical doc §2.6). Finishing A1 requires redesigning those subprocess tests —
+  a separate, user-gated task, not a mechanical hook delete.
+- **C** (`load_pipeline_models` helper) — ❌ **dropped as obsolete.** The #5/#6/A2 campaign already
+  moved loading to lazy cached owners (`load_embedder`/`load_reranker`). Each consumer calls the
+  loader it needs at point of use (`ingest`→embedder only; `qa_loop.answer`→reranker only, lazy;
+  `retriever`→embedder if `None`). An eager `(embedder, reranker)` helper would *regress* that
+  laziness (e.g. `ingest` would load the reranker it never uses). The lazy-owner shape IS the fix.
+- **D1** (single source for Ollama model name) — ✅ shipped (`aa2db9f`): shell reads
+  `DEFAULT_OLLAMA_MODEL` from `config.py` via awk; `check_model_synchronization` drift-check deleted.
+- **D2 / B3 / E** — opportunistic only; not done (fold into unrelated future edits to those files).
+
+Remaining open work is A1's subprocess-test redesign (user-gated). Archive this doc once that lands.
 
 ---
 
