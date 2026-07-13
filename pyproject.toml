@@ -14,7 +14,7 @@ dependencies = [
     # >=5.6.0: earlier 5.1.0 capped transformers<5.0.0, blocking the transformers 5.x
     # security bump; 5.2.0+ widened to transformers<6.0.0. See constraint-dependencies.
     "sentence-transformers>=5.6.0,<6.0.0",
-    "streamlit>=1.59.0,<2.0.0",
+    "streamlit>=1.59.2,<2.0.0",
     # torch + torchvision resolve from PyPI by default → GPU-capable, ABI-matched
     # wheels for local dev. The `cpu` extra re-pins both to the pytorch-cpu index
     # for slim CI/Docker installs. See docs/plans/archive/2026-06-23-cpu-gpu-variant-simplification-design.md.
