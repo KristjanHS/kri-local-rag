@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(**/*.ipynb)",
+      "Read(**/*.egg-info/**)",
+      "Read(**/__pycache__/**)",
+      "Read(**/.venv/**)",
+      "Read(**/.venv-ci/**)",
+      "Read(**/.ruff_cache/**)",
+      "Read(**/.pytest_cache/**)",
+      "Read(**/.uv_cache/**)",
+      "Read(**/.uv-cache-hooks/**)",
+      "Read(**/.pre-commit-cache/**)",
+      "Read(**/.mypy_cache/**)",
+      "Read(**/.codex/**)",
+      "Read(**/.cursor/**)",
+      "Read(**/.gemini/**)",
+      "Read(**/gemini)",
+      "Read(**/gemini.md)",
+      "Read(**/AGENTS.md)",
+      "Read(**/logs/**)",
+      "Read(**/reports/**)",
+      "Read(**/tmp*/**)",
+      "Read(**/*.db)",
+      "Read(**/*.sqlite*)",
+      "Read(**/wget-log*)",
+      "Read(**/model_cache/**)",
+      "Read(**/.cache/**)",
+      "Read(**/data/**)",
+      "Read(**/example_data/**)",
+      "Read(**/test_data/**)",
+      "Read(./docs/_archived/**)",
+      "Read(./docs/plans/archive/**)",
+      "Read(./docs/analysis/**)",
+      "Read(**/*.bat)",
+      "Read(**/*.cmd)"
+    ]
+  }
+}

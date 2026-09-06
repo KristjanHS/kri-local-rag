@@ -1,6 +1,6 @@
 # Architectural Simplification — Critique & Steps
 
-**Status:** Mostly shipped (see §Realized status) · **Branch:** `dev`/`main` · **Scope:** `backend/`, `frontend/`, `cli.py`, `docker/`, `scripts/`
+**Status:** ✅ Closed (archived 2026-06-25 — A1 resolved as *keep hooks*; see §Realized status) · **Branch:** `dev`/`main` · **Scope:** `backend/`, `frontend/`, `cli.py`, `docker/`, `scripts/`
 **Lens:** Ousterhout (deep vs. shallow modules, information leakage) + Linus (YAGNI, no speculative generality) + brutal-honesty review.
 **Method:** Four parallel subagent reviews (pipeline / clients-config / frontend-ops / test-architecture), every load-bearing claim grep-verified against the tree before inclusion. Reviewer overreaches are called out in [§Rejected](#rejected-recommendations-reviewer-overreach).
 
@@ -13,13 +13,15 @@
 - **B1** (drop `console.py`) — ✅ shipped (`3888b35`).
 - **B2** (drop `_get_ollama_base_url`) — ✅ shipped earlier (ollama_client now imports `OLLAMA_URL`).
 - **A2** (retriever single cache / no model override) — ✅ shipped earlier (`95c0ef6` #5).
-- **A1** — ⏳ *partial*. `PYTEST_CURRENT_TEST` removed (`bd419d9`, the "worst offender"). The
-  remaining hooks (`RAG_VERBOSE_TEST`, `RAG_FAKE_ANSWER`, `RAG_SKIP_STARTUP_CHECKS`) are **left
-  intentionally**: they are consumed by *subprocess-launched* integration/UI tests
-  (`test_cli_script_integration.py`, `test_app_smoke.py`), where in-process `mock.patch` cannot
-  reach across the fork. Plus the Streamlit `RAG_FAKE_ANSWER` branch is still pending the e2e
-  decision (§A1, tactical doc §2.6). Finishing A1 requires redesigning those subprocess tests —
-  a separate, user-gated task, not a mechanical hook delete.
+- **A1** — ✅ **resolved (keep hooks, 2026-06-25 user decision).** `PYTEST_CURRENT_TEST` removed
+  (`bd419d9`, the "worst offender"). The remaining hooks (`RAG_VERBOSE_TEST`, `RAG_FAKE_ANSWER`,
+  `RAG_SKIP_STARTUP_CHECKS`) are **kept intentionally**: they are consumed by *subprocess-launched*
+  integration/UI tests (`test_cli_script_integration.py`, `test_app_smoke.py`), where in-process
+  `mock.patch` cannot reach across the fork. Finishing A1 the "delete" way would require redesigning
+  those subprocess tests to invoke in-process — at the cost of the real-argv/real-fork coverage that
+  is the whole point of those tests. **User decision (2026-06-25): keep the hooks as a legitimate
+  subprocess-test seam; do not redesign.** A1 is done-as-sensible; no prod-code change. This also
+  settles the Streamlit `RAG_FAKE_ANSWER` e2e question (tactical doc §2.6) in favour of *leave as-is*.
 - **C** (`load_pipeline_models` helper) — ❌ **dropped as obsolete.** The #5/#6/A2 campaign already
   moved loading to lazy cached owners (`load_embedder`/`load_reranker`). Each consumer calls the
   loader it needs at point of use (`ingest`→embedder only; `qa_loop.answer`→reranker only, lazy;
@@ -29,7 +31,8 @@
   `DEFAULT_OLLAMA_MODEL` from `config.py` via awk; `check_model_synchronization` drift-check deleted.
 - **D2 / B3 / E** — opportunistic only; not done (fold into unrelated future edits to those files).
 
-Remaining open work is A1's subprocess-test redesign (user-gated). Archive this doc once that lands.
+No open work remains — A1's subprocess-test redesign was declined (2026-06-25 user decision: keep
+hooks). Doc closed and archived this session, together with the tactical companion `complexity-cleanup.md`.
 
 ---
 
