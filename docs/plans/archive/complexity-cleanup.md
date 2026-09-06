@@ -1,6 +1,6 @@
 # Complexity Cleanup Plan — Tiers 1 & 2
 
-**Status:** Proposed · **Branch:** `dev` · **Scope:** `backend/`, `frontend/`
+**Status:** ✅ Closed (archived 2026-06-25 — Tiers 1–2 shipped; §2.6 resolved as *keep hooks*) · **Branch:** `dev` · **Scope:** `backend/`, `frontend/`
 **Source:** Whole-repo complexity survey (parallel reviewers, Ousterhout/Linus lens), all dead-code claims grep-verified before inclusion.
 
 ## Goal
@@ -93,10 +93,13 @@ existing tests.
 - **Fix:** Remove the param and the bypass branch; tests mock `load_embedder()` if they need a specific model.
 - **Verify:** retriever tests pass.
 
-### 2.6 (Flag only — needs a decision) `RAG_FAKE_ANSWER` / `RAG_SKIP_STARTUP_CHECKS` in UI
-- **File:** `frontend/rag_app.py:204-211`
+### 2.6 ✅ RESOLVED (keep hooks) — `RAG_FAKE_ANSWER` / `RAG_SKIP_STARTUP_CHECKS` in UI
+- **File:** `frontend/rag_app.py` (fake-answer + skip-startup-checks env reads)
 - **Problem:** Test hooks live in production UI code.
-- **Decision needed:** The reviewer's "split into a separate test app" may be worse than the disease for Streamlit e2e. **Do not action without agreeing an approach first.** Leaving as-is is acceptable.
+- **Resolution (2026-06-25 user decision):** Keep the hooks. They are a legitimate seam for the
+  subprocess-launched smoke tests (`test_app_smoke.py`), where in-process `mock.patch` cannot reach
+  across the fork; the "split into a separate test app" reviewer suggestion is worse than the disease.
+  No code change. (Same decision as `architectural-simplification.md` §A1.)
 
 ### Tier 2 verification
 - [ ] `make pre-commit`
