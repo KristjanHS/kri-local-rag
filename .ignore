@@ -1,0 +1,4 @@
+# ripgrep-only: keeps the plan archive out of Claude's default Grep/Glob results.
+# An explicit-path search (Grep path=docs/plans/archive) still reaches it.
+# git and Bash grep (ugrep) do not read this file.
+docs/plans/archive/
