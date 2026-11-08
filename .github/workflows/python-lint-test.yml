@@ -168,7 +168,7 @@ jobs:
         run: make app-up
       - name: Ensure Ollama model present
         env:
-          OLLAMA_MODEL: cas/mistral-7b-instruct-v0.3
+          OLLAMA_MODEL: gemma4:e4b-it-qat
         run: make ollama-pull MODEL="$OLLAMA_MODEL"
       - name: Prepare reports directories
         run: |
