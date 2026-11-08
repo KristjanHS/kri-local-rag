@@ -16,7 +16,7 @@ Key ports and exposure:
 Set variables in `.env` (example values shown):
 ```
 LOG_LEVEL=INFO
-OLLAMA_MODEL=cas/mistral-7b-instruct-v0.3  # Default defined in backend/config.py
+OLLAMA_MODEL=gemma4:e4b-it-qat  # Default defined in backend/config.py
 OLLAMA_CONTEXT_TOKENS=8192
 RETRIEVER_EMBEDDING_TORCH_COMPILE=false
 RERANKER_CROSS_ENCODER_OPTIMIZATIONS=false

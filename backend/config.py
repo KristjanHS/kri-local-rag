@@ -197,7 +197,7 @@ DEFAULT_HYBRID_ALPHA = 0.5  # 0 → pure BM25, 1 → pure vector
 # Model names (single source of truth)
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-DEFAULT_OLLAMA_MODEL = "cas/mistral-7b-instruct-v0.3"
+DEFAULT_OLLAMA_MODEL = "gemma4:e4b-it-qat"
 
 # Working model names (with environment variable overrides)
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
@@ -236,11 +236,3 @@ WEAVIATE_CONCURRENT_REQUESTS = int(os.getenv("WEAVIATE_CONCURRENT_REQUESTS", 2))
 
 # Default context window (max tokens) for Ollama LLM requests
 OLLAMA_CONTEXT_TOKENS = int(os.getenv("OLLAMA_CONTEXT_TOKENS", 8192))  # e.g. 4096, 8192, etc.
-
-
-# (base) PS %USERPROFILE%> ollama show cas/mistral-7b-instruct-v0.3
-#  Model
-#    architecture        llama3
-#    context length      32768
-#    embedding length    4096
-#    quantization        Q4_K_M
