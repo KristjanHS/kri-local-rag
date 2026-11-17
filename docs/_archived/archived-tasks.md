@@ -108,7 +108,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
       - `test_weaviate_compose.py` (2/2 tests pass) - ✅ Verified
       - `test_vectorizer_enabled_compose.py` (1/1 test pass) - ✅ Verified  
       - `test_ingest_pipeline_compose.py` (4/4 tests pass) - ✅ Verified
-      - `test_qa_real_ollama_compose.py` (1/1 test pass) - ✅ Verified
+      - real-Ollama compose QA test (1/1 test pass) - ✅ Verified
     - **✅ Test Execution Method Verified**:
       - Tests run **inside** the app container using: `docker compose -p <RUN_ID> exec -T app /opt/venv/bin/python3 -m pytest <test_file>`
       - Python executable is at `/opt/venv/bin/python3` inside container (not `.venv/bin/python`)
@@ -118,7 +118,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
       - `test_frontend_requirements_in_container.py`: Removed (Docker-in-Docker test, redundant in Compose environment)
       - `test_weaviate_integration.py`: Removed (redundant with `test_weaviate_compose.py`)
     - **✅ Old Testcontainers Tests Removed**:
-      - `test_qa_real_ollama.py`: Removed (replaced by `test_qa_real_ollama_compose.py`)
+      - Testcontainers real-Ollama QA test: Removed (replaced by its compose version)
       - `test_vectorizer_enabled_integration.py`: Removed (replaced by `test_vectorizer_enabled_compose.py`)
       - `test_ingest_pipeline.py`: Removed (replaced by `test_ingest_pipeline_compose.py`)
     - **✅ Environment Tests Moved**:
@@ -525,7 +525,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
   - **Action**: Update test logic to work with the fixture approach.
   - **Verify**: All tests in this file pass with the new fixture approach.
 
-- [x] **Task 7 — Migrate test_qa_real_ollama.py**
+- [x] **Task 7 — Migrate the real-Ollama QA integration test**
   - **Action**: Replace `@patch("backend.qa_loop.get_top_k")` with appropriate fixture.
   - **Verify**: All tests in this file pass with the new fixture approach.
 
@@ -1275,7 +1275,7 @@ This document tracks the progress of the migration from Testcontainers to a Dock
 
 - [x] Make bootstrap e2e use compose Weaviate (no app rebuild), not Testcontainers
   - **Action**: Add `weaviate_compose_up` fixture in `tests/e2e/conftest.py` to start only the `weaviate` service via docker compose (`up -d --wait weaviate`).
-  - **Action**: Update `tests/e2e/test_weaviate_bootstrap_missing_collection_e2e.py` to use this fixture and connect to `http://localhost:8080` with gRPC 50051.
+  - **Action**: Update the bootstrap missing-collection e2e test to use this fixture and connect to `http://localhost:8080` with gRPC 50051.
   - **Rationale**: Mirrors production networking (HTTP + gRPC) and avoids gRPC port mismatch issues seen with Testcontainers defaults.
   - **Verify**: Running the single test passes; e2e suite remains green.
 

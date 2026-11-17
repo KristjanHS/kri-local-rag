@@ -1,14 +1,11 @@
 # Act configuration file
 
-# NB! these images don't include node 20 -> newer Github actions wont work in Act!
-# -P ubuntu-latest=catthehacker/ubuntu:act-latest
-# -P ubuntu-22.04=catthehacker/ubuntu:act-22.04
-
-# The Actions-OSS project now ships runner images “for act” under the actions-oss org, meant to supersede the old personal namespace and keep up with platform shifts.
-# There’s an active migration to these images specifically to modernize the stack for act; they’re maintained with current toolchains.
-# NB! Even thes don't include node 20 -> newer Github actions wont work in Act!
--P ubuntu-latest=ghcr.io/actions-oss/ubuntu:act-latest
--P ubuntu-22.04=ghcr.io/actions-oss/ubuntu:act-22.04
+# Runner images: catthehacker's act images on ghcr (public; act-latest ships node 24).
+# ghcr.io/actions-oss/ubuntu is NOT pullable (ghcr answers 403 / "registry: denied").
+# The pre-push hook runs act with --pull=false: a local image is reused as-is (not refreshed);
+# a missing one is still pulled on first use.
+-P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest
+-P ubuntu-22.04=ghcr.io/catthehacker/ubuntu:act-22.04
 
 # Both of these full images are Enormous, dont use! (≈ 20 GB compressed, ~60 GB unpacked !!!
 # -P ubuntu-latest=catthehacker/ubuntu:full-latest
