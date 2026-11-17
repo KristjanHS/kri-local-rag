@@ -1,7 +1,9 @@
-"""Integration test that hits the real Ollama model while bypassing Weaviate.
+"""Integration test: ingest the example fixture, then answer with the real Ollama model.
 
-This test exercises the QA path end-to-end with the actual LLM by patching only
-the retrieval step. Supports both Docker and local environments.
+Ingests ``example_data/`` (a small self-authored PDF about a fictional lighthouse)
+into the compose Weaviate, asks a question only that document answers, and checks
+the real LLM was called over HTTP and grounded its answer in the retrieved chunk.
+Supports both Docker and local environments.
 """
 
 import subprocess
@@ -15,11 +17,16 @@ from tests.conftest import TEST_COLLECTION_NAME
 
 pytestmark = pytest.mark.requires_ollama
 
+# Fact stated only in example_data/juniper_point_lighthouse.pdf.
+QUESTION = "What colour was the Juniper Point lighthouse lamp room repainted in 1987?"
+EXPECTED_TERM = "teal"
+
 
 @pytest.mark.requires_ollama
-def test_answer_uses_real_ollama_compose(weaviate_client, test_collection_name, sample_documents_path, monkeypatch):
-    """Test QA with real Ollama using both Docker and local environments."""
-    # First, ensure we have data in Weaviate by running ingestion
+def test_answer_grounded_in_example_fixture_with_real_ollama(
+    weaviate_client, test_collection_name, sample_documents_path, monkeypatch
+):
+    """Ingest the example fixture, then answer from it with the real Ollama model."""
     from backend import ingest
     from backend.models import load_embedder
 
@@ -34,8 +41,6 @@ def test_answer_uses_real_ollama_compose(weaviate_client, test_collection_name, 
     # Ensure the required model is available (single pull request if missing)
     assert pull_if_missing(OLLAMA_MODEL) is True
 
-    question = "How do you write a limerick?"
-    # Use a small k to keep the prompt minimal; actual generation length is controlled by server/model
     from backend.qa_loop import _get_cross_encoder
 
     cross_encoder = _get_cross_encoder()
@@ -56,11 +61,11 @@ def test_answer_uses_real_ollama_compose(weaviate_client, test_collection_name, 
 
     monkeypatch.setattr(oc.httpx, "stream", _stream_wrapper)
 
-    out = answer(question, k=1, cross_encoder=cross_encoder, collection_name=TEST_COLLECTION_NAME)
+    # Small k keeps the prompt minimal; the fixture is a single chunk.
+    out = answer(QUESTION, k=1, cross_encoder=cross_encoder, collection_name=TEST_COLLECTION_NAME)
     assert isinstance(out, str) and out.strip(), "Expected a non-empty answer from the real model"
     assert "Error generating response" not in out
-    # The answer should mention limericks since that's what the document is about
-    assert "limerick" in out.lower() or "rhyme" in out.lower(), f"Expected answer about limericks, got: {out[:200]}..."
+    assert EXPECTED_TERM in out.lower(), f"Expected an answer grounded in the fixture, got: {out[:200]}..."
 
     # Verify that the client attempted to call Ollama over HTTP
     assert called_generate["value"], "Expected call to Ollama /api/generate endpoint"

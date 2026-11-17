@@ -38,7 +38,7 @@ def mock_docs():
     """Fixture to create mock Document objects."""
     doc1 = Document(
         page_content="This is the first sentence.",
-        metadata={"source": "test_data/test.pdf"},
+        metadata={"source": "tests/test_data/test.pdf"},
     )
     doc2 = Document(
         page_content="This is the second sentence.",

@@ -243,7 +243,7 @@ def cross_encoder_cache_dir(project_root: Path) -> str:
 
 @pytest.fixture(scope="session")
 def sample_documents_path():
-    """Fixture for using the example_data directory (now only contains PDF files)."""
+    """Fixture for using the example_data directory (one small self-authored sample PDF)."""
     return "example_data/"
 
 
