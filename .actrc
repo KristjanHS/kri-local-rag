@@ -1,8 +1,9 @@
 # Act configuration file
 
 # Runner images: catthehacker's act images on ghcr (public; act-latest ships node 24).
-# ghcr.io/actions-oss/ubuntu is NOT pullable (ghcr answers 403 / "registry: denied"), and the
-# pre-push hook runs act with --pull=false, so the image must already be local: `docker pull` it once.
+# ghcr.io/actions-oss/ubuntu is NOT pullable (ghcr answers 403 / "registry: denied").
+# The pre-push hook runs act with --pull=false: a local image is reused as-is (not refreshed);
+# a missing one is still pulled on first use.
 -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest
 -P ubuntu-22.04=ghcr.io/catthehacker/ubuntu:act-22.04
 
