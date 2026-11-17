@@ -30,4 +30,4 @@ def test_ingest_pipeline_with_real_weaviate_compose(weaviate_client, sample_docu
     # Check that the collection was created and contains the correct number of documents
     collection = weaviate_client.collections.get(COLLECTION_NAME)
     count = collection.aggregate.over_all(total_count=True)
-    assert count.total_count == 1  # Only test.pdf (no markdown files to avoid NLTK dependency)
+    assert count.total_count == 1  # The single-page, single-chunk example_data/ sample PDF
