@@ -233,7 +233,7 @@ PY
 3.5) Ingestion minimal path
 - [x] Action: Ensure a tiny PDF exists. Verify one file present:
   ```bash
-  test -f example_data/test.pdf && cp -n example_data/test.pdf data/ || true
+  cp -n example_data/*.pdf data/ 2>/dev/null || true
   ls -1 data/*.pdf | head -n 1 | cat
   ```
   ✓ PDF file present: data/210717IS21-FuseAgilityRoadmap.pdf

@@ -202,7 +202,7 @@ def ensure_weaviate_ready_and_populated():
             # First-time setup: create the empty collection schema only. The embedder and
             # other heavy modules load lazily on the first real query (load_embedder is an
             # idempotent in-process cache), so there is no need to "warm" them by ingesting
-            # example_data/test.pdf and immediately deleting it — that round-trip only ran on
+            # a sample document and immediately deleting it — that round-trip only ran on
             # a fresh DB and added zero steady-state benefit. Creating the schema is all the
             # bootstrap owes the user.
             logger.info("   → Collection does not exist. Creating empty collection schema...")

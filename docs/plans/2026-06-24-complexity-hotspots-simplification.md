@@ -94,7 +94,7 @@ the day Ollama changes its API.
 
 ### #6 — First-run bootstrap living in the readiness check  (HIGH)
 - **qa_loop.py:243-323** — `ensure_weaviate_ready_and_populated` connects, and on a
-  missing collection: creates it → loads embedder → ingests `example_data/test.pdf` →
+  missing collection: creates it → loads embedder → ingests a bundled sample PDF →
   checks objects via `next(collection.iterator())` → **deletes the data it just
   ingested**, plus a `collections.use`/`collections.get` version-fallback.
 - **Wrong:** a function named `ensure_*_ready` silently doing a full ingest-and-rollback
@@ -414,9 +414,9 @@ it regardless, so the one-time cold-start cost is paid during the first query wh
 bootstrap pre-warmed it; moving it out adds ZERO steady-state latency. (3) The dance's only
 durable effect was an empty schema, which `weaviate_client.ensure_collection()` already
 creates directly. Fix: replaced the whole block with `ensure_collection(client, name)`;
-removed the `example_data/test.pdf` resolution, `load_embedder()` warmup, iterator check,
+removed the sample-PDF resolution, `load_embedder()` warmup, iterator check,
 `delete_many`, the `collections.use`/`get` version-fallback, and the now-unused `Filter`
-import. The e2e test (`test_weaviate_bootstrap_missing_collection_e2e`) assertions
+import. The e2e test (`test_bootstrap_creates_empty_collection_e2e`) assertions
 (collection exists + empty) are unchanged; only its docstring/comment were updated.
 
 ---
