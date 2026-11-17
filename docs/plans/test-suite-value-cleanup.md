@@ -14,7 +14,7 @@ integration, e2e/ui). Each verdict cites the gate check or anti-pattern violated
   - Already-`--ignore`'d dead files: `unit/test_debug.py`, `unit/test_logging.py`, `unit/test_search_logic_archived.py`
   - Harness-testing files: `unit/test_weaviate_guard.py` (tests the conftest guard), `e2e/test_container_helper.py` (`--help` banner), `ui/test_browser_launch_only.py` (tests Playwright works)
   - Vendor smoke / diagnostics: `integration/test_weaviate_compose.py` (Weaviate connect+CRUD), `integration/test_weaviate_debug.py` (print-driven)
-  - Weaker dup: `e2e/test_qa_real_end_to_end.py` (in-process, strictly weaker than `integration/test_qa_real_ollama_compose.py`); `e2e/test_heavy_optimizations_weaviate_e2e.py` (claims to verify `torch.compile` but only asserts `count>=2`)
+  - Weaker dup: `e2e/test_qa_real_end_to_end.py` (in-process, strictly weaker than the real-Ollama compose QA integration test); `e2e/test_heavy_optimizations_weaviate_e2e.py` (claims to verify `torch.compile` but only asserts `count>=2`)
 - **Moved 3 fully-mocked "integration" tests → `tests/unit/`** (no real component, misfiled):
   `test_answer_streaming_integration.py`→`unit/test_answer_streaming.py`, `test_cli_output.py`, `test_qa_pipeline.py`
 - **Fixed `unit/test_compose_security.py`** — removed broken `compute_str()` forward-reference (a `# type: ignore[name-defined]` was masking it); the loopback-binding security assertions are kept.
@@ -65,6 +65,6 @@ Verdicts from the audit. Each is "real value buried in waste" — fix, don't del
 `test_model_import_chain`, `test_qa_loop_logic`, `test_ollama_client_unit`, `test_cli_error_handling_unit`,
 `test_supports_encode_protocol_unit`, `test_logging_config`, `test_e2e_diagnostics_unit`, `test_ingest_pdf_unit`,
 `test_weaviate_client_close`, `test_config_get_service_url_unit`, `test_startup_model_check_unit` (borderline),
-`integration/test_cross_encoder_environment`, `integration/test_qa_real_ollama_compose`,
+`integration/test_cross_encoder_environment`, `integration/test_answer_real_ollama_compose`,
 `integration/test_vectorizer_enabled_compose`, `e2e/test_qa_real_end_to_end_container_e2e`,
-`e2e/test_weaviate_bootstrap_missing_collection_e2e`.
+`e2e/test_bootstrap_creates_empty_collection_e2e`.

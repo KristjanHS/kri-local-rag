@@ -16,10 +16,6 @@
 			"path": "frontend",
 			"name": "frontend"
 		},
-		{
-			"path": "dewpointApp",
-			"name": "dewpointApp"
-		},
 
 		{
 			"path": "data",

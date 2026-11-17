@@ -416,7 +416,7 @@ durable effect was an empty schema, which `weaviate_client.ensure_collection()` 
 creates directly. Fix: replaced the whole block with `ensure_collection(client, name)`;
 removed the sample-PDF resolution, `load_embedder()` warmup, iterator check,
 `delete_many`, the `collections.use`/`get` version-fallback, and the now-unused `Filter`
-import. The e2e test (`test_weaviate_bootstrap_missing_collection_e2e`) assertions
+import. The e2e test (`test_bootstrap_creates_empty_collection_e2e`) assertions
 (collection exists + empty) are unchanged; only its docstring/comment were updated.
 
 ---
