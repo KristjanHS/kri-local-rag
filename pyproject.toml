@@ -124,6 +124,7 @@ constraint-dependencies = [
     "marshmallow>=3.26.2",     # GHSA-428g-f7cq-pgp5 (Schema.load DoS; stays on 3.x)
     "protobuf>=6.33.5",        # GHSA-7gcm-g887-7qv7 (JSON recursion bypass; Streamlit transitive)
     "requests>=2.33.0",        # GHSA-gc5v-m9x4-r6x2 (insecure temp-file reuse in extract_zipped_paths)
+    "setuptools>=84.1.0",      # GHSA-xmj3-9gf7-h52w (torch transitive; Dependabot can't bump it)
     # LangChain 1.x migration DONE 2026-06-23 (-community>=0.4 / -core>=1.2.22 /
     # -text-splitters>=1.1.2 as direct deps; the `langchain` umbrella is no longer a
     # direct dep — we import only from community/core/text_splitters). Cleared the 5
