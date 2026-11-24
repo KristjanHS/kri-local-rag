@@ -40,6 +40,11 @@ class _StubStreamlit(ModuleType):
         self.sidebar = _StubSidebar()
 
     def __getattr__(self, name: str) -> Any:  # set_page_config, title, button, form, etc.
+        # Dunders (__file__, __path__, ...) must miss like on a real module: a callable
+        # __file__ crashes inspect.getmodule(), which scans every sys.modules entry and
+        # calls __file__.endswith() (torch's import-time register_fake hits this).
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(name)
         if name in {"set_page_config", "title", "button", "file_uploader", "empty", "expander"}:
             return self._callable
         if name == "form":
@@ -93,9 +98,13 @@ class _StubSessionState:
 
 def test_frontend_module_imports_with_stub(monkeypatch) -> None:
     """Test that frontend module can be imported without making real connections."""
-    # Inject stubbed streamlit before importing the app
+    # Inject stubbed streamlit before importing the app; monkeypatch restores the prior
+    # sys.modules entry afterwards so the stub can't leak into later tests in the worker.
     stub = _StubStreamlit()
-    sys.modules["streamlit"] = stub
+    monkeypatch.setitem(sys.modules, "streamlit", stub)
+    # Force a fresh import (module code must run against the stub) and drop the
+    # stub-bound frontend.rag_app from sys.modules on teardown.
+    monkeypatch.delitem(sys.modules, "frontend.rag_app", raising=False)
 
     # Mock backend initialization to prevent real connections
     with patch("backend.qa_loop.ensure_weaviate_ready_and_populated") as mock_weaviate:
