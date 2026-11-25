@@ -61,37 +61,6 @@ make stack-reset
 
 ---
 
-## Local (no Docker)
-
-If you prefer to run Python locally and point to Docker services (or your own):
-
-```bash
-# Sync test dependencies with uv (creates/uses .venv)
-make uv-sync-test
-```
-
-Notes:
-- By default the app expects `WEAVIATE_URL=http://weaviate:8080` and `OLLAMA_URL=http://ollama:11434` in Docker. When running fully locally without Docker networking, set them to `http://localhost:8080` and `http://localhost:11434` respectively.
- - Compose uses service healthchecks; when starting manually, prefer `--wait` to block until ready.
- - To pin the Ollama image, copy `.env.example` to `.env` and adjust `OLLAMA_IMAGE=ollama/ollama:<version>`.
-
----
-
-## Common Docker commands
-
-```bash
-# Rebuild just the app image (advanced)
-docker compose -f docker/docker-compose.yml build app
-
-# Restart the app to pick up code changes (advanced)
-docker compose -f docker/docker-compose.yml restart app
-
-# Follow logs
-make app-logs LINES=200          # add FOLLOW=1 to tail
-```
-
----
-
 ## Prerequisites
 - Docker & Docker Compose
 - 8GB+ RAM

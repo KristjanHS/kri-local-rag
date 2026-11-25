@@ -1,8 +1,6 @@
 # Docker Management Guide
 
-> **Note:** Other documentation files refer to this guide for all Docker usage, troubleshooting, and advanced commands.
-
-> For basic startup and quick reference commands, see the root [README.md](../../README.md). This guide covers advanced operations and troubleshooting only.
+Run every command from the repo root. The compose file lives at `docker/docker-compose.yml`, so plain `docker compose` calls pass `-f docker/docker-compose.yml`.
 
 ## Services
 
@@ -16,49 +14,68 @@
 ## Service Details
 
 ### Weaviate (Vector Database)
-- **Purpose**: Stores document embeddings
-- **Data**: Persisted in named volume `weaviate_db`
+- Purpose: stores document embeddings.
+- Data: named volume `weaviate_db`.
 
 ### Ollama (LLM Server)
-- **Purpose**: Local LLM inference
-- **Models**: Stored in named volume `ollama_models`
+- Purpose: local LLM inference.
+- Models: bind mount `model_cache/` in the repo root.
 
 ### app (Application + UI)
-- **Purpose**: Main RAG application (Streamlit UI + backend)
-- **Port**: 8501
-- **Depends on**: weaviate, ollama
+- Purpose: main RAG application (Streamlit UI + backend).
+- Port: 8501.
+- Depends on: weaviate, ollama.
 
 ### ingester (One-off ingestion)
-- **Purpose**: Batch ingest documents
-- **Profile**: `ingest`
+- Purpose: batch ingest documents from `data/`.
+- Profile: `ingest`.
 
-## Service Operations (advanced)
+## Ports and environment
 
-Refer to the root README for common operations. Prefer using `make stack-up` to build and start all services with health checks, `make stack-down` to stop without removing volumes, and `make stack-reset` for a destructive teardown that removes volumes. Below are additional/advanced commands not covered there:
+Weaviate (8080, plus gRPC on 50051) and Ollama (11434) bind to `127.0.0.1` only. The app publishes 8501 on all host interfaces, so other machines on your network can reach the UI.
+
+Compose reads `.env` from the repo root. Copy `.env.example` and adjust:
+
+```
+LOG_LEVEL=INFO
+OLLAMA_MODEL=gemma4:e4b-it-qat      # default from backend/config.py
+OLLAMA_CONTEXT_TOKENS=8192
+RETRIEVER_EMBEDDING_TORCH_COMPILE=false
+RERANKER_CROSS_ENCODER_OPTIMIZATIONS=false
+OLLAMA_IMAGE=ollama/ollama:<version>   # optional; pins the Ollama image
+```
+
+## Service Operations
+
+`make stack-up` builds and starts all services and waits on their healthchecks (`compose up --wait`). `make stack-down` stops them and keeps the volumes. `make stack-reset` is the destructive teardown at the end of this page.
 
 ```bash
+# Rebuild just the app image
+docker compose -f docker/docker-compose.yml build app
+
+# Restart the app to pick up code changes
+docker compose -f docker/docker-compose.yml restart app
+
+# Follow logs
+make app-logs LINES=200          # add FOLLOW=1 to tail
+
 # Rebuild all images with no cache (slower, clean rebuild)
-DOCKER_BUILDKIT=1 docker compose build --no-cache
+DOCKER_BUILDKIT=1 docker compose -f docker/docker-compose.yml build --no-cache
 
-# Restart only Weaviate with full health recheck
-docker compose restart weaviate && docker compose logs -f weaviate | cat
+# Restart only Weaviate and follow its logs
+docker compose -f docker/docker-compose.yml restart weaviate && docker compose -f docker/docker-compose.yml logs -f weaviate
 
-# Execute a shell inside the app container with env debug
-docker compose exec -e LOG_LEVEL=DEBUG app bash
+# Open a shell in the app container with debug logging
+docker compose -f docker/docker-compose.yml exec -e LOG_LEVEL=DEBUG app bash
 ```
 
 ## Docker Image Security
 
 ### OS Package Security Strategy
 
-The project's `app.Dockerfile` uses a security strategy that balances reproducibility and receiving timely security updates.
+`docker/app.Dockerfile` builds on `python:3.14-slim-bookworm` and points apt at a dated Debian snapshot (`ARG SNAPSHOT`). The snapshot pins the whole OS package set, security archive included, so the `apt-get install` line names packages without versions. Bumping `SNAPSHOT` picks up security fixes in one reviewed change.
 
-- **Pinned Base Image**: The `FROM python:3.12.3-slim` line uses a specific, immutable tag. This ensures that the foundational OS layer is consistent and reproducible across all builds.
-- **Security Updates on Build**: The `RUN apt-get update && apt-get upgrade -y` command is intentionally included. It applies the latest available security patches for the OS packages provided by the base image's distribution (`debian:bookworm` in this case).
-
-This approach is preferred over pinning individual `apt` package versions (e.g., `apt-get install <package>=<version>`). While package pinning offers maximum reproducibility, it prevents automatic security patches and creates a significant maintenance burden to manually track and update dozens of packages for vulnerabilities.
-
-The `hadolint` linter may flag this as a warning (DL3008), which is why it is explicitly ignored with an inline comment (`# hadolint ignore=DL3008`) in the Dockerfile.
+Hadolint flags unversioned installs (DL3008); the Dockerfile ignores that rule inline (`# hadolint ignore=DL3008`) because the snapshot already pins them.
 
 ## Troubleshooting
 
@@ -74,7 +91,7 @@ sudo netstat -tulpn | grep :11434
 docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
 
 # Test GPU in containers
-docker compose exec ollama nvidia-smi
+docker compose -f docker/docker-compose.yml exec ollama nvidia-smi
 
 # Install NVIDIA Container Toolkit
 distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
@@ -86,15 +103,15 @@ sudo systemctl restart docker
 
 ## Debug & Monitoring
 
-### Service Health (advanced)
+### Service Health
 ```bash
 # Weaviate readiness and cluster status
 curl -fsS http://localhost:8080/v1/.well-known/ready && echo ready
 curl -fsS http://localhost:8080/v1/meta | jq .
 
-# Ollama: list models and pull a model (example)
+# Ollama: list models, pull the configured model
 curl -fsS http://localhost:11434/api/tags | jq .
-curl -fsS -X POST http://localhost:11434/api/pull -d '{"model":"llama3"}' | jq .
+docker compose -f docker/docker-compose.yml exec -T ollama ollama pull gemma4:e4b-it-qat
 
 # App reachability with headers
 curl -I http://localhost:8501
@@ -111,25 +128,18 @@ docker ps -a
 
 ### Access Service Shells
 ```bash
-docker compose exec weaviate sh
-docker compose exec ollama sh
-docker compose exec app bash
+docker compose -f docker/docker-compose.yml exec weaviate sh
+docker compose -f docker/docker-compose.yml exec ollama sh
+docker compose -f docker/docker-compose.yml exec app bash
 ```
 
 ## Volumes & Data Management
-
-Persistent data uses named volumes:
-- **weaviate_db**: Weaviate database
-- **ollama_models**: Ollama model cache
 
 ### Common Commands (Work in WSL2 & Linux)
 
 ```bash
 # List all project-related volumes
 docker volume ls | grep kri-local-rag
-
-# Remove old/unused volumes from previous project names
-# (Refer to README.md for canonical reset instructions)
 ```
 
 ### Backup/Restore Weaviate (via Docker Container)
@@ -155,34 +165,26 @@ sudo tar czf /backup/weaviate_backup.tar.gz -C /var/lib/docker/volumes/kri-local
 
 ## Data Locations
 
-- **Weaviate data**: named volume `weaviate_db` (prefixed to `kri-local-rag_weaviate_db`)
-- **Ollama models**: named volume `ollama_models` (prefixed to `kri-local-rag_ollama_models`)
-- **Source documents**: Local `data/` directory (bind-mounted)
+- Weaviate data: named volume `weaviate_db` (prefixed to `kri-local-rag_weaviate_db`).
+- Ollama models: bind mount `model_cache/` in the repo root.
+- Source documents: `data/` (bind-mounted into the app and ingester).
 
 ## Cleaning Up Containers & Images (Keep All Data)
 
-This process removes all containers and images associated with the project but preserves your persistent data volumes.
+This removes the project's containers and images and keeps your data.
 
 ### Step 1: Stop Services and Preserve Data
 
-First, stop the running services. It is critical to use the correct `down` command to ensure your data volumes are not deleted.
-
 ```bash
-# Recommended: stop stack and PRESERVE data volumes
+# Stop the stack and keep data volumes
 make stack-down
-
-# Equivalent compose command (also preserves volumes)
-docker compose down
 ```
 
-> **⚠️ Important:**
-> -   `docker compose down` **preserves** data volumes.
-> -   `docker compose down -v` **deletes** data volumes.
-> -   Always consider creating a backup first (see backup commands in the section above).
+`docker compose down` keeps volumes; `docker compose down -v` deletes them. Back up Weaviate first (see Backup/Restore Weaviate).
 
 ### Step 2: (Optional) Prune Unused System Resources
 
-If you want to free up more disk space, you can remove any remaining stopped containers and all associated Docker images.
+To free more disk space, remove stopped containers and images. Both commands act on every container and image on the host, not only this project's.
 
 ```bash
 # Force-remove any remaining stopped containers
@@ -194,14 +196,9 @@ docker rmi -f $(docker images -q)
 
 ### Step 3: Verify Data Preservation
 
-After running the cleanup, your persistent data remains safe. The following volumes are preserved:
--   **`ollama_models`**: A named volume stored outside the project, containing downloaded LLMs.
--   **`docker/.data`**: A bind mount inside the `docker` directory, containing the Weaviate database.
-
-## Next Steps
-
-- [Development, Testing & CI/CD](../dev_test_CI/README.md)
-- [MVP Deployment runbook](mvp_deployment.md)
+Two data stores survive the cleanup:
+- `kri-local-rag_weaviate_db`: the named volume holding the Weaviate database.
+- `model_cache/`: the bind mount holding downloaded Ollama models.
 
 ## Destructive Reset (Delete Volumes)
 
@@ -211,4 +208,4 @@ To wipe all app data managed by Compose, use:
 make stack-reset
 ```
 
-Warning: This removes named volumes (e.g., Weaviate DB, Ollama models). Backup first if needed.
+This removes the project's containers, images and the `weaviate_db` volume. Ollama models in `model_cache/` stay on disk. Back up Weaviate first if needed.
