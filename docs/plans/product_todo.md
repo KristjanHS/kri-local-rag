@@ -248,7 +248,7 @@ MagicMock)" message no longer exists.
 
 Carried over from the archived `docs/plans/archive/launch_prep_todo.md` bring-up checklist
 (the bring-up steps themselves shipped; these were its open "Post-MVP (defer)" items). The
-deploy runbook is `docs/operate/mvp_deployment.md`.
+ports and `.env` settings live in `docs/operate/docker-management.md`.
 
 - [ ] Add app healthcheck / readiness probe for the Streamlit container.
 - [ ] Produce a lean production image (drop dev deps, avoid the editable install).

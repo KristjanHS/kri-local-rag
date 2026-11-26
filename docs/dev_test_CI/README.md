@@ -4,9 +4,10 @@ Reference for dev setup, the test suites, and the CI/release pipeline. Run comma
 
 ## Setup
 
-- Prerequisites: Python 3.12+, Docker (optional, for the full stack).
+- Prerequisites: Python 3.14, Docker (optional, for the full stack).
 - Full dev environment (venv, deps, system tools): `make dev-setup`, then `source .venv/bin/activate`.
-- Shared git hooks: `make setup-hooks` points git at `scripts/git-hooks/` (the `pre-commit` and `pre-push` hooks). Local `.git/hooks/` still take precedence.
+- Host Python against the Docker services: `make uv-sync-test` syncs the test group into `.venv`. On the host, `OLLAMA_URL` and `WEAVIATE_URL` default to `http://localhost:11434` and `http://localhost:8080`. Compose sets the container hostnames.
+- Shared git hooks: `make setup-hooks` sets `core.hooksPath` to `scripts/git-hooks/`, so git runs that folder's `pre-commit` and `pre-push` hooks and ignores `.git/hooks/`.
 - Import strategy (editable install, never `PYTHONPATH`): see `.claude/rules/python-imports-and-deps.md`. `kri_local_rag.egg-info/` carries the package metadata that drives editable installs and module discovery.
 
 ## Running tests
@@ -17,11 +18,10 @@ Suites map to folders (`tests/unit|integration|e2e|ui`; defined in `.claude/rule
 make unit                                    # fast, sockets blocked
 make e2e                                     # host pytest vs localhost services (see ## E2E tests)
 .venv/bin/python -m pytest tests/ui --no-cov -q   # Playwright/Streamlit
-make pre-push                                # unit bundle; respects SKIP_TESTS=1
+make pre-push                                # the pre-push hook with every step on
 ```
 
-Integration tests need real services — see `## Integration tests` below.
-E2E tests run the full stack two ways — see `## E2E tests` below.
+Integration tests need real services. E2E tests run the full stack in two modes.
 
 ## Test notifications
 
@@ -61,34 +61,34 @@ make integration PYTEST_ARGS='-m "requires_weaviate and requires_ollama"'
 
 End-to-end tests exercise the real stack (Weaviate + Ollama + the packaged app
 image) and run in **two modes**. Both resolve service URLs through
-`get_service_url`, so the same test code works either way — never hardcode a URL
+`get_service_url`, so the same test code works either way. Never hardcode a URL
 in a test.
 
 ```bash
-# Mode 1 — host: pytest runs on the host against localhost services.
+# Mode 1, host: pytest runs on the host against localhost services.
 make e2e                 # targets whichever stack is up (live OR test); auto-
                          # starts the live stack if none. PRESERVE=0 to stack-down after.
 
-# Mode 2 — in-container: pytest runs inside the app-test container (hermetic, CI-faithful).
+# Mode 2, in-container: pytest runs inside the app-test container (hermetic, CI-faithful).
 make test-up && make test-e2e && make test-down
 ```
 
 Because the test stack reuses the live host ports (`8080/50051/11434/8501`), the
-two stacks can't run at once — `make e2e` hits `http://localhost:8080`, while
+two stacks can't run at once. `make e2e` hits `http://localhost:8080`, while
 `make test-e2e` hits the compose hostname `http://weaviate:8080` from inside the
-container (see the URL table under `## Test utilities & service URLs`). `make e2e`
+container. `make e2e`
 needs the `kri-local-rag-app:latest` image or it skips; `make test-e2e` needs a
 running test stack (`make test-up`).
 
 ## Test markers
 
-- `slow` — long-running (>30s).
-- `docker` — needs the Docker daemon.
-- `requires_weaviate` / `requires_ollama` — needs that service up.
+- `slow`: long-running (>30s).
+- `docker`: needs the Docker daemon.
+- `requires_weaviate` / `requires_ollama`: needs that service up.
 
 ## Test utilities & service URLs
 
-Integration helpers live in `tests/integration/conftest.py` — import, never reimplement (see `.claude/rules/testing.md`): `get_service_url`, `is_service_healthy`, `get_available_services`. `get_service_url` is defined in `backend/config.py`; endpoints/timeouts come from `pyproject.toml` `[tool.integration]`.
+Integration helpers live in `tests/integration/conftest.py`; import them, never reimplement (see `.claude/rules/testing.md`): `get_service_url`, `is_service_healthy`, `get_available_services`. `get_service_url` is defined in `backend/config.py`; endpoints/timeouts come from `pyproject.toml` `[tool.integration]`.
 
 Service URLs default to localhost and are overridden by env var; Docker Compose sets the container-network values:
 
@@ -128,7 +128,7 @@ that resolve from PyPI by default → GPU-capable CUDA wheels on Linux. A single
 `pyproject.toml` `[tool.uv]` and
 `docs/plans/archive/2026-06-23-cpu-gpu-variant-simplification-design.md`). The
 otherwise-redundant `gpu` extra exists only to satisfy uv's ≥2-members-per-conflict
-rule — it is source-less, so it resolves from PyPI just like the no-extra default.
+rule. It is source-less, so it resolves from PyPI just like the no-extra default.
 
 ```bash
 make sync                            # local/bare-metal dev → PyPI/CUDA torch (default)
@@ -138,7 +138,7 @@ make sync SYNC_EXTRA="--extra cpu"   # CPU-only box → slim +cpu wheels
 
 CI passes `SYNC_EXTRA="--extra cpu"` (CPU-only runners). A bare `uv sync` with no
 extra is now the *intended* GPU path, not a footgun. To switch an existing checkout
-between variants, recreate the venv clean (`rm -rf .venv` then re-sync) — swapping
+between variants, recreate the venv clean (`rm -rf .venv` then re-sync). Swapping
 CUDA wheel families in place can corrupt the shared PEP-420 `nvidia/` namespace dir.
 
 The **Docker app image stays CPU** (slim runtime; only Ollama uses the GPU). Its
@@ -150,24 +150,29 @@ DOCKER_BUILDKIT=1 docker build -f docker/app.Dockerfile -t kri-local-rag:local .
 
 ## Helper scripts
 
-- `scripts/docker/docker-setup.sh` — one-time Docker bootstrap.
-- `scripts/docker/docker-reset.sh` — full cleanup (containers, images, volumes).
-- `scripts/docker/build_app.sh` — build the `app` image (`--no-cache` accepted).
-- `scripts/cli.sh` — run the CLI inside Docker.
+- `scripts/docker/docker-setup.sh`: one-time Docker bootstrap.
+- `scripts/docker/docker-reset.sh`: full cleanup (containers, images, volumes).
+- `scripts/docker/build_app.sh`: build the `app` image (`--no-cache` accepted).
+- `scripts/cli.sh`: run the CLI with the host `.venv` (behind `make cli` and `make ask`). `make cli-docker` runs it inside the app container instead.
 
 ## CI workflows
 
 GitHub Actions; canonical local gate is `make pre-commit` before pushing.
 
-- `python-lint-test.yml` — lint -> fast_tests, plus pyright and docker_smoke_tests. PR to main/dev. 5–15 min.
-- `codeql.yml` — static security analysis. Push/PR to main, weekly. Up to 6h.
-- `semgrep.yml` — pattern security scan. Push/PR to main. Up to 30 min.
+- `python-lint-test.yml`: Lint, Deptry, Unit Tests, Pyright. PR to main/dev, push to main, weekly, manual. Integration, E2E and UI jobs run only under Act.
+- `codeql.yml`: static security analysis. Every PR, weekly, manual. Up to 6h.
+- `semgrep.yml`: pattern security scan. Every PR, manual. Up to 30 min.
+- `security_scans.yml`: uv audit and Trivy filesystem scan. PRs touching `uv.lock`, `pyproject.toml` or Docker files, weekly, manual.
+- `meta-linters.yml`: Actionlint, Yamlfmt, Hadolint. PRs touching YAML or Docker files, manual.
+- `enable-automerge.yml`: turns on auto-merge. PRs to main opened or marked ready.
+- `auto-pr.yml`: opens a pull request. Manual.
+- `codeql_local.yml`: CodeQL in an isolated env for Act. Manual.
 
-Security workflows run only on GitHub, not under Act.
+CodeQL and Semgrep have separate local jobs for Act; their GitHub jobs skip under Act.
 
 ## Pre-push sequence (Act)
 
-`git push` runs this gate locally via Act, in order — all blocking except CodeQL:
+`git push` runs this gate locally via Act, in order. All steps block except CodeQL:
 
 1. Pyright (types) 2. Lint (`ruff check` + `ruff format --check`) 3. Fast tests 4. Semgrep 5. CodeQL (informational locally).
 
@@ -185,7 +190,7 @@ act workflow_dispatch -j lint                            # single job
 
 ## Pre-commit framework
 
-`make setup-hooks` installs it; hooks fire on `git commit`. Run all with `make pre-commit`, or one via `pre-commit run ruff`. Tools: Ruff, YAMLfmt, Actionlint, Hadolint, Bandit, Pyright, Detect-secrets. Config: `.pre-commit-config.yaml`, `.secrets.baseline`.
+After `make setup-hooks`, the `scripts/git-hooks/pre-commit` hook runs the framework on the staged files at every `git commit`. Skip `pre-commit install`: it refuses to run while `core.hooksPath` is set. Run all hooks on all files with `make pre-commit`, or one via `pre-commit run ruff`. Tools: Ruff, YAMLfmt, Actionlint, Hadolint, Bandit, Pyright, Detect-secrets. Config: `.pre-commit-config.yaml`, `.secrets.baseline`.
 
 ```bash
 pre-commit autoupdate                # refresh hook versions
