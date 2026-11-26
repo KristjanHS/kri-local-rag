@@ -7,7 +7,7 @@ Reference for dev setup, the test suites, and the CI/release pipeline. Run comma
 - Prerequisites: Python 3.14, Docker (optional, for the full stack).
 - Full dev environment (venv, deps, system tools): `make dev-setup`, then `source .venv/bin/activate`.
 - Host Python against the Docker services: `make uv-sync-test` syncs the test group into `.venv`. On the host, `OLLAMA_URL` and `WEAVIATE_URL` default to `http://localhost:11434` and `http://localhost:8080`. Compose sets the container hostnames.
-- Shared git hooks: `make setup-hooks` points git at `scripts/git-hooks/` (the `pre-commit` and `pre-push` hooks). Local `.git/hooks/` still take precedence.
+- Shared git hooks: `make setup-hooks` sets `core.hooksPath` to `scripts/git-hooks/`, so git runs that folder's `pre-commit` and `pre-push` hooks and ignores `.git/hooks/`.
 - Import strategy (editable install, never `PYTHONPATH`): see `.claude/rules/python-imports-and-deps.md`. `kri_local_rag.egg-info/` carries the package metadata that drives editable installs and module discovery.
 
 ## Running tests
@@ -18,7 +18,7 @@ Suites map to folders (`tests/unit|integration|e2e|ui`; defined in `.claude/rule
 make unit                                    # fast, sockets blocked
 make e2e                                     # host pytest vs localhost services (see ## E2E tests)
 .venv/bin/python -m pytest tests/ui --no-cov -q   # Playwright/Streamlit
-make pre-push                                # unit bundle; respects SKIP_TESTS=1
+make pre-push                                # the pre-push hook with every step on
 ```
 
 Integration tests need real services. E2E tests run the full stack in two modes.
@@ -153,13 +153,13 @@ DOCKER_BUILDKIT=1 docker build -f docker/app.Dockerfile -t kri-local-rag:local .
 - `scripts/docker/docker-setup.sh`: one-time Docker bootstrap.
 - `scripts/docker/docker-reset.sh`: full cleanup (containers, images, volumes).
 - `scripts/docker/build_app.sh`: build the `app` image (`--no-cache` accepted).
-- `scripts/cli.sh`: run the CLI inside Docker.
+- `scripts/cli.sh`: run the CLI with the host `.venv` (behind `make cli` and `make ask`). `make cli-docker` runs it inside the app container instead.
 
 ## CI workflows
 
 GitHub Actions; canonical local gate is `make pre-commit` before pushing.
 
-- `python-lint-test.yml`: Lint, Deptry, Unit Tests, Pyright. PR to main/dev, push to main, weekly. Integration, E2E and UI jobs run only under Act.
+- `python-lint-test.yml`: Lint, Deptry, Unit Tests, Pyright. PR to main/dev, push to main, weekly, manual. Integration, E2E and UI jobs run only under Act.
 - `codeql.yml`: static security analysis. Every PR, weekly, manual. Up to 6h.
 - `semgrep.yml`: pattern security scan. Every PR, manual. Up to 30 min.
 - `security_scans.yml`: uv audit and Trivy filesystem scan. PRs touching `uv.lock`, `pyproject.toml` or Docker files, weekly, manual.
@@ -190,7 +190,7 @@ act workflow_dispatch -j lint                            # single job
 
 ## Pre-commit framework
 
-`make setup-hooks` installs it; hooks fire on `git commit`. Run all with `make pre-commit`, or one via `pre-commit run ruff`. Tools: Ruff, YAMLfmt, Actionlint, Hadolint, Bandit, Pyright, Detect-secrets. Config: `.pre-commit-config.yaml`, `.secrets.baseline`.
+After `make setup-hooks`, the `scripts/git-hooks/pre-commit` hook runs the framework on the staged files at every `git commit`. Skip `pre-commit install`: it refuses to run while `core.hooksPath` is set. Run all hooks on all files with `make pre-commit`, or one via `pre-commit run ruff`. Tools: Ruff, YAMLfmt, Actionlint, Hadolint, Bandit, Pyright, Detect-secrets. Config: `.pre-commit-config.yaml`, `.secrets.baseline`.
 
 ```bash
 pre-commit autoupdate                # refresh hook versions

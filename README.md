@@ -7,7 +7,7 @@ Ask questions about your local PDFs offline, with Ollama and Weaviate.
 
 ## Quick start
 
-Prerequisites: Docker with Docker Compose and GNU Make, on Linux or WSL2.
+Prerequisites: Docker with Docker Compose, GNU Make, and an NVIDIA GPU with the NVIDIA Container Toolkit, on Linux or WSL2. The compose file reserves every NVIDIA GPU for the Ollama container, so the stack does not start without one.
 
 ```bash
 git clone https://github.com/KristjanHS/kri-local-rag.git && cd kri-local-rag
@@ -19,7 +19,7 @@ Open `http://localhost:8501` and ask what year the Juniper Point lighthouse was 
 
 ## What it does
 
-- Ingests PDF and Markdown files from any folder into a local Weaviate index.
+- Ingests PDF and Markdown files into a local Weaviate index. `make ingest` reads `./data` by default; `INGEST_SRC` can point it at another folder under `data/` or `example_data/`, the only two document folders mounted into the app container.
 - Answers questions in a Streamlit web UI, or in a CLI (`make cli`, `make ask`) that runs from the local Python setup in the dev docs.
 - Streams the answer token by token from a local Ollama model.
 
@@ -37,7 +37,7 @@ Service operations and troubleshooting: [docs/operate/docker-management.md](docs
 
 ## How it was built
 
-Coding agents wrote the code; I reviewed it and steered. The agents changed over time: Cursor (`.cursor/rules/`), Codex (`.codex/`), Gemini CLI and Gemini Code Assist (`gemini.md`, `.gemini/`), Continue with open-weight models (`Continue_AI_coder/`) and Claude Code (`CLAUDE.md`, `.claude/rules/`), with `AGENTS.md` as the shared brief. Their config files stay tracked as they were used. Bigger changes began as a written plan, and 17 of those are in [docs/plans/](docs/plans/) (12 finished and archived). The method that grew out of this project is published, cleaned up, as [claudeconf](https://github.com/KristjanHS/claudeconf).
+Coding agents wrote the code; I reviewed it and steered. The agents changed over time: Cursor (`.cursor/rules/`), Codex (`.codex/`), Gemini CLI and Gemini Code Assist (`gemini.md`, `.gemini/`), Continue with open-weight models (`Continue_AI_coder/`) and Claude Code (`CLAUDE.md`, `.claude/rules/`), with `AGENTS.md` as the shared brief. Their config files stay tracked as they were used. Bigger changes began as a written plan. The plans are in [docs/plans/](docs/plans/), with finished ones under `archive/`. The method that grew out of this project is published, cleaned up, as [claudeconf](https://github.com/KristjanHS/claudeconf).
 
 ## Tests
 
@@ -45,15 +45,15 @@ Coding agents wrote the code; I reviewed it and steered. The agents changed over
 make unit
 ```
 
-Tests per suite (static count of `def test_` under `tests/`): unit 52, integration 11, E2E 2, UI 1. CI runs Ruff lint, Pyright, the unit tests and Deptry on every push to `main` and every pull request. Pull requests also run CodeQL and Semgrep. `uv audit` and Trivy run weekly and on pull requests that touch dependencies or Docker files. Setup, suites and the CI flow: [docs/dev_test_CI/README.md](docs/dev_test_CI/README.md).
+Tests per suite (static count of `def test_` under `tests/`): unit 52, integration 11, E2E 2, UI 1. CI runs Ruff lint, Pyright, the unit tests and Deptry on pull requests to `main` or `dev`, on pushes to `main`, and weekly. Every pull request also runs CodeQL and Semgrep. `uv audit` and Trivy run weekly and on pull requests that touch dependencies or Docker files. Setup, suites and the CI flow: [docs/dev_test_CI/README.md](docs/dev_test_CI/README.md).
 
 ## Limits
 
 - One question peaked at 8.4 GiB of RAM across the three containers, 7.7 GiB of it Ollama with the model on an NVIDIA GPU (`docker stats`). The app container itself runs on CPU only.
-- The first `make stack-up` downloads 10.8 GB of images and a 6.1 GB model (`docker image ls`, `ollama list`).
+- After the first `make stack-up`, the images take 10.8 GB of disk and the model 6.1 GB (`docker image ls`, `ollama list`). Of the 10.8 GB, 8.6 GB is the pulled Ollama and Weaviate images and 2.2 GB the app image, built locally.
 - The embedding and re-ranking models download from Hugging Face on first use in each new app container, and `make ingest` starts a new one every run, so ingest needs network access.
 - The LLM context window defaults to 8,192 tokens (`OLLAMA_CONTEXT_TOKENS` in `backend/config.py`).
-- Integration and E2E tests (13 of 66) need the full Docker stack and run only locally, never on GitHub CI.
+- Integration, E2E and UI tests (14 of 66) need the Docker stack and run only locally, never on GitHub CI.
 
 ## License
 

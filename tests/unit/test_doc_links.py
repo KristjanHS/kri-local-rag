@@ -61,7 +61,9 @@ def _parents(rel: str) -> list[str]:
 
 def test_doc_links_resolve_to_tracked_files():
     tracked = _tracked_files()
-    dead = _dead_links(REPO_ROOT, _doc_pages(tracked), set(tracked))
+    pages = _doc_pages(tracked)
+    assert "README.md" in pages, f"page selector missed README.md; selected {len(pages)} pages"
+    dead = _dead_links(REPO_ROOT, pages, set(tracked))
     assert not dead, "dead relative doc links: " + "; ".join(f"{page} -> {target}" for page, target in dead)
 
 

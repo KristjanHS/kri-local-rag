@@ -6,10 +6,10 @@ Run every command from the repo root. The compose file lives at `docker/docker-c
 
 | Service | Purpose | Port |
 |---------|---------|------|
-| **weaviate** | Vector database | 8080 |
-| **ollama** | LLM server | 11434 |
-| **app** | Streamlit UI + backend | 8501 |
-| **ingester** (profile: ingest) | One-off ingestion utility | - |
+| weaviate | Vector database | 8080 |
+| ollama | LLM server | 11434 |
+| app | Streamlit UI + backend | 8501 |
+| ingester (profile: ingest) | One-off ingestion utility | none |
 
 ## Service Details
 
@@ -34,7 +34,11 @@ Run every command from the repo root. The compose file lives at `docker/docker-c
 
 Weaviate (8080, plus gRPC on 50051) and Ollama (11434) bind to `127.0.0.1` only. The app publishes 8501 on all host interfaces, so other machines on your network can reach the UI.
 
-Compose reads `.env` from the repo root. Copy `.env.example` and adjust:
+Compose does not read the repo-root `.env`. It looks for `docker/.env`, next to the compose file, and the Makefile passes no `--env-file`. The repo-root `.env` is read only by host-side Python through `backend/config.py`, which covers `make cli`, `make ask` and host pytest runs. The containers get only the variables listed under `environment:` in the compose file, and `.env` is excluded from the image build.
+
+The one variable compose itself interpolates is `OLLAMA_IMAGE`. To set it, export it in the shell, or call compose with `--env-file .env`. The `make` targets don't pass that flag.
+
+For the host-side CLI, copy `.env.example` to `.env` and adjust:
 
 ```
 LOG_LEVEL=INFO
@@ -42,12 +46,11 @@ OLLAMA_MODEL=gemma4:e4b-it-qat      # default from backend/config.py
 OLLAMA_CONTEXT_TOKENS=8192
 RETRIEVER_EMBEDDING_TORCH_COMPILE=false
 RERANKER_CROSS_ENCODER_OPTIMIZATIONS=false
-OLLAMA_IMAGE=ollama/ollama:<version>   # optional; pins the Ollama image
 ```
 
 ## Service Operations
 
-`make stack-up` builds and starts all services and waits on their healthchecks (`compose up --wait`). `make stack-down` stops them and keeps the volumes. `make stack-reset` is the destructive teardown at the end of this page.
+`make stack-up` builds and starts all services and waits on their healthchecks (`compose up --wait`). `make stack-down` stops them and keeps the volumes. `make stack-reset` deletes the project's containers, images and Weaviate volume, then prunes unused Docker data across the whole host.
 
 ```bash
 # Rebuild just the app image
@@ -87,19 +90,14 @@ sudo netstat -tulpn | grep :11434
 
 ### GPU Issues
 ```bash
-# Check GPU availability
-docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
+# Docker can reach the GPU (the toolkit injects nvidia-smi into the container)
+docker run --rm --gpus all ubuntu nvidia-smi
 
-# Test GPU in containers
+# The running Ollama container sees the GPU
 docker compose -f docker/docker-compose.yml exec ollama nvidia-smi
-
-# Install NVIDIA Container Toolkit
-distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
-curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-sudo apt-get update && sudo apt-get install -y nvidia-docker2
-sudo systemctl restart docker
 ```
+
+If the first command fails, install the NVIDIA Container Toolkit with [NVIDIA's install guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 
 ## Debug & Monitoring
 
@@ -138,14 +136,14 @@ docker compose -f docker/docker-compose.yml exec app bash
 ### Common Commands (Work in WSL2 & Linux)
 
 ```bash
-# List all project-related volumes
-docker volume ls | grep kri-local-rag
+# List the project's volumes (compose project name: kri-local-rag)
+docker volume ls --filter label=com.docker.compose.project=kri-local-rag
 ```
 
 ### Backup/Restore Weaviate (via Docker Container)
 
 ```bash
-# Backup Weaviate data (volume name usually prefixed):
+# Backup Weaviate data to ./weaviate_backup.tar.gz (compose prefixes the volume with the project name):
 docker run --rm -v kri-local-rag_weaviate_db:/data -v $(pwd):/backup alpine tar czf /backup/weaviate_backup.tar.gz -C /data .
 # Restore Weaviate data:
 docker run --rm -v kri-local-rag_weaviate_db:/data -v $(pwd):/backup alpine tar xzf /backup/weaviate_backup.tar.gz -C /data .
@@ -160,18 +158,18 @@ On native Linux you can directly access named volume paths. On WSL2 (Docker Desk
 sudo ls -la /var/lib/docker/volumes/kri-local-rag_weaviate_db/_data
 
 # Example (Linux Only): Direct filesystem backup
-sudo tar czf /backup/weaviate_backup.tar.gz -C /var/lib/docker/volumes/kri-local-rag_weaviate_db/_data .
+sudo tar czf "$PWD/weaviate_backup.tar.gz" -C /var/lib/docker/volumes/kri-local-rag_weaviate_db/_data .
 ```
 
 ## Data Locations
 
-- Weaviate data: named volume `weaviate_db` (prefixed to `kri-local-rag_weaviate_db`).
+- Weaviate data: named volume `weaviate_db`, created as `kri-local-rag_weaviate_db` because the compose file sets `name: kri-local-rag`.
 - Ollama models: bind mount `model_cache/` in the repo root.
 - Source documents: `data/` (bind-mounted into the app and ingester).
 
 ## Cleaning Up Containers & Images (Keep All Data)
 
-This removes the project's containers and images and keeps your data.
+This removes the project's containers and images and keeps your data. Both commands touch only the `kri-local-rag` compose project.
 
 ### Step 1: Stop Services and Preserve Data
 
@@ -180,19 +178,16 @@ This removes the project's containers and images and keeps your data.
 make stack-down
 ```
 
-`docker compose down` keeps volumes; `docker compose down -v` deletes them. Back up Weaviate first (see Backup/Restore Weaviate).
+`docker compose down` keeps volumes. Adding `-v` deletes them, so back up Weaviate before you use it.
 
-### Step 2: (Optional) Prune Unused System Resources
-
-To free more disk space, remove stopped containers and images. Both commands act on every container and image on the host, not only this project's.
+### Step 2: (Optional) Remove the Project's Images
 
 ```bash
-# Force-remove any remaining stopped containers
-docker rm -f $(docker ps -aq)
-
-# Remove all Docker images (this requires re-downloading/rebuilding them later)
-docker rmi -f $(docker images -q)
+# Remove the containers and every image the services use (app, Weaviate, Ollama); volumes stay
+docker compose -f docker/docker-compose.yml down --rmi all
 ```
+
+The next `make stack-up` rebuilds the app image and pulls Weaviate and Ollama again.
 
 ### Step 3: Verify Data Preservation
 
@@ -208,4 +203,4 @@ To wipe all app data managed by Compose, use:
 make stack-reset
 ```
 
-This removes the project's containers, images and the `weaviate_db` volume. Ollama models in `model_cache/` stay on disk. Back up Weaviate first if needed.
+It asks you to type "yes", then removes the project's containers, its `kri-local-rag-*` images and the `weaviate_db` volume. Its last step runs `docker system prune -a -f`, which acts on the whole host: it deletes every stopped container, every unused network, every image no container uses and the build cache, from all projects. Ollama models in `model_cache/` stay on disk, since that is a bind mount. Back up Weaviate first if needed.
