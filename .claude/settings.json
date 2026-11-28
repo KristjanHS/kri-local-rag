@@ -29,7 +29,6 @@
       "Read(**/data/**)",
       "Read(**/example_data/**)",
       "Read(**/test_data/**)",
-      "Read(./docs/_archived/**)",
       "Read(./docs/analysis/**)",
       "Read(**/*.bat)",
       "Read(**/*.cmd)"
